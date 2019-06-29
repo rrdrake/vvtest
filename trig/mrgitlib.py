@@ -97,7 +97,7 @@ def clone_from_single_url( cfg, url, directory ):
 
     try:
         # prefer an .mrgit repo under the given url
-        git = clone_repo( url+'/.mrgit', tmpd.path(), quiet=True )
+        git = clone_repo( url+'/.mrgit', tmpd.path(), verbose=1 )
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
@@ -350,7 +350,7 @@ def clone_repositories_from_config( cfg ):
             clone_repo( url, loc )
 
 
-def clone_repo( url, into_dir, quiet=False ):
+def clone_repo( url, into_dir, verbose=2 ):
     ""
     git = gititf.GitInterface()
 
@@ -359,13 +359,13 @@ def clone_repo( url, into_dir, quiet=False ):
         assert '.git' not in os.listdir( into_dir )
 
         tmp = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( into_dir ) )
-        git.clone( url, tmp, quiet=quiet )
+        git.clone( url, tmp, verbose=verbose )
         move_directory_contents( tmp, into_dir )
 
         git = gititf.GitInterface( rootdir=into_dir )
 
     else:
-        git.clone( url, into_dir, quiet=quiet )
+        git.clone( url, into_dir, verbose=verbose )
 
     return git
 

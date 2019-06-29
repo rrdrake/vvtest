@@ -12,10 +12,10 @@ import mrgitlib
 help_mrgit = \
 """
 SYNOPSIS
-    Multi-Repository GIT.
+    Multi-Repository Git.
 
 COMMANDS:
-    mrgit clone [<repository>] [<directory>]
+    mrgit clone [-G] [<repository>] [<directory>]
 
     The <repository> can be a manifests URL or another mrgit clone URL.
     If more than one <repository> is given, an mrgit repository is created
