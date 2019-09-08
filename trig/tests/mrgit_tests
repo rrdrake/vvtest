@@ -361,7 +361,12 @@ class google_repo_manifests( trigutil.trigTestCase ):
 
     def test_if_G_option_given_then_only_one_url_can_be_cloned(self):
         ""
-        pass
+        try:
+            mrlib.clone( ['-G', 'https:///foo', 'https:///bar'] )
+        except mrlib.MRGitExitError as e:
+            assert 'exactly one URL' in str(e)
+        else:
+            raise Exception( 'expected an MRGitExitError exception' )
 
 
 defaults_xml = """\

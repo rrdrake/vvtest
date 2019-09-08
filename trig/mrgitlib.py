@@ -20,7 +20,7 @@ from os.path import dirname
 import gitinterface as gititf
 
 
-class MRGitError( Exception ):
+class MRGitExitError( Exception ):
     pass
 
 
@@ -55,10 +55,8 @@ def clone( argv ):
 
 def errorexit( *args ):
     ""
-    err = '*** mrgit error: '+' '.join( [ str(arg) for arg in args ] )
-    sys.stderr.write( err + '\n' )
-    sys.stderr.flush()
-    sys.exit(1)
+    err = ' '.join( [ str(arg) for arg in args ] )
+    raise MRGitExitError( err )
 
 
 def parse_url_list( args ):
@@ -780,3 +778,9 @@ def parse_attribute_line( line ):
             attrs[ kv[0] ] = kv[1]
 
     return attrs
+
+
+def print3( *args ):
+    ""
+    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
+    sys.stdout.flush()

@@ -48,18 +48,18 @@ def main():
     optD = {}
     for n,v in optL:
         if n == '-h' or n == '--help':
-            print3( help_mrgit.strip() )
+            mrgitlib.print3( help_mrgit.strip() )
             return
         optD[n] = v
 
     if len(argL) == 0:
-        print3( help_mrgit.strip() )
+        mrgitlib.print3( help_mrgit.strip() )
         mrgitlib.errorexit( 'no command given' )
 
     cmd = argL[0]
 
     if cmd == 'help':
-        print3( help_mrgit.strip() )
+        mrgitlib.print3( help_mrgit.strip() )
 
     elif cmd == 'clone':
         mrgitlib.clone( argL[1:] )
@@ -68,46 +68,10 @@ def main():
         mrgitlib.errorexit( '*** unknown mrgit command:', cmd )
 
 
-# def determine_repositories( setnames ):
-#     ""
-#     reposet = {}
-
-#     for setname in setnames:
-#         if setname == 'awe':
-#             reposet[ 'sierra.base.git' ] = 'code'
-#             reposet[ 'sierra.plato_engine.git' ] = 'code/plato/engine'
-#             reposet[ 'sierra.itar.git' ] = 'code/itar'
-#             reposet[ 'sierra.awe.git' ] = 'code/awe'
-#         elif setname == 'base':
-#             reposet[ 'sierra.base.git' ] = 'code'
-#             reposet[ 'sierra.plato_engine.git' ] = 'code/plato/engine'
-#         elif setname == 'base_tests':
-#             reposet[ 'sierra.tests.git' ] = 'tests'
-#         else:
-#             raise Exception( 'unknown repository set name: '+setname )
-
-#     repolist = []
-#     for name,path in reposet.items():
-#         repolist.append( [ path, name ] )
-#     repolist.sort()
-
-#     assert repolist[0][0] == '.'
-
-#     return repolist
-
-
-# def clone_repositories( repolist ):
-#     ""
-#     for path, name in repolist:
-#         pass
-
-
-def print3( *args ):
-    ""
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
-
-
 ####################################################################
 
-main()
+try:
+    main()
+except mrgitlib.MRGitExitError as exc:
+    mrgitlib.print3( '*** mrgit error:', exc )
+    sys.exit(1)
