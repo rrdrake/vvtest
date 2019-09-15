@@ -86,7 +86,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url = util.create_bare_repo_with_topic_branch( 'cool' )
         ness_url = util.create_bare_repo_with_topic_branch( 'ness',
-                                                                tag='nessie' )
+                                                            tag='nessie' )
         return cool_url, ness_url
 
     def test_cloning_multiple_repos_from_the_command_line(self):
@@ -511,7 +511,8 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         rmap = mrlib.RepoMap()
         git = GitInterface( rootdir='.mrgit' )
-        mrlib.check_load_mrgit_repo( cfg, git )
+        baseurl = 'file://'+os.getcwd()
+        mrlib.check_load_mrgit_repo( cfg, baseurl, git )
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 2

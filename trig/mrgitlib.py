@@ -18,6 +18,7 @@ from os.path import basename
 from os.path import dirname
 
 import gitinterface as gititf
+from gitinterface import change_directory
 
 
 class MRGitExitError( Exception ):
@@ -96,13 +97,15 @@ def clone_from_single_url( cfg, url, directory ):
     try:
         # prefer an .mrgit repo under the given url
         git = clone_repo( url+'/.mrgit', tmpd.path(), verbose=1 )
+        baseurl = url
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
         tmpd.removeFiles()
         git = clone_repo( url, tmpd.path() )
+        baseurl = dirname( url )
 
-    if check_load_mrgit_repo( cfg, git ):
+    if check_load_mrgit_repo( cfg, baseurl, git ):
 
         # we just cloned an mrgit manifests repo
         cfg.computeLocalRepoMap()
@@ -150,7 +153,7 @@ def load_config_from_google_manifests( cfg, git ):
     ""
     import xml.etree.ElementTree as ET
 
-    with gititf.change_directory( git.getRootDir() ):
+    with change_directory( git.getRootDir() ):
 
         parse_google_manifest_file( 'default.xml' )
 
@@ -187,7 +190,12 @@ class GoogleConverter:
             self.manifests.append( gmr )
 
     def getPrimaryURL(self, repo_name):
-        ""
+        """
+        The repo XML syntax allows for different Git remote URLs for the
+        same repository name.  The "primary" URL for a repository name is
+        the one specified in the defaults.xml, or if not there then it is
+        the most common one in all of the manifest XML files.
+        """
         url = self.default.getRepoURL( repo_name, None )
 
         if not url:
@@ -343,7 +351,7 @@ def clone_repositories_from_config( cfg ):
 
     check_make_directory( topdir )
 
-    with gititf.change_directory( topdir ):
+    with change_directory( topdir ):
         for url,loc in cfg.getRemoteRepoList():
             clone_repo( url, loc )
 
@@ -373,7 +381,7 @@ class TempDirectory:
     def __init__(self, subdir):
         """
         if 'subdir' is None, create tmpdir1/tmpdir2
-        else, create subdir/tmpdir
+        else, create subdir/tmpdir2
         """
         self.subdir = subdir
         self.tmpdir = self._create()
@@ -413,7 +421,7 @@ class TempDirectory:
         return tmpdir
 
 
-def check_load_mrgit_repo( cfg, git ):
+def check_load_mrgit_repo( cfg, baseurl, git ):
     ""
     mfestfn = pjoin( git.getRootDir(), 'manifests' )
 
@@ -421,7 +429,7 @@ def check_load_mrgit_repo( cfg, git ):
         if 'mrgit_config' in git.listBranches() or \
            'mrgit_config' in git.listRemoteBranches():
 
-            cfg.loadFromCheckout( git )
+            cfg.loadFromCheckout( baseurl, git )
             return True
 
     return False
@@ -456,6 +464,13 @@ def check_make_directory( path ):
 
 
 class Configuration:
+    """
+    The manifests describe repo groupings and the repo layouts for each.
+
+    The remote maps a repository name to the upstream repo URL.
+
+    The local maps a repository name to the local repo directory path.
+    """
 
     def __init__(self):
         ""
@@ -478,17 +493,10 @@ class Configuration:
             self.mfest.addRepo( groupname, name, path )
             self.remote.setRepoLocation( name, url=url )
 
-    def loadFromCheckout(self, git):
+    def loadFromCheckout(self, baseurl, git):
         ""
-        fn = pjoin( git.getRootDir(), 'manifests' )
-        with open( fn, 'r' ) as fp:
-            self.mfest.readFromFile( fp )
-
-        git.checkoutBranch( 'mrgit_config' )
-        try:
-            self.remote.loadFromRepo( git )
-        finally:
-            git.checkoutBranch( 'master' )
+        read_mrgit_manifests_file( self.mfest, git )
+        read_mrgit_repo_map_file( self.remote, baseurl, git )
 
     def addRepoURL(self, reponame, url):
         ""
@@ -503,8 +511,7 @@ class Configuration:
         grp = self.mfest.findGroup( None )
 
         for spec in grp.getRepoList():
-            gitpath = normpath( pjoin( '..', spec['path'] ) )
-            self.local.setRepoLocation( spec['repo'], path=gitpath )
+            self.local.setRepoLocation( spec['repo'], path=spec['path'] )
 
     def setTopDir(self, directory):
         ""
@@ -539,7 +546,7 @@ class Configuration:
         git.checkoutBranch( 'mrgit_config' )
 
         try:
-            self.local.commitToRepo( git )
+            write_mrgit_repo_map_file( self.local, git )
         finally:
             git.checkoutBranch( 'master' )
 
@@ -555,7 +562,7 @@ class Configuration:
         git.commit( 'init manifests' )
 
         git.createBranch( 'mrgit_config' )
-        self.remote.commitToRepo( git )
+        write_mrgit_repo_map_file( self.remote, git )
         git.checkoutBranch( 'master' )
 
     def getRemoteRepoMap(self):
@@ -690,29 +697,10 @@ class RepoMap:
         ""
         return self.repomap[ reponame ][0]
 
-    def commitToRepo(self, git):
-        ""
-        with gititf.change_directory( git.getRootDir() ):
-
-            if os.path.exists( CONFIG_FILENAME ):
-                self.writeToFile( CONFIG_TEMPFILE )
-                self._commit_if_changed( git )
-
-            else:
-                self.writeToFile( CONFIG_FILENAME )
-                git.add( CONFIG_FILENAME )
-                git.commit( 'init config' )
-
-    def loadFromRepo(self, git):
-        ""
-        with gititf.change_directory( git.getRootDir() ):
-            self.readFromFile( git.getRemoteURL() )
-
     def writeToFile(self, filename):
         ""
         with open( filename, 'w' ) as fp:
             for name,loc in self.repomap.items():
-                url = loc[0]
                 fp.write( 'repo='+name )
                 if loc[0]:
                     fp.write( ', url='+loc[0] )
@@ -742,15 +730,6 @@ class RepoMap:
 
                         self.setRepoLocation( attrs['repo'], url=url )
 
-    def _commit_if_changed(self, git):
-        ""
-        if not filecmp.cmp( CONFIG_FILENAME, CONFIG_TEMPFILE ):
-            os.rename( CONFIG_TEMPFILE, CONFIG_FILENAME )
-            git.add( CONFIG_FILENAME )
-            git.commit( 'changed config' )
-        else:
-            os.remove( CONFIG_FILENAME )
-
 
 def append_path_to_url( url, path ):
     ""
@@ -759,11 +738,8 @@ def append_path_to_url( url, path ):
 
     if not path or path == '.':
         return url
-    elif path == '..':
-        return dirname( url )
-    elif path.startswith('../') or path.startswith('..'+os.sep):
-        return pjoin( dirname( url ), path[3:] )
     else:
+        assert not path.startswith('..')
         return pjoin( url, path )
 
 
@@ -778,6 +754,51 @@ def parse_attribute_line( line ):
             attrs[ kv[0] ] = kv[1]
 
     return attrs
+
+
+def read_mrgit_manifests_file( manifests, git ):
+    ""
+    fn = pjoin( git.getRootDir(), 'manifests' )
+
+    git.checkoutBranch( 'master' )
+
+    with open( fn, 'r' ) as fp:
+        manifests.readFromFile( fp )
+
+
+def read_mrgit_repo_map_file( repomap, baseurl, git ):
+    ""
+    git.checkoutBranch( 'mrgit_config' )
+
+    try:
+        with change_directory( git.getRootDir() ):
+            repomap.readFromFile( baseurl )
+    finally:
+        git.checkoutBranch( 'master' )
+
+
+def write_mrgit_repo_map_file( repomap, git ):
+    ""
+    with change_directory( git.getRootDir() ):
+
+        if os.path.exists( CONFIG_FILENAME ):
+            repomap.writeToFile( CONFIG_TEMPFILE )
+            commit_repo_map_config_file_if_changed( git )
+
+        else:
+            repomap.writeToFile( CONFIG_FILENAME )
+            git.add( CONFIG_FILENAME )
+            git.commit( 'init config' )
+
+
+def commit_repo_map_config_file_if_changed( git ):
+    ""
+    if filecmp.cmp( CONFIG_FILENAME, CONFIG_TEMPFILE ):
+        os.remove( CONFIG_TEMPFILE )
+    else:
+        os.rename( CONFIG_TEMPFILE, CONFIG_FILENAME )
+        git.add( CONFIG_FILENAME )
+        git.commit( 'changed config' )
 
 
 def print3( *args ):

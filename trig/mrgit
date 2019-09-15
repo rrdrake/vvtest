@@ -7,6 +7,7 @@ import os
 import getopt
 
 import mrgitlib
+from mrgitlib import print3
 
 
 help_mrgit = \
@@ -48,18 +49,18 @@ def main():
     optD = {}
     for n,v in optL:
         if n == '-h' or n == '--help':
-            mrgitlib.print3( help_mrgit.strip() )
+            print3( help_mrgit.strip() )
             return
         optD[n] = v
 
     if len(argL) == 0:
-        mrgitlib.print3( help_mrgit.strip() )
+        print3( help_mrgit.strip() )
         mrgitlib.errorexit( 'no command given' )
 
     cmd = argL[0]
 
     if cmd == 'help':
-        mrgitlib.print3( help_mrgit.strip() )
+        print3( help_mrgit.strip() )
 
     elif cmd == 'clone':
         mrgitlib.clone( argL[1:] )
@@ -73,5 +74,5 @@ def main():
 try:
     main()
 except mrgitlib.MRGitExitError as exc:
-    mrgitlib.print3( '*** mrgit error:', exc )
+    print3( '*** mrgit error:', exc )
     sys.exit(1)
