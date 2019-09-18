@@ -27,6 +27,24 @@ class UserPluginBridge:
         # each exception string
         self.exc_uniq = set()
 
+    def callPrologue(self, command_line):
+        ""
+        if self.prolog != None:
+            try:
+                self.prolog( command_line )
+            except Exception:
+                xs,tb = capture_traceback( sys.exc_info() )
+                sys.stdout.write( '\n' + tb + '\n' )
+
+    def callEpilogue(self):
+        ""
+        if self.epilog != None:
+            try:
+                self.epilog()
+            except Exception:
+                xs,tb = capture_traceback( sys.exc_info() )
+                sys.stdout.write( '\n' + tb + '\n' )
+
     def validateTest(self, tcase):
         """
         Returns non-empty string (an explanation) if user validation fails.
@@ -95,6 +113,14 @@ class UserPluginBridge:
         self.preload = None
         if self.plugin and hasattr( self.plugin, 'test_preload' ):
             self.preload = self.plugin.test_preload
+
+        self.prolog = None
+        if self.plugin and hasattr( self.plugin, 'prologue' ):
+            self.prolog = self.plugin.prologue
+
+        self.epilog = None
+        if self.plugin and hasattr( self.plugin, 'epilogue' ):
+            self.epilog = self.plugin.epilogue
 
     def _check_print_exc(self, xs, tb):
         ""

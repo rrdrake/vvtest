@@ -98,6 +98,8 @@ class MainEntry:
 
         else:
 
+            call_user_prologue( self.rtdata )
+
             # if no results keywords are specified, then add -k notrun/notdone
             if not self.opts.dash_w and not self.opts.dash_R:
                 rtconfig = self.rtdata.getRuntimeConfig()
@@ -108,6 +110,8 @@ class MainEntry:
             else:
                 exitstat = runTests( self.opts, self.optD,
                                      self.rtdata, self.dirs )
+
+            call_user_epilogue( self.rtdata )
 
         if self.opts.encode_exit_status:
             return exitstat
@@ -176,9 +180,6 @@ class MainEntry:
 
         platobj = self.rtdata.getPlatformObject()
         rtconfig = self.rtdata.getRuntimeConfig()
-
-        # rtconfig = construct_RuntimeConfig( platobj, self.opts, self.optD )
-        # self.rtdata.setRuntimeConfig( rtconfig )
 
         creator = TestCreator( rtconfig.platformName(), rtconfig.getOptionList() )
         self.rtdata.setTestCreator( creator )
@@ -677,6 +678,20 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
             elif kvpair[0] == 'CHECK':
                 opts.check = kvpair[1].split()
         fp.close()
+
+
+def call_user_prologue( rtdata ):
+    ""
+    plug = rtdata.getUserPlugin()
+    cmdL = rtdata.cmdL
+
+    plug.callPrologue( cmdL )
+
+
+def call_user_epilogue( rtdata ):
+    ""
+    plug = rtdata.getUserPlugin()
+    plug.callEpilogue()
 
 
 def runTests( opts, optD, rtdata, dirs ):

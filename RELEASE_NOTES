@@ -1,7 +1,16 @@
 
 Improvements:
 
-    - 
+    - Add user plugin functions:
+
+        def prologue( command_line ):
+          pass
+
+        def epilogue():
+          pass
+
+      which are called during startup and during shutdown, respectively.
+      The 'command_line' is a python list of the command line arguments.
 
 Fixes:
 
