@@ -98,8 +98,6 @@ class MainEntry:
 
         else:
 
-            call_user_prologue( self.rtdata )
-
             # if no results keywords are specified, then add -k notrun/notdone
             if not self.opts.dash_w and not self.opts.dash_R:
                 rtconfig = self.rtdata.getRuntimeConfig()
@@ -110,8 +108,6 @@ class MainEntry:
             else:
                 exitstat = runTests( self.opts, self.optD,
                                      self.rtdata, self.dirs )
-
-            call_user_epilogue( self.rtdata )
 
         if self.opts.encode_exit_status:
             return exitstat
@@ -688,10 +684,10 @@ def call_user_prologue( rtdata ):
     plug.callPrologue( cmdL )
 
 
-def call_user_epilogue( rtdata ):
+def call_user_epilogue( rtdata, tlist ):
     ""
     plug = rtdata.getUserPlugin()
-    plug.callEpilogue()
+    plug.callEpilogue( tlist.getTests() )
 
 
 def runTests( opts, optD, rtdata, dirs ):
@@ -702,6 +698,8 @@ def runTests( opts, optD, rtdata, dirs ):
     testsubdir = rtdata.getTestSubdir()
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
+
+    call_user_prologue( rtdata )
 
     # determine the directory that stores the test results
     test_dir = abspath( testsubdir )
@@ -754,6 +752,8 @@ def runTests( opts, optD, rtdata, dirs ):
     results_writer.postrun( tlist )
 
     print3( "Test directory:", testsubdir )
+
+    call_user_epilogue( rtdata, tlist )
 
     return tlist.encodeIntegerWarning()
 
@@ -992,6 +992,8 @@ def restartTests( opts, optD, rtdata ):
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
 
+    call_user_prologue( rtdata )
+
     qid = opts.qsub_id
     if qid == None:
         tfile = pjoin( test_dir, testlist_name )
@@ -1035,6 +1037,8 @@ def restartTests( opts, optD, rtdata ):
 
     print3()
     results_writer.postrun( tlist )
+
+    call_user_epilogue( rtdata, tlist )
 
     return tlist.encodeIntegerWarning()
 

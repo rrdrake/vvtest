@@ -18,7 +18,7 @@ from .teststatus import copy_test_results
 class TestList:
     """
     Stores a set of TestCase objects.  Has utilities to read/write to a text
-    file and to read from a test XML file.
+    file and to read from a test specification file.
     """
 
     def __init__(self, filename,

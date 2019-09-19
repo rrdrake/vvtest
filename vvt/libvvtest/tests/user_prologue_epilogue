@@ -50,41 +50,54 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
     def test_calling_epilogue(self):
         ""
         plug = vtu.make_user_plugin( """
-            def epilogue():
+            def epilogue( tests ):
                 ""
+                assert len(tests) == 1
+                name,tD = list( tests.items() )[0]
+                assert name == 'sdir/atest.np=4'
+                assert tD['result'] == 'fail'
+                assert tD['runtime'] == 42
                 print ( 'done done done' )
             """ )
+        tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
 
-        rtn,out,err = util.call_capture_output( plug.callEpilogue )
+        rtn,out,err = util.call_capture_output( plug.callEpilogue, [tcase] )
 
+        assert not err.strip()
         assert out.strip() == 'done done done'
         assert not err.strip()
 
     def test_calling_epilogue_with_an_exception(self):
         ""
         plug = vtu.make_user_plugin( """
-            def epilogue():
+            def epilogue( tests ):
                 ""
                 raise Exception( 'fake exception' )
             """ )
+        tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
 
-        rtn,out,err = util.call_capture_output( plug.callEpilogue )
+        rtn,out,err = util.call_capture_output( plug.callEpilogue, [tcase] )
         assert 'fake exception' in out
 
-        plug.callEpilogue()
+        plug.callEpilogue( [tcase] )
 
     def test_prologue_epilogue_integration(self):
         ""
         util.writefile( 'testA.vvt', """
-            pass
+            import time
+            time.sleep(1)
             """ )
         util.writefile( 'adir/vvtest_user_plugin.py', """
             def prologue( cmdline ):
                 ""
                 print ( 'CMDLINE='+' '.join( cmdline ) )
 
-            def epilogue():
+            def epilogue( tests ):
                 ""
+                assert len(tests) == 1
+                info = tests['testA']
+                assert info['result'] == 'pass'
+                assert info['runtime'] > 0 and info['runtime'] < 5
                 print ( 'EPILOGUE=foobar' )
             """ )
         adir = os.path.abspath( 'adir' )

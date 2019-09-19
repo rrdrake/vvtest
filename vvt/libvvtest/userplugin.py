@@ -36,11 +36,12 @@ class UserPluginBridge:
                 xs,tb = capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
 
-    def callEpilogue(self):
+    def callEpilogue(self, tcaselist):
         ""
         if self.epilog != None:
+            testD = self._convert_test_list_to_info_dict( tcaselist )
             try:
-                self.epilog()
+                self.epilog( testD )
             except Exception:
                 xs,tb = capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
@@ -127,6 +128,21 @@ class UserPluginBridge:
         if xs not in self.exc_uniq:
             sys.stdout.write( '\n' + tb + '\n' )
             self.exc_uniq.add( xs )
+
+    def _convert_test_list_to_info_dict(self, tcaselist):
+        ""
+        testD = {}
+
+        for tcase in tcaselist:
+            displ = tcase.getSpec().getDisplayString()
+
+            tstat = tcase.getStat()
+            res = tstat.getResultStatus()
+            tm = tstat.getRuntime()
+
+            testD[ displ ] = { 'result':res, 'runtime':tm }
+
+        return testD
 
     def _make_test_to_user_interface_dict(self, tcase):
         ""

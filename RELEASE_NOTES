@@ -6,11 +6,15 @@ Improvements:
         def prologue( command_line ):
           pass
 
-        def epilogue():
+        def epilogue( testdict ):
           pass
 
       which are called during startup and during shutdown, respectively.
       The 'command_line' is a python list of the command line arguments.
+      The 'testdict' is a dictionary of test ids to another dictionary:
+
+          result -> pass, fail, diff, timeout, notrun, notdone, or skip
+          runtime -> num seconds or None if not run
 
 Fixes:
 
