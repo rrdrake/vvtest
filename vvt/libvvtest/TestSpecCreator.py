@@ -121,11 +121,7 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
 
     if ext == '.xml':
 
-        docreader = xmlwrapper.XmlDocReader()
-        try:
-            filedoc = docreader.readDoc( fname )
-        except xmlwrapper.XmlError:
-            raise TestSpecError( str( sys.exc_info()[1] ) )
+        filedoc = read_xml_file( fname )
         
         nameL = testNameList( filedoc )
         if nameL == None:
@@ -154,6 +150,18 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
         tspec.setConstructionCompleted()
 
     return tL
+
+
+def read_xml_file( filename ):
+    ""
+    docreader = xmlwrapper.XmlDocReader()
+
+    try:
+        filedoc = docreader.readDoc( filename )
+    except xmlwrapper.XmlError:
+        raise TestSpecError( str( sys.exc_info()[1] ) )
+
+    return filedoc
 
 
 def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
@@ -360,8 +368,7 @@ def reparse_test_object( evaluator, testobj ):
 
     if ext == '.xml':
 
-        docreader = xmlwrapper.XmlDocReader()
-        filedoc = docreader.readDoc( fname )
+        filedoc = read_xml_file( fname )
 
         # run through the test name logic to check XML validity
         nameL = testNameList(filedoc)
@@ -1160,65 +1167,67 @@ def parseTestParameters( filedoc, tname, evaluator, force_params ):
 
     if force_params == None:
         force_params = {}
-    
+
     for nd in filedoc.matchNodes(['parameterize$']):
-      
-      attrs = nd.getAttrs()
-      
-      pL = []
-      skip = 0
-      attrL = list( attrs.items() )
-      attrL.sort()
-      for n,v in attrL:
-        
-        if n in ["parameters","parameter"]:
-          raise TestSpecError( n + " attribute not allowed here, " + \
-                               "line " + str(nd.getLineNumber()) )
 
-        isfa, istrue = filterAttr( n, v, tname, None, evaluator,
-                                   str(nd.getLineNumber()) )
-        if isfa:
-          if not istrue:
-            skip = 1
-            break
-          continue
-        
-        if not allowableVariable(n):
-          raise TestSpecError( 'bad parameter name: "' + n + '", line ' + \
-                               str(nd.getLineNumber()) )
-        
-        vals = v.split()
-        if len(vals) == 0:
-          raise TestSpecError( "expected one or more values separated by " + \
-                               "spaces, line " + str(nd.getLineNumber()) )
-        
-        for val in vals:
-          if not allowableString(val):
-            raise TestSpecError( 'bad parameter value: "' + val + '", line ' + \
-                                 str(nd.getLineNumber()) )
-        
-        vals = force_params.get(n,vals)
-        L = [ n ]
-        L.extend( vals )
-        
-        for mL in pL:
-          if len(L) != len(mL):
-            raise TestSpecError( 'combined parameters must have the same ' + \
-                                 'number of values, line ' + str(nd.getLineNumber()) )
-        
-        pL.append( L )
+        attrs = nd.getAttrs()
 
-      if len(pL) > 0 and not skip:
-            # TODO: the parameter names should really be sorted here in order
-            #       to avoid duplicates if another parameterize comes along
-            #       with a different order of the same names
-            # the name(s) and each of the values are tuples
-            if len(pL) == 1:
-                L = pL[0]
-                paramset.addParameter( L[0], L[1:] )
-            else:
-                L = [ list(T) for T in zip( *pL ) ]
-                paramset.addParameterGroup( L[0], L[1:] )
+        pL = []
+        skip = 0
+        attrL = list( attrs.items() )
+        attrL.sort()
+        for n,v in attrL:
+
+            if n in ["parameters","parameter"]:
+                raise TestSpecError( n + " attribute not allowed here, " + \
+                                     "line " + str(nd.getLineNumber()) )
+
+            isfa, istrue = filterAttr( n, v, tname, None, evaluator,
+                                       str(nd.getLineNumber()) )
+            if isfa:
+                if not istrue:
+                    skip = 1
+                    break
+                continue
+
+            if not allowableVariable(n):
+                raise TestSpecError( 'bad parameter name: "' + n + '", line ' + \
+                                     str(nd.getLineNumber()) )
+
+            vals = v.split()
+            if len(vals) == 0:
+                raise TestSpecError( "expected one or more values separated by " + \
+                                     "spaces, line " + str(nd.getLineNumber()) )
+
+            for val in vals:
+                if not allowableString(val):
+                    raise TestSpecError( 'bad parameter value: "' + val + '", line ' + \
+                                         str(nd.getLineNumber()) )
+
+            vals = force_params.get(n,vals)
+            L = [ n ]
+            L.extend( vals )
+
+            for mL in pL:
+                if len(L) != len(mL):
+                    raise TestSpecError( 'combined parameters must have the same ' + \
+                                         'number of values, line ' + str(nd.getLineNumber()) )
+ 
+            pL.append( L )
+
+        if len(pL) > 0 and not skip:
+              # TODO: the parameter names should really be sorted here in order
+              #       to avoid duplicates if another parameterize comes along
+              #       with a different order of the same names
+              # the name(s) and each of the values are tuples
+              if len(pL) == 1:
+                  L = pL[0]
+                  check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
+                  paramset.addParameter( L[0], L[1:] )
+              else:
+                  L = [ list(T) for T in zip( *pL ) ]
+                  check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
+                  paramset.addParameterGroup( L[0], L[1:] )
 
     return paramset
 

@@ -391,6 +391,38 @@ class parameter_tests( vtu.vvtestTestCase ):
         self.assertRaises( TSC.TestSpecError,
                 TSC.parseTestParameters_scr, vspecs, 'err7', evaluator, None )
 
+    def test_for_duplicate_parameters_in_xml_form(self):
+        ""
+        util.writefile( 'err1.xml', """
+            <rtest name="err1">
+              <parameterize np="1 4 1"/>
+              <execute> echo "execute np = $np" </execute>
+            </rtest>""" )
+        util.writefile( 'ok1.xml', """
+            <rtest name="ok1">
+              <parameterize np="1 1" nt="2 4"/>
+              <execute> echo "execute np = $np" </execute>
+            </rtest>""" )
+        util.writefile( 'err2.xml', """
+            <rtest name="err2">
+              <parameterize np="1 2 1" nt="2 4 2"/>
+              <execute> echo "execute np = $np" </execute>
+            </rtest>""" )
+        time.sleep(1)
+
+        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+
+        xdoc = TSC.read_xml_file( 'err1.xml' )
+        self.assertRaises( TSC.TestSpecError,
+                TSC.parseTestParameters, xdoc, 'err1', evaluator, None )
+
+        xdoc = TSC.read_xml_file( 'ok1.xml' )
+        TSC.parseTestParameters( xdoc, 'ok1', evaluator, None )
+
+        xdoc = TSC.read_xml_file( 'err2.xml' )
+        self.assertRaises( TSC.TestSpecError,
+            TSC.parseTestParameters, xdoc, 'err2', evaluator, None )
+
 
 #####################################################################
 
