@@ -55,13 +55,15 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
                 assert len(tests) == 1
                 name,tD = list( tests.items() )[0]
                 assert name == 'sdir/atest.np=4'
+                assert tD['rundir'].endswith( 'sdir/atest.np=4' )
                 assert tD['result'] == 'fail'
                 assert tD['runtime'] == 42
                 print ( 'done done done' )
             """ )
         tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
 
-        rtn,out,err = util.call_capture_output( plug.callEpilogue, [tcase] )
+        rtn,out,err = util.call_capture_output(
+                        plug.callEpilogue, os.getcwd(), [tcase] )
 
         assert not err.strip()
         assert out.strip() == 'done done done'
@@ -76,10 +78,11 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
             """ )
         tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
 
-        rtn,out,err = util.call_capture_output( plug.callEpilogue, [tcase] )
+        rtn,out,err = util.call_capture_output(
+                        plug.callEpilogue, os.getcwd(), [tcase] )
         assert 'fake exception' in out
 
-        plug.callEpilogue( [tcase] )
+        plug.callEpilogue( os.getcwd(), [tcase] )
 
     def test_prologue_epilogue_integration(self):
         ""
@@ -88,6 +91,8 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
             time.sleep(1)
             """ )
         util.writefile( 'adir/vvtest_user_plugin.py', """
+            import os
+
             def prologue( cmdline ):
                 ""
                 print ( 'CMDLINE='+' '.join( cmdline ) )
@@ -96,6 +101,8 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
                 ""
                 assert len(tests) == 1
                 info = tests['testA']
+                assert info['rundir'].endswith( 'testA' )
+                assert os.path.exists( info['rundir']+'/execute.log' )
                 assert info['result'] == 'pass'
                 assert info['runtime'] > 0 and info['runtime'] < 5
                 print ( 'EPILOGUE=foobar' )

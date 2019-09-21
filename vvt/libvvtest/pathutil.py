@@ -123,6 +123,28 @@ def fault_tolerant_remove( path, num_attempts=5 ):
         time.sleep(1)
 
 
+class change_directory:
+    """
+    with change_directory( 'subdir' ):
+        pass
+    """
+
+    def __init__(self, directory):
+        ""
+        self.cwd = os.getcwd()
+        self.directory = directory
+
+    def __enter__(self):
+        ""
+        if self.directory:
+            assert os.path.isdir( self.directory )
+            os.chdir( self.directory )
+
+    def __exit__(self, type, value, traceback):
+        ""
+        os.chdir( self.cwd )
+
+
 def print3( *args ):
     sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
     sys.stdout.flush()

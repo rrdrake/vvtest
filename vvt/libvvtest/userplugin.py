@@ -7,6 +7,7 @@
 import os, sys
 
 from .outpututils import capture_traceback
+from .pathutil import change_directory
 
 
 class UserPluginError( Exception ):
@@ -36,12 +37,13 @@ class UserPluginBridge:
                 xs,tb = capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
 
-    def callEpilogue(self, tcaselist):
+    def callEpilogue(self, rundir, tcaselist):
         ""
         if self.epilog != None:
             testD = self._convert_test_list_to_info_dict( tcaselist )
             try:
-                self.epilog( testD )
+                with change_directory( rundir ):
+                    self.epilog( testD )
             except Exception:
                 xs,tb = capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
@@ -134,13 +136,20 @@ class UserPluginBridge:
         testD = {}
 
         for tcase in tcaselist:
-            displ = tcase.getSpec().getDisplayString()
+
+            infoD = self._make_test_to_user_interface_dict( tcase )
 
             tstat = tcase.getStat()
             res = tstat.getResultStatus()
             tm = tstat.getRuntime()
+            infoD[ 'result' ] = res
+            infoD[ 'runtime' ] = tm
 
-            testD[ displ ] = { 'result':res, 'runtime':tm }
+            infoD[ 'rundir' ] = tcase.getSpec().getExecuteDirectory()
+
+            displ = tcase.getSpec().getDisplayString()
+
+            testD[ displ ] = infoD
 
         return testD
 

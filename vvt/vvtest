@@ -294,10 +294,10 @@ class RuntimeData:
         ""
         if test_cache_file:
             assert os.path.isabs( test_cache_file )
-            self.test_dir = dirname( test_cache_file )
+            self.test_dir = normpath( dirname( test_cache_file ) )
             self.is_restart = True
         else:
-            self.test_dir = abspath( self.testsubdir )
+            self.test_dir = normpath( abspath( self.testsubdir ) )
             self.is_restart = False
 
     def getTestResultsDir(self): return self.test_dir
@@ -507,11 +507,10 @@ def generateTestList( opts, optD, dirs, rtdata ):
     rtconfig = rtdata.getRuntimeConfig()
     plat = rtdata.getPlatformObject()
     testsubdir = rtdata.getTestSubdir()
+    test_dir = rtdata.getTestResultsDir()
     perms = rtdata.getPermissionsObject()
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
-
-    test_dir = abspath( testsubdir )
 
     tfile = pjoin( test_dir, testlist_name )
 
@@ -700,8 +699,9 @@ def call_user_prologue( rtdata ):
 
 def call_user_epilogue( rtdata, tlist ):
     ""
+    rdir = rtdata.getTestResultsDir()
     plug = rtdata.getUserPlugin()
-    plug.callEpilogue( tlist.getTests() )
+    plug.callEpilogue( rdir, tlist.getTests() )
 
 
 def runTests( opts, optD, rtdata, dirs ):
@@ -710,13 +710,12 @@ def runTests( opts, optD, rtdata, dirs ):
     """
     plat = rtdata.getPlatformObject()
     testsubdir = rtdata.getTestSubdir()
+    test_dir = rtdata.getTestResultsDir()
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
 
     call_user_prologue( rtdata )
 
-    # determine the directory that stores the test results
-    test_dir = abspath( testsubdir )
     tfile = pjoin( test_dir, testlist_name )
 
     tlist = make_TestList( rtdata, tfile )
@@ -724,7 +723,7 @@ def runTests( opts, optD, rtdata, dirs ):
     check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
-    os.environ['VVTEST_TEST_ROOT'] = normpath( test_dir )
+    os.environ['VVTEST_TEST_ROOT'] = test_dir
 
     perms = rtdata.getPermissionsObject()
 
