@@ -43,7 +43,7 @@ class MainEntry:
         ""
         start_epoch = time.time()
 
-        check_for_bootstrap_file()
+        check_for_bootstrap_file( self.exepath )
 
         # this may call sys.exit (for help or errors)
         self.opts, self.optD, self.dirs = \
@@ -174,7 +174,6 @@ class MainEntry:
         from libvvtest.filtering import TestFilter
         from libvvtest.timeout import TimeHandler
 
-        platobj = self.rtdata.getPlatformObject()
         rtconfig = self.rtdata.getRuntimeConfig()
 
         creator = TestCreator( rtconfig.platformName(), rtconfig.getOptionList() )
@@ -186,7 +185,7 @@ class MainEntry:
         testfilter = TestFilter( rtconfig, plug )
         self.rtdata.setTestFilter( testfilter )
 
-        timehandler = TimeHandler( plug, platobj,
+        timehandler = TimeHandler( plug,
                                    self.opts.dash_T,
                                    self.opts.timeout_multiplier,
                                    self.opts.max_timeout )
@@ -520,7 +519,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
 
     scan_test_source_directories( tlist, dirs, optD['param_dict'] )
 
-    timehandler.load( tlist )
+    timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
     tlist.applyPermanentFilters()
 
@@ -551,7 +550,9 @@ def extractTestFiles( param_dict, dirs, target_dir, rtdata ):
 
     scan_test_source_directories( tlist, dirs, param_dict )
 
-    rtdata.getTestTimeHandler().load( tlist )
+    plat = rtdata.getPlatformObject()
+    cache = construct_runtime_lookup_cache( plat )
+    rtdata.getTestTimeHandler().load( cache, tlist )
 
     tlist.applyPermanentFilters()
 
@@ -559,6 +560,19 @@ def extractTestFiles( param_dict, dirs, target_dir, rtdata ):
 
 
 ##############################################################################
+
+
+def construct_runtime_lookup_cache( plat ):
+    ""
+    from libvvtest.fmtresults import LookupCache
+
+    pname = plat.getName()
+    cplr = plat.getCompiler()
+    tdir = plat.testingDirectory()
+
+    cache = LookupCache( pname, cplr, tdir )
+
+    return cache
 
 
 def writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms ):
@@ -725,7 +739,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     tlist.readTestList()
 
-    timehandler.load( tlist )
+    timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
     tlist.applyPermanentFilters()
 
@@ -1015,7 +1029,7 @@ def restartTests( opts, optD, rtdata ):
 
     if qid == None:
         timehandler = rtdata.getTestTimeHandler()
-        timehandler.load( tlist )
+        timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
     reld = rtdata.getFilterPath()
 
@@ -1090,7 +1104,7 @@ def print3( *args, **kwargs ):
 
 ###########################################################################
 
-def check_for_bootstrap_file():
+def check_for_bootstrap_file( exepath ):
     """
     if vvtest_bootstrap.py exists in the same directory as vvtest,
     then import it (which may set os.environ variables)
@@ -1101,7 +1115,7 @@ def check_for_bootstrap_file():
     except ImportError:
         # to allow for vvtest to be a soft link to an installed vvtest area,
         # look for a bootstrap file in the directory containing the soft link
-        bindir = dirname( abspath( sys.argv[0] ) )
+        bindir = dirname( exepath )
         boot = pjoin( bindir, 'vvtest_bootstrap.py' )
         if os.path.exists( boot ):
             sys.path.append( bindir )

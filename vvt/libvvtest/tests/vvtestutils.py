@@ -689,7 +689,7 @@ def make_user_plugin( content=None, platname=None, options=None ):
     subdir = 'adir'
     if content != None:
         util.writefile( subdir+'/'+plugname+'.py', content )
-    time.sleep(1)
+        time.sleep(1)
 
     rtconfig = make_RuntimeConfig( platname, options )
 

@@ -99,8 +99,8 @@ def writeScript( tspec, xdb, plat, \
       'echo "PLATFORM = $PLATFORM"',
       'set COMPILER = ' + plat.getCompiler(),
       'echo "COMPILER = $COMPILER"',
-      'set TOOLSET_DIR = ' + vvtestdir,
-      'echo "TOOLSET_DIR = $TOOLSET_DIR"' ] )
+      'set VVTESTSRC = ' + vvtestdir,
+      'echo "VVTESTSRC = $VVTESTSRC"' ] )
     if projdir:
       line_list.append( 'set PROJECT = ' + projdir )
     else:

@@ -1,0 +1,197 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+import time
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+import libvvtest.timeout as timeout
+from libvvtest.fmtresults import LookupCache
+
+
+class the_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        ""
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_TimeoutHandler_construct_and_load(self):
+        ""
+        th = make_timeout_handler()
+        th.load( make_lookup_cache(), MockTestList() )
+
+    def test_a_timeout_specified_by_the_test(self):
+        ""
+        th = make_timeout_handler()
+        tlist = make_test_list( timeout=281 )
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 281
+
+    def test_a_timeout_maximum(self):
+        ""
+        th = make_timeout_handler( max_timeout=200 )
+        tlist = make_test_list( timeout=281 )
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 200
+
+    def test_a_timeout_multiplier(self):
+        ""
+        th = make_timeout_handler( timeout_multiplier=2.5 )
+        tlist = make_test_list( timeout=11 )
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert abs( tspec.getAttr( 'timeout' ) - 11*2.5 ) < 2
+
+    def test_a_command_line_timeout(self):
+        ""
+        th = make_timeout_handler( cmdline_timeout=42 )
+        tlist = make_test_list( timeout=281 )
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 42
+
+    def test_that_max_timeout_takes_precedence(self):
+        ""
+        th = make_timeout_handler( cmdline_timeout=42, max_timeout=31 )
+        tlist = make_test_list( timeout=281 )
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 31
+
+    def test_default_timeout_is_one_hour_or_5_hours_for_long(self):
+        ""
+        th = make_timeout_handler()
+        tlist = make_test_list()
+
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 60*60
+
+        tlist = make_test_list( keyword='long' )
+        th.load( make_lookup_cache(), tlist )
+
+        tspec = tlist.getTests()[0].getSpec()
+        assert tspec.getAttr( 'timeout' ) == 5*60*60
+
+    def test_the_timeout_table_from_a_previous_runtime(self):
+        ""
+        th = make_timeout_handler()
+        assert th._timeout_from_previous_runtime( 1 ) == 120
+
+        tm = th._timeout_from_previous_runtime( 5*60*60 )
+        assert abs( tm - 1.3*5*60*60 ) < 10
+
+    def test_timeout_selection_after_a_previous_timeout_occurred(self):
+        ""
+        th = make_timeout_handler()
+
+        tcase = vtu.make_fake_TestCase()
+        tm = th._timeout_if_test_timed_out( tcase.getSpec(), 231 )
+        assert tm == 60*60
+
+        add_keyword_to_test( tcase.getSpec(), 'long' )
+
+        tm = th._timeout_if_test_timed_out( tcase.getSpec(), 231 )
+        assert tm == 4*60*60
+
+        tm = th._timeout_if_test_timed_out( tcase.getSpec(), 12*60*60 )
+        assert abs( tm - 4*12*60*60 ) < 10
+
+        tm = th._timeout_if_test_timed_out( tcase.getSpec(), 6*24*60*60 )
+        assert abs( tm - 5*24*60*60 ) < 10
+
+
+def make_timeout_handler( cmdline_timeout=None,
+                          timeout_multiplier=None,
+                          max_timeout=None ):
+    ""
+    plug = vtu.make_user_plugin( platname='XBox' )
+    platobj = MockPlatform()
+
+    th = timeout.TimeHandler( plug,
+                              cmdline_timeout,
+                              timeout_multiplier,
+                              max_timeout )
+
+    return th
+
+
+def make_test_list( timeout=None, keyword=None ):
+    ""
+    tlist = MockTestList()
+
+    tspec = tlist.getTests()[0].getSpec()
+
+    if timeout != None:
+        tspec.setTimeout( timeout )
+
+    if keyword != None:
+        add_keyword_to_test( tspec, keyword )
+
+    return tlist
+
+
+def add_keyword_to_test( tspec, keyword ):
+    ""
+    kwL = tspec.getKeywords( include_implicit=False ) + [ keyword ]
+    tspec.setKeywords( kwL )
+
+
+class MockTestList:
+
+    def __init__(self):
+        ""
+        self.tlist = [ vtu.make_fake_TestCase() ]
+
+    def getTests(self):
+        ""
+        return self.tlist
+
+
+class MockPlatform:
+
+    def getName(self): return 'XBox'
+    def getCompiler(self): return 'gcc'
+    def testingDirectory(self): return '/foo/bar/timings'
+
+
+def make_lookup_cache():
+    ""
+    plat = MockPlatform()
+
+    pname = plat.getName()
+    cplr = plat.getCompiler()
+    tdir = plat.testingDirectory()
+
+    cache = LookupCache( pname, cplr, tdir )
+
+    return cache
+
+
+########################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )

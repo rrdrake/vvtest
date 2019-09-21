@@ -6,32 +6,24 @@
 
 import os, sys
 
-from .fmtresults import LookupCache
-
 
 class TimeHandler:
 
-    def __init__(self, userplugin, platobj, cmdline_timeout,
+    def __init__(self, userplugin, cmdline_timeout,
                        timeout_multiplier, max_timeout):
         ""
         self.plugin = userplugin
-        self.platobj = platobj
         self.cmdline_timeout = cmdline_timeout
         self.tmult = timeout_multiplier
         self.maxtime = max_timeout
 
-    def load(self, tlist):
+    def load(self, cache, tlist):
         """
         For each test, a 'runtimes' file will be read (if it exists) and the
         run time for this platform extracted.  This run time is saved as the
         test execute time.  Also, a timeout is calculated for each test and
         placed in the 'timeout' attribute.
         """
-        pname = self.platobj.getName()
-        cplr = self.platobj.getCompiler()
-
-        cache = LookupCache( pname, cplr, self.platobj.testingDirectory() )
-
         for tcase in tlist.getTests():
 
             tspec = tcase.getSpec()
@@ -52,7 +44,7 @@ class TimeHandler:
 
                 if tout == None:
                     if tresult == "timeout":
-                        tout = self._timeout_if_test_timed_out( tlen )
+                        tout = self._timeout_if_test_timed_out( tspec, tlen )
                     else:
                         tout = self._timeout_from_previous_runtime( tlen )
 
@@ -65,10 +57,10 @@ class TimeHandler:
 
         cache = None
 
-    def _timeout_if_test_timed_out(self, runtime):
+    def _timeout_if_test_timed_out(self, tspec, runtime):
         ""
         # for tests that timed out, make timeout much larger
-        if t.hasKeyword( "long" ):
+        if tspec.hasKeyword( "long" ):
             # only long tests get timeouts longer than an hour
             if runtime < 60*60:
                 tm = 4*60*60
