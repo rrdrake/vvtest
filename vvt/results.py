@@ -858,10 +858,12 @@ def get_results_plugin( optD ):
         if d == None:
             d = os.path.join( mydir, 'config' )
         cfg = os.path.abspath( d )
-    if os.path.exists( os.path.join( d, 'results_plugin.py' ) ):
-        sys.path.insert( 0, d )
+
+    if os.path.exists( os.path.join( cfg, 'results_plugin.py' ) ):
+        sys.path.insert( 0, cfg )
         import results_plugin
         return results_plugin
+
     return None
 
 
@@ -891,9 +893,7 @@ def process_option( optD, option_name, value_type, *restrictions ):
 
 ########################################################################
 
-d = sys.path[0]
-if d: mydir = os.path.abspath( d )
-else: mydir = os.getcwd()
+mydir = os.path.dirname( os.path.normpath( os.path.abspath( sys.argv[0] ) ) )
 
 if __name__ == "__main__":
     results_main()
