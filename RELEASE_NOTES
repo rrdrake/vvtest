@@ -11,10 +11,12 @@ Improvements:
 
       which are called during startup and during shutdown, respectively.
       The 'command_line' is a python list of the command line arguments.
-      The 'testdict' is a dictionary of test ids to another dictionary:
+      The 'testdict' is a dictionary of test ids to another dictionary
+      containing test information, including
 
           result -> pass, fail, diff, timeout, notrun, notdone, or skip
           runtime -> num seconds or None if not run
+          rundir -> the test execution directory
 
 Fixes:
 
@@ -25,6 +27,12 @@ Changes:
     - For XML specified tests, the variable TOOLSET_DIR has been changed
       to VVTESTSRC.  This name is consistent with the script form of test
       specifications.
+
+    - The option given to a test when the command line -a, --analyze option
+      was given to vvtest has changed.  If you use the vvtest_util helper,
+      this should be transparent, but just in case, the new option is
+      --execute-analysis-sections'.  The old option is now deprecated but
+      still given, --execute_analysis_sections.
 
 
 ==============================================================================

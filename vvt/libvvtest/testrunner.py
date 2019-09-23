@@ -284,6 +284,7 @@ class ExecutionHandler:
                 cmdL.extend( ['--mpirun_opts', obj.mpi_opts] )
 
             if self.rtconfig.getAttr('analyze'):
+                cmdL.append('--execute-analysis-sections')
                 cmdL.append('--execute_analysis_sections')
 
             cmdL.extend( self.rtconfig.getAttr( 'testargs' ) )

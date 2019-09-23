@@ -73,7 +73,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
 
         w.add( '',
                'diff_exit_status = 64',
-               'opt_analyze = "--execute_analysis_sections" in sys.argv[1:]' )
+               'opt_analyze = "--execute_analysis_sections" in sys.argv[1:] ' + \
+                          'or "--execute-analysis-sections" in sys.argv[1:]' )
 
         platenv = plat.getEnvironment()
         w.add( '',
@@ -152,6 +153,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
 
             opt_analyze=0
             cmdline_option --execute_analysis_sections && opt_analyze=1
+            cmdline_option --execute-analysis-sections && opt_analyze=1
             """ )
 
         w.add( '',
