@@ -47,7 +47,29 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
 
         plug.callPrologue( ['foo','--bar'] )
 
-    def test_calling_epilogue(self):
+    def test_calling_epilogue_with_test_that_did_not_run(self):
+        ""
+        plug = vtu.make_user_plugin( """
+            def epilogue( tests ):
+                ""
+                assert len(tests) == 1
+                name,tD = list( tests.items() )[0]
+                assert name == 'sdir/atest.np=4'
+                assert tD['rundir'].endswith( 'sdir/atest.np=4' )
+                assert tD['result'] == 'notrun'
+                assert tD['runtime'] == None
+                print ( 'done done done' )
+            """ )
+        tcase = vtu.make_fake_TestCase( result='notrun', runtime=None )
+
+        rtn,out,err = util.call_capture_output(
+                        plug.callEpilogue, os.getcwd(), [tcase] )
+
+        assert not err.strip()
+        assert out.strip() == 'done done done'
+        assert not err.strip()
+
+    def test_calling_epilogue_with_test_that_ran(self):
         ""
         plug = vtu.make_user_plugin( """
             def epilogue( tests ):

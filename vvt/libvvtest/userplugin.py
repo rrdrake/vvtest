@@ -141,7 +141,7 @@ class UserPluginBridge:
 
             tstat = tcase.getStat()
             res = tstat.getResultStatus()
-            tm = tstat.getRuntime()
+            tm = tstat.getRuntime( None )
             infoD[ 'result' ] = res
             infoD[ 'runtime' ] = tm
 
