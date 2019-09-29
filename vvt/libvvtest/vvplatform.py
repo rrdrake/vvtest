@@ -288,14 +288,14 @@ def create_Platform_instance( vvtestdir, platname, platopts, usenv,
     ugly but changing it requires interface changes.
     """
     optdict = {}
-    if platname:         optdict['--plat']     = platname
-    if platopts:         optdict['--platopts'] = platopts
-    if usenv:            optdict['-e']         = True
-    if numprocs != None: optdict['-n']         = numprocs
-    if maxprocs != None: optdict['-N']         = maxprocs
-    if onopts:           optdict['-o']         = onopts
-    if offopts:          optdict['-O']         = offopts
-    if qsubid != None:   optdict['--qsub-id']  = qsubid
+    if platname:         optdict['--plat']    = platname
+    if platopts:         optdict['--platopt'] = platopts
+    if usenv:            optdict['-e']        = True
+    if numprocs != None: optdict['-n']        = numprocs
+    if maxprocs != None: optdict['-N']        = maxprocs
+    if onopts:           optdict['-o']        = onopts
+    if offopts:          optdict['-O']        = offopts
+    if qsubid != None:   optdict['--qsub-id'] = qsubid
 
     return construct_Platform( vvtestdir, optdict )
 
@@ -345,7 +345,7 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
             print3( 'construct_Platform C:', plat.platname, plat.cplrname )
             idplatform.debug = False
 
-    platopts = optdict.get( '--platopts', {} )
+    platopts = optdict.get( '--platopt', {} )
 
     q = platopts.get( 'queue', platopts.get( 'q', None ) )
     plat.setattr( 'queue', q )

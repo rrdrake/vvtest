@@ -713,7 +713,7 @@ def adjust_options_and_create_derived_options( opts ):
         letters = clean_sort_options( opts.sort )
         derived_opts['sort_letters'] = letters
 
-        errtype = 'platopts'
+        errtype = 'platopt'
         platD = create_platform_options( opts.platopt )
         derived_opts['platopt_dict'] = platD
 
