@@ -166,12 +166,12 @@ def read_xml_file( filename ):
 
 def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
     ""
-    paramset = parseTestParameters( filedoc, tname, evaluator, force_params )
-    numparams = len( paramset.getParameters() )
+    pset = parseTestParameters( filedoc, tname, evaluator, force_params )
+    numparams = len( pset.getParameters() )
 
     # create the test instances
 
-    testL = generate_test_objects( tname, rootpath, relpath, paramset )
+    testL = generate_test_objects( tname, rootpath, relpath, pset )
 
     if len(testL) > 0:
         # check for parameterize/analyze
@@ -187,7 +187,7 @@ def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
 
             # create an analyze test
             parent = t.makeParent()
-            parent.setParameterSet( paramset )
+            parent.setParameterSet( pset )
             testL.append( parent )
 
             parent.setAnalyzeScript( analyze_spec )
@@ -208,13 +208,13 @@ def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
 def createScriptTest( tname, vspecs, rootpath, relpath,
                       force_params, evaluator ):
     ""
-    paramset = parseTestParameters_scr( vspecs, tname, evaluator, force_params )
+    pset = parseTestParameters_scr( vspecs, tname, evaluator, force_params )
 
-    testL = generate_test_objects( tname, rootpath, relpath, paramset )
+    testL = generate_test_objects( tname, rootpath, relpath, pset )
 
-    mark_staged_tests( paramset, testL )
+    mark_staged_tests( pset, testL )
 
-    check_add_analyze_test( paramset, testL, vspecs, evaluator )
+    check_add_analyze_test( pset, testL, vspecs, evaluator )
 
     for t in testL:
         parseKeywords_scr     ( t, vspecs, tname )
@@ -228,35 +228,36 @@ def createScriptTest( tname, vspecs, rootpath, relpath,
     return testL
 
 
-def generate_test_objects( tname, rootpath, relpath, paramset ):
+def generate_test_objects( tname, rootpath, relpath, pset ):
     ""
     testL = []
 
-    numparams = len( paramset.getParameters() )
+    numparams = len( pset.getParameters() )
     if numparams == 0:
         t = TestSpec.TestSpec( tname, rootpath, relpath )
         testL.append(t)
 
     else:
         # take a cartesian product of all the parameter values
-        for pdict in paramset.getInstances():
+        for pdict in pset.getInstances():
             # create the test and add to test list
             t = TestSpec.TestSpec( tname, rootpath, relpath )
             t.setParameters( pdict )
+            t.setParameterTypes( pset.getParameterTypeMap() )
             testL.append(t)
 
     return testL
 
 
-def mark_staged_tests( paramset, testL ):
+def mark_staged_tests( pset, testL ):
     """
     1. each test must be told which parameter names form the staged set
     2. the first and last tests in a staged set must be marked as such
     3. each staged test "depends on" the previous staged test
     """
-    if paramset.getStagedGroup():
+    if pset.getStagedGroup():
 
-        oracle = StagingOracle( paramset.getStagedGroup() )
+        oracle = StagingOracle( pset.getStagedGroup() )
 
         for tspec in testL:
 
@@ -333,7 +334,7 @@ class StagingOracle:
             paramD[ pname ] = pval
 
 
-def check_add_analyze_test( paramset, testL, vspecs, evaluator ):
+def check_add_analyze_test( pset, testL, vspecs, evaluator ):
     ""
     if len(testL) > 0:
 
@@ -343,14 +344,14 @@ def check_add_analyze_test( paramset, testL, vspecs, evaluator ):
 
         if analyze_spec:
 
-            numparams = len( paramset.getParameters() )
+            numparams = len( pset.getParameters() )
             if numparams == 0:
                 raise TestSpecError( 'an analyze requires at least one ' + \
                                      'parameter to be defined' )
 
             # create an analyze test
             parent = t.makeParent()
-            parent.setParameterSet( paramset )
+            parent.setParameterSet( pset )
             testL.append( parent )
 
             parent.setAnalyzeScript( analyze_spec )
@@ -399,10 +400,16 @@ def reparse_test_object( evaluator, testobj ):
         parse_enable( testobj, vspecs )
 
         pset = parseTestParameters_scr( vspecs, tname, evaluator, None )
+
+        type_map = pset.getParameterTypeMap()
+        testobj.setParameterTypes( type_map )
+
         if pset.getStagedGroup():
             mark_staged_tests( pset, [ testobj ] )
 
         if testobj.isAnalyze():
+            testobj.getParameterSet().setParameterTypeMap( type_map )
+
             analyze_spec = parseAnalyze_scr( testobj, vspecs, evaluator )
             testobj.setAnalyzeScript( analyze_spec )
             if not analyze_spec.startswith('-'):
@@ -540,34 +547,10 @@ def parseTestParameters_scr( vspecs, tname, evaluator, force_params ):
         #VVT::                          4, 0.01 , 0.02
         #VVT::                          8, 0.001, 0.002
 
-    Returns a dictionary mapping combined parameter names to lists of the
-    combined values.  For example,
-
-        #VVT: parameterize : pA=value1 value2
-
-    would return the dict
-
-        { (pA,) : [ (value1,), (value2,) ] }
-
-    And this
-
-        #VVT: parameterize : pA=value1 value2
-        #VVT: parameterize : pB=val1 val2
-
-    would return
-
-        { (pA,) : [ (value1,), (value2,) ],
-          (pB,) : [ (val1,), (val2,) ] }
-
-    And this
-
-        #VVT: parameterize : pA,pB = value1,val1 value2,val2
-
-    would return
-
-        { (pA,pB) : [ (value1,val1), (value2,val2) ] }
+    Returns a ParameterSet object.
     """
-    paramset = ParameterSet()
+    pset = ParameterSet()
+    tmap = {}
 
     for spec in vspecs.getSpecList( 'parameterize' ):
 
@@ -606,19 +589,55 @@ def parseTestParameters_scr( vspecs, tname, evaluator, force_params ):
             valL = parse_param_group_values( nameL, valuestr, lnum )
             check_forced_group_parameter( force_params, nameL, lnum )
 
-        staged = check_for_staging( spec.attrs, paramset, nameL, valL, lnum )
+        if spec.attrs and 'autotype' in spec.attrs:
+            auto_determine_param_types( nameL, valL, tmap )
+
+        staged = check_for_staging( spec.attrs, pset, nameL, valL, lnum )
 
         check_for_duplicate_parameter( valL, lnum )
 
         if len(nameL) == 1:
-            paramset.addParameter( nameL[0], valL )
+            pset.addParameter( nameL[0], valL )
         else:
-            paramset.addParameterGroup( nameL, valL, staged )
+            pset.addParameterGroup( nameL, valL, staged )
 
-    return paramset
+    pset.setParameterTypeMap( tmap )
+
+    return pset
 
 
-def check_for_staging( spec_attrs, paramset, nameL, valL, lineno ):
+def auto_determine_param_types( nameL, valL, tmap ):
+    ""
+    if len( nameL ) == 1:
+        typ = try_cast_to_int_or_float( valL )
+        if typ != None:
+            tmap[ nameL[0] ] = typ
+
+    else:
+        for i,name in enumerate(nameL):
+            typ = try_cast_to_int_or_float( [ tup[i] for tup in valL ] )
+            if typ != None:
+                tmap[ name ] = typ
+
+
+def try_cast_to_int_or_float( valuelist ):
+    ""
+    for typ in [int,float]:
+        if values_cast_to_type( typ, valuelist ):
+            return typ
+    return None
+
+
+def values_cast_to_type( typeobj, valuelist ):
+    ""
+    try:
+        vL = [ typeobj(v) for v in valuelist ]
+    except Exception:
+        return False
+    return True
+
+
+def check_for_staging( spec_attrs, pset, nameL, valL, lineno ):
     """
     for staged parameterize, the names & values are augmented. for example,
 
@@ -627,7 +646,7 @@ def check_for_staging( spec_attrs, paramset, nameL, valL, lineno ):
     """
     if spec_attrs and 'staged' in spec_attrs:
 
-        if paramset.getStagedGroup() != None:
+        if pset.getStagedGroup() != None:
             raise TestSpecError( 'only one parameterize can be staged' + \
                                  ', line ' + str(lineno) )
 
@@ -1163,7 +1182,7 @@ def parseTestParameters( filedoc, tname, evaluator, force_params ):
 
         { (pA,pB) : [ (value1,val1), (value2,val2) ] }
     """
-    paramset = ParameterSet()
+    pset = ParameterSet()
 
     if force_params == None:
         force_params = {}
@@ -1223,13 +1242,13 @@ def parseTestParameters( filedoc, tname, evaluator, force_params ):
               if len(pL) == 1:
                   L = pL[0]
                   check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
-                  paramset.addParameter( L[0], L[1:] )
+                  pset.addParameter( L[0], L[1:] )
               else:
                   L = [ list(T) for T in zip( *pL ) ]
                   check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
-                  paramset.addParameterGroup( L[0], L[1:] )
+                  pset.addParameterGroup( L[0], L[1:] )
 
-    return paramset
+    return pset
 
 
 def testname_ok( xmlnode, tname ):

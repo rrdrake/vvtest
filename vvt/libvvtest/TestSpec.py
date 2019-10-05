@@ -130,14 +130,19 @@ class TestSpec:
         """
         return keyword in self.getKeywords()
 
-    def getParameters(self):
+    def getParameters(self, typed=False):
         """
-        Returns a dictionary mapping parameter names to values.
+        Returns a dictionary mapping parameter names to values.  If 'typed'
+        is True, the type map is applied to each value.
         """
         D = {}
         D.update( self.params )
+
+        if typed:
+            apply_types_to_param_values( D, self.param_types )
+
         return D
-    
+
     def getParameterNames(self):
         """
         Returns a list of the parameter names for this test.
@@ -344,6 +349,7 @@ class TestSpec:
 
         self.keywords = set()      # set of strings
         self.params = {}           # name string to value string
+        self.param_types = {}      # param name to param type
         self.analyze_spec = None
         self.timeout = None        # timeout value in seconds (an integer)
         self.preload = None        # a string label
@@ -435,6 +441,13 @@ class TestSpec:
         self.params.clear()
         self.params.update( param_dict )
         self._set_identifiers()
+
+    def setParameterTypes(self, type_map):
+        """
+        Maps parameter name to a type, such as { 'np': int, 'dx': float }.
+        """
+        self.param_types.clear()
+        self.param_types.update( type_map )
 
     def setStagedParameters(self, is_first_stage, is_last_stage,
                                   stage_name, *param_names):
@@ -635,3 +648,10 @@ class IDGenerator:
             if param_name in self.staged[1:]:
                 return True
         return False
+
+
+def apply_types_to_param_values( paramD, param_types ):
+    ""
+    for n,v in paramD.items():
+        if n in param_types:
+            paramD[n] = param_types[n](v)

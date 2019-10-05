@@ -33,6 +33,7 @@ class ParameterSet:
     def __init__(self):
         ""
         self.params = {}
+        self.type_map = {}
         self.staged = None
         self.instances = []
 
@@ -52,6 +53,17 @@ class ParameterSet:
         if staged:
             self.staged = ( list( names ), list( values_list ) )
         self._constructInstances()
+
+    def setParameterTypeMap(self, type_map):
+        """
+        Such as { 'np': int, 'dx': float }.
+        """
+        self.type_map.clear()
+        self.type_map.update( type_map )
+
+    def getParameterTypeMap(self):
+        ""
+        return self.type_map
 
     def getStagedGroup(self):
         ""
@@ -81,7 +93,7 @@ class ParameterSet:
         """
         return self.instances
 
-    def getParameters(self):
+    def getParameters(self, typed=False):
         """
         Returns the filtered parameters in a dictionary, such as
             {
@@ -91,11 +103,16 @@ class ParameterSet:
         """
         instL = self.getInstances()
         filtered_params = {}
+
         for nameT,valuesL in self.params.items():
+
             L = []
             for valL in valuesL:
                 if contains_parameter_name_value( instL, nameT, valL ):
+                    if typed:
+                        valL = apply_value_types( self.type_map, nameT, valL )
                     L.append( valL )
+
             filtered_params[ nameT ] = L
 
         return filtered_params
@@ -113,6 +130,18 @@ class ParameterSet:
 
 
 ###########################################################################
+
+def apply_value_types( type_map, nameT, valL ):
+    ""
+    newvalL = []
+    for i,name in enumerate(nameT):
+        if name in type_map:
+            newvalL.append( type_map[name]( valL[i] ) )
+        else:
+            newvalL.append( valL[i] )
+
+    return newvalL
+
 
 def contains_parameter_name_value( instances, nameT, valL ):
     """

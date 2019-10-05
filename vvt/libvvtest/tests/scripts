@@ -19,6 +19,13 @@ from testutils import print3
 import libvvtest.TestSpecCreator as TestSpecCreator
 from libvvtest.errors import TestSpecError
 
+from libvvtest.paramset import ParameterSet
+from libvvtest.TestSpec import TestSpec
+from libvvtest.testcase import TestCase
+import libvvtest.TestSpecCreator as TSC
+from libvvtest.ScriptReader import ScriptReader
+import libvvtest.testlistio as tio
+
 
 class script_tests( vtu.vvtestTestCase ):
 
@@ -494,6 +501,119 @@ class script_tests( vtu.vvtestTestCase ):
         assert len(lineL) == 1
         depd = lineL[0].split( 'DEPS =', 1 )[1].strip()
         assert os.path.samefile( depd, vrun.resultsDir()+'/mars' )
+
+    def test_specify_parameter_types(self):
+        ""
+        pset = ParameterSet()
+        pset.addParameter( 'A', ['1','2'] )
+        pset.addParameterGroup( ('B','C'), [ ('1.1','ab'), ('1.2','ac') ] )
+
+        assert pset.getParameterTypeMap() == {}
+
+        tmap = { 'A':int, 'B':float }
+        pset.setParameterTypeMap( tmap )
+        assert pset.getParameterTypeMap() == tmap
+        pDL = pset.getParameters( typed=True )
+        assert len( pDL ) == 2
+        for nameT,valL in pDL.items():
+            if nameT == ('A',):
+                assert valL == [ [1], [2] ]
+            else:
+                assert nameT == ('B','C')
+                assert valL == [ [1.1,'ab'], [1.2,'ac'] ]
+
+        tspec = vtu.make_fake_TestSpec()
+        assert type( tspec.getParameterValue( 'np' ) ) == type('')
+        pD = tspec.getParameters( typed=True )
+        assert len( pD ) == 1
+        assert pD.pop('np') == '4'
+
+        tspec.setParameterTypes( { 'np': int } )
+        assert type( tspec.getParameterValue( 'np' ) ) == type('')
+        pD = tspec.getParameters()
+        assert len( pD ) == 1
+        assert pD['np'] == '4'
+        pD = tspec.getParameters( typed=True )
+        assert len( pD ) == 1
+        assert pD['np'] == 4
+
+    def test_parse_parameter_type_specifications(self):
+        ""
+        util.writefile( 'blue.vvt', """
+            #VVT: parameterize (autotype) : np = 1 8
+            #VVT: parameterize            : nt = 1 8
+            #VVT: parameterize (autotype) : dx,dy = 1,2 8.8,9.9
+            #VVT: parameterize (autotype) : foo = 1 bar
+            """ )
+        time.sleep(1)
+
+        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+
+        vspecs = ScriptReader( 'blue.vvt' )
+        pset = TSC.parseTestParameters_scr( vspecs, 'blue', evaluator, None )
+
+        tmap = pset.getParameterTypeMap()
+        assert len( tmap ) == 3
+        assert tmap['np'] == int
+        assert tmap['dx'] == float
+        assert tmap['dy'] == float
+
+        creat = TSC.TestCreator( 'atari', [] )
+        tL = creat.fromFile( os.getcwd(), 'blue.vvt', None )
+        assert len( tL ) == 2*2*2*2
+
+        tspec = tL[3]
+        pD = tspec.getParameters( typed=True )
+        assert type( pD['foo'] ) == type('')
+        assert type( pD['np'] ) == type(2)
+        assert type( pD['dy'] ) == type(9.9)
+
+        sid = tio.test_to_string( TestCase( tspec, None ) )
+        tcase = reparse_test_string( sid )
+        pD = tcase.getSpec().getParameters( typed=True )
+        assert type( pD['foo'] ) == type('')
+        assert type( pD['np'] ) == type(2)
+        assert type( pD['dy'] ) == type(9.9)
+
+    def test_integration_with_typed_parameters(self):
+        ""
+        util.writefile( 'blue.vvt', """
+            #VVT: parameterize (autotype) : num = 3 7
+            #VVT: parameterize (autotype) : size = 1.1 2.2
+            #VVT: analyze : --analyze
+            import sys
+            import vvtest_util as vvt
+            if '--analyze' in sys.argv:
+                for val in vvt.PARAM_num:
+                    assert type(val) == type(3)
+                for val in vvt.PARAM_size:
+                    assert type(val) == type(3.3)
+            else:
+                assert type( vvt.num ) == type(3)
+                assert type( vvt.size ) == type(3.3)
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( batch=batch )
+            vrun.assertCounts( total=5, npass=5 )
+            tdir = vrun.resultsDir()
+
+            vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=5, npass=5 )
+
+
+def reparse_test_string( stringid ):
+    ""
+    tcase = tio.string_to_test( stringid )
+
+    creator = TSC.TestCreator( 'atari', [] )
+    creator.reparse( tcase.getSpec() )
+
+    return tcase
 
 
 ########################################################################

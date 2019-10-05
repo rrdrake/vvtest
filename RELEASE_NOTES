@@ -18,6 +18,15 @@ Improvements:
           runtime -> num seconds or None if not run
           rundir -> the test execution directory
 
+    - Parameter typing is now supported (relevant only for python script
+      tests).  You can now add in your test header, for example,
+
+          #VVT: parameterize (autotype) : np = 1 32 256
+          #VVT: parameterize (autotype) : dx = 0.1  0.01  0.001
+
+      and the parameter values in the vvtest_util.py file will be typed
+      (np will be an int, and dx will be a float).
+
 Fixes:
 
     - 

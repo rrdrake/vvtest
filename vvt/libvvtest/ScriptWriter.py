@@ -86,23 +86,22 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
             w.add( '    os.environ["'+k+'"] = "'+v+'"' )
 
         w.add( '', '# parameters defined by the test' )
-        paramD = testobj.getParameters()
+        paramD = testobj.getParameters( typed=True )
         w.add( 'PARAM_DICT = '+repr( paramD ) )
         for k,v in paramD.items():
-            w.add( k+' = "'+v+'"' )
+            w.add( k+' = '+repr(v) )
 
         if testobj.isAnalyze():
+            # the parameter names and values of the children tests
             w.add( '', '# parameters comprising the children' )
-            psetD = testobj.getParameterSet().getParameters()
-            if len(psetD) > 0:
-                # the parameter names and values of the children tests
-                for n,L in psetD.items():
-                    if len(n) == 1:
-                        L2 = [ T[0] for T in L ]
-                        w.add( 'PARAM_'+n[0]+' = ' + repr(L2) )
-                    else:
-                        n2 = '_'.join( n )
-                        w.add( 'PARAM_'+n2+' = ' + repr(L) )
+            psetD = testobj.getParameterSet().getParameters( typed=True )
+            for n,L in psetD.items():
+                if len(n) == 1:
+                    L2 = [ T[0] for T in L ]
+                    w.add( 'PARAM_'+n[0]+' = ' + repr(L2) )
+                else:
+                    n2 = '_'.join( n )
+                    w.add( 'PARAM_'+n2+' = ' + repr(L) )
 
         L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
         w.add( '', 'DEPDIRS = '+repr(L) )
