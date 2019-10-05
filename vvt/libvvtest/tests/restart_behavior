@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+import time
+import glob
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+
+class restart_tests( vtu.vvtestTestCase ):
+
+    def test_run_then_fix_a_test_then_restart(self):
+        ""
+        for batch in [False,True]:
+
+            util.writefile( 'atest.xml', """
+                <rtest name="atest">
+                  <parameterize timestep="1 2"/>
+                  <execute>
+                    if ( "$timestep" == 2 ) then
+                      echo "fake failure"
+                      exit 1
+                    else
+                      touch atest.$timestep
+                    endif
+                  </execute>
+                  <analyze>
+                     ls ../atest.timestep=1/atest.1 || exit 1
+                     ls ../atest.timestep=2/atest.2 || exit 1
+                  </analyze>
+                </rtest>""" )
+            time.sleep(1)
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( batch=batch )
+            vrun.assertCounts( total=3, npass=1, fail=1, notrun=1 )
+
+            # "fix" the test and restart
+            util.writefile( 'atest.xml', """
+                <rtest name="atest">
+                  <parameterize timestep="1 2"/>
+                  <execute>
+                    touch atest.$timestep
+                  </execute>
+                  <analyze>
+                     ls ../atest.timestep=1/atest.1 || exit 1
+                     ls ../atest.timestep=2/atest.2 || exit 1
+                  </analyze>
+                </rtest>""" )
+            time.sleep(1)
+
+            vrun = vtu.runvvtest( '-k fail/notrun', batch=batch )
+            vrun.assertCounts( total=2, npass=2 )
+
+    def test_a_previously_notrun_test_can_be_run_outside_of_TestResults(self):
+        ""
+        util.writefile( "testA.vvt", """
+            raise Exception( 'fake exception' )
+            """ )
+        util.writefile( "testB.vvt", """
+            #VVT: depends on : testA
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, fail=1, notrun=1 )
+
+        util.writefile( 'testA.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        td = util.globfile( 'TestResults*/testA' )
+        vrun = vtu.runvvtest( '-R', chdir=td )
+        vrun.assertCounts( total=1, npass=1 )
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=1, npass=1 )
+
+    def test_a_previously_notrun_test_can_be_run_inside_of_TestResults(self):
+        ""
+        util.writefile( "testA.vvt", """
+            raise Exception( 'fake exception' )
+            """ )
+        util.writefile( "testB.vvt", """
+            #VVT: depends on : testA
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, fail=1, notrun=1 )
+
+        util.writefile( 'testA.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        td = util.globfile( 'TestResults*/testA' )
+        vrun = vtu.runvvtest( '-R', chdir=td )
+        vrun.assertCounts( total=1, npass=1 )
+
+        td = util.globfile( 'TestResults*/testB' )
+        vrun = vtu.runvvtest( chdir=td )
+        vrun.assertCounts( total=1, npass=1 )
+
+
+########################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
