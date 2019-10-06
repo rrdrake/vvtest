@@ -284,6 +284,41 @@ class info_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-N '+str(maxprocs)+' --files' )
         assert_files( vrun, [ 'atest.vvt', 'btest.vvt' ] )
 
+    def test_that_complete_info_from_previous_runs_is_shown(self):
+        ""
+        util.writefile( 'foo.vvt', """
+            pass
+            """ )
+        util.writefile( 'bar.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
+        rdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-R -k foo' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'foo' ]
+
+        vrun = vtu.runvvtest( '-i' )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
+
+        vrun = vtu.runvvtest( '-i -k bar' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'bar' ]
+
+        vrun = vtu.runvvtest( '-i', chdir=rdir )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
+
+        vrun = vtu.runvvtest( '-i -k bar', chdir=rdir )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'bar' ]
+
 
 ############################################################################
 

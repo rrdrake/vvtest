@@ -64,7 +64,7 @@ class restart_tests( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '-k fail/notrun', batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
-    def test_a_previously_notrun_test_can_be_run_outside_of_TestResults(self):
+    def test_running_a_skipped_dependent_test(self):
         ""
         util.writefile( "testA.vvt", """
             raise Exception( 'fake exception' )
@@ -90,7 +90,7 @@ class restart_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest()
         vrun.assertCounts( total=1, npass=1 )
 
-    def test_a_previously_notrun_test_can_be_run_inside_of_TestResults(self):
+    def test_running_a_skipped_dependent_test_within_the_results_dir(self):
         ""
         util.writefile( "testA.vvt", """
             raise Exception( 'fake exception' )
@@ -116,6 +116,70 @@ class restart_tests( vtu.vvtestTestCase ):
         td = util.globfile( 'TestResults*/testB' )
         vrun = vtu.runvvtest( chdir=td )
         vrun.assertCounts( total=1, npass=1 )
+
+    def test_previously_skipped_tests_can_be_run(self):
+        ""
+        util.writefile( 'foo.vvt', """
+            pass
+            """ )
+        util.writefile( 'bar.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
+        rdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-R -k foo' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'foo' ]
+
+        vrun = vtu.runvvtest( '-R -k bar' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'bar' ]
+
+        vrun = vtu.runvvtest( '-R', chdir=rdir )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
+
+        vrun = vtu.runvvtest( '-R -k foo', chdir=rdir )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'foo' ]
+
+    def test_skipped_tests_are_still_skipped_inside_a_results_dir(self):
+        ""
+        util.writefile( 'foo.vvt', """
+            pass
+            """ )
+        util.writefile( 'bar.vvt', """
+            pass
+            """ )
+        util.writefile( 'baz.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-k foo' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'foo' ]
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-R', chdir=tdir )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'foo' ]
+
+        vrun = vtu.runvvtest( '-R -k bar', chdir=tdir )
+        vrun.assertCounts( total=0 )
+
+        vrun = vtu.runvvtest( '-k bar' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'bar' ]
+
+        vrun = vtu.runvvtest( '-R', chdir=tdir )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'bar', 'foo' ]
 
 
 ########################################################################

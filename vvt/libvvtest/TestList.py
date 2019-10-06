@@ -131,12 +131,19 @@ class TestList:
                 if xdir not in self.tcasemap:
                     self.tcasemap[ xdir ] = tcase
 
-    def readTestResults(self, resultsfilename=None):
-        ""
+    def readTestResults(self, resultsfilename=None, preserve_skips=False):
+        """
+        If 'resultsfilename' is not None, only read that one file.  Otherwise,
+        glob for results filenames and read them all in time stamp increasing
+        order.
+
+        If 'preserve_skips' is False, each test read in from a results file
+        will have its skip setting removed from the test.
+        """
         if resultsfilename == None:
-            self._read_file_list( self.getResultsFilenames() )
+            self._read_file_list( self.getResultsFilenames(), preserve_skips )
         else:
-            self._read_file_list( [ resultsfilename ] )
+            self._read_file_list( [ resultsfilename ], preserve_skips )
 
     def getResultsFilenames(self):
         ""
@@ -145,7 +152,7 @@ class TestList:
         fileL.sort()
         return fileL
 
-    def _read_file_list(self, files):
+    def _read_file_list(self, files, preserve_skips):
         ""
         for fn in files:
 
@@ -160,6 +167,8 @@ class TestList:
                 t = self.tcasemap.get( xdir, None )
                 if t != None:
                     copy_test_results( t, tcase )
+                    if not preserve_skips:
+                        t.getSpec().attrs.pop( 'skip', None )
 
     def ensureInlinedTestResultIncludes(self):
         ""

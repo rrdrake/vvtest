@@ -29,7 +29,9 @@ Improvements:
 
 Fixes:
 
-    - 
+    - Under some circumstances, previous test results would not show up in
+      the vvtest -i output, and some tests would fail to rerun when running
+      inside the test results directory.
 
 Changes:
 

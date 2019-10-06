@@ -359,7 +359,7 @@ class generate_tests( vtu.vvtestTestCase ):
             vrun.assertCounts( total=1, npass=1 )
             assert vrun.getTestIds() == [ 'three' ]
 
-            # the original test list should be run here
+            # this should run the union of all tests that have previously run
             vrun = vtu.runvvtest( '-R', chdir=tdir, batch=batch )
             vrun.assertCounts( total=2, npass=2 )
             assert vrun.getTestIds() == [ 'three', 'two' ]
@@ -369,10 +369,10 @@ class generate_tests( vtu.vvtestTestCase ):
             vrun.assertCounts( total=1, npass=1 )
             assert vrun.getTestIds() == [ 'one' ]
 
-            # the first testlist should have been overwritten
+            # the union has grown
             vrun = vtu.runvvtest( '-R', chdir=tdir, batch=batch )
-            vrun.assertCounts( total=2, npass=2 )
-            assert vrun.getTestIds() == [ 'one', 'three' ]
+            vrun.assertCounts( total=3, npass=3 )
+            assert vrun.getTestIds() == [ 'one', 'three', 'two' ]
 
 
 ########################################################################

@@ -102,7 +102,7 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             vtu.remove_results()
 
             vrun = vtu.runvvtest( batch=batch )
-            vrun.assertCounts( total=4 )
+            vrun.assertCounts( total=4, npass=2, fail=2 )
             tdir = vrun.resultsDir()
 
             vrun = vtu.runvvtest( '-k atest/fail', batch=batch, chdir=tdir )
@@ -116,9 +116,11 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             vrun.assertCounts( total=0 )
 
             vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
-            vrun.assertCounts( total=2, npass=1, fail=1 )
+            vrun.assertCounts( total=4, npass=2, fail=2 )
             assert vrun.countTestLines( 'atest*pass*.nx=1') == 1
             assert vrun.countTestLines( 'atest*fail*.nx=4') == 1
+            assert vrun.countTestLines( 'btest*pass*.nx=1') == 1
+            assert vrun.countTestLines( 'btest*fail*.nx=4') == 1
 
     def test_xml_test_filter_by_keyword_expression(self):
         """

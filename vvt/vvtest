@@ -740,13 +740,12 @@ def runTests( opts, optD, rtdata, dirs ):
 
     timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
+    # apply filters and save the test list in the TestResults directory
     tlist.applyPermanentFilters()
-
-    # save the test list in the TestResults directory
     tlist.stringFileWrite()
     perms.set( abspath( tfile ) )
 
-    tlist.readTestResults()
+    tlist.readTestResults( preserve_skips=True )
     tlist.ensureInlinedTestResultIncludes()
 
     tlist.determineActiveTests()
