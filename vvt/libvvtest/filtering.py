@@ -158,6 +158,36 @@ class TestFilter:
 
         return ok
 
+    def checkAnalyze(self, analyze_tcase, analyze_deps):
+        """
+        Certain analyze dependency skips cause the analyze test to be skipped.
+        If analyze dependencies are skipped in a way that does NOT cause the
+        analyze test to be skipped, then the analyze parameter set must be
+        adjusted to reflect the reduced dependencies.
+        """
+        skip_analyze = False
+        paramsets = []
+
+        for tcase in analyze_deps:
+            if tcase.getStat().skipTestCausingAnalyzeSkip():
+                skip_analyze = True
+            else:
+                paramsets.append( tcase.getSpec().getParameters() )
+
+        if skip_analyze:
+            if not analyze_tcase.getStat().skipTest():
+                analyze_tcase.getStat().markSkipByAnalyzeDependency()
+        else:
+            filter_analyze_parameter_set( analyze_tcase, paramsets )
+
+    def applyBaselineSkips(self, tcase_map):
+        ""
+        for xdir,tcase in tcase_map.items():
+            tspec = tcase.getSpec()
+            if not tcase.getStat().skipTest():
+                if not tspec.hasBaseline():
+                    tcase.getStat().markSkipByBaselineHandling()
+
     def applyPermanent(self, tcase_map):
         ""
         for tcase in tcase_map.values():
@@ -232,6 +262,18 @@ class TestFilter:
                         tcase.getStat().markSkipByCummulativeRuntime()
 
                 i += 1
+
+
+def filter_analyze_parameter_set( analyze_tcase, paramsets ):
+    ""
+    def evalfunc( paramD ):
+        for D in paramsets:
+            if paramD == D:
+                return True
+        return False
+
+    pset = analyze_tcase.getSpec().getParameterSet()
+    pset.applyParamFilter( evalfunc )
 
 
 def clean_up_filter_directory( filter_dir ):

@@ -225,12 +225,12 @@ class TestList:
 
         self.testfilter.applyPermanent( self.tcasemap )
 
-        check_analyze_tests_after_filtering( self.groups )
+        for analyze, tcaseL in self.groups.iterateGroups():
+            self.testfilter.checkAnalyze( analyze, tcaseL )
 
         self.numactive = count_active( self.tcasemap )
 
     def determineActiveTests(self, filter_dir=None,
-                                   analyze_only=False,
                                    baseline=False,
                                    apply_filters=True):
         ""
@@ -238,19 +238,21 @@ class TestList:
 
         if apply_filters:
             self.testfilter.applyRuntime( self.tcasemap, filter_dir )
-            check_analyze_tests_after_filtering( self.groups )
+
+            for analyze, tcaseL in self.groups.iterateGroups():
+                self.testfilter.checkAnalyze( analyze, tcaseL )
 
         refresh_active_tests( self.tcasemap, self.creator )
 
         if baseline:
             # baseline marking must come after TestSpecs are refreshed
-            mark_skips_for_baselining( self.tcasemap )
+            self.testfilter.applyBaselineSkips( self.tcasemap )
 
         self.numactive = count_active( self.tcasemap )
 
     def numActive(self):
         """
-        Return the total number of active tests (the tests that are to be run).
+        Return the total number of active tests (the tests to be run).
         """
         return self.numactive
 
@@ -402,41 +404,6 @@ def check_make_directory_containing_file( filename ):
     if d and d != '.':
         if not os.path.exists(d):
             os.mkdir( d )
-
-
-def mark_skips_for_baselining( tcase_map ):
-    ""
-    for xdir,tcase in tcase_map.items():
-        tspec = tcase.getSpec()
-        if not tcase.getStat().skipTest():
-            if not tspec.hasBaseline():
-                tcase.getStat().markSkipByBaselineHandling()
-
-
-def check_analyze_tests_after_filtering( groups ):
-    ""
-    for analyze, tcaseL in groups.iterateGroups():
-
-        skip_analyze = False
-        paramsets = []
-
-        for tcase in tcaseL:
-            if tcase.getStat().skipTestCausingAnalyzeSkip():
-                skip_analyze = True
-            else:
-                paramsets.append( tcase.getSpec().getParameters() )
-
-        if skip_analyze:
-            if not analyze.getStat().skipTest():
-                analyze.getStat().markSkipByAnalyzeDependency()
-        else:
-            def evalfunc( paramD ):
-                for D in paramsets:
-                    if paramD == D:
-                        return True
-                return False
-            pset = analyze.getSpec().getParameterSet()
-            pset.applyParamFilter( evalfunc )
 
 
 def count_active( tcase_map ):
