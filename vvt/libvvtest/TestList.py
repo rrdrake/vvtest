@@ -232,15 +232,23 @@ class TestList:
 
     def determineActiveTests(self, filter_dir=None,
                                    baseline=False,
-                                   apply_filters=True):
-        ""
+                                   apply_filters=True,
+                                   remove_skips=False):
+        """
+        If 'remove_skips' is True then every test skipped by the current
+        filtering is removed entirely from the test list.
+        """
         self._check_create_parameterize_analyze_group_map()
 
         if apply_filters:
-            self.testfilter.applyRuntime( self.tcasemap, filter_dir )
+            self.testfilter.applyRuntime( self.tcasemap, filter_dir,
+                                          force_checks=remove_skips )
 
             for analyze, tcaseL in self.groups.iterateGroups():
                 self.testfilter.checkAnalyze( analyze, tcaseL )
+
+            if remove_skips:
+                self.testfilter.removeNewSkips( self.tcasemap )
 
         refresh_active_tests( self.tcasemap, self.creator )
 

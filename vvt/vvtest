@@ -361,8 +361,6 @@ def construct_RuntimeConfig( opts, optD ):
     rtconfig = RuntimeConfig( \
                   param_expr_list=optD['param_list'],
                   keyword_expr=optD['keyword_expr'],
-                  # option_list=( optD['onopts'] + [plat.getCompiler()] ),
-                  # platform_name=plat.getName(),
                   ignore_platforms=( opts.dash_A == True ),
                   set_platform_expr=optD['platform_expr'],
                   search_file_globs=search_fnmatch,
@@ -370,7 +368,6 @@ def construct_RuntimeConfig( opts, optD ):
                   include_tdd=( opts.include_tdd == True ),
                   runtime_range=[ opts.tmin, opts.tmax ],
                   runtime_sum=opts.tsum )
-                  # maxprocs=plat.getMaxProcs() )
 
     if opts.qsub_id != None:
         rtconfig.setAttr( 'include_all', True )
@@ -429,7 +426,8 @@ class InformationMode:
             tlist.readTestList()
             tlist.readTestResults()
 
-        tlist.determineActiveTests( filter_dir=self.rtdata.getFilterPath() )
+        tlist.determineActiveTests( filter_dir=self.rtdata.getFilterPath(),
+                                    remove_skips=True )
 
         return tlist
 

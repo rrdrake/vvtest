@@ -16,6 +16,9 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.filtering import TestFilter
+from libvvtest.FilterExpressions import WordExpression
+
 
 class info_tests( vtu.vvtestTestCase ):
 
@@ -318,6 +321,80 @@ class info_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-i -k bar', chdir=rdir )
         vrun.assertCounts( total=1, npass=1 )
         assert vrun.getTestIds() == [ 'bar' ]
+
+    def test_that_filtering_records_skips(self):
+        ""
+        tcase = vtu.make_fake_TestCase()
+
+        tf = TestFilter( None, None )
+        tf.checkEnabled( tcase )
+        assert len( tf.getSkipped() ) == 0
+        tcase.getSpec().setEnabled( False )
+        tf.checkEnabled( tcase )
+        tL = list( tf.getSkipped() )
+        assert len(tL) == 1 and id( tL[0] ) == id( tcase )
+
+        tf = TestFilter( None, None )
+        xdir = tcase.getSpec().getExecuteDirectory()
+        tf.checkSubdirectory( tcase, xdir )
+        assert len( list( tf.getSkipped() ) ) == 0
+        tf.checkSubdirectory( tcase, 'foobar.np=4' )
+        tL = list( tf.getSkipped() )
+        assert len(tL) == 1 and id( tL[0] ) == id( tcase )
+
+        tf = TestFilter( vtu.make_RuntimeConfig( 'atari', [] ), None )
+        tf.checkPlatform( tcase )
+        assert len( list( tf.getSkipped() ) ) == 0
+        tcase.getSpec().addEnablePlatformExpression( WordExpression( 'XBox' ) )
+        tf.checkPlatform( tcase )
+        tL = list( tf.getSkipped() )
+        assert len(tL) == 1 and id( tL[0] ) == id( tcase )
+
+        rtconfig = vtu.make_RuntimeConfig( 'atari', [] )
+        tf = TestFilter( rtconfig, None )
+        tf.checkKeywords( tcase )
+        assert len( list( tf.getSkipped() ) ) == 0
+        rtconfig.setAttr( 'keyword_expr', WordExpression( 'not key1' ) )
+        tf.checkKeywords( tcase )
+        tL = list( tf.getSkipped() )
+        assert len(tL) == 1 and id( tL[0] ) == id( tcase )
+
+    def test_that_command_line_info_ignores_its_own_filtering(self):
+        """
+        When using "vvtest -i -K pass", for example, the skips shown in the
+        summary output should NOT include the tests filtered out by "-K pass".
+        """
+        util.writefile( 'blue.vvt', """
+            #VVT: keywords = velvet underground
+            """ )
+        util.writefile( 'subdir/pink.vvt', """
+            #VVT: keywords = velvet uptown
+            import sys, vvtest_util
+            sys.exit( vvtest_util.diff_exit_status )
+            """ )
+        util.writefile( 'gold.vvt', """
+            #VVT: keywords = nugget underground
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-k velvet' )
+        vrun.assertCounts( total=2, npass=1, diff=1 )
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-i -vv' )
+        vrun.assertCounts( total=3, npass=1, diff=1, skip=1 )
+
+        vrun = vtu.runvvtest( '-i -K pass -vv' )
+        vrun.assertCounts( total=2, diff=1, skip=1 )
+        vrun.getTestIds() == ['gold','pink']
+
+        vrun = vtu.runvvtest( '-i -k underground -vv', chdir=tdir )
+        vrun.assertCounts( total=2, npass=1, skip=1 )
+        vrun.getTestIds() == ['blue','gold']
+
+        vrun = vtu.runvvtest( '-i -vv', chdir=tdir+'/subdir' )
+        vrun.assertCounts( total=1, diff=1 )
+        vrun.getTestIds() == ['pink']
 
 
 ############################################################################

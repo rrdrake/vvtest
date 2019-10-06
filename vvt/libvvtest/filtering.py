@@ -15,6 +15,7 @@ class TestFilter:
         ""
         self.rtconfig = rtconfig
         self.plugin = user_plugin
+        self.skipped = {}  # test id to TestCase
 
     def checkSubdirectory(self, tcase, subdir):
         ""
@@ -26,6 +27,7 @@ class TestFilter:
             ok = False
             tcase.getStat().markSkipBySubdirectoryFilter()
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkEnabled(self, tcase):
@@ -34,6 +36,8 @@ class TestFilter:
         ok = tspec.isEnabled()
         if not ok:
             tcase.getStat().markSkipByEnabled()
+
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkPlatform(self, tcase):
@@ -44,6 +48,8 @@ class TestFilter:
         ok = self.rtconfig.evaluate_platform_include( pev.satisfies_platform )
         if not ok:
             tcase.getStat().markSkipByPlatform()
+
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkOptions(self, tcase):
@@ -57,6 +63,8 @@ class TestFilter:
                 break
         if not ok:
             tcase.getStat().markSkipByOption()
+
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkKeywords(self, tcase, results_keywords=True):
@@ -81,6 +89,7 @@ class TestFilter:
             if not ok:
                 tcase.getStat().markSkipByKeyword( with_results=False )
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkTDD(self, tcase):
@@ -91,8 +100,11 @@ class TestFilter:
             ok = True
         else:
             ok = ( 'TDD' not in tspec.getKeywords() )
+
         if not ok:
             tcase.getStat().markSkipByTDD()
+
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkParameters(self, tcase, permanent=True):
@@ -108,6 +120,7 @@ class TestFilter:
         if not ok:
             tcase.getStat().markSkipByParameter( permanent=permanent )
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkFileSearch(self, tcase):
@@ -121,6 +134,7 @@ class TestFilter:
         if not ok:
             tcase.getStat().markSkipByFileSearch()
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkMaxProcessors(self, tcase):
@@ -132,6 +146,7 @@ class TestFilter:
         if not ok:
             tcase.getStat().markSkipByMaxProcessors()
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkRuntime(self, tcase):
@@ -144,6 +159,7 @@ class TestFilter:
         if not ok:
             tcase.getStat().markSkipByRuntime()
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def userValidation(self, tcase):
@@ -156,6 +172,7 @@ class TestFilter:
             reason = 'validate: '+reason
             tcase.getStat().markSkipByUserValidation( reason )
 
+        self._record_skipped_tests( ok, tcase )
         return ok
 
     def checkAnalyze(self, analyze_tcase, analyze_deps):
@@ -177,6 +194,7 @@ class TestFilter:
         if skip_analyze:
             if not analyze_tcase.getStat().skipTest():
                 analyze_tcase.getStat().markSkipByAnalyzeDependency()
+            self._record_skipped_tests( False, analyze_tcase )
         else:
             filter_analyze_parameter_set( analyze_tcase, paramsets )
 
@@ -187,6 +205,7 @@ class TestFilter:
             if not tcase.getStat().skipTest():
                 if not tspec.hasBaseline():
                     tcase.getStat().markSkipByBaselineHandling()
+                    self._record_skipped_tests( False, tcase )
 
     def applyPermanent(self, tcase_map):
         ""
@@ -205,7 +224,7 @@ class TestFilter:
 
         self.filterByCummulativeRuntime( tcase_map )
 
-    def applyRuntime(self, tcase_map, filter_dir):
+    def applyRuntime(self, tcase_map, filter_dir, force_checks=False):
         ""
         include_all = self.rtconfig.getAttr( 'include_all', False )
 
@@ -217,7 +236,7 @@ class TestFilter:
 
                 tspec = tcase.getSpec()
 
-                if not tcase.getStat().skipTest():
+                if not tcase.getStat().skipTest() or force_checks:
 
                     self.checkSubdirectory( tcase, subdir ) and \
                         self.checkKeywords( tcase, results_keywords=True ) and \
@@ -260,8 +279,23 @@ class TestFilter:
                     tsum += tm
                     if tsum > rtsum:
                         tcase.getStat().markSkipByCummulativeRuntime()
+                        self._record_skipped_tests( False, tcase )
 
                 i += 1
+
+    def _record_skipped_tests(self, keep_test, tcase):
+        ""
+        if not keep_test:
+            self.skipped[ tcase.getSpec().getID() ] = tcase
+
+    def getSkipped(self):
+        ""
+        return self.skipped.values()
+
+    def removeNewSkips(self, tcasemap):
+        ""
+        for tid,tcase in self.skipped.items():
+            tcasemap.pop( tid )
 
 
 def filter_analyze_parameter_set( analyze_tcase, paramsets ):
@@ -313,7 +347,7 @@ def is_subdir(parent_dir, subdir):
     lp = len(parent_dir)
     ls = len(subdir)
     if ls > lp and parent_dir + '/' == subdir[0:lp+1]:
-      return subdir[lp+1:]
+        return subdir[lp+1:]
     return None
 
 
