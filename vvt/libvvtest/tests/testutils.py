@@ -25,6 +25,7 @@ import string
 import glob
 import traceback
 import unittest
+import gzip
 
 
 working_directory = None
@@ -524,6 +525,29 @@ def readfile( filename ):
     finally:
         fp.close()
     return buf
+
+
+def gzip_compress_file( filepath ):
+    """
+    Compresses filepath into filepath.gz, then removes filepath.
+    """
+    timepair = ( os.path.getatime(filepath), os.path.getmtime(filepath) )
+
+    gzfilepath = filepath+'.gz'
+    gzfile = gzip.open( gzfilepath, 'wb' )
+    try:
+        fp = open( filepath, 'rb' )
+        buf = fp.read(1024)
+        while buf:
+            gzfile.write( buf )
+            buf = fp.read(1024)
+    finally:
+        fp.close()
+        gzfile.close()
+
+    os.utime( gzfilepath, timepair )
+
+    os.remove( filepath )
 
 
 def adjust_shell_pattern_to_work_with_fnmatch( pattern ):

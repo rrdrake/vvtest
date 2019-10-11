@@ -492,7 +492,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_verbose_print_with_a_command_that_captures_output(self):
         ""
-        orig_url = trigutil.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
 
         git = GitInterface( orig_url, 'dest' )
 
