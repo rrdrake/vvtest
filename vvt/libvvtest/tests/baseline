@@ -315,7 +315,7 @@ class baseline_tests( vtu.vvtestTestCase ):
         util.writescript( "pybase.vvt", """
             #!"""+sys.executable+"""
             #VVT: parameterize : foo = 1 2
-            #VVT: baseline (parameters="foo=1") : $NAME.txt, ${NAME}_base.txt
+            #VVT: baseline (parameters="foo<2") : $NAME.txt, ${NAME}_base.txt
             import vvtest_util as vvt
             import sys, filecmp
             # create a single baseline file to use for the first differencing
