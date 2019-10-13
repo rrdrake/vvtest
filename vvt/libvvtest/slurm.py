@@ -32,7 +32,7 @@ class BatchSLURM:
               '#SBATCH --nodes=' + str(nnodes) + '\n' + \
               '#SBATCH --output=' + outfile + '\n' + \
               '#SBATCH --error=' + outfile + '\n' + \
-              '#SBATCH --workdir=' + workdir
+              '#SBATCH --chdir=' + workdir
 
         # Add a line for Quality of Service (QoS) if the user defined it.
         QoS = plat_attrs.get('QoS', None)
@@ -66,7 +66,7 @@ class BatchSLURM:
 
         cmdL.append('--output='+outfile)
         cmdL.append('--error='+outfile)
-        cmdL.append('--workdir='+workdir)
+        cmdL.append('--chdir='+workdir)
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
         
