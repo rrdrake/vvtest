@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - Add --scan-type <type> command line argument, where 'type' can be
+      "xml" or "vvt".  This restricts the test scanning to tests of the
+      given type.
+
     - Add user plugin functions:
 
         def prologue( command_line ):

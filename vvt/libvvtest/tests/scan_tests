@@ -73,14 +73,63 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         assert x != 0
         assert 'does not exist' in out and 'mypath' in out
 
+    def write_vvt_and_xml_test_files(self):
+        ""
+        util.writefile( 'scr.vvt', """
+            pass
+            """ )
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+                <execute> echo "hello" </execute>
+            </rtest>
+            """ )
 
-def construct_TestList_and_TestFileScanner():
+    def test_restrict_scan_to_one_extension(self):
+        ""
+        self.write_vvt_and_xml_test_files()
+        time.sleep(1)
+
+        tlist,scan = construct_TestList_and_TestFileScanner( spectype='vvt' )
+        scan.scanPath( '.' )
+
+        tL = list( tlist.getTests() )
+        assert len( tL ) == 1
+        assert tL[0].getSpec().getName() == 'scr'
+        assert tL[0].getSpec().getFilepath() == 'scr.vvt'
+
+        tlist,scan = construct_TestList_and_TestFileScanner( spectype='xml' )
+        scan.scanPath( '.' )
+
+        tL = list( tlist.getTests() )
+        assert len( tL ) == 1
+        assert tL[0].getSpec().getName() == 'atest'
+        assert tL[0].getSpec().getFilepath() == 'atest.xml'
+
+    def test_command_line_interface_to_scan_type_restriction(self):
+        ""
+        self.write_vvt_and_xml_test_files()
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == [ 'atest', 'scr' ]
+
+        vrun = vtu.runvvtest( '-w --scan-type vvt' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'scr' ]
+
+        vrun = vtu.runvvtest( '-w --scan-type xml' )
+        vrun.assertCounts( total=1, npass=1 )
+        assert vrun.getTestIds() == [ 'atest' ]
+
+
+def construct_TestList_and_TestFileScanner( spectype=None ):
     ""
     rtconfig = RuntimeConfig()
     creator = TestCreator( 'atari', [] )
     tlist = TestList.TestList( None, rtconfig, creator )
 
-    scan = TestFileScanner( tlist )
+    scan = TestFileScanner( tlist, spectype=spectype )
 
     return tlist,scan
 

@@ -11,15 +11,20 @@ from .errors import FatalError
 
 class TestFileScanner:
 
-    def __init__(self, testlist, force_params_dict=None):
+    def __init__(self, testlist, force_params_dict=None, spectype=None):
         """
         If 'force_params_dict' is not None, it must be a dictionary mapping
         parameter names to a list of parameter values.  Any test that contains
         a parameter in this dictionary will take on the given values for that
         parameter.
+
+        If 'spectype' is not None, it must be 'vvt' or 'xml'.  The scanner will
+        only pick up files for those test specification types.  Default is
+        both *.xml and *.vvt.
         """
         self.tlist = testlist
         self.params = force_params_dict
+        self.extensions = make_test_extension_list( spectype )
 
     def scanPaths(self, path_list):
         ""
@@ -63,7 +68,7 @@ class TestFileScanner:
         for f in files:
             bn,ext = os.path.splitext(f)
             df = os.path.join(d,f)
-            if bn and ext in ['.xml','.vvt']:
+            if bn and ext in self.extensions:
                 fname = os.path.join(reldir,f)
                 self.tlist.readTestFile( basedir, fname, self.params )
 
@@ -88,3 +93,13 @@ class TestFileScanner:
         for ld in linkdirs:
             for lroot,ldirs,lfiles in os.walk( ld ):
                 self._scan_recurse( basedir, lroot, ldirs, lfiles )
+
+
+def make_test_extension_list( spectype ):
+    ""
+    if spectype == 'vvt':
+        return ['.vvt']
+    elif spectype == 'xml':
+        return ['.xml']
+    else:
+        return ['.xml','.vvt']

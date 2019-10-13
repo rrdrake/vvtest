@@ -511,6 +511,9 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--include-tdd', action='store_true',
         help='Include tests that contain the keyword "TDD", which are '
              'normally not included.' )
+    grp.add_argument( '--scan-type',
+        help='Value can be "vvt" or "xml", and restricts test scanning to '
+             'one type of test specification (extension). Default is both.' )
 
     # behavior
     grp = psr.add_argument_group( 'Runtime behavior (subhelp: behavior)' )
