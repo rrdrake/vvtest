@@ -675,7 +675,7 @@ class Configuration:
         git.commit( 'init manifests' )
 
         git.createBranch( REPO_MAP_BRANCH )
-        write_mrgit_repo_map_file( self.remote, git )
+        write_mrgit_repo_map_file( self.local, git )
         git.checkoutBranch( 'master' )
 
     def getRemoteRepoMap(self):
