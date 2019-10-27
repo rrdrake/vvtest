@@ -65,8 +65,11 @@ def main():
     elif cmd == 'clone':
         mrgitlib.clone( argL[1:] )
 
+    elif cmd == 'init':
+        mrgitlib.init( argL[1:] )
+
     else:
-        mrgitlib.errorexit( '*** unknown mrgit command:', cmd )
+        mrgitlib.errorexit( 'unknown mrgit command:', cmd )
 
 
 ####################################################################

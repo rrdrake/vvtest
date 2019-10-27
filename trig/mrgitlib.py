@@ -11,11 +11,9 @@ import tempfile
 import shutil
 import filecmp
 import glob
+import pipes
 from os.path import join as pjoin
-from os.path import abspath
-from os.path import normpath
-from os.path import basename
-from os.path import dirname
+from os.path import abspath, normpath, basename, dirname
 
 import gitinterface as gititf
 from gitinterface import change_directory
@@ -23,6 +21,12 @@ from gitinterface import change_directory
 
 class MRGitExitError( Exception ):
     pass
+
+
+def errorexit( *args ):
+    ""
+    err = ' '.join( [ str(arg) for arg in args ] )
+    raise MRGitExitError( err )
 
 
 def clone( argv ):
@@ -54,10 +58,92 @@ def clone( argv ):
         cfg.commitLocalRepoMap()
 
 
-def errorexit( *args ):
+def init( argv ):
     ""
-    err = ' '.join( [ str(arg) for arg in args ] )
-    raise MRGitExitError( err )
+    cfg = Configuration()
+    cfg.setTopDir( os.getcwd() )
+    cfg.createMRGitRepo()
+
+
+def fetch( argv ):
+    ""
+    cfg = load_configuration()
+
+    top = cfg.getTopDir()
+    for path in cfg.getLocalRepoPaths():
+        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git.run( 'fetch', verbose=3 )
+
+
+def pull( argv ):
+    ""
+    cfg = load_configuration()
+
+    top = cfg.getTopDir()
+    for path in cfg.getLocalRepoPaths():
+        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git.run( 'pull', verbose=3 )
+
+
+def add( argv ):
+    ""
+    cfg = load_configuration()
+
+    top = cfg.getTopDir()
+    for path in cfg.getLocalRepoPaths():
+        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        args = [ pipes.quote(arg) for arg in argv ]
+        git.run( 'add', *args, verbose=3 )
+
+
+def commit( argv ):
+    ""
+    cfg = load_configuration()
+
+    top = cfg.getTopDir()
+    for path in cfg.getLocalRepoPaths():
+        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        args = [ pipes.quote(arg) for arg in argv ]
+        git.run( 'commit', *args, verbose=3 )
+
+
+def push( argv ):
+    ""
+    cfg = load_configuration()
+
+    top = cfg.getTopDir()
+    for path in cfg.getLocalRepoPaths():
+        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git.run( 'push', verbose=3 )
+
+
+def load_configuration():
+    ""
+    cfg = Configuration()
+    top = find_mrgit_top_level()
+    cfg.setTopDir( top )
+    git = gititf.GitInterface( rootdir=top+'/.mrgit' )
+    cfg.loadManifests( git )
+    cfg.computeLocalRepoMap()
+
+    return cfg
+
+
+def find_mrgit_top_level():
+    ""
+    top = None
+
+    d1 = os.getcwd()
+    while True:
+        if os.path.isdir( pjoin( d1, '.mrgit' ) ):
+            top = d1
+            break
+        d2 = dirname( d1 )
+        if not d2 or d1 == d2:
+            break
+        d1 = d2
+
+    return top
 
 
 def parse_url_list( args ):
@@ -109,7 +195,8 @@ def clone_from_single_url( cfg, url, directory ):
 
         # we just cloned an mrgit manifests repo
         cfg.computeLocalRepoMap()
-        topdir = cfg.setTopDir( directory )
+        urlname = gititf.repo_name_from_url( baseurl )
+        topdir = cfg.setTopDir( directory, urlname )
         tmpd.moveTo( topdir+'/.mrgit' )
         clone_repositories_from_config( cfg )
 
@@ -429,7 +516,8 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
         if 'mrgit_config' in git.listBranches() or \
            'mrgit_config' in git.listRemoteBranches():
 
-            cfg.loadFromCheckout( baseurl, git )
+            cfg.loadManifests( git )
+            cfg.loadRepoMap( git, baseurl )
             return True
 
     return False
@@ -493,9 +581,12 @@ class Configuration:
             self.mfest.addRepo( groupname, name, path )
             self.remote.setRepoLocation( name, url=url )
 
-    def loadFromCheckout(self, baseurl, git):
+    def loadManifests(self, git):
         ""
         read_mrgit_manifests_file( self.mfest, git )
+
+    def loadRepoMap(self, git, baseurl):
+        ""
         read_mrgit_repo_map_file( self.remote, baseurl, git )
 
     def addRepoURL(self, reponame, url):
@@ -510,16 +601,20 @@ class Configuration:
         ""
         grp = self.mfest.findGroup( None )
 
-        for spec in grp.getRepoList():
-            self.local.setRepoLocation( spec['repo'], path=spec['path'] )
+        if grp != None:
+            for spec in grp.getRepoList():
+                self.local.setRepoLocation( spec['repo'], path=spec['path'] )
 
-    def setTopDir(self, directory):
+    def setTopDir(self, directory, urlname=None):
         ""
         if directory:
             self.topdir = abspath( normpath( directory ) )
         else:
             grp = self.mfest.findGroup( None )
-            self.topdir = abspath( grp.getName() )
+            if grp == None:
+                self.topdir = abspath( urlname )
+            else:
+                self.topdir = abspath( grp.getName() )
 
         return self.topdir
 
@@ -527,15 +622,28 @@ class Configuration:
         ""
         return self.topdir
 
+    def getLocalRepoPaths(self):
+        ""
+        paths = []
+
+        grp = self.mfest.findGroup( None )
+        if grp != None:
+            for spec in grp.getRepoList():
+                paths.append( spec['path'] )
+
+        return paths
+
     def getRemoteRepoList(self):
         ""
+        repolist = []
+
         grp = self.mfest.findGroup( None )
 
-        repolist = []
-        for spec in grp.getRepoList():
-            url = self.remote.getRepoURL( spec['repo'] )
-            path = spec['path']
-            repolist.append( [ url, path ] )
+        if grp != None:
+            for spec in grp.getRepoList():
+                url = self.remote.getRepoURL( spec['repo'] )
+                path = spec['path']
+                repolist.append( [ url, path ] )
 
         return repolist
 
@@ -555,7 +663,7 @@ class Configuration:
         repodir = pjoin( self.topdir, '.mrgit' )
 
         git = gititf.GitInterface()
-        git.create( repodir )
+        git.create( repodir, verbose=3 )
 
         self.mfest.writeToFile( repodir+'/manifests' )
         git.add( 'manifests' )

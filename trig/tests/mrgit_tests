@@ -43,10 +43,6 @@ class help_message( trigutil.trigTestCase ):
         assert 'SYNOPSIS' in out
 
 
-class helper_functions( trigutil.trigTestCase ):
-    pass
-
-
 class cloning( trigutil.trigTestCase ):
 
     def test_clone_a_single_repository(self):
@@ -59,7 +55,7 @@ class cloning( trigutil.trigTestCase ):
         git = GitInterface( rootdir='cool' )
         assert 'topic' in git.listRemoteBranches()
 
-    def test_cloning_a_repository_specified_on_the_command_line(self):
+    def test_command_line_clone_a_single_repository(self):
         ""
         src_url = util.create_bare_repo_with_topic_branch( 'cool' )
 
@@ -89,7 +85,7 @@ class cloning( trigutil.trigTestCase ):
                                                             tag='nessie' )
         return cool_url, ness_url
 
-    def test_cloning_multiple_repos_from_the_command_line(self):
+    def test_command_line_clone_multiple_repos(self):
         ""
         cool_url, ness_url = self.make_coolness_repositories()
 
@@ -521,11 +517,58 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         assert cfg.getTopDir() == abspath( 'repo' )
 
 
+class mrgit_init( trigutil.trigTestCase ):
+
+    def test_mrgit_init_in_an_empty_directory(self):
+        ""
+        os.mkdir( 'adir' )
+        os.mkdir( 'bdir' )
+        time.sleep(1)
+
+        x,out = util.runcmd( mrgit_file+' init', chdir='adir' )
+        assert x == 0
+
+        x,out = util.runcmd( mrgit_file+' clone ../adir', chdir='bdir' )
+        assert x == 0
+        assert os.path.isdir( 'bdir/adir/.mrgit' )
+
+
 class updating( trigutil.trigTestCase ):
 
-    def test_foo(self):
+    def test_fetch_from_a_genesis_repo_set(self):
         ""
         src_url = util.create_bare_repo_with_topic_branch( 'cool' )
+
+        mrlib.clone( [ src_url ] )
+
+        util.push_file_to_repo( src_url, 'newfile.txt', 'anything\n' )
+
+        assert not os.path.exists( 'cool/.git/FETCH_HEAD' )
+
+        with util.change_directory( 'cool' ):
+            mrlib.fetch( [] )
+
+        x,out = util.runcmd( 'git branch -rv', chdir='cool' )
+        assert x == 0
+        assert os.path.exists( 'cool/.git/FETCH_HEAD' )
+
+
+class commit_and_push( trigutil.trigTestCase ):
+
+    def test_push_to_a_genesis_repo_set(self):
+        ""
+        src_url = util.create_bare_repo_with_topic_branch( 'cool' )
+
+        mrlib.clone( [ src_url ] )
+
+        with util.change_directory( 'cool' ):
+            util.writefile( 'newfile.txt', 'foo bar\n' )
+            mrlib.add( [ '.' ] )
+            mrlib.commit( ['-m','add new file'] )
+            mrlib.push( [] )
+
+        GitInterface( src_url, rootdir='check', verbose=3 )
+        assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1
 
 
 #######################################################################
