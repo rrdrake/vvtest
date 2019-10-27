@@ -19,6 +19,11 @@ import gitinterface as gititf
 from gitinterface import change_directory
 
 
+REPO_MAP_BRANCH = 'mrgit_repo_map'
+REPOMAP_FILENAME = 'repomap'
+REPOMAP_TEMPFILE = 'repomap.tmp'
+
+
 class MRGitExitError( Exception ):
     pass
 
@@ -513,8 +518,8 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
     mfestfn = pjoin( git.getRootDir(), 'manifests' )
 
     if os.path.isfile( mfestfn ):
-        if 'mrgit_config' in git.listBranches() or \
-           'mrgit_config' in git.listRemoteBranches():
+        if REPO_MAP_BRANCH in git.listBranches() or \
+           REPO_MAP_BRANCH in git.listRemoteBranches():
 
             cfg.loadManifests( git )
             cfg.loadRepoMap( git, baseurl )
@@ -651,7 +656,7 @@ class Configuration:
         ""
         mrgit = pjoin( self.topdir, '.mrgit' )
         git = gititf.GitInterface( rootdir=mrgit )
-        git.checkoutBranch( 'mrgit_config' )
+        git.checkoutBranch( REPO_MAP_BRANCH )
 
         try:
             write_mrgit_repo_map_file( self.local, git )
@@ -669,7 +674,7 @@ class Configuration:
         git.add( 'manifests' )
         git.commit( 'init manifests' )
 
-        git.createBranch( 'mrgit_config' )
+        git.createBranch( REPO_MAP_BRANCH )
         write_mrgit_repo_map_file( self.remote, git )
         git.checkoutBranch( 'master' )
 
@@ -788,9 +793,6 @@ class RepoGroup:
         return spec['path']
 
 
-CONFIG_FILENAME = 'config'
-CONFIG_TEMPFILE = 'config.tmp'
-
 class RepoMap:
 
     def __init__(self):
@@ -820,7 +822,7 @@ class RepoMap:
 
     def readFromFile(self, baseurl):
         ""
-        with open( CONFIG_FILENAME, 'r' ) as fp:
+        with open( REPOMAP_FILENAME, 'r' ) as fp:
 
             for line in fp:
                 line = line.strip()
@@ -876,7 +878,7 @@ def read_mrgit_manifests_file( manifests, git ):
 
 def read_mrgit_repo_map_file( repomap, baseurl, git ):
     ""
-    git.checkoutBranch( 'mrgit_config' )
+    git.checkoutBranch( REPO_MAP_BRANCH )
 
     try:
         with change_directory( git.getRootDir() ):
@@ -889,24 +891,24 @@ def write_mrgit_repo_map_file( repomap, git ):
     ""
     with change_directory( git.getRootDir() ):
 
-        if os.path.exists( CONFIG_FILENAME ):
-            repomap.writeToFile( CONFIG_TEMPFILE )
-            commit_repo_map_config_file_if_changed( git )
+        if os.path.exists( REPOMAP_FILENAME ):
+            repomap.writeToFile( REPOMAP_TEMPFILE )
+            commit_repo_map_file_if_changed( git )
 
         else:
-            repomap.writeToFile( CONFIG_FILENAME )
-            git.add( CONFIG_FILENAME )
-            git.commit( 'init config' )
+            repomap.writeToFile( REPOMAP_FILENAME )
+            git.add( REPOMAP_FILENAME )
+            git.commit( 'init '+REPOMAP_FILENAME )
 
 
-def commit_repo_map_config_file_if_changed( git ):
+def commit_repo_map_file_if_changed( git ):
     ""
-    if filecmp.cmp( CONFIG_FILENAME, CONFIG_TEMPFILE ):
-        os.remove( CONFIG_TEMPFILE )
+    if filecmp.cmp( REPOMAP_FILENAME, REPOMAP_TEMPFILE ):
+        os.remove( REPOMAP_TEMPFILE )
     else:
-        os.rename( CONFIG_TEMPFILE, CONFIG_FILENAME )
-        git.add( CONFIG_FILENAME )
-        git.commit( 'changed config' )
+        os.rename( REPOMAP_TEMPFILE, REPOMAP_FILENAME )
+        git.add( REPOMAP_FILENAME )
+        git.commit( 'changed '+REPOMAP_FILENAME )
 
 
 def print3( *args ):

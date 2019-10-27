@@ -488,15 +488,15 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         assert os.path.isfile( 'checkrepo/manifests' )
         assert not os.path.isfile( 'checkrepo/config' )
 
-        assert 'mrgit_config' in git.listRemoteBranches()
-        git.checkoutBranch( 'mrgit_config' )
-        assert os.path.isfile( 'checkrepo/config' )
+        assert mrlib.REPO_MAP_BRANCH in git.listRemoteBranches()
+        git.checkoutBranch( mrlib.REPO_MAP_BRANCH )
+        assert os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
 
-        lines = util.grepfiles( 'repo=repo', 'checkrepo/config' )
+        lines = util.grepfiles( 'repo=repo', 'checkrepo/'+mrlib.REPOMAP_FILENAME )
         assert len( lines ) == 1
         assert 'one/repo.git' in lines[0]
 
-        lines = util.grepfiles( 'repo=two', 'checkrepo/config' )
+        lines = util.grepfiles( 'repo=two', 'checkrepo/'+mrlib.REPOMAP_FILENAME )
         assert len( lines ) == 1
         assert 'and/two.git' in lines[0]
 
