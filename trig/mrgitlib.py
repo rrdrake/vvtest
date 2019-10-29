@@ -19,7 +19,9 @@ import gitinterface as gititf
 from gitinterface import change_directory
 
 
-REPO_MAP_BRANCH = 'mrgit_repo_map'
+MANIFESTS_FILENAME = 'manifests.mrgit'
+GENESIS_FILENAME = 'genesis.map'
+REPOMAP_BRANCH = 'mrgit_repo_map'
 REPOMAP_FILENAME = 'repomap'
 REPOMAP_TEMPFILE = 'repomap.tmp'
 
@@ -515,14 +517,20 @@ class TempDirectory:
 
 def check_load_mrgit_repo( cfg, baseurl, git ):
     ""
-    mfestfn = pjoin( git.getRootDir(), 'manifests' )
+    mfestfn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
+    genfn = pjoin( git.getRootDir(), GENESIS_FILENAME )
 
     if os.path.isfile( mfestfn ):
-        if REPO_MAP_BRANCH in git.listBranches() or \
-           REPO_MAP_BRANCH in git.listRemoteBranches():
+        if REPOMAP_BRANCH in git.listBranches() or \
+           REPOMAP_BRANCH in git.listRemoteBranches():
 
             cfg.loadManifests( git )
             cfg.loadRepoMap( git, baseurl )
+            return True
+
+        elif os.path.isfile( genfn ):
+            cfg.loadManifests( git )
+            cfg.loadGenesisMap( git )
             return True
 
     return False
@@ -594,6 +602,10 @@ class Configuration:
         ""
         read_mrgit_repo_map_file( self.remote, baseurl, git )
 
+    def loadGenesisMap(self, git):
+        ""
+        read_genesis_map_file( self.remote, git )
+
     def addRepoURL(self, reponame, url):
         ""
         self.remote.setRepoLocation( reponame, url )
@@ -656,7 +668,7 @@ class Configuration:
         ""
         mrgit = pjoin( self.topdir, '.mrgit' )
         git = gititf.GitInterface( rootdir=mrgit )
-        git.checkoutBranch( REPO_MAP_BRANCH )
+        checkout_repo_map_branch( git )
 
         try:
             write_mrgit_repo_map_file( self.local, git )
@@ -670,13 +682,9 @@ class Configuration:
         git = gititf.GitInterface()
         git.create( repodir, verbose=3 )
 
-        self.mfest.writeToFile( repodir+'/manifests' )
-        git.add( 'manifests' )
-        git.commit( 'init manifests' )
+        write_first_manifests_file( self.mfest, git )
 
-        git.createBranch( REPO_MAP_BRANCH )
-        write_mrgit_repo_map_file( self.local, git )
-        git.checkoutBranch( 'master' )
+        self.commitLocalRepoMap()
 
     def getRemoteRepoMap(self):
         ""
@@ -820,9 +828,9 @@ class RepoMap:
 
             fp.write( '\n' )
 
-    def readFromFile(self, baseurl):
+    def readFromFile(self, filename, baseurl=None):
         ""
-        with open( REPOMAP_FILENAME, 'r' ) as fp:
+        with open( filename, 'r' ) as fp:
 
             for line in fp:
                 line = line.strip()
@@ -868,7 +876,7 @@ def parse_attribute_line( line ):
 
 def read_mrgit_manifests_file( manifests, git ):
     ""
-    fn = pjoin( git.getRootDir(), 'manifests' )
+    fn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
 
     git.checkoutBranch( 'master' )
 
@@ -876,15 +884,34 @@ def read_mrgit_manifests_file( manifests, git ):
         manifests.readFromFile( fp )
 
 
+def write_first_manifests_file( manifests, git ):
+    ""
+    fn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
+
+    manifests.writeToFile( fn )
+    git.add( MANIFESTS_FILENAME )
+    git.commit( 'init '+MANIFESTS_FILENAME )
+
+
 def read_mrgit_repo_map_file( repomap, baseurl, git ):
     ""
-    git.checkoutBranch( REPO_MAP_BRANCH )
+    git.checkoutBranch( REPOMAP_BRANCH )
 
     try:
         with change_directory( git.getRootDir() ):
-            repomap.readFromFile( baseurl )
+            repomap.readFromFile( REPOMAP_FILENAME, baseurl )
     finally:
         git.checkoutBranch( 'master' )
+
+
+def read_genesis_map_file( repomap, git ):
+    ""
+    fn = pjoin( git.getRootDir(), GENESIS_FILENAME )
+
+    git.checkoutBranch( 'master' )
+
+    with change_directory( git.getRootDir() ):
+        repomap.readFromFile( GENESIS_FILENAME )
 
 
 def write_mrgit_repo_map_file( repomap, git ):
@@ -909,6 +936,14 @@ def commit_repo_map_file_if_changed( git ):
         os.rename( REPOMAP_TEMPFILE, REPOMAP_FILENAME )
         git.add( REPOMAP_FILENAME )
         git.commit( 'changed '+REPOMAP_FILENAME )
+
+
+def checkout_repo_map_branch( git ):
+    ""
+    if REPOMAP_BRANCH in git.listBranches():
+        git.checkoutBranch( REPOMAP_BRANCH )
+    else:
+        git.createBranch( REPOMAP_BRANCH )
 
 
 def print3( *args ):
