@@ -22,6 +22,9 @@ Improvements:
           runtime -> num seconds or None if not run
           rundir -> the test execution directory
 
+      Note that only epilogue() is called during shutdown when in information
+      mode, such as "vvtest -i".
+
     - Parameter typing is now supported (relevant only for python script
       tests).  You can now add in your test header, for example,
 

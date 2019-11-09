@@ -142,6 +142,12 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
             assert 'CMDLINE=' in vrun.out and '-vv --config' in vrun.out
             assert 'EPILOGUE=foobar' in vrun.out
 
+            vrun = vtu.runvvtest( '-i --config', adir )
+            vrun.assertCounts( total=1, npass=1 )
+
+            assert 'CMDLINE=' not in vrun.out
+            assert 'EPILOGUE=foobar' in vrun.out
+
 
 ############################################################################
 

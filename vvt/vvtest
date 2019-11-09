@@ -406,6 +406,7 @@ class InformationMode:
         else:
             self.rtdata.getResultsWriter().info( tlist )
             exitcode = tlist.encodeIntegerWarning()
+            call_user_epilogue( self.rtdata, tlist )
 
         return exitcode
 
