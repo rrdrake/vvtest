@@ -69,7 +69,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_cloning_two_repositories_puts_second_under_the_first(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url ] )
 
@@ -79,16 +79,9 @@ class cloning( trigutil.trigTestCase ):
         git = GitInterface( rootdir='cool/ness' )
         assert 'nessie' in git.listTags()
 
-    def make_coolness_repositories(self):
-        ""
-        cool_url = util.create_bare_repo_with_topic_branch( 'cool' )
-        ness_url = util.create_bare_repo_with_topic_branch( 'ness',
-                                                            tag='nessie' )
-        return cool_url, ness_url
-
     def test_command_line_clone_multiple_repos(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         x,out = util.runcmd( mrgit_file+' clone ' + \
                              ness_url+' '+cool_url+' myclone' )
@@ -101,7 +94,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_clone_an_mrgit_clone_by_pointing_to_the_manifests(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
 
@@ -115,7 +108,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_clone_an_mrgit_clone_via_manifests_with_only_one_repo(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ ness_url, 'clone1' ] )
 
@@ -127,7 +120,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_clone_an_mrgit_clone(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
 
@@ -141,7 +134,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_clone_an_mrgit_clone_using_a_file_url(self):
         ""
-        cool_url, ness_url = self.make_coolness_repositories()
+        cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
 
@@ -155,16 +148,7 @@ class cloning( trigutil.trigTestCase ):
 
     def test_clone_a_genesis_repo(self):
         ""
-        cool_url, genesis_url = self.make_coolness_repositories()
-
-        util.push_file_to_repo( genesis_url, mrlib.MANIFESTS_FILENAME, """
-            [ group code ]
-                repo=cool, path=.
-            """ )
-
-        util.push_file_to_repo( genesis_url, mrlib.GENESIS_FILENAME, """
-            repo=cool, url="""+cool_url+"""
-            """ )
+        genesis_url, sub_url = create_example_genesis_repo()
 
         assert len( glob.glob( 'ness*' ) ) == 0
         assert len( glob.glob( 'code*' ) ) == 0
@@ -219,20 +203,26 @@ class cloning( trigutil.trigTestCase ):
     #     util.runcmd( mrgit_file, 'clone -m repos/mymanifest tests' )
 
 
+def create_example_genesis_repo():
+    ""
+    cool_url, genesis_url = make_coolness_repositories()
+    ness_url = util.create_local_bare_repository( 'ness' )
+
+    util.push_file_to_repo( genesis_url, mrlib.MANIFESTS_FILENAME, """
+        [ group code ]
+            repo=cool, path=.
+            repo=ness, path=ness
+        """ )
+
+    util.push_file_to_repo( genesis_url, mrlib.GENESIS_FILENAME, """
+        repo=cool, url="""+cool_url+"""
+        repo=ness, url="""+ness_url+"""
+        """ )
+
+    return genesis_url, ness_url
+
+
 class google_repo_manifests( trigutil.trigTestCase ):
-
-    def create_google_repo_set(self):
-        ""
-        self.man_url = util.create_local_bare_repository( 'manifests', 'central' )
-
-        contents = defaults_xml.replace( 'CENTRALPATH', abspath('central') )
-        util.push_file_to_repo( self.man_url, 'default.xml', contents )
-
-        for repo in ['service','navy','army','airforce','afrl','marines']:
-            url = util.create_local_bare_repository( repo+'.git', 'central' )
-            util.push_file_to_repo( url, 'file.txt', """
-                file in """+repo+""" repository
-                """ )
 
     def test_parse_prefix_urls(self):
         ""
@@ -369,9 +359,9 @@ class google_repo_manifests( trigutil.trigTestCase ):
 
     def test_clone_from_a_google_repo_manifests(self):
         ""
-        self.create_google_repo_set()
+        man_url = create_google_repo_set()
 
-        mrlib.clone( [ '-G', self.man_url, 'clone1' ] )
+        mrlib.clone( [ '-G', man_url, 'clone1' ] )
 
         assert 'service' in util.readfile( 'clone1/file.txt' )
         assert 'navy' in util.readfile( 'clone1/navy/file.txt' )
@@ -386,6 +376,30 @@ class google_repo_manifests( trigutil.trigTestCase ):
             assert 'exactly one URL' in str(e)
         else:
             raise Exception( 'expected an MRGitExitError exception' )
+
+
+def make_coolness_repositories():
+    ""
+    cool_url = util.create_bare_repo_with_topic_branch( 'cool' )
+    ness_url = util.create_bare_repo_with_topic_branch( 'ness',
+                                                        tag='nessie' )
+    return cool_url, ness_url
+
+
+def create_google_repo_set():
+    ""
+    man_url = util.create_local_bare_repository( 'manifests', 'central' )
+
+    contents = defaults_xml.replace( 'CENTRALPATH', abspath('central') )
+    util.push_file_to_repo( man_url, 'default.xml', contents )
+
+    for repo in ['service','navy','army','airforce','afrl','marines']:
+        url = util.create_local_bare_repository( repo+'.git', 'central' )
+        util.push_file_to_repo( url, 'file.txt', """
+            file in """+repo+""" repository
+            """ )
+
+    return man_url
 
 
 defaults_xml = """\
@@ -559,7 +573,7 @@ class mrgit_init( trigutil.trigTestCase ):
 
 class updating( trigutil.trigTestCase ):
 
-    def test_fetch_from_a_repo_set(self):
+    def test_fetch_within_a_repo_set(self):
         ""
         src_url = util.create_bare_repo_with_topic_branch( 'cool' )
 
@@ -575,6 +589,46 @@ class updating( trigutil.trigTestCase ):
         x,out = util.runcmd( 'git branch -rv', chdir='cool' )
         assert x == 0
         assert os.path.exists( 'cool/.git/FETCH_HEAD' )
+
+    def test_pull_within_a_repo_set_clone(self):
+        ""
+        src_url = util.create_bare_repo_with_topic_branch( 'cool' )
+
+        mrlib.clone( [ src_url ] )
+
+        util.push_file_to_repo( src_url, 'newfile.txt', 'anything\n' )
+
+        with util.change_directory( 'cool' ):
+            mrlib.pull( [] )
+
+        assert util.readfile( 'cool/newfile.txt' ).strip() == 'anything'
+
+    def test_pull_within_a_google_repo_clone(self):
+        ""
+        man_url = create_google_repo_set()
+
+        mrlib.clone( [ '-G', man_url ] )
+
+        util.push_file_to_repo( abspath('central/navy.git'),
+                                'newfile.txt', "anything\n" )
+
+        x,out = util.runcmd( mrgit_file+' pull', chdir='default' )
+        assert x == 0
+
+        assert util.readfile( 'default/navy/newfile.txt' ).strip() == 'anything'
+
+    def test_pull_within_a_genesis_clone(self):
+        ""
+        genesis_url, sub_url = create_example_genesis_repo()
+
+        mrlib.clone( [ genesis_url ] )
+
+        util.push_file_to_repo( sub_url, 'newfile.txt', "anything\n" )
+
+        x,out = util.runcmd( mrgit_file+' pull', chdir='code' )
+        assert x == 0
+
+        assert util.readfile( 'code/ness/newfile.txt' ).strip() == 'anything'
 
 
 class commit_and_push( trigutil.trigTestCase ):

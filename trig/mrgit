@@ -12,17 +12,29 @@ from mrgitlib import print3
 
 help_mrgit = \
 """
+NAME
+    mrgit - Multi-Repository Git
+
 SYNOPSIS
-    Multi-Repository Git.
+    mrgit help, mrgit -h, mrgit --help
+    mrgit clone
+    mrgit pull
 
-COMMANDS:
-    mrgit clone [-G] [<repository>] [<directory>]
+DESCRIPTION
+    clone <repository> [<repository> ...] [<directory>]
+    clone -G <repository> [<directory>]
 
-    The <repository> can be a manifests URL or another mrgit clone URL.
+    A single <repository> can be a genesis URL, another mrgit clone URL, or
+    one or more Git repository URLs.
+
+    Use the -G option to clone from a Google Repo manifests URL.
+
     If more than one <repository> is given, an mrgit repository is created
     and populated with those.
 
-    mrgit init ???
+    pull
+
+    Loop over each repository and issue "git pull".
 """
 
 notes = """
@@ -64,6 +76,9 @@ def main():
 
     elif cmd == 'clone':
         mrgitlib.clone( argL[1:] )
+
+    elif cmd == 'pull':
+        mrgitlib.pull( argL[1:] )
 
     elif cmd == 'init':
         mrgitlib.init( argL[1:] )
