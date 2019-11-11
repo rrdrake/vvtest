@@ -83,6 +83,13 @@ queue_config = string one
                string two
                string three
 
+[attaway]
+host_match = attaway-login*
+batch_type = slurm
+queue_config = string one
+               string two
+               string three
+
 ###
 
 [doom]
