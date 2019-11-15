@@ -498,7 +498,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         x,out = util.runcmd( vvtest )
 
         assert len( util.grepfiles( 'coolname=atest', '*/atest/execute.log' ) ) == 1
-        assert len( util.greplines( 'atest *diff', out ) ) > 0
+        assert len( util.greplines( 'diff *atest', out ) ) > 0
 
     def test_the_set_environ_utility_context_manager(self):
         ""
@@ -551,7 +551,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             x,out = util.runcmd( vtu.vvtest_file )
 
         assert len( util.grepfiles( 'coolname=atest', '*/atest/execute.log' ) ) == 1
-        assert len( util.greplines( 'atest *diff', out ) ) > 0
+        assert len( util.greplines( 'diff *atest', out ) ) > 0
 
     def test_running_vvtest_without_PYTHONPATH_set(self):
         ""
@@ -569,7 +569,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             x,out = util.runcmd( vtu.vvtest_file )
 
         assert len( util.grepfiles( 'coolname=atest', '*/atest/execute.log' ) ) == 1
-        assert len( util.greplines( 'atest *diff', out ) ) > 0
+        assert len( util.greplines( 'diff *atest', out ) ) > 0
 
 
 ########################################################################

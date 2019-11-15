@@ -459,8 +459,8 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vrun = vtu.runvvtest( '-vv' )
         vrun.assertCounts( total=2, npass=1, skip=1 )
-        assert vrun.countTestLines( 'blue*pass' ) == 1
-        assert vrun.countTestLines( 'red*skip' ) == 1
+        assert vrun.countTestLines( 'pass *blue' ) == 1
+        assert vrun.countTestLines( 'skip *red' ) == 1
 
 
 ########################################################################

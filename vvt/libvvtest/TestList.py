@@ -269,15 +269,15 @@ class TestList:
         Get a list of the active tests (after filtering).  If 'sorting' is
         not an empty string, it should be a set of characters that control the
         way the test sorting is performed.
-                n : test name (the default)
-                x : execution directory name
+                n : test name
+                x : execution directory name (the default)
                 t : test run time
                 d : execution date
                 s : test status (such as pass, fail, diff, etc)
                 r : reverse the order
         """
         if not sorting:
-            sorting = 'nx'
+            sorting = 'xd'
 
         tL = []
 

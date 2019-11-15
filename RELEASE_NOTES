@@ -47,6 +47,14 @@ Fixes:
 
 Changes:
 
+    - The console test list output format has changed.  Each test result
+      line started with the test name, but not any more.  Also, the runtime
+      of each test changed to hh:mm:ss.  For example,
+      before:
+          atest  pass       1s   10/06 11:21:53 TestResults.Linux/atest.np=4
+      now:
+          pass      0:01 10/06 11:21:53 TestResults.Linux/atest.np=4
+
     - The CONFIGDIR variable in the vvtest_util.py file for each test has
       changed type.  It was a string, but now a (possibly empty) python list.
       The only change for the same variable in vvtest_util.sh files is that

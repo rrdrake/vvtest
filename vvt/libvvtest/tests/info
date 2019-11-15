@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import basename
 import time
 
 import vvtestutils as vtu
@@ -184,14 +185,11 @@ class info_tests( vtu.vvtestTestCase ):
 
         finL = vrun.grepLines( 'Finished: ' )
         assert len(finL) == 4
-        xorder = [ line.split()[1] for line in finL ]
-        for nam in ['ardvark','marmot','otter','zebra']:
-            assert nam in xorder
 
         tdir = vrun.resultsDir()
 
         vrun = vtu.runvvtest( '-i', chdir=tdir )
-        assert test_names( vrun ) == ['ardvark','marmot','otter','zebra']
+        assert test_names( vrun ) == ['marmot','zebra','ardvark','otter']
 
         vrun = vtu.runvvtest( '-i --sort nx', chdir=tdir )
         assert test_names( vrun ) == ['ardvark','marmot','otter','zebra']
@@ -206,7 +204,7 @@ class info_tests( vtu.vvtestTestCase ):
         assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
 
         vrun = vtu.runvvtest( '-i --sort d', chdir=tdir )
-        assert test_names( vrun ) == xorder
+        assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
 
     def test_using_the_files_option_with_a_multi_test_xml_file(self):
         ""
@@ -415,7 +413,9 @@ def test_names( vrun ):
     ""
     nameL = []
     for line in vtu.extract_testlines( vrun.out ):
-        nameL.append( line.split()[0] )
+        xdir = line.split()[-1]
+        bname = basename( xdir )
+        nameL.append( bname.split('.')[0] )
     return nameL
 
 

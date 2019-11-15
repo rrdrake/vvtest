@@ -221,8 +221,8 @@ class validate_plugin_integration_tests( vtu.vvtestTestCase ):
             vtu.remove_results()
             vrun = vtu.runvvtest( '-vv --config', adir, batch=batch )
             vrun.assertCounts( npass=1, skip=1 )
-            assert len( vrun.grepTestLines( 'testA*pass' ) ) == 1
-            assert len( vrun.grepTestLines( 'testB*skip' ) ) == 1
+            assert len( vrun.grepTestLines( 'pass *testA' ) ) == 1
+            assert len( vrun.grepTestLines( 'skip *testB' ) ) == 1
             assert len( vrun.grepTestLines(
                         'keywords must contain fast, medium, or long' ) ) == 1
 

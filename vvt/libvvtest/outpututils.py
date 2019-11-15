@@ -18,18 +18,18 @@ def XstatusString( tcase, test_dir, cwd ):
     """
     ref = tcase.getSpec()
 
-    s =  '%-20s' % ref.getName()
+    s =  ''
 
     skipreason = None
     if tcase.getStat().skipTest():
         skipreason = tcase.getStat().getReasonForSkipTest()
 
     if skipreason:
-        s += ' %-8s' % 'skip'
+        s += '%-8s' % 'skip'
     else:
-        s += ' %-8s' % tcase.getStat().getResultStatus()
+        s += '%-8s' % tcase.getStat().getResultStatus()
 
-    s += ' %-4s' % format_test_run_time( tcase )
+    s += ' %7s' % format_test_run_time( tcase )
     s += ' %14s' % format_test_run_date( tcase )
 
     xdir = ref.getDisplayString()
@@ -119,22 +119,33 @@ def format_test_run_time( tcase ):
     if xtime < 0:
         return ''
     else:
-        return pretty_time( xtime )
+        return colon_separated_time( xtime )
+
+
+def colon_separated_time( nseconds ):
+    ""
+    hr,mn,sc = get_hour_minute_second( nseconds )
+    if hr == 0:
+        return '%d:%02d' % (mn,sc)
+    return '%d:%02d:%02d' % (hr,mn,sc)
+
+
+def get_hour_minute_second( nseconds ):
+    ""
+    h = int( nseconds / 3600 )
+    m = int( ( nseconds - 3600*h ) / 60 )
+    s = int( ( nseconds - 3600*h - 60*m ) + 0.5 )
+    return h,m,s
 
 
 def pretty_time( nseconds ):
-    """
-    Returns a string with the given number of seconds written in a human
-    readable form.
-    """
-    h = int( nseconds / 3600 )
+    ""
+    h,m,s = get_hour_minute_second( nseconds )
     sh = str(h)+'h'
-
-    m = int( ( nseconds - 3600*h ) / 60 )
     sm = str(m)+'m'
 
-    s = int( ( nseconds - 3600*h - 60*m ) )
-    if h == 0 and m == 0 and s == 0: s = 1
+    if h == 0 and m == 0 and s == 0:
+        s = 1
     ss = str(s) + 's'
 
     if h > 0: return sh+' '+sm+' '+ss

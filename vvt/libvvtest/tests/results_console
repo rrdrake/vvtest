@@ -232,16 +232,16 @@ class consolue_output_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
 
         vrun = vtu.runvvtest( '-i' )
-        assert vrun.countLines( 'passtest *pass' ) == 1
+        assert vrun.countLines( 'pass *passtest' ) == 1
 
         vrun = vtu.runvvtest( '-i --html red.htm' )
-        assert vrun.countLines( 'passtest *pass' ) == 0
+        assert vrun.countLines( 'pass *passtest' ) == 0
 
         vrun = vtu.runvvtest( '-i --junit ju.xml' )
-        assert vrun.countLines( 'passtest *pass' ) == 0
+        assert vrun.countLines( 'pass *passtest' ) == 0
 
         vrun = vtu.runvvtest( '-i --gitlab .' )
-        assert vrun.countLines( 'passtest *pass' ) == 0
+        assert vrun.countLines( 'pass *passtest' ) == 0
 
     def test_list_output_using_double_verbose_flag(self):
         ""

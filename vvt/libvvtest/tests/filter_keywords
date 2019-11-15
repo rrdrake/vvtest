@@ -56,10 +56,10 @@ class filter_and_keywords( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( batch=batch )
             vrun.assertCounts( total=4, npass=2, fail=2 )
-            assert vrun.countTestLines( 'pass*atest.nx=1') == 1
-            assert vrun.countTestLines( 'pass*btest.nx=1') == 1
-            assert vrun.countTestLines( 'fail*atest.nx=4') == 1
-            assert vrun.countTestLines( 'fail*btest.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 1
+            assert vrun.countTestLines( 'pass *btest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 1
+            assert vrun.countTestLines( 'fail *btest.nx=4') == 1
 
             vtu.remove_results()
 
@@ -77,20 +77,20 @@ class filter_and_keywords( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( '-k atest/notrun', batch=batch )
             vrun.assertCounts( total=2, npass=1, fail=1 )
-            assert vrun.countTestLines( 'pass*atest.nx=1') == 1
-            assert vrun.countTestLines( 'fail*atest.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 1
 
             vrun = vtu.runvvtest( '-k atest/fail', batch=batch )
             vrun.assertCounts( total=2, npass=1, fail=1 )
-            assert vrun.countTestLines( 'pass*atest.nx=1') == 1
-            assert vrun.countTestLines( 'fail*atest.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 1
 
             vrun = vtu.runvvtest( '-k btest -K fail', batch=batch )
             vrun.assertCounts( total=2, npass=1, fail=1 )
-            assert vrun.countTestLines( 'atest*pass*.nx=1') == 0
-            assert vrun.countTestLines( 'atest*fail*.nx=4') == 0
-            assert vrun.countTestLines( 'btest*pass*.nx=1') == 1
-            assert vrun.countTestLines( 'btest*fail*.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 0
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 0
+            assert vrun.countTestLines( 'pass *btest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *btest.nx=4') == 1
 
     def test_results_keyword_expression_inside_test_results_area(self):
         ""
@@ -107,20 +107,20 @@ class filter_and_keywords( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( '-k atest/fail', batch=batch, chdir=tdir )
             vrun.assertCounts( total=3, npass=1, fail=2 )
-            assert vrun.countTestLines( 'atest*pass*.nx=1') == 1
-            assert vrun.countTestLines( 'atest*fail*.nx=4') == 1
-            assert vrun.countTestLines( 'btest*pass*.nx=1') == 0
-            assert vrun.countTestLines( 'btest*fail*.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 1
+            assert vrun.countTestLines( 'pass *btest.nx=1') == 0
+            assert vrun.countTestLines( 'fail *btest.nx=4') == 1
 
             vrun = vtu.runvvtest( '-k atest', batch=batch )
             vrun.assertCounts( total=0 )
 
             vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
             vrun.assertCounts( total=4, npass=2, fail=2 )
-            assert vrun.countTestLines( 'atest*pass*.nx=1') == 1
-            assert vrun.countTestLines( 'atest*fail*.nx=4') == 1
-            assert vrun.countTestLines( 'btest*pass*.nx=1') == 1
-            assert vrun.countTestLines( 'btest*fail*.nx=4') == 1
+            assert vrun.countTestLines( 'pass *atest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *atest.nx=4') == 1
+            assert vrun.countTestLines( 'pass *btest.nx=1') == 1
+            assert vrun.countTestLines( 'fail *btest.nx=4') == 1
 
     def test_xml_test_filter_by_keyword_expression(self):
         """
@@ -230,16 +230,16 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( batch=batch )
             vrun.assertCounts( total=3, npass=2, fail=1 )
 
-            assert vrun.countTestLines( 'pass*atest') == 1
-            assert vrun.countTestLines( 'fail*btest') == 1
-            assert vrun.countTestLines( 'pass*ctest') == 1
+            assert vrun.countTestLines( 'pass *atest') == 1
+            assert vrun.countTestLines( 'fail *btest') == 1
+            assert vrun.countTestLines( 'pass *ctest') == 1
 
             vrun = vtu.runvvtest( '-k atest/fail/btest', batch=batch )
             vrun.assertCounts( total=2, npass=1, fail=1 )
 
-            assert vrun.countTestLines( 'pass*atest') == 1
-            assert vrun.countTestLines( 'fail*btest') == 1
-            assert vrun.countTestLines( 'pass*ctest') == 0
+            assert vrun.countTestLines( 'pass *atest') == 1
+            assert vrun.countTestLines( 'fail *btest') == 1
+            assert vrun.countTestLines( 'pass *ctest') == 0
 
 
 ########################################################################

@@ -343,9 +343,9 @@ execute tests.
 
 When listing the tests, the --sort option can be used to control the order.
 When test results are printed to the screen, they are sorted by
-their test name by default.  Use this option to sort by other fields:
->   n : test name (the default)
->   x : execution directory name
+their execution by default.  Use this option to sort by other fields:
+>   n : test name
+>   x : execution directory name (the default)
 >   t : test run time
 >   d : execution date
 >   s : test status (such as pass, fail, diff, etc)

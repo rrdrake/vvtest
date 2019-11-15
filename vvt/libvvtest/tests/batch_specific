@@ -142,7 +142,7 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         assert len(L2) == 1 and L2[0] == 1
 
         assert len( vtu.greptestlist( 'sleeper[1-4]', out ) ) == 4
-        assert len( vtu.greptestlist( 'sleeper[1-4] *pass', out ) ) == 3
+        assert len( vtu.greptestlist( 'pass *sleeper[1-4]', out ) ) == 3
 
 
 ########################################################################

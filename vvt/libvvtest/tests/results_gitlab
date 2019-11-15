@@ -68,7 +68,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         print3( line )
         sL = [ s.strip() for s in line.split( '|' )[1:-1] ]
         assert len(sL) == 4
-        assert sL[0] == 'pass' and sL[2] == '5s'
+        assert sL[0] == 'pass' and sL[2] == '0:05'
         assert sL[3] == 'sdir/atest.np=4'
 
         tcase = self.makeTest( 'fail', 7 )
@@ -76,7 +76,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         print3( line )
         sL = [ s.strip() for s in line.split( '|' )[1:-1] ]
         assert len(sL) == 4
-        assert sL[0] == 'fail' and sL[2] == '7s'
+        assert sL[0] == 'fail' and sL[2] == '0:07'
         assert sL[3] == '[sdir/atest.np=4](sdir_atest.np=4.md)'
 
         tcase = self.makeTest( 'fail', 7 )
@@ -84,7 +84,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         print3( line )
         sL = [ s.strip() for s in line.split( '|' )[1:-1] ]
         assert len(sL) == 4
-        assert sL[0] == 'fail' and sL[2] == '7s'
+        assert sL[0] == 'fail' and sL[2] == '0:07'
         assert sL[3] == 'sdir/atest.np=4'
 
     def test_write_gitlab_results_table(self):
@@ -528,7 +528,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         mdfile = util.globfile( 'DiffTest.*.md' )
         xdir = os.path.join( vrun.resultsDir(), tst.getExecuteDirectory() )
         assert len( util.grepfiles( 'Run directory:*'+xdir, mdfile ) ) == 1
-        assert len( util.grepfiles( 'Result:*DiffTest *diff *', mdfile ) ) == 1
+        assert len( util.grepfiles( 'Result:*diff *DiffTest', mdfile ) ) == 1
 
     def test_producing_gitlab_markdown_results_files(self):
         ""

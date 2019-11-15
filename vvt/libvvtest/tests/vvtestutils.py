@@ -419,13 +419,13 @@ def parse_vvtest_counts( out ):
 
 
 # these have to be modified if/when the output format changes in vvtest
-def check_pass(L): return len(L) >= 5 and L[1] == 'pass'
-def check_fail(L): return len(L) >= 5 and L[1] == 'fail'
-def check_diff(L): return len(L) >= 5 and L[1] == 'diff'
-def check_notrun(L): return len(L) >= 3 and L[1] == 'notrun'
-def check_timeout(L): return len(L) >= 4 and L[1] == 'timeout'
-def check_notdone(L): return len(L) >= 3 and L[1] == 'notdone'
-def check_skip(L): return len(L) >= 4 and L[1] == 'skip'
+def check_pass(L): return len(L) >= 4 and L[0] == 'pass'
+def check_fail(L): return len(L) >= 4 and L[0] == 'fail'
+def check_diff(L): return len(L) >= 4 and L[0] == 'diff'
+def check_notrun(L): return len(L) >= 2 and L[0] == 'notrun'
+def check_timeout(L): return len(L) >= 3 and L[0] == 'timeout'
+def check_notdone(L): return len(L) >= 2 and L[0] == 'notdone'
+def check_skip(L): return len(L) >= 3 and L[0] == 'skip'
 
 
 def parse_test_ids( vvtest_output, results_dir ):
@@ -546,14 +546,24 @@ def testtimes(out):
     for line in extract_testlines(out):
         L = line.strip().split()
         try:
-            s = time.strftime('%Y ')+L[3]+' '+L[4]
+            s = time.strftime('%Y ')+L[2]+' '+L[3]
             t = time.mktime( time.strptime( s, fmt ) )
-            e = t + int( L[2][:-1] )
+            e = t + parse_runtime_from_output_line( L )
             timesL.append( [ L[-1], t, e ] )
         except Exception:
             pass
 
     return timesL
+
+
+def parse_runtime_from_output_line( lineL ):
+    ""
+    hmsL = lineL[1].split(':')
+    assert len(hmsL) in [2,3]
+    if len(hmsL) == 2:
+        return int(hmsL[0])*60 + int(hmsL[1])
+    else:
+        return int(hmsL[0])*60*60 + int(hmsL[1])*60 + int(hmsL[2])
 
 
 def parse_summary_string( summary_string ):
