@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath, dirname
 import time
 
 import vvtestutils as vtu
@@ -17,6 +18,8 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.location import find_vvtest_test_root_file
+from libvvtest.location import determine_configdir
+from libvvtest.location import split_by_largest_existing_path
 import libvvtest.TestList as TestList
 
 
@@ -36,10 +39,10 @@ class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         p = find_vvtest_test_root_file( os.getcwd(), None, 'foobar.baz' )
-        assert p == os.path.abspath( 'foobar.baz' )
+        assert p == abspath( 'foobar.baz' )
 
         p = find_vvtest_test_root_file( os.getcwd(), os.getcwd(), 'foobar.baz' )
-        assert p == os.path.abspath( 'foobar.baz' )
+        assert p == abspath( 'foobar.baz' )
 
     def test_marker_file_in_parent_directory(self):
         ""
@@ -47,8 +50,8 @@ class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
         os.makedirs( 'subdir/deep' )
         time.sleep(1)
 
-        startd = os.path.abspath( 'subdir' )
-        markf = os.path.abspath( 'foobar.baz' )
+        startd = abspath( 'subdir' )
+        markf = abspath( 'foobar.baz' )
 
         p = find_vvtest_test_root_file( startd, None, 'foobar.baz' )
         assert p == markf
@@ -56,14 +59,102 @@ class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
         p = find_vvtest_test_root_file( startd, os.getcwd(), 'foobar.baz' )
         assert p == None
 
-        startd = os.path.abspath( 'subdir/deep' )
-        markf = os.path.abspath( 'foobar.baz' )
+        startd = abspath( 'subdir/deep' )
+        markf = abspath( 'foobar.baz' )
 
         p = find_vvtest_test_root_file( startd, None, 'foobar.baz' )
         assert p == markf
 
         p = find_vvtest_test_root_file( startd, os.getcwd(), 'foobar.baz' )
         assert p == None
+
+
+class configdir_handling( vtu.vvtestTestCase ):
+
+    def test_simple_configdir_specification(self):
+        ""
+        dL = determine_configdir( [], None )
+        assert dL == []
+
+        dL = determine_configdir( ['/a/path'], None )
+        assert dL == [ '/a/path' ]
+
+        dL = determine_configdir( [], '/a/path' )
+        assert dL == [ '/a/path' ]
+
+        dL = determine_configdir( ['/a/path'], '/b/path' )
+        assert dL == [ '/a/path' ]
+
+    def test_abspath_is_applied(self):
+        ""
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        dL = determine_configdir( ['subdir'], None )
+        assert dL == [ abspath('subdir') ]
+
+        dL = determine_configdir( [], '..' )
+        assert dL == [ dirname( os.getcwd() ) ]
+
+    def test_multiple_paths(self):
+        ""
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        dL = determine_configdir( ['/a/path','/b/path'], None )
+        assert dL == ['/a/path','/b/path']
+
+        dL = determine_configdir( ['/a/path:/b/path'], None )
+        assert dL == ['/a/path','/b/path']
+
+        dL = determine_configdir( [], '/a/path:/b/path' )
+        assert dL == ['/a/path','/b/path']
+
+        dL = determine_configdir( [], '/a/path:subdir' )
+        assert dL == ['/a/path',abspath('subdir')]
+
+    def test_directories_with_colons(self):
+        ""
+        os.mkdir( 'subdir' )
+        os.mkdir( 'some:dir' )
+        time.sleep(1)
+
+        d1,d2 = split_by_largest_existing_path( abspath('subdir') )
+        assert d1 == abspath('subdir') and d2 == None
+
+        d1,d2 = split_by_largest_existing_path( abspath('some:dir') )
+        assert d1 == abspath('some:dir') and d2 == None
+
+        d1,d2 = split_by_largest_existing_path( 'some:dir' )
+        assert d1 == 'some:dir' and d2 == None
+
+        d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
+        assert d1 == 'subdir' and d2 == 'some:dir'
+
+        d1,d2 = split_by_largest_existing_path( 'foo:some:dir' )
+        assert d1 == None and d2 == 'foo:some:dir'
+
+        d1,d2 = split_by_largest_existing_path( 'some:dir:foo' )
+        assert d1 == 'some:dir' and d2 == 'foo'
+
+        d1,d2 = split_by_largest_existing_path( 'some:dir:foo:bar' )
+        assert d1 == 'some:dir' and d2 == 'foo:bar'
+
+        d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
+        assert d1 == 'subdir' and d2 == 'some:dir'
+
+        d1,d2 = split_by_largest_existing_path( 'foo:bar' )
+        assert d1 == None and d2 == 'foo:bar'
+
+
+        dL = determine_configdir( [], 'some:dir:subdir' )
+        assert dL == [abspath('some:dir'),abspath('subdir')]
+
+        dL = determine_configdir( [], 'subdir:some:dir' )
+        assert dL == [abspath('subdir'),abspath('some:dir')]
+
+        dL = determine_configdir( [], 'foo:some:dir' )
+        assert dL == [abspath('foo'),abspath('some:dir')]
 
 
 class exit_status_controls( vtu.vvtestTestCase ):

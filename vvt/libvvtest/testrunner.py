@@ -66,8 +66,8 @@ class TestRunner:
         if tspec.getSpecificationForm() == 'xml':
             if self.commondb == None:
                 d = pjoin( self.rtconfig.getAttr('vvtestdir'), 'libvvtest' )
-                c = self.rtconfig.getAttr('configdir')
-                self.commondb = CommonSpec.loadCommonSpec( d, c )
+                cfgdirs = self.rtconfig.getAttr('configdir')
+                self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
 
             return self.commondb
 
@@ -165,47 +165,6 @@ class ExecutionHandler:
             # [Apr 2019] using TIMEOUT is deprecated
             os.environ['TIMEOUT'] = str( int( t ) )
             os.environ['VVTEST_TIMEOUT'] = str( int( t ) )
-
-    def set_PYTHONPATH(self, baseline):
-        """
-        When running Python in a test, the sys.path must include a few vvtest
-        directories as well as the user's config dir.  This can be done with
-        PYTHONPATH *unless* a directory contains a colon, which messes up
-        Python's handling of the paths.
-
-        To work in this case, sys.path is set in the vvtest_util.py file.
-        The user's test just imports vvtest_util.py first thing.  However,
-        importing vvtest_util.py assumes the execute directory is in sys.path
-        on startup.  Normally it would be, but this can fail to be the case
-        if the script is a soft link (which it is for the test script).
-
-        The solution is to make sure PYTHONPATH contains an empty directory,
-        which Python will expand to the current working directory. Note that
-        versions of Python before 3.4 would allow the value of PYTHONPATH to
-        be an empty string, but for 3.4 and later, it must at least be a single
-        colon.
-
-        [July 2019] To preserve backward compatibility for tests that do not
-        import vvtest_util.py first thing, the directories are placed in
-        PYTHONPATH here too (but only those that do not contain colons).
-        """
-        val = ''
-
-        cfgd = self.rtconfig.getAttr( 'configdir' )
-        if cfgd and ':' not in cfgd:
-            val += ':'+cfgd
-
-        tdir = self.rtconfig.getAttr( 'vvtestdir' )
-        if ':' not in tdir:
-            val += ':'+pjoin( tdir, 'config' ) + ':'+tdir
-
-        if 'PYTHONPATH' in os.environ:
-            val += ':'+os.environ['PYTHONPATH']
-
-        if not val:
-            val = ':'
-
-        os.environ['PYTHONPATH'] = val
 
     def check_run_postclean(self):
         ""
@@ -307,7 +266,8 @@ class ExecutionHandler:
         self.check_write_mpi_machine_file()
         self.check_set_working_files( baseline )
 
-        self.set_PYTHONPATH( baseline )
+        set_PYTHONPATH( self.rtconfig.getAttr( 'vvtestdir' ),
+                        self.rtconfig.getAttr( 'configdir' ) )
 
         pyexe = self.apply_plugin_preload()
 
@@ -385,6 +345,52 @@ def get_execution_log_filename( tcase, baseline ):
         logfname = 'execute.log'
 
     return logfname
+
+
+def set_PYTHONPATH( vvtestdir, configdirs ):
+    """
+    When running Python in a test, the sys.path must include a few vvtest
+    directories as well as the user's config dir.  This can be done with
+    PYTHONPATH *unless* a directory contains a colon, which messes up
+    Python's handling of the paths.
+
+    To work in this case, sys.path is set in the vvtest_util.py file.
+    The user's test just imports vvtest_util.py first thing.  However,
+    importing vvtest_util.py assumes the execute directory is in sys.path
+    on startup.  Normally it would be, but this can fail to be the case
+    if the script is a soft link (which it is for the test script).
+
+    The solution is to make sure PYTHONPATH contains an empty directory,
+    which Python will expand to the current working directory. Note that
+    versions of Python before 3.4 would allow the value of PYTHONPATH to
+    be an empty string, but for 3.4 and later, it must at least be a single
+    colon.
+
+    [July 2019] To preserve backward compatibility for tests that do not
+    import vvtest_util.py first thing, the directories are placed in
+    PYTHONPATH here too (but only those that do not contain colons).
+    """
+    os.environ['PYTHONPATH'] = determine_PYTHONPATH( vvtestdir, configdirs )
+
+
+def determine_PYTHONPATH( vvtestdir, configdirs ):
+    ""
+    val = ''
+
+    for cfgd in configdirs:
+        if ':' not in cfgd:
+            val += ':'+cfgd
+
+    if ':' not in vvtestdir:
+        val += ':'+pjoin( vvtestdir, 'config' ) + ':'+vvtestdir
+
+    if 'PYTHONPATH' in os.environ:
+        val += ':'+os.environ['PYTHONPATH']
+
+    if not val:
+        val = ':'
+
+    return val
 
 
 def echo_test_execution_info( testname, cmd_list, timeout ):

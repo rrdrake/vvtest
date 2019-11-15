@@ -769,11 +769,6 @@ def adjust_options_and_create_derived_options( opts ):
         if opts.bin_dir != None:
             opts.bin_dir = os.path.normpath( os.path.abspath( opts.bin_dir ) )
 
-        errtype = 'config directory'
-        if opts.config != None:
-            for i,d in enumerate( opts.config ):
-                opts.config[i] = os.path.normpath( os.path.abspath( d ) )
-
         errtype = '--results-date'
         if opts.results_date != None:
             opts.results_date = check_convert_date_spec( opts.results_date )

@@ -32,7 +32,7 @@ class RuntimeConfig:
 
     defaults = { \
         'vvtestdir'  : None,  # the top level vvtest directory
-        'configdir'  : None,  # the configuration directory
+        'configdir'  : [],    # the configuration directory(ies)
         'exepath'    : None,  # the path to the executables
         'onopts'     : [],
         'offopts'    : [],

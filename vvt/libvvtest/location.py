@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os, sys
+from os.path import normpath, abspath
 import shutil
 
 
@@ -36,6 +37,66 @@ def find_vvtest_test_root_file( start_directory,
             break
 
     return None
+
+
+def determine_configdir( opts_config, environ_config ):
+    ""
+    cfgL = []
+
+    cfgspecs = []
+    if opts_config:
+        cfgspecs = opts_config
+    elif environ_config and environ_config.strip():
+        cfgspecs = [ environ_config.strip() ]
+
+    for cfgdir in cfgspecs:
+        if ':' in cfgdir:
+
+            d1 = cfgdir
+            while True:
+
+                d1,d2 = split_by_largest_existing_path( d1 )
+
+                if d1 == None:
+                    d1,d2 = d2.split(':',1)
+
+                if d1 != None:
+                    cfgL.append( normpath( abspath(d1) ) )
+
+                if d2 == None:
+                    break
+                elif ':' in d2:
+                    d1 = d2
+                else:
+                    cfgL.append( normpath( abspath(d2) ) )
+                    break
+
+        else:
+            cfgL.append( normpath( abspath( cfgdir ) ) )
+
+    return cfgL
+
+
+def split_by_largest_existing_path( path, rindex=0 ):
+    ""
+    if rindex == 0:
+        d1 = path
+        d2 = None
+    else:
+        pL = path.split(':')
+        n = len(pL)
+
+        if rindex >= n:
+            d1 = None
+            d2 = path
+        else:
+            d1 = ':'.join( pL[:n-rindex] )
+            d2 = ':'.join( pL[n-rindex:] )
+
+    if d1 == None or os.path.exists( d1 ):
+        return d1,d2
+    else:
+        return split_by_largest_existing_path( path, rindex+1 )
 
 
 def test_results_subdir_name( rundir, onopts, offopts, platform_name ):

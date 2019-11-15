@@ -332,23 +332,22 @@ def scanCommonSpecs( filedoc, common_db ):
 
 ###########################################################################
 
-def loadCommonSpec( specdir, configdir ):
-    """
-    """
+def load_common_xmldb( specdir, configdirs ):
+    ""
     import libvvtest.xmlwrapper as xmlwrapper
     xmldocreader = xmlwrapper.XmlDocReader()
     
     xdb = CommonSpecDB()
-    f1 = os.path.join( specdir, 'exeDB.xml' )
-    f2 = os.path.join( configdir, 'exeDB.xml' )
-    for xdbf in [f1,f2]:
+
+    for d in [specdir]+configdirs:
+        xdbf = os.path.join( d, 'exeDB.xml' )
+
         if os.path.exists( xdbf ):
             try:
                 doc = xmldocreader.readDoc( xdbf )
                 scanCommonSpecs( doc, xdb )
-            except:
-                sys.stderr.write( "*** error: failed to read " + xdbf + \
-                                  os.linesep )
+            except Exception:
+                sys.stderr.write( "*** error: failed to read " + xdbf + '\n' )
                 sys.stderr.flush()
                 raise
     

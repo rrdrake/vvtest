@@ -22,7 +22,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     trel = dirname( testobj.getFilepath() )
     srcdir = normpath( pjoin( troot, trel ) )
     
-    configdir = rtconfig.getAttr('configdir')
+    configdirs = rtconfig.getAttr('configdir')
 
     tdir = rtconfig.getAttr('vvtestdir')
     assert tdir
@@ -58,18 +58,15 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                'OPTIONS_OFF = '+repr( offopts ),
                'SRCDIR = "'+srcdir+'"' )
 
-        if configdir:
-            w.add( 'CONFIGDIR = "'+configdir+'"' )
-        else:
-            w.add( 'CONFIGDIR = ""' )
+        w.add( 'CONFIGDIR = '+repr(configdirs) )
 
         # order matters; configdir should be the first entry in sys.path
         w.add( '',
                'sys.path.insert( 0, "'+trigdir+'" )',
                'sys.path.insert( 0, "'+tdir+'" )',
                'sys.path.insert( 0, "'+tdir+'/config" )' )
-        if configdir and configdir != tdir+'/config':
-            w.add( 'sys.path.insert( 0, "'+configdir+'" )' )
+        for d in configdirs[::-1]:
+            w.add( 'sys.path.insert( 0, "'+d+'" )' )
 
         w.add( '',
                'diff_exit_status = 64',
@@ -168,10 +165,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                'SRCDIR="'+srcdir+'"',
                'PYTHONEXE="'+sys.executable+'"' )
 
-        if configdir:
-            w.add( 'CONFIGDIR="'+configdir+'"' )
-        else:
-            w.add( 'CONFIGDIR=""' )
+        w.add( 'CONFIGDIR="'+':'.join( configdirs )+'"' )
 
         w.add( '',
                'diff_exit_status=64' )
@@ -210,20 +204,15 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
         L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
         w.add( '', 'DEPDIRS="'+' '.join(L)+'"' )
 
-        # for sh/bash, all variables go into a global namespace; therefore,
-        # we can just source the utility scripts from here
-        if configdir:
+        w.add( '',
+               'source $VVTESTSRC/config/script_util.sh' )
+        for d in configdirs[::-1]:
             w.add( """
-                if [ -e $CONFIGDIR/script_util_plugin.sh ]
+                if [ -e """+d+"""/script_util_plugin.sh ]
                 then
-                    source $CONFIGDIR/script_util_plugin.sh
-                else
-                    source $VVTESTSRC/config/script_util.sh
+                    source """+d+"""/script_util_plugin.sh
                 fi
                 """ )
-        else:
-            w.add( '',
-                   'source $VVTESTSRC/config/script_util.sh )' )
     
     w.write( filename )
 

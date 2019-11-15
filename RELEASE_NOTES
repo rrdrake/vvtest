@@ -1,6 +1,11 @@
 
 Improvements:
 
+    - The VVTEST_CONFIGDIR environment variable string or the command line
+      option --config, can now contain multiple directories separated by a
+      colon (like PYTHONPATH).  More than one --config option is also allowed.
+      This allows multiple config directories to be specified.
+
     - Add --scan-type <type> command line argument, where 'type' can be
       "xml" or "vvt".  This restricts the test scanning to tests of the
       given type.
@@ -41,6 +46,11 @@ Fixes:
       inside the test results directory.
 
 Changes:
+
+    - The CONFIGDIR variable in the vvtest_util.py file for each test has
+      changed type.  It was a string, but now a (possibly empty) python list.
+      The only change for the same variable in vvtest_util.sh files is that
+      is can now be a colon separated list of directories.
 
     - For XML specified tests, the variable TOOLSET_DIR has been changed
       to VVTESTSRC.  This name is consistent with the script form of test

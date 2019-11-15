@@ -237,7 +237,7 @@ class config_tests( vtu.vvtestTestCase ):
             import os
             import vvtest_util as vvt
             import script_util_plugin as util
-            assert os.path.samefile( vvt.CONFIGDIR, '"""+cfg+"""' )
+            assert os.path.samefile( vvt.CONFIGDIR[0], '"""+cfg+"""' )
             util.special_function()
             """ )
         util.writescript( 'shtest.vvt', """
@@ -343,6 +343,66 @@ class config_tests( vtu.vvtestTestCase ):
         platname, cplr = check_get_compiler_and_platform( vrun )
         assert cplr == "BASIC"
         assert platname == "PlayStation"
+
+    def test_using_multiple_config_directories(self):
+        ""
+        cfg1 = os.path.abspath('config1')
+        cfg2 = os.path.abspath('config2')
+
+        os.mkdir( 'rundir' )
+
+        util.writefile( 'pytest.vvt', """
+            import vvtest_util as vvt
+            import mypyutil
+            mypyutil.mypyfunc()
+            """ )
+        util.writescript( 'shtest.vvt', """
+            #!/bin/sh
+            source ./vvtest_util.sh
+            save_IFS=$IFS ; IFS=:
+            for pth in $CONFIGDIR ; do
+                [ -e $pth/myshutil.sh ] && source $pth/myshutil.sh
+            done
+            IFS=$save_IFS
+            myshfunc
+            """ )
+
+        util.writefile( cfg1+'/mypyutil.py', """
+            import os, sys
+            def mypyfunc():
+                print ( 'mypyfunc was called' )
+            """ )
+        util.writefile( cfg2+'/myshutil.sh', """
+            myshfunc() {
+                echo "myshfunc was called"
+            }
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            with util.set_environ( VVTEST_CONFIGDIR=None ):
+                self.run_multi_config( '--config', cfg1, '--config', cfg2, '..',
+                                       chdir='rundir', batch=batch )
+                self.run_multi_config( '--config ../config1', '--config ../config2', '..',
+                                       chdir='rundir', batch=batch )
+                self.run_multi_config( '--config', cfg2, '--config', cfg1, '..',
+                                       chdir='rundir', batch=batch )
+                self.run_multi_config( '--config ../config2', '--config ../config1', '..',
+                                       chdir='rundir', batch=batch )
+
+            with util.set_environ( VVTEST_CONFIGDIR=cfg1+':'+cfg2 ):
+                self.run_multi_config( '..', chdir='rundir', batch=batch )
+
+            with util.set_environ( VVTEST_CONFIGDIR='../config2:../config1'):
+                self.run_multi_config( '..', chdir='rundir', batch=batch )
+
+    def run_multi_config(self, *args, **kwargs):
+        ""
+        vrun = vtu.runvvtest( '-w', *args, **kwargs )
+        vrun.assertCounts( total=2, npass=2 )
+        assert len( vrun.greplogs( 'mypyfunc was called' ) ) == 1
+        assert len( vrun.greplogs( 'myshfunc was called' ) ) == 1
 
 
 class preload_tests( vtu.vvtestTestCase ):

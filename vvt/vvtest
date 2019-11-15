@@ -49,10 +49,13 @@ class MainEntry:
         self.opts, self.optD, self.dirs = \
             cmdline.parse_command_line( self.argv[1:], version )
 
+        configdir = location.determine_configdir(
+                                self.opts.config,
+                                os.getenv( 'VVTEST_CONFIGDIR' ) )
+
         # non-None only if the CWD is in a TestResults.* directory
         self.cache_file = get_test_cache_file()
 
-        configdir = determine_configdir( self.vvtestdir, self.opts )
         insert_configdir_into_sys_path( self.vvtestdir, configdir )
 
         self.rtdata = RuntimeData( self.argv, self.vvtestdir, self.exepath )
@@ -209,19 +212,6 @@ def import_plugin_module( rtconfig ):
     plug = userplugin.UserPluginBridge( rtconfig, plugmod )
 
     return plug
-
-
-def determine_configdir( vvtestdir, opts ):
-    ""
-    if opts.config:
-        return opts.config[-1]
-
-    else:
-        d = os.getenv( 'VVTEST_CONFIGDIR' )
-        if d == None:
-            d = pjoin( vvtestdir, 'config' )
-
-        return abspath(d)
 
 
 def create_configuration( rtconfig, opts, optD, vvtestdir, configdir ):
@@ -984,8 +974,8 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     if opts.perms:
         cmd += ' --perms '+','.join( opts.perms )
 
-    if rtconfig.getAttr('configdir'):
-        cmd += ' --config='+rtconfig.getAttr('configdir')
+    for cfgdir in rtconfig.getAttr('configdir'):
+        cmd += ' --config='+cfgdir
 
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
@@ -1125,21 +1115,17 @@ def check_for_bootstrap_file( exepath ):
             import vvtest_bootstrap
 
 
-def insert_configdir_into_sys_path( vvtestdir, configdir ):
+def insert_configdir_into_sys_path( vvtestdir, configdirs ):
     ""
-    d1 = normpath( pjoin( vvtestdir, 'config' ) )
+    dL = [ normpath(d) for d in configdirs ]
 
-    d2 = configdir
-    if d2:
-        d2 = normpath( d2 )
+    d = normpath( pjoin( vvtestdir, 'config' ) )
+    if d not in dL:
+        dL.append( d )
 
-        if d1 != d2:
-            sys.path.insert( 1, d1 )
-
-        sys.path.insert( 1, d2 )
-
-    else:
-        sys.path.insert( 1, d1 )
+    dL.reverse()
+    for d in dL:
+        sys.path.insert( 1, d )
 
 
 def make_PermissionSetter( test_dir, optperms ):
