@@ -8,32 +8,28 @@ import os, sys
 
 from .TestExec import TestExec
 from . import depend
-from . import testrunner
 
 
 class TestExecList:
 
-    def __init__(self, usrplugin, tlist):
+    def __init__(self, usrplugin, tlist, runner):
         ""
         self.plugin = usrplugin
         self.tlist = tlist
+        self.runner = runner
 
         self.xtlist = {}  # np -> list of TestCase objects
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
-    def createTestExecs(self, test_dir, platform, rtconfig, perms):
+    def createTestExecs(self, perms):
         """
         Creates the set of TestExec objects from the active test list.
         """
-        runner = testrunner.TestRunner( test_dir, platform,
-                                        rtconfig, self.plugin,
-                                        perms )
-
         self._createTestExecList( perms )
-        
+
         for tcase in self.getTestExecList():
-            runner.initialize_for_execution( tcase )
+            self.runner.initialize_for_execution( tcase )
 
     def _createTestExecList(self, perms):
         ""
@@ -99,7 +95,7 @@ class TestExecList:
         needed by one or more tests in the TestExec list.
         """
         return self.xtlist.keys()
-    
+
     def getTestExecList(self, numprocs=None):
         """
         If 'numprocs' is None, all TestExec objects are returned.  If 'numprocs'
@@ -115,12 +111,12 @@ class TestExecList:
             xL.extend( self.xtlist.get(numprocs,[]) )
 
         return xL
-    
+
     def popNext(self, platform):
         """
         Finds a test to execute.  Returns a TestExec object, or None if no
         test can run.  In this case, one of the following is true
-        
+
             1. there are not enough free processors to run another test
             2. the only tests left are parent tests that cannot be run
                because one or more of their children did not pass or diff

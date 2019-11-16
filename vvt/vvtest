@@ -15,6 +15,7 @@ import shlex
 
 import libvvtest.cmdline as cmdline
 from libvvtest.execlist import TestExecList
+from libvvtest.testrunner import TestRunner
 import libvvtest.pathutil as pathutil
 from libvvtest.errors import FatalError
 import libvvtest.location as location
@@ -525,8 +526,10 @@ def generateTestList( opts, optD, dirs, rtdata ):
     tlist.stringFileWrite()
     perms.set( abspath( tfile ) )
 
-    xlist = TestExecList( plugin, tlist )
-    xlist.createTestExecs( test_dir, plat, rtconfig, perms )
+    runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
+
+    xlist = TestExecList( plugin, tlist, runner )
+    xlist.createTestExecs( perms )
 
     print3( "\nTest directory:", testsubdir )
 
@@ -914,8 +917,10 @@ def run_test_exec_list( opts, optD, rtdata,
     testsubdir = rtdata.getTestSubdir()
     plugin = rtdata.getUserPlugin()
 
-    xlist = TestExecList( plugin, tlist )
-    xlist.createTestExecs( test_dir, plat, rtconfig, perms )
+    runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
+
+    xlist = TestExecList( plugin, tlist, runner )
+    xlist.createTestExecs( perms )
 
     if not opts.batch:
         execute.run_test_list( opts.qsub_id, tlist, xlist, test_dir, plat,
@@ -1078,9 +1083,10 @@ def baselineTests( opts, optD, rtdata ):
     if tlist.numActive() > 0:
 
         perms = rtdata.getPermissionsObject()
+        runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-        xlist = TestExecList( plugin, tlist )
-        xlist.createTestExecs( test_dir, plat, rtconfig, perms )
+        xlist = TestExecList( plugin, tlist, runner )
+        xlist.createTestExecs( perms )
 
         execute.run_baseline( xlist, plat )
 
