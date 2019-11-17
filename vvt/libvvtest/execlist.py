@@ -27,6 +27,8 @@ class TestExecList:
         Creates the set of TestExec objects from the active test list.
         """
         self._createTestExecList( perms )
+        self.sortTestExecList()  # sorts tests by longest running first
+        self._connect_execute_dependencies()
 
         for tcase in self.getTestExecList():
             self.runner.initialize_for_execution( tcase )
@@ -50,11 +52,6 @@ class TestExecList:
                     self.xtlist[np].append( tcase )
                 else:
                     self.xtlist[np] = [ tcase ]
-
-        # sort tests longest running first; 
-        self.sortTestExecList()
-
-        self._connect_execute_dependencies()
 
     def _connect_execute_dependencies(self):
         ""

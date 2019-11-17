@@ -21,7 +21,15 @@ class Batcher:
                        test_dir, qsublimit,
                        batch_length, max_timeout):
         ""
+        self.perms = perms
+
         clean_exit_marker = "queue job finished cleanly"
+
+        # allow these values to be set by environment variable, mainly for
+        # unit testing; if setting these is needed more regularly then a
+        # command line option should be added
+        read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
+        read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
 
         self.accountant = BatchAccountant()
 
@@ -33,28 +41,16 @@ class Batcher:
                             perms, plat, qsublimit,
                             clean_exit_marker )
 
-        # allow these values to be set by environment variable, mainly for
-        # unit testing; if setting these is needed more regularly then a
-        # command line option should be added
-        read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
-        read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
-
         suffix = tlist.getResultsSuffix()
         self.handler = JobHandler( suffix, self.namer, plat,
                                    vvtestcmd,
                                    read_interval, read_timeout,
                                    clean_exit_marker )
 
-        self.batscriptor = BatchScriptWriter(
-                                self.namer,
-                                self.accountant,
-                                self.handler,
-                                perms,
-                                tlist, xlist, plat,
-                                batch_length,
-                                max_timeout )
+        self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
+        self.grouper.construct()
 
-        self.batscriptor.createTestGroups()
+        self.qsub_testfilenames = []
 
     def getScheduler(self):
         return self.scheduler
@@ -73,83 +69,20 @@ class Batcher:
 
     def writeQsubScripts(self):
         ""
-        self.batscriptor.writeQsubScripts()
+        self._remove_batch_directories()
 
-    def getIncludeFiles(self):
-        ""
-        return self.batscriptor.getIncludeFiles()
-
-
-class BatchScriptWriter:
-
-    def __init__(self, namer, accountant, handler, perms, tlist, xlist, plat,
-                       batch_length, max_timeout):
-        ""
-        self.namer = namer
-        self.accountant = accountant
-        self.handler = handler
-        self.perms = perms
-        self.tlist = tlist
-        self.xlist = xlist
-        self.plat = plat
-        self.batch_length = batch_length
-        self.max_timeout = max_timeout
-
-        # TODO: make Tzero a platform plugin thing
-        self.Tzero = 21*60*60  # no timeout in batch mode is 21 hours
-
-        self.qsub_testfilenames = []
+        for qnumber,qL in enumerate( self.grouper.getGroups() ):
+            self._create_job_and_write_script( qnumber, qL )
 
     def getIncludeFiles(self):
         ""
         return self.qsub_testfilenames
 
-    def createTestGroups(self):
-        ""
-        qlen = self.batch_length
-        if qlen == None:
-            qlen = 30*60
-
-        qL = []
-        for np in self.xlist.getTestExecProcList():
-          xL = []
-          for tcase in self.xlist.getTestExecList(np):
-            xdir = tcase.getSpec().getDisplayString()
-            xL.append( (tcase.getSpec().getAttr('timeout'),xdir,tcase) )
-          xL.sort()
-          grpL = []
-          tsum = 0
-          for rt,xdir,tcase in xL:
-            tspec = tcase.getSpec()
-            if tcase.numDependencies() > 0 or tspec.getAttr('timeout') < 1:
-              # analyze tests and those with no timeout get their own group
-              qL.append( [ self.Tzero, len(qL), [tcase] ] )
-            else:
-              if len(grpL) > 0 and tsum + rt > qlen:
-                qL.append( [ tsum, len(qL), grpL ] )
-                grpL = []
-                tsum = 0
-              grpL.append( tcase )
-              tsum += rt
-          if len(grpL) > 0:
-            qL.append( [ tsum, len(qL), grpL ] )
-
-        qL.sort()
-        qL.reverse()
-        self.qsublists = map( lambda L: L[2], qL )
-
-    def removeBatchDirectories(self):
+    def _remove_batch_directories(self):
         ""
         for d in self.namer.globBatchDirectories():
             print3( 'rm -rf '+d )
             pathutil.fault_tolerant_remove( d )
-
-    def writeQsubScripts(self):
-        ""
-        self.removeBatchDirectories()
-
-        for qnumber,qL in enumerate(self.qsublists):
-            self._create_job_and_write_script( qnumber, qL )
 
     def _create_job_and_write_script(self, qnumber, testL):
         ""
@@ -157,7 +90,7 @@ class BatchScriptWriter:
 
         self.accountant.addJob( qnumber, jb )
 
-        qtime = compute_queue_time( jb, self.Tzero, self.max_timeout )
+        qtime = self.grouper.computeQueueTime( jb.getTestList() )
         self.handler.writeJob( jb, qtime )
 
         incl = self.namer.getTestListName( qnumber, relative=True )
@@ -165,6 +98,89 @@ class BatchScriptWriter:
 
         d = self.namer.getSubdir( qnumber )
         self.perms.recurse( d )
+
+
+class BatchTestGrouper:
+
+    def __init__(self, xlist, batch_length, max_timeout):
+        ""
+        self.xlist = xlist
+
+        if batch_length == None:
+            self.qlen = 30*60
+        else:
+            self.qlen = batch_length
+
+        self.max_timeout = max_timeout
+
+        # TODO: make Tzero a platform plugin thing
+        self.Tzero = 21*60*60  # no timeout in batch mode is 21 hours
+
+        self.groups = []
+
+    def construct(self):
+        ""
+        qL = []
+
+        for np in self.xlist.getTestExecProcList():
+            qL.extend( self._process_groups( np ) )
+
+        qL.sort()
+        qL.reverse()
+
+        self.groups = [ L[3] for L in qL ]
+
+    def getGroups(self):
+        ""
+        return self.groups
+
+    def computeQueueTime(self, tlist):
+        ""
+        qtime = 0
+
+        for tcase in tlist.getTests():
+            tspec = tcase.getSpec()
+            qtime += int( tspec.getAttr('timeout') )
+
+        if qtime == 0:
+            qtime = self.Tzero  # give it the "no timeout" length of time
+        else:
+            qtime = apply_queue_timeout_bump_factor( qtime )
+
+        if self.max_timeout:
+            qtime = min( qtime, float(self.max_timeout) )
+
+        return qtime
+
+    def _process_groups(self, np):
+        ""
+        qL = []
+
+        xL = []
+        for tcase in self.xlist.getTestExecList(np):
+            xdir = tcase.getSpec().getDisplayString()
+            xL.append( (tcase.getSpec().getAttr('timeout'),xdir,tcase) )
+        xL.sort()
+
+        grpL = []
+        tsum = 0
+        for rt,xdir,tcase in xL:
+            tspec = tcase.getSpec()
+            if tcase.numDependencies() > 0 or tspec.getAttr('timeout') < 1:
+                # analyze tests and those with no timeout get their own group
+                qL.append( [ self.Tzero, np, len(qL), [tcase] ] )
+            else:
+                if len(grpL) > 0 and tsum + rt > self.qlen:
+                    qL.append( [ tsum, np, len(qL), grpL ] )
+                    grpL = []
+                    tsum = 0
+                grpL.append( tcase )
+                tsum += rt
+
+        if len(grpL) > 0:
+            qL.append( [ tsum, np, len(qL), grpL ] )
+
+        return qL
 
 
 def make_batch_TestList( filename, suffix, qlist ):
@@ -187,25 +203,6 @@ def compute_max_np( tlist ):
         maxnp = max( maxnp, np )
 
     return maxnp
-
-
-def compute_queue_time( bjob, Tzero, max_timeout ):
-    ""
-    qtime = 0
-
-    for tcase in bjob.getTestList().getTests():
-        tspec = tcase.getSpec()
-        qtime += int( tspec.getAttr('timeout') )
-
-    if qtime == 0:
-        qtime = Tzero  # give it the "no timeout" length of time
-    else:
-        qtime = apply_queue_timeout_bump_factor( qtime )
-
-    if max_timeout:
-        qtime = min( qtime, float(max_timeout) )
-
-    return qtime
 
 
 def apply_queue_timeout_bump_factor( qtime ):
