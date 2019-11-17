@@ -47,7 +47,7 @@ class TestList:
         self.creator = testcreator
         self.testfilter = testfilter
 
-    def setRunDate(self, suffix=None):
+    def setResultsSuffix(self, suffix=None):
         ""
         if suffix:
             self.rundate = suffix
@@ -84,7 +84,7 @@ class TestList:
 
     def initializeResultsFile(self):
         ""
-        self.setRunDate()
+        self.setResultsSuffix()
 
         rfile = self.filename + '.' + self.rundate
         

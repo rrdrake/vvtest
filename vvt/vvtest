@@ -942,6 +942,8 @@ def batchTestList( opts, optD, rtdata,
 
     assert opts.qsub_id == None
 
+    tlist.setResultsSuffix()
+
     qsublimit = opts.batch_limit
     if qsublimit == None:
         qsublimit = plat.getDefaultQsubLimit()
@@ -958,10 +960,7 @@ def batchTestList( opts, optD, rtdata,
 
     plat.display()
 
-    rundate = tlist.setRunDate()
-
-    # write testlist files for each qsub
-    batch.writeQsubScripts( rundate )
+    batch.writeQsubScripts()
 
     execute.run_batch( batch, tlist, xlist, perms, results_writer,
                        test_dir, qsublimit )

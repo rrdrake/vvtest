@@ -34,7 +34,7 @@ class InformationPrinter( vtu.vvtestTestCase ):
         ""
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-        self.xlist, self.xtests = make_fake_TestExecList()
+        self.xlist, self.tlist = make_fake_TestExecList()
 
     def test_print_list_information(self):
         ""
@@ -80,7 +80,7 @@ class InformationPrinter( vtu.vvtestTestCase ):
     def test_print_batch_information(self):
         ""
         sio = StringIO()
-        batch = make_mock_Batcher( self.xtests )
+        batch = make_mock_Batcher( self.tlist )
         obj = printinfo.TestInformationPrinter( sio, self.xlist, batch )
 
         time.sleep(2)
@@ -126,7 +126,7 @@ def make_fake_TestExecList():
     xt1 = xlist.popNext( None )
     xt2 = xlist.popNext( None )
 
-    return xlist, [ xt1, xt2 ]
+    return xlist, tlist
 
 
 class MockBatcher:
@@ -144,10 +144,10 @@ class MockBatcher:
         return self.accountant.getStarted()
 
 
-def make_mock_Batcher( xtests ):
+def make_mock_Batcher( tlist ):
     ""
     batch = MockBatcher()
-    bjob = batchutils.BatchJob( None, None, None, xtests, None, None )
+    bjob = batchutils.BatchJob( 0, None, None, None, tlist, None, None )
 
     qid = 0
     jid = 42

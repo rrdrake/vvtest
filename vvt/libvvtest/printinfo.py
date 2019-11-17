@@ -62,7 +62,7 @@ class TestInformationPrinter:
             duration = datetime.timedelta( seconds=int(duration) )
             self.println( '    * qbat.{0}'.format(qid),
                           '({0} since submitting)'.format(duration) )
-            for tcase in batch_job.testL:
+            for tcase in batch_job.getTests():
                 xdir = tcase.getSpec().getDisplayString()
                 self.println( '      *', xdir )
 

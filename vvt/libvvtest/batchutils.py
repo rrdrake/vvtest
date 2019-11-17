@@ -33,14 +33,26 @@ class Batcher:
                             perms, plat, qsublimit,
                             clean_exit_marker )
 
+        # allow these values to be set by environment variable, mainly for
+        # unit testing; if setting these is needed more regularly then a
+        # command line option should be added
+        read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
+        read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
+
+        suffix = tlist.getResultsSuffix()
+        self.handler = JobHandler( suffix, self.namer, plat,
+                                   vvtestcmd,
+                                   read_interval, read_timeout,
+                                   clean_exit_marker )
+
         self.batscriptor = BatchScriptWriter(
                                 self.namer,
-                                self.accountant, perms,
-                                xlist, plat,
-                                vvtestcmd,
+                                self.accountant,
+                                self.handler,
+                                perms,
+                                tlist, xlist, plat,
                                 batch_length,
-                                max_timeout,
-                                clean_exit_marker )
+                                max_timeout )
 
         self.batscriptor.createTestGroups()
 
@@ -59,9 +71,9 @@ class Batcher:
         ""
         return self.accountant.getStarted()
 
-    def writeQsubScripts(self, rundate):
+    def writeQsubScripts(self):
         ""
-        self.batscriptor.writeQsubScripts( rundate )
+        self.batscriptor.writeQsubScripts()
 
     def getIncludeFiles(self):
         ""
@@ -70,32 +82,23 @@ class Batcher:
 
 class BatchScriptWriter:
 
-    def __init__(self, namer, accountant, perms, xlist, plat,
-                       vvtestcmd,
-                       batch_length, max_timeout, clean_exit_marker):
+    def __init__(self, namer, accountant, handler, perms, tlist, xlist, plat,
+                       batch_length, max_timeout):
         ""
         self.namer = namer
         self.accountant = accountant
+        self.handler = handler
         self.perms = perms
+        self.tlist = tlist
         self.xlist = xlist
         self.plat = plat
-        self.vvtestcmd = vvtestcmd
         self.batch_length = batch_length
         self.max_timeout = max_timeout
-        self.clean_exit_marker = clean_exit_marker
 
         # TODO: make Tzero a platform plugin thing
         self.Tzero = 21*60*60  # no timeout in batch mode is 21 hours
 
         self.qsub_testfilenames = []
-
-        # allow these values to be set by environment variable, mainly for
-        # unit testing; if setting these is needed more regularly then a
-        # command line option should be added
-        val = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
-        self.read_interval = val
-        val = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
-        self.read_timeout = val
 
     def getIncludeFiles(self):
         ""
@@ -141,80 +144,132 @@ class BatchScriptWriter:
             print3( 'rm -rf '+d )
             pathutil.fault_tolerant_remove( d )
 
-    def writeQsubScripts(self, rundate):
+    def writeQsubScripts(self):
         ""
         self.removeBatchDirectories()
 
-        qsubids = {}  # maps batch id to max num processors for that batch
+        for qnumber,qL in enumerate(self.qsublists):
+            self._create_job_and_write_script( qnumber, qL )
 
-        qid = 0
-        for qL in self.qsublists:
-          self.make_queue_batch( qid, qL, qsubids, rundate )
-          qid += 1
-
-        qidL = list( qsubids.keys() )
-        qidL.sort()
-        for i in qidL:
-            incl = self.namer.getTestListName( i, relative=True )
-            self.qsub_testfilenames.append( incl )
-
-        for i in qidL:
-            d = self.namer.getSubdir( i )
-            self.perms.recurse( d )
-
-    def make_queue_batch(self, qnumber, qlist, npD, rundate):
+    def _create_job_and_write_script(self, qnumber, testL):
         ""
-        qidstr = str(qnumber)
+        jb = self.handler.createJob( qnumber, testL )
 
-        testlistfname = self.namer.getTestListName( qidstr )
-
-        tl = TestList.TestList( testlistfname )
-        tl.setRunDate( rundate )
-
-        tL = []
-        maxnp = 0
-        qtime = 0
-        for tcase in qlist:
-            tspec = tcase.getSpec()
-            np = int( tspec.getParameters().get('np', 0) )
-            if np <= 0: np = 1
-            maxnp = max( maxnp, np )
-            tl.addTest( tcase )
-            tL.append( tcase )
-            qtime += int( tspec.getAttr('timeout') )
-
-        if qtime == 0:
-            qtime = self.Tzero  # give it the "no timeout" length of time
-        else:
-            # allow more time in the queue than calculated. This overhead time
-            # monotonically increases with increasing qtime and plateaus at
-            # about 16 minutes of overhead.
-            if qtime < 60:
-                qtime += 60
-            elif qtime < 10*60:
-                qtime += qtime
-            elif qtime < 30*60:
-                qtime += 10*60 + int( float(qtime-10*60) * 0.3 )
-            else:
-                qtime += 10*60 + int( float(30*60-10*60) * 0.3 )
-
-        if self.max_timeout:
-            qtime = min( qtime, float(self.max_timeout) )
-
-        npD[qnumber] = maxnp
-        pout = self.namer.getBatchOutputName( qnumber )
-        tout = self.namer.getTestListName( qnumber ) + '.' + rundate
-
-        jb = BatchJob( maxnp, pout, tout, tL,
-                       self.read_interval, self.read_timeout )
         self.accountant.addJob( qnumber, jb )
 
+        qtime = compute_queue_time( jb, self.Tzero, self.max_timeout )
+        self.handler.writeJob( jb, qtime )
+
+        incl = self.namer.getTestListName( qnumber, relative=True )
+        self.qsub_testfilenames.append( incl )
+
+        d = self.namer.getSubdir( qnumber )
+        self.perms.recurse( d )
+
+
+def make_batch_TestList( filename, suffix, qlist ):
+    ""
+    tl = TestList.TestList( filename )
+    tl.setResultsSuffix( suffix )
+    for tcase in qlist:
+        tl.addTest( tcase )
+
+    return tl
+
+
+def compute_max_np( tlist ):
+    ""
+    maxnp = 0
+    for tcase in tlist.getTests():
+        tspec = tcase.getSpec()
+        np = int( tspec.getParameters().get('np', 0) )
+        if np <= 0: np = 1
+        maxnp = max( maxnp, np )
+
+    return maxnp
+
+
+def compute_queue_time( bjob, Tzero, max_timeout ):
+    ""
+    qtime = 0
+
+    for tcase in bjob.getTestList().getTests():
+        tspec = tcase.getSpec()
+        qtime += int( tspec.getAttr('timeout') )
+
+    if qtime == 0:
+        qtime = Tzero  # give it the "no timeout" length of time
+    else:
+        qtime = apply_queue_timeout_bump_factor( qtime )
+
+    if max_timeout:
+        qtime = min( qtime, float(max_timeout) )
+
+    return qtime
+
+
+def apply_queue_timeout_bump_factor( qtime ):
+    ""
+    # allow more time in the queue than calculated. This overhead time
+    # monotonically increases with increasing qtime and plateaus at
+    # about 16 minutes of overhead.
+
+    if qtime < 60:
+        qtime += 60
+    elif qtime < 10*60:
+        qtime += qtime
+    elif qtime < 30*60:
+        qtime += 10*60 + int( float(qtime-10*60) * 0.3 )
+    else:
+        qtime += 10*60 + int( float(30*60-10*60) * 0.3 )
+
+    return qtime
+
+
+class JobHandler:
+
+    def __init__(self, suffix, filenamer, platform,
+                       basevvtestcmd, read_interval, read_timeout,
+                       clean_exit_marker):
+        ""
+        self.suffix = suffix
+        self.namer = filenamer
+        self.plat = platform
+        self.vvtestcmd = basevvtestcmd
+        self.read_interval = read_interval
+        self.read_timeout = read_timeout
+        self.clean_exit_marker = clean_exit_marker
+
+    def createJob(self, qnumber, testL):
+        ""
+        testlistfname = self.namer.getTestListName( qnumber )
+        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
+
+        maxnp = compute_max_np( tlist )
+
+        pout = self.namer.getBatchOutputName( qnumber )
+        tout = self.namer.getTestListName( qnumber ) + '.' + self.suffix
+
+        bjob = BatchJob( qnumber, maxnp, pout, tout, tlist,
+                         self.read_interval, self.read_timeout )
+
+        return bjob
+
+    def writeJob(self, bjob, qtime):
+        ""
+        tl = bjob.getTestList()
+
         tl.stringFileWrite( extended=True )
+
+        qidstr = str( bjob.getQNumber() )
+        maxnp = bjob.getMaxNP()
 
         fn = self.namer.getBatchScriptName( qidstr )
         fp = open( fn, "w" )
 
         tdir = self.namer.getTestResultsRoot()
+        pout = self.namer.getBatchOutputName( bjob.getQNumber() )
+
         hdr = self.plat.getQsubScriptHeader( maxnp, qtime, tdir, pout )
         fp.writelines( [ hdr + '\n\n',
                          'cd ' + tdir + ' || exit 1\n',
@@ -227,7 +282,7 @@ class BatchScriptWriter:
 
         cmd = self.vvtestcmd + ' --qsub-id=' + qidstr
 
-        if len(qlist) == 1:
+        if len( tl.getTestMap() ) == 1:
           # force a timeout for batches with only one test
           if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
           else:           cmd += ' -T ' + str(qtime-120)
@@ -427,7 +482,7 @@ class BatchScheduler:
         for qid,bjob in list( self.accountant.getNotStarted() ):
             tcase1 = self.getBlockingDependency( bjob )
             assert tcase1 != None  # otherwise checkstart() should have ran it
-            for tcase0 in bjob.testL:
+            for tcase0 in bjob.getTests():
                 notrunL.append( (tcase0,tcase1) )
             self.accountant.markJobDone( qid, 'notrun' )
 
@@ -460,7 +515,7 @@ class BatchScheduler:
             jobtests = tlr.getTests()
 
             # only add tests to the stopped list that are done
-            for tcase in bjob.testL:
+            for tcase in bjob.getTests():
 
                 tid = tcase.getSpec().getID()
 
@@ -482,7 +537,7 @@ class BatchScheduler:
         ran but did not pass or diff, then that dependency test is returned.
         Otherwise None is returned.
         """
-        for tcase in bjob.testL:
+        for tcase in bjob.getTests():
             deptx = tcase.getBlockingDependency()
             if deptx != None:
                 return deptx
@@ -490,20 +545,29 @@ class BatchScheduler:
 
 
 class BatchJob:
-    
-    def __init__(self, maxnp, fout, resultsfile, testL,
+
+    def __init__(self, qnumber, maxnp, fout, resultsfile, tlist,
                        read_interval, read_timeout):
+        ""
+        self.qnumber = qnumber
         self.maxnp = maxnp
         self.outfile = fout
         self.resultsfile = resultsfile
-        self.testL = testL  # list of TestCase objects
+        self.tlist = tlist  # a TestList object
+        self.read_interval = read_interval
+        self.read_timeout = read_timeout
+
         self.jobid = None
         self.tstart = None
         self.tstop = None
         self.tcheck = None
         self.result = None
-        self.read_interval = read_interval
-        self.read_timeout = read_timeout
+
+    def getQNumber(self): return self.qnumber
+    def getMaxNP(self): return self.maxnp
+
+    def getTestList(self): return self.tlist
+    def getTests(self): return self.tlist.getTests()
 
     def start(self, jobid):
         """

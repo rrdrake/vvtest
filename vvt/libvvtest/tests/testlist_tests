@@ -350,12 +350,12 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         # create suffix for the include files
-        sfx = tl.setRunDate()
+        sfx = tl.setResultsSuffix()
 
         # write include test list file containing suffix attribute
         tcase = list( tl.getTests() )[0]
         tlincl = TestList.TestList( 'subtests' )
-        tlincl.setRunDate( sfx )
+        tlincl.setResultsSuffix( sfx )
         tl.addTest( tcase )
         tlincl.stringFileWrite( extended=True )
         time.sleep(1)
@@ -590,7 +590,7 @@ def write_TestList_with_fake_test( filename, **kwargs ):
     tl = TestList.TestList( filename )
 
     if dosuffix:
-        tl.setRunDate()
+        tl.setResultsSuffix()
 
     tcase = create_TestCase()
     for k,v in kwargs.items():
