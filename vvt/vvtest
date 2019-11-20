@@ -1027,6 +1027,8 @@ def restartTests( opts, optD, rtdata ):
     if qid == None:
         timehandler = rtdata.getTestTimeHandler()
         timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
+    else:
+        symlink_batch_files_in_tests( tlist, namer, qid )
 
     reld = rtdata.getFilterPath()
 
@@ -1088,6 +1090,16 @@ def baselineTests( opts, optD, rtdata ):
         xlist.createTestExecs( perms )
 
         execute.run_baseline( xlist, plat )
+
+
+def symlink_batch_files_in_tests( tlist, namer, qid ):
+    ""
+    qbat = namer.getBatchScriptName( qid )
+    qout = namer.getBatchOutputName( qid )
+
+    for tcase in tlist.getTests():
+        tcase.getSpec().addLinkFile( qbat )
+        tcase.getSpec().addLinkFile( qout )
 
 
 ###########################################################################

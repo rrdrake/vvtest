@@ -275,14 +275,14 @@ class JobHandler:
 
         # set the environment variables from the platform into the script
         for k,v in self.plat.getEnvironment().items():
-          fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
+            fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
 
         cmd = self.vvtestcmd + ' --qsub-id=' + qidstr
 
         if len( tl.getTestMap() ) == 1:
-          # force a timeout for batches with only one test
-          if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
-          else:           cmd += ' -T ' + str(qtime-120)
+            # force a timeout for batches with only one test
+            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
+            else:           cmd += ' -T ' + str(qtime-120)
 
         cmd += ' || exit 1'
         fp.writelines( [ cmd+'\n\n' ] )

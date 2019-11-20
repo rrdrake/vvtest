@@ -508,7 +508,7 @@ class TestSpec:
         the test execution directory.  If 'destname' is None, the base name
         of 'srcname' is used.
         """
-        assert srcname and not os.path.isabs( srcname )
+        assert srcname and srcname.strip()
         if (srcname,destname) not in self.lnfiles:
             self.lnfiles.append( (srcname,destname) )
     

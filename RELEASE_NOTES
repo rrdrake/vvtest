@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - The batch queue files are now soft linked into the test execute
+      directories to make it easier to associate a test with the queueing
+      behavior.
+
     - The VVTEST_CONFIGDIR environment variable string or the command line
       option --config, can now contain multiple directories separated by a
       colon (like PYTHONPATH).  More than one --config option is also allowed.

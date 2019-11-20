@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import dirname
 import time
 import glob
 
@@ -143,6 +144,30 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
 
         assert len( vtu.greptestlist( 'sleeper[1-4]', out ) ) == 4
         assert len( vtu.greptestlist( 'pass *sleeper[1-4]', out ) ) == 3
+
+    def test_soft_link_from_test_dir_to_batch_files(self):
+        ""
+        util.writefile( 'testa.vvt', """
+            import vvtest_util as vvt
+            """ )
+        util.writefile( 'testb.vvt', """
+            import vvtest_util as vvt
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '--batch-length 0', batch=True )
+        vrun.assertCounts( total=2, npass=2 )
+        tdir = vrun.resultsDir()
+
+        fn = util.globfile( tdir+'/test*/qbat.0' )
+        assert os.path.islink(fn) and os.path.exists(fn)
+        fn2 = dirname(fn)+'/qbat-out.0'
+        assert os.path.islink(fn2) and os.path.exists(fn2)
+
+        fn = util.globfile( tdir+'/test*/qbat.1' )
+        assert os.path.islink(fn) and os.path.exists(fn)
+        fn2 = dirname(fn)+'/qbat-out.1'
+        assert os.path.islink(fn2) and os.path.exists(fn2)
 
 
 ########################################################################

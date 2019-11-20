@@ -169,8 +169,10 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
 
         with util.change_directory( 'destdir3' ):
             testrunner.link_and_copy_files( srcdir,
-                                            [ ('file*.txt',None) ],
-                                            [ ('adir','bdir') ] )
+                                            [ ('file*.txt',None),
+                                              (srcdir+'/file2.txt','lnk.txt') ],
+                                            [ ('adir','bdir'),
+                                              (srcdir+'/file2.txt','cpy.txt') ] )
 
             ok,out,err = util.call_capture_output(
                 testrunner.link_and_copy_files, srcdir,
@@ -193,6 +195,12 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
 
         assert not os.path.islink( 'destdir3/bdir' )
         assert util.readfile( 'destdir3/bdir/file3.txt' ).strip() == 'file3 contents'
+
+        assert os.path.islink( 'destdir3/lnk.txt' )
+        assert util.readfile( 'destdir3/lnk.txt' ).strip() == 'file2 contents'
+
+        assert not os.path.islink( 'destdir3/cpy.txt' )
+        assert util.readfile( 'destdir3/cpy.txt' ).strip() == 'file2 contents'
 
     def make_example_execute_directory(self):
         ""

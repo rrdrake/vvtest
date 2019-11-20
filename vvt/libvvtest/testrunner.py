@@ -448,7 +448,11 @@ def link_and_copy_files( srcdir, linkfiles, copyfiles ):
 
     for srcname,destname in linkfiles:
 
-        srcf = normpath( pjoin( srcdir, srcname ) )
+        if os.path.isabs( srcname ):
+            srcf = normpath( srcname )
+        else:
+            srcf = normpath( pjoin( srcdir, srcname ) )
+
         srcL = get_source_file_names( srcf )
 
         if check_source_file_list( 'soft link', srcf, srcL, destname ):
@@ -459,7 +463,11 @@ def link_and_copy_files( srcdir, linkfiles, copyfiles ):
 
     for srcname,destname in copyfiles:
 
-        srcf = normpath( pjoin( srcdir, srcname ) )
+        if os.path.isabs( srcname ):
+            srcf = normpath( srcname )
+        else:
+            srcf = normpath( pjoin( srcdir, srcname ) )
+
         srcL = get_source_file_names( srcf )
 
         if check_source_file_list( 'copy', srcf, srcL, destname ):
