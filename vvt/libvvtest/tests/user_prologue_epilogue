@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 
 import vvtestutils as vtu
@@ -129,7 +130,7 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
                 assert info['runtime'] > 0 and info['runtime'] < 5
                 print ( 'EPILOGUE=foobar' )
             """ )
-        adir = os.path.abspath( 'adir' )
+        adir = abspath( 'adir' )
         time.sleep(1)
 
         for batch in [False,True]:
@@ -147,6 +148,33 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
 
             assert 'CMDLINE=' not in vrun.out
             assert 'EPILOGUE=foobar' in vrun.out
+
+    def test_calling_epilogue_when_test_directory_does_not_exist(self):
+        ""
+        util.writefile( 'atest.vvt', 'pass' )
+
+        util.writefile( 'adir/vvtest_user_plugin.py', """
+            def epilogue( tests ):
+                ""
+                print ( 'EPILOGUE=foobar' )
+            """ )
+        adir = abspath( 'adir' )
+
+        time.sleep(1)
+
+        with util.set_environ( VVTEST_CONFIGDIR=adir ):
+
+            vrun = vtu.runvvtest( '-vv' )
+            vrun.assertCounts( total=1, npass=1 )
+            assert 'EPILOGUE=foobar' in vrun.out
+
+            vrun = vtu.runvvtest( '-vv -i' )
+            assert 'EPILOGUE=foobar' in vrun.out
+
+            vrun = vtu.runvvtest( '-vv -i -o myoption' )
+            assert 'EPILOGUE=foobar' not in vrun.out
+            assert 'directory not found' in vrun.out
+            assert 'Traceback' not in vrun.out
 
 
 ############################################################################

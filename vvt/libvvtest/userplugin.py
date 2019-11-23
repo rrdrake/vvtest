@@ -39,7 +39,7 @@ class UserPluginBridge:
 
     def callEpilogue(self, rundir, tcaselist):
         ""
-        if self.epilog != None:
+        if self.epilog != None and os.path.isdir(rundir):
             testD = self._convert_test_list_to_info_dict( tcaselist )
             try:
                 with change_directory( rundir ):

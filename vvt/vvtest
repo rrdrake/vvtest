@@ -420,6 +420,10 @@ class InformationMode:
             tlist.readTestList()
             tlist.readTestResults()
 
+        else:
+            print3( 'WARNING: previous test results directory not found,',
+                    test_dir )
+
         tlist.determineActiveTests( filter_dir=self.rtdata.getFilterPath(),
                                     remove_skips=True )
 
