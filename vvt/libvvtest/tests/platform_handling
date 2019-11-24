@@ -1,0 +1,238 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import abspath
+from os.path import join as pjoin
+import time
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+import libvvtest.vvplatform as vvplatform
+
+
+class loading_idplatform( vtu.vvtestTestCase ):
+
+    def test_import_idplatform_module(self):
+        ""
+        util.writefile( 'adir/idplatform.py', """
+            def hello():
+                return 'world'
+            """ )
+        adir = abspath( 'adir' )
+        time.sleep(1)
+
+        # first check adjust_sys_path_for_unit_testing()
+        savepath = list( sys.path )
+        try:
+            sys.path.insert( 0, adir )
+            sys.path.append( adir )
+            assert adir in sys.path
+            adjust_sys_path_for_unit_testing()
+            assert adir not in sys.path
+        finally:
+            sys.path[:] = savepath
+
+        # None is returned if idplatform.py not in sys.path
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            idp = vvplatform.import_idplatform()
+        finally:
+            sys.path[:] = savepath
+        assert idp == None
+
+        # module returned if idplatform.py is in sys.path
+        sys.path.insert( 0, adir )
+        try:
+            idp = vvplatform.import_idplatform()
+        finally:
+            sys.path.pop(0)
+        assert idp.hello() == 'world'
+
+    def test_option_convert_function(self):
+        ""
+        opts = vvplatform.convert_to_option_dictionary( None, None, [], [] )
+        assert '--plat' not in opts
+        assert '--cplr' not in opts
+        assert opts['-o'] == []
+        assert opts['-O'] == []
+
+        opts = vvplatform.convert_to_option_dictionary( 'foo', 'bar', ['a'], ['b'] )
+        assert opts['--plat'] == 'foo'
+        assert opts['--cplr'] == 'bar'
+        assert opts['-o'] == ['a']
+        assert opts['-O'] == ['b']
+
+    def test_using_idplatform_to_define_platform_and_compiler(self):
+        ""
+        util.writefile( 'adir/idplatform.py', """
+            def platform( opts ):
+                return 'XBox'
+            def compiler( platname, opts ):
+                return 'llvm'
+            """ )
+        adir = abspath( 'adir' )
+        time.sleep(1)
+
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            plat1,cplr1 = vvplatform.get_platform_and_compiler( None, None, [], [] )
+            plat2,cplr2 = vvplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
+        finally:
+            sys.path[:] = savepath
+        assert plat1 == os.uname()[0] and cplr1 == 'gcc'
+        assert plat2 == 'foo' and cplr2 == 'bar'
+
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            sys.path.insert( 0, adir )
+            plat1,cplr1 = vvplatform.get_platform_and_compiler( None, None, [], [] )
+            plat2,cplr2 = vvplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
+        finally:
+            sys.path[:] = savepath
+        assert plat1 == 'XBox' and cplr1 == 'llvm'
+        assert plat2 == 'foo' and cplr2 == 'bar'
+
+
+class constructing_platform( vtu.vvtestTestCase ):
+
+    def test_initialize_platform_from_platform_plugin(self):
+        ""
+        util.writefile( 'adir/platform_plugin.py', """
+            def initialize( platobj ):
+                platobj.setattr( 'foo', 'bar' )
+            """ )
+        adir = abspath( 'adir' )
+        time.sleep(1)
+
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            plat = vvplatform.Platform( '/fake', {} )
+            plug = vvplatform.initialize_platform( plat )
+        finally:
+            sys.path[:] = savepath
+        assert plug == None and plat.getattr( 'foo', None ) == None
+
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            plat = vvplatform.Platform( '/fake', {} )
+            sys.path.insert( 0, adir )
+            plug = vvplatform.initialize_platform( plat )
+        finally:
+            sys.path[:] = savepath
+        assert plug != None and plat.getattr( 'foo', None ) == 'bar'
+
+    def test_setting_platform_options(self):
+        ""
+        plat = vvplatform.Platform( '/fake', {} )
+        vvplatform.set_platform_options( plat, {} )
+
+        popts = { 'q':'admin',
+                  'PT':'fy666',
+                  'walltime':'2:34',
+                  'QoS':'long' }
+        vvplatform.set_platform_options( plat, popts )
+
+        assert plat.getattr( 'queue' ) == 'admin'
+        assert plat.getattr( 'account' ) == 'fy666'
+        assert plat.getattr( 'walltime' ) == '2:34'
+        assert plat.getattr( 'QoS' ) == 'long'
+
+    def test_the_construct_Platform_function(self):
+        """
+        Very bad design, but the construct_Platform() function is used by
+        client projects.  This test helps preserve backward compatibility
+        (until deprecation) while facilitating refactoring towards a better
+        architecture.
+        """
+        plat = vvplatform.construct_Platform( os.getcwd(), {} )
+
+        optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
+        plat = vvplatform.construct_Platform( os.getcwd(),
+                    { '--plat':'XBox',
+                      '--platopt':optD,
+                      '-e':True,
+                      '-n':10,
+                      '-N':20,
+                      '-o':['dbg'],
+                      '-O':['symbols'],
+                      '--qsub-id':23 } )
+        self.check_platform_object( plat )
+
+    def test_the_create_Platform_instance_function(self):
+        ""
+        plat = vvplatform.create_Platform_instance(
+                    os.getcwd(),
+                    None, None, None, None, None, None, None, None )
+
+        optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
+        plat = vvplatform.create_Platform_instance(
+                    os.getcwd(),
+                    'XBox',
+                    optD,
+                    True,
+                    10, 20,
+                    ['dbg'], ['symbols'],
+                    23 )
+        self.check_platform_object( plat )
+
+    def check_platform_object(self, plat):
+        ""
+        assert plat.vvtesthome == os.getcwd()
+        assert plat.getName() == 'XBox'
+        assert plat.getMaxProcs() == 20
+        assert plat.getNumProcs() == 10
+        assert plat.getattr( 'queue' ) == 'justdoit'
+        assert plat.getattr( 'account' ) == 'fy666'
+        assert plat.getattr( 'walltime' ) == '2:34'
+        opts = plat.getOptions()
+        assert opts['--qsub-id'] == 23
+        assert opts['-o'] == ['dbg']
+        assert opts['-O'] == ['symbols']
+        assert opts['-e'] == True
+        platopts = opts['--platopt']
+        assert 'knl' in platopts
+        assert platopts['q'] == 'justdoit'
+        assert platopts['PT'] == 'fy666'
+        assert platopts['walltime'] == '2:34'
+
+
+def adjust_sys_path_for_unit_testing():
+    ""
+    save = list( sys.path )
+
+    len1 = len( sys.path )
+    len0 = len1+1
+    while len0 != len1:
+        for i,path in enumerate(sys.path):
+            if os.path.exists( pjoin( path, 'idplatform.py' ) ) or \
+               os.path.exists( pjoin( path, 'platform_plugin.py' ) ):
+                sys.path.pop(i)
+                break
+        len0 = len1
+        len1 = len( sys.path )
+
+    # this https://justus.science/blog/2015/04/19/sys.modules-is-dangerous.html
+    # says don't reload or remove modules from sys.modules, but we should be
+    # safe in the confines of this little unit test script
+    if 'idplatform' in sys.modules:
+        del sys.modules['idplatform']
+    if 'platform_plugin' in sys.modules:
+        del sys.modules['platform_plugin']
+
+    return save
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )

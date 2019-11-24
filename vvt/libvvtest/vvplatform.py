@@ -10,9 +10,6 @@ import re
 ############################################################################
 
 class Platform:
-    """
-    This class is .
-    """
 
     def __init__(self, vvtesthome, optdict):
         ""
@@ -39,6 +36,7 @@ class Platform:
     def getCompiler(self): return self.cplrname
     def getOptions(self): return self.optdict
     def getMaxProcs(self): return self.maxprocs
+    def getNumProcs(self): return self.nprocs
 
     def display(self):
         s = "Platform " + self.platname
@@ -72,6 +70,13 @@ class Platform:
                 del self.attrs[name]
         else:
             self.attrs[name] = value
+
+    def getattr(self, name, *default):
+        ""
+        if len(default) > 0:
+            return self.attrs.get( name, default[0] )
+        else:
+            return self.attrs[name]
 
     def setBatchSystem(self, batch, ppn, **kwargs ):
         """
@@ -308,45 +313,30 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
     assert vvtestdir
     assert os.path.exists( vvtestdir )
     assert os.path.isdir( vvtestdir )
-    
-    if 'debug' in kwargs:
-        print3( 'construct_Platform A:', vvtestdir, optdict )
 
     plat = Platform( vvtestdir, optdict )
 
-    # set the platform name and compiler name
-    try:
-        # this comes from the config directory
-        import idplatform
-    except ImportError:
-        plat.platname = os.uname()[0]
-        plat.cplrname = 'gcc'
-        if 'debug' in kwargs:
-            print3( 'construct_Platform B:', plat.platname, plat.cplrname )
-    else:
-        if 'debug' in kwargs:
-            idplatform.debug = True
-        
-        plat.platname = None
-        if '--plat' in optdict:
-            plat.platname = optdict['--plat']
-        elif hasattr( idplatform, "platform" ):
-            plat.platname = idplatform.platform( optdict )
-        if not plat.platname:
-            plat.platname = os.uname()[0]
+    platname,cplrname = get_platform_and_compiler(
+                                optdict.get( '--plat', None ),
+                                optdict.get( '--cplr', None ),
+                                optdict.get( '-o', [] ),
+                                optdict.get( '-O', [] ) )
 
-        plat.cplrname = None
-        if hasattr( idplatform, "compiler" ):
-            plat.cplrname = idplatform.compiler( plat.platname, optdict )
-        if not plat.cplrname:
-            plat.cplrname = 'gcc'
-        
-        if 'debug' in kwargs:
-            print3( 'construct_Platform C:', plat.platname, plat.cplrname )
-            idplatform.debug = False
+    plat.platname = platname
+    plat.cplrname = cplrname
 
-    platopts = optdict.get( '--platopt', {} )
+    set_platform_options( plat, optdict.get( '--platopt', {} ) )
 
+    plug = initialize_platform( plat )
+    plat.plugin = plug
+
+    plat.initProcs( optdict.get( '-n', None ), optdict.get( '-N', None ) )
+
+    return plat
+
+
+def set_platform_options( plat, platopts ):
+    ""
     q = platopts.get( 'queue', platopts.get( 'q', None ) )
     plat.setattr( 'queue', q )
 
@@ -360,22 +350,71 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
     QoS = platopts.get( 'QoS', None )
     plat.setattr( 'QoS', QoS )
 
+
+def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
+    ""
+    idplatform = import_idplatform()
+
+    optdict = convert_to_option_dictionary( platname, cplrname, onopts, offopts )
+
+    if not platname:
+        if idplatform != None and hasattr( idplatform, "platform" ):
+            platname = idplatform.platform( optdict )
+        if not platname:
+            platname = os.uname()[0]
+
+    if not cplrname:
+        if idplatform != None and hasattr( idplatform, "compiler" ):
+            cplrname = idplatform.compiler( platname, optdict )
+        if not cplrname:
+            cplrname = 'gcc'
+
+    return platname, cplrname
+
+
+def initialize_platform( plat ):
+    ""
+    plug = import_platform_plugin()
+
+    if plug != None and hasattr( plug, 'initialize' ):
+        plug.initialize( plat )
+
+    return plug
+
+
+def import_idplatform():
+    ""
+    try:
+        # this comes from the config directory
+        import idplatform
+    except ImportError:
+        idplatform = None
+
+    return idplatform
+
+
+def import_platform_plugin():
+    ""
     try:
         # this comes from the config directory
         import platform_plugin
     except ImportError:
-        pass
-    except:
-        raise
-    else:
-        plat.plugin = platform_plugin
+        platform_plugin = None
 
-        if hasattr( platform_plugin, 'initialize' ):
-            platform_plugin.initialize( plat )
+    return platform_plugin
 
-    plat.initProcs( optdict.get( '-n', None ), optdict.get( '-N', None ) )
 
-    return plat
+def convert_to_option_dictionary( platname, cplrname, onopts, offopts ):
+    ""
+    optdict = {}
+
+    if platname: optdict['--plat'] = platname
+    if cplrname: optdict['--cplr'] = cplrname
+
+    optdict['-o'] = onopts
+    optdict['-O'] = offopts
+
+    return optdict
 
 
 ##########################################################################
