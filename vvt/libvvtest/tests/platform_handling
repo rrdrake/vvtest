@@ -233,6 +233,107 @@ def adjust_sys_path_for_unit_testing():
     return save
 
 
+class resource_pooling( vtu.vvtestTestCase ):
+
+    def test_resources_are_given_out_as_a_list_of_indexes(self):
+        ""
+        pool = vvplatform.ResourcePool( 10 )
+
+        assert pool.available( 3 )
+        idxL = pool.get( 3 )
+        idxL.sort()
+        assert idxL == [0,1,2]
+
+    def test_resource_availability(self):
+        ""
+        pool = vvplatform.ResourcePool( 10 )
+
+        assert pool.available( 5 )
+        pool.get( 5 )
+        assert pool.available( 4 )
+        assert pool.available( 5 )
+        assert not pool.available( 6 )
+        pool.get( 4 )
+        assert pool.available( 1 )
+        assert not pool.available( 2 )
+        pool.get( 1 )
+        assert not pool.available( 0 )
+        assert not pool.available( 1 )
+
+    def test_get_then_put_resources(self):
+        ""
+        pool = vvplatform.ResourcePool( 10 )
+
+        L1 = pool.get( 5 )
+        L2 = pool.get( 5 )
+        assert_no_overlap( L1, L2 )
+        pool.put( L1 )
+        assert pool.available( 5 )
+        L3 = pool.get(5)
+        assert_no_overlap( L2, L3 )
+
+    def test_oversubscribing_the_pool(self):
+        ""
+        pool = vvplatform.ResourcePool( 10 )
+
+        assert not pool.available( 11 )
+        L1 = pool.get( 11 )
+        assert len( L1 ) == 11
+        assert len( set(L1) ) == 10
+
+        pool.put( L1 )
+        assert pool.available( 10 )
+        assert not pool.available( 11 )
+        L1 = pool.get( 5 )
+        L2 = pool.get( 5 )
+        assert_no_overlap( L1, L2 )
+
+    def test_the_vvtest_util_file_defines_the_processor_ids(self):
+        ""
+        util.writefile( "atest.vvt", """
+            import time
+            import vvtest_util as vvt
+            print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            time.sleep(1)
+            """ )
+        util.writefile( "btest.vvt", """
+            #VVT: parameterize: np = 3
+            import time
+            import vvtest_util as vvt
+            print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            time.sleep(1)
+            """ )
+        util.writescript( "ctest.vvt", """
+            #!/bin/sh
+            #VVT: parameterize: np = 2
+            source vvtest_util.sh
+            echo "procids=$RESOURCE_IDS_np"
+            sleep 1
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-n 10' )
+        vrun.assertCounts( total=3, npass=3 )
+        ids1 = eval( vrun.greplogs( 'procids=', 'atest' )[0].split('=',1)[1] )
+        assert len(ids1) == 1
+        ids2 = eval( vrun.greplogs( 'procids=', 'btest' )[0].split('=',1)[1] )
+        assert len(ids2) == 3
+        s3 = vrun.greplogs( 'procids=', 'ctest' )[0].split('=',1)[1]
+        assert len(ids2) == 3
+        ids3 = [ int(si) for si in s3.split() ]
+        assert_no_overlap( ids1, ids2 )
+        assert_no_overlap( ids1, ids3 )
+        assert_no_overlap( ids2, ids3 )
+
+
+def assert_no_overlap( L1, L2 ):
+    ""
+    for i in L1:
+        assert i not in L2
+    for i in L2:
+        assert i not in L1
+
+
 ############################################################################
 
 util.run_test_cases( sys.argv, sys.modules[__name__] )

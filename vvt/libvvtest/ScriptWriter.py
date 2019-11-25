@@ -16,6 +16,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     """
     testobj = testcase.getSpec()
     tname = testobj.getName()
+    resourceobj = testcase.getExec().getResourceObject()
 
     troot = testobj.getRootpath()
     assert os.path.isabs( troot )
@@ -116,6 +117,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
             D[ k ].sort()
         w.add( '', 'DEPDIRMAP = '+repr(D) )
 
+        w.add( '', 'RESOURCE_IDS_np = '+repr(resourceobj.procs) )
+
         w.add( """
             # to avoid circular imports in python, the script_util.py
             # or the script_util_plugin.py must be imported by the
@@ -203,6 +206,9 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
 
         L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
         w.add( '', 'DEPDIRS="'+' '.join(L)+'"' )
+
+        sprocs = [ str(procid) for procid in resourceobj.procs ]
+        w.add( '', 'RESOURCE_IDS_np="'+' '.join(sprocs)+'"' )
 
         w.add( '',
                'source $VVTESTSRC/config/script_util.sh' )

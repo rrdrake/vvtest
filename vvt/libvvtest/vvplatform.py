@@ -17,8 +17,8 @@ class Platform:
         self.optdict = optdict
 
         self.maxprocs = 1
-        self.nprocs = 0
-        self.nfree = 0
+        self.nprocs = 1
+        self.procpool = ResourcePool( self.nprocs )
 
         self.platname = None
         self.cplrname = None
@@ -197,59 +197,32 @@ class Platform:
         else:
             self.nprocs = set_num
 
-        self.nfree = self.nprocs
+        if '--qsub-id' in self.optdict:
+            self.procpool = ResourcePool( 1 )
+        else:
+            self.procpool = ResourcePool( self.nprocs )
 
     def queryProcs(self, np):
-        """
-        """
-        if np <= 0: np = 1
-        return np <= self.nfree
+        ""
+        return self.procpool.available( np )
 
     def obtainProcs(self, np):
         """
         """
         if np <= 0: np = 1
 
-        if '--qsub-id' in self.optdict:
-            assert self.nfree > 0
-            self.nfree = 0
-        else:
-            self.nfree = max( 0, self.nfree - np )
+        procs = self.procpool.get( np )
 
-        job_info = JobInfo( np )
-
-        pf = self.attrs.get( 'mpifile', '' )
-        if pf == 'hostfile':
-            # use OpenMPI style machine file
-            job_info.mpi_opts = "--hostfile machinefile"
-            slots = min( np, self.nprocs )
-            job_info.machinefile = \
-                        os.uname()[1].strip() + " slots=" + str(slots) + '\n'
-
-        elif pf == 'machinefile':
-            # use MPICH style machine file
-            job_info.mpi_opts = "-machinefile machinefile"
-            job_info.machinefile = ''
-            for i in range(np):
-                job_info.machinefile += machine + '\n'
-
-        mpiopts = self.attrs.get( 'mpiopts', '' )
-        if mpiopts:
-            job_info.mpi_opts += ' ' + mpiopts
+        job_info = construct_job_info( procs, self.nprocs,
+                                       self.getattr( 'mpifile', '' ),
+                                       self.getattr( 'mpiopts', '' ) )
 
         return job_info
 
     def giveProcs(self, job_info):
         """
         """
-        np = job_info.np
-        assert np > 0
-
-        if '--qsub-id' in self.optdict:
-            assert self.nfree == 0
-            self.nfree = 1
-        else:
-            self.nfree = min( self.nprocs, self.nfree + np )
+        self.procpool.put( job_info.procs )
 
     # ----------------------------------------------------------------
 
@@ -281,6 +254,56 @@ class Platform:
                 f = os.path.abspath(f)
               return os.path.normpath(f)
         return None
+
+
+class ResourcePool:
+
+    def __init__(self, total):
+        ""
+        self.total = total
+        self.idx = 0
+        self.pool = []
+
+    def available(self, num):
+        ""
+        num = max( num, 1 )
+        avail = self._get_num_available()
+        return num <= avail
+
+    def get(self, num):
+        ""
+        num = max( num, 1 )
+
+        items = []
+
+        while len(items) < num and len(self.pool) > 0:
+            items.append( self.pool.pop(0) )
+
+        while len(items) < num and self.idx < self.total:
+            items.append( self.idx )
+            self.idx += 1
+
+        if len(items) < num:
+            n = num-len(items)
+            for i in range(n):
+                items.append( i%self.total )
+
+        return items
+
+    def put(self, items):
+        ""
+        pset = set( self.pool )
+        for i in items:
+            if i not in pset:
+                pset.add( i )
+        self.pool.extend( pset )
+        self.pool.sort()
+
+    def _get_num_available(self):
+        ""
+        n = len( self.pool )
+        n += ( self.total - self.idx )
+        return n
 
 
 def create_Platform_instance( vvtestdir, platname, platopts, usenv,
@@ -425,9 +448,34 @@ class JobInfo:
     processor request, including a string to give to the mpirun command, if
     any.  It is returned to the Platform when the job finishes.
     """
-    def __init__(self, np):
-        self.np = np
+    def __init__(self, procs):
+        ""
+        self.procs = procs
         self.mpi_opts = ''
+
+
+def construct_job_info( procs, numprocs, mpifile, mpiopts ):
+    ""
+    job_info = JobInfo( procs )
+
+    if mpifile == 'hostfile':
+        # use OpenMPI style machine file
+        job_info.mpi_opts = "--hostfile machinefile"
+        slots = min( len(procs), numprocs )
+        job_info.machinefile = \
+                    os.uname()[1].strip() + " slots=" + str(slots) + '\n'
+
+    elif mpifile == 'machinefile':
+        # use MPICH style machine file
+        job_info.mpi_opts = "-machinefile machinefile"
+        job_info.machinefile = ''
+        for i in range(len(procs)):
+            job_info.machinefile += machine + '\n'
+
+    if mpiopts:
+        job_info.mpi_opts += ' ' + mpiopts
+
+    return job_info
 
 
 def probe_max_processors():
