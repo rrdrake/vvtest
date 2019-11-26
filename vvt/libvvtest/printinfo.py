@@ -79,7 +79,7 @@ class TestInformationPrinter:
 
 def standard_in_has_data():
     ""
-    if sys.stdin.isatty():
+    if sys.stdin and sys.stdin.isatty():
         if select.select( [sys.stdin,], [], [], 0.0 )[0]:
             sys.stdin.readline()
             return True
