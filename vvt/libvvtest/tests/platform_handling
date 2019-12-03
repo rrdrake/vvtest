@@ -294,6 +294,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             import time
             import vvtest_util as vvt
             print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
             time.sleep(1)
             """ )
         util.writefile( "btest.vvt", """
@@ -301,6 +302,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             import time
             import vvtest_util as vvt
             print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
             time.sleep(1)
             """ )
         util.writescript( "ctest.vvt", """
@@ -308,22 +310,41 @@ class resource_pooling( vtu.vvtestTestCase ):
             #VVT: parameterize: np = 2
             source vvtest_util.sh
             echo "procids=$RESOURCE_IDS_np"
+            echo "proctotal=$RESOURCE_TOTAL_np"
             sleep 1
             """ )
         time.sleep(1)
 
         vrun = vtu.runvvtest( '-n 10' )
         vrun.assertCounts( total=3, npass=3 )
+        self.assert_processor_ids( vrun )
+
+        vrun = vtu.runvvtest( '-w -n 10 -N 6' )
+        vrun.assertCounts( total=3, npass=3 )
+        self.assert_processor_ids( vrun )
+        self.assert_processor_totals( vrun, 6 )
+
+    def assert_processor_ids(self, vrun):
+        ""
         ids1 = eval( vrun.greplogs( 'procids=', 'atest' )[0].split('=',1)[1] )
         assert len(ids1) == 1
         ids2 = eval( vrun.greplogs( 'procids=', 'btest' )[0].split('=',1)[1] )
         assert len(ids2) == 3
         s3 = vrun.greplogs( 'procids=', 'ctest' )[0].split('=',1)[1]
-        assert len(ids2) == 3
         ids3 = [ int(si) for si in s3.split() ]
+        assert len(ids3) == 2
         assert_no_overlap( ids1, ids2 )
         assert_no_overlap( ids1, ids3 )
         assert_no_overlap( ids2, ids3 )
+
+    def assert_processor_totals(self, vrun, maxprocs):
+        ""
+        tot1 = int( vrun.greplogs( 'proctotal=', 'atest' )[0].split('=',1)[1] )
+        tot2 = int( vrun.greplogs( 'proctotal=', 'btest' )[0].split('=',1)[1] )
+        tot3 = int( vrun.greplogs( 'proctotal=', 'ctest' )[0].split('=',1)[1] )
+        assert tot1 == maxprocs
+        assert tot2 == maxprocs
+        assert tot3 == maxprocs
 
 
 def assert_no_overlap( L1, L2 ):

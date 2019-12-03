@@ -1,6 +1,13 @@
 
 Improvements:
 
+    - The vvtest_util.py and .sh utility files now contain a list of
+      processor ids, RESOURCE_IDS_np, and the total number of processors
+      available, RESOURCE_TOTAL_np.  The id list will be integers between
+      zero and the value of -n, and the second will be the value of -N.
+      Both -n and -N default to the number of processors on the machine,
+      if available.
+
     - The batch queue files are now soft linked into the test execute
       directories to make it easier to associate a test with the queueing
       behavior.

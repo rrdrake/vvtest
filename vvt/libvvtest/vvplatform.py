@@ -40,9 +40,10 @@ class Platform:
 
     def display(self):
         s = "Platform " + self.platname
-        if self.nprocs > 0:
-            s += ", num procs = " + str(self.nprocs)
-        s += ", max procs = " + str(self.maxprocs)
+        if self.batch == None:
+            if self.nprocs > 0:
+                s += ", num procs = " + str(self.nprocs)
+            s += ", max procs = " + str(self.maxprocs)
         print3( s )
 
     def getEnvironment(self):
@@ -213,7 +214,7 @@ class Platform:
 
         procs = self.procpool.get( np )
 
-        job_info = construct_job_info( procs, self.nprocs,
+        job_info = construct_job_info( procs, self.nprocs, self.maxprocs,
                                        self.getattr( 'mpifile', '' ),
                                        self.getattr( 'mpiopts', '' ) )
 
@@ -448,15 +449,16 @@ class JobInfo:
     processor request, including a string to give to the mpirun command, if
     any.  It is returned to the Platform when the job finishes.
     """
-    def __init__(self, procs):
+    def __init__(self, procs, maxprocs):
         ""
         self.procs = procs
+        self.maxprocs = maxprocs
         self.mpi_opts = ''
 
 
-def construct_job_info( procs, numprocs, mpifile, mpiopts ):
+def construct_job_info( procs, numprocs, maxprocs, mpifile, mpiopts ):
     ""
-    job_info = JobInfo( procs )
+    job_info = JobInfo( procs, maxprocs )
 
     if mpifile == 'hostfile':
         # use OpenMPI style machine file
