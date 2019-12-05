@@ -18,6 +18,8 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+import libvvtest.batchutils as batchutils
+
 
 class inlining_results_file_includes( vtu.vvtestTestCase ):
 
@@ -168,6 +170,38 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         assert os.path.islink(fn) and os.path.exists(fn)
         fn2 = dirname(fn)+'/qbat-out.1'
         assert os.path.islink(fn2) and os.path.exists(fn2)
+
+    def test_queue_time_bump_is_continuous(self):
+        ""
+        delta = 5.0
+        N = 100000
+        b = 48*60*60
+        x0 = 0
+        for i in range(N):
+
+            x1 = b * ( (i+1) / float(N) )
+
+            y0 = batchutils.apply_queue_timeout_bump_factor( x0 )
+            y1 = batchutils.apply_queue_timeout_bump_factor( x1 )
+
+            assert y1 > y0
+            assert y1-y0 < delta*(x1-x0)
+
+            x0 = x1
+
+    def test_queue_time_bump_is_capped_at_15_minutes(self):
+        ""
+        max_bump = 15*60 + 0.001
+
+        N = 100000
+        b = 48*60*60
+        for i in range(N+1):
+
+            x = b * ( i / float(N) )
+            y = batchutils.apply_queue_timeout_bump_factor( x )
+
+            assert x < y
+            assert y-x < max_bump
 
 
 ########################################################################
