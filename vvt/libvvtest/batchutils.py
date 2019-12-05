@@ -209,7 +209,8 @@ def apply_queue_timeout_bump_factor( qtime ):
     ""
     # allow more time in the queue than calculated. This overhead time
     # monotonically increases with increasing qtime and plateaus at
-    # about 16 minutes of overhead.
+    # about 16 minutes of overhead, but force it to never be more than
+    # exactly 15 minutes.
 
     if qtime < 60:
         qtime += 60
@@ -220,7 +221,7 @@ def apply_queue_timeout_bump_factor( qtime ):
     else:
         qtime += 10*60 + int( float(30*60-10*60) * 0.3 )
 
-    return qtime
+    return min(qtime, 15 * 60)
 
 
 class JobHandler:
