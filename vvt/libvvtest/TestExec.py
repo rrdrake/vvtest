@@ -70,7 +70,7 @@ class TestExec:
 
         sys.stdout.flush() ; sys.stderr.flush()
 
-        self.pid = os.fork()
+        self.pid = os_fork_with_retry( 10 )
         if self.pid == 0:
             # child process is the test itself
             self._prepare_and_execute_test( baseline )
@@ -176,6 +176,30 @@ def decode_subprocess_exit_code( exit_code ):
         return 0
 
     return 1
+
+
+def os_fork_with_retry( numtries ):
+    ""
+    assert numtries > 0
+
+    pause = 0.5
+
+    for i in range(numtries):
+
+        try:
+            pid = os.fork()
+            break
+
+        except OSError:
+            # the BlockingIOError subclass of OSError has been seen on heavily
+            # loaded machines; given some time between retries, it will often
+            # succeed
+            if i+1 == numtries:
+                raise
+            time.sleep( pause )
+            pause *= 2
+
+    return pid
 
 
 def group_exec_subprocess( cmd, **kwargs ):

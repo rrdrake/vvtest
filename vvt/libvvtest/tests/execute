@@ -18,6 +18,8 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+import libvvtest.TestExec as TestExec
+
 
 class execute_tests( vtu.vvtestTestCase ):
 
@@ -423,6 +425,48 @@ class execute_tests( vtu.vvtestTestCase ):
         assert len( fL ) == 1
         fn = os.readlink( fL[0] )
         assert os.path.samefile( fn, 'adir/subdir/dup.xml' )
+
+    def test_os_fork_with_retry(self):
+        ""
+        save_os_fork = os.fork
+
+        def fake_os_fork():
+            return 42
+
+        try:
+            os.fork = fake_os_fork
+            pid = TestExec.os_fork_with_retry( 2 )
+        finally:
+            os.fork = save_os_fork
+        assert pid == 42
+
+        def os_fork_always_OSError():
+            raise OSError( 'fake it' )
+
+        try:
+            os.fork = os_fork_always_OSError
+            try:
+                pid = TestExec.os_fork_with_retry( 2 )
+            except OSError:
+                pass
+            else:
+                raise Exception( 'expected OSError' )
+        finally:
+            os.fork = save_os_fork
+
+        TestExec._fork_count = 0
+        def os_fork_eventually_works():
+            if TestExec._fork_count < 2:
+                TestExec._fork_count += 1
+                raise OSError( 'fake it' )
+            return 43
+
+        try:
+            os.fork = os_fork_eventually_works
+            pid = TestExec.os_fork_with_retry( 5 )
+        finally:
+            os.fork = save_os_fork
+        assert pid == 43
 
 
 ############################################################################
