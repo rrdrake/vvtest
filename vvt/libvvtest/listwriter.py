@@ -15,19 +15,19 @@ print3 = outpututils.print3
 class ListWriter:
     """
     Option is
-    
+
       --save-results
-    
+
     which writes to the platform config testing directory (which looks first at
     the TESTING_DIRECTORY env var).  Can add
-    
+
       --results-tag <string>
-    
+
     which is appended to the results file name.  A date string is embedded in
     the file name, which is obtained from the date of the first test that
     ran.  But if the option
 
-      --results-date <float or string>
+      --results-date <number or string>
 
     is given on the vvtest command line, then that date is used instead.
     """

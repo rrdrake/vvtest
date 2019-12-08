@@ -609,8 +609,13 @@ def create_parser( argvlist, vvtest_version ):
         help='Sort test listings.  Letters include n=name, '
              'x=execution name, t=runtime, d=execution date, '
              's=status, r=reverse the order.' )
-    grp.add_argument( '--save-results', action='store_true',
-        help='Save the test results to the TESTING_DIRECTORY.' )
+    helpstr = ( 'Optionally --save-results=<directory>.  Save test results '
+                'to the TESTING_DIRECTORY or the given directory.' )
+    if an_argument_startswith( '--save-results=', argvlist ):
+        grp.add_argument( '--save-results', action='store',
+                          metavar='DIRECTORY', help=helpstr )
+    else:
+        grp.add_argument( '--save-results', action='store_true', help=helpstr )
     grp.add_argument( '--results-tag',
         help='Add an arbitrary tag to the --save-results output file.' )
     grp.add_argument( '--results-date', metavar='DATE',
@@ -647,6 +652,15 @@ def create_parser( argvlist, vvtest_version ):
     psr.add_argument( 'directory', nargs='*' )
 
     return psr
+
+
+def an_argument_startswith( prefix, argvlist ):
+    ""
+    for arg in argvlist:
+        if arg.startswith( prefix ):
+            return True
+
+    return False
 
 
 ##############################################################################

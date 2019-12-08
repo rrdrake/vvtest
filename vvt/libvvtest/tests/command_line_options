@@ -83,6 +83,35 @@ class help_page_tests( vtu.vvtestTestCase ):
         assert 'Traceback' in err and 'SystemExit' in err
 
 
+class special_options( vtu.vvtestTestCase ):
+
+    def test_giving_an_optional_value_to_save_results(self):
+        ""
+        rtn,out,err = util.call_capture_output(
+                        cmdline.parse_command_line,
+                        [ '-v', '../some/dir' ] )
+        assert not out.strip() and not err.strip()
+        opts,dopts,args = rtn
+        assert not opts.save_results
+        assert args == ['../some/dir']
+
+        rtn,out,err = util.call_capture_output(
+                        cmdline.parse_command_line,
+                        [ '-v', '--save-results', '../some/dir' ] )
+        assert not out.strip() and not err.strip()
+        opts,dopts,args = rtn
+        assert opts.save_results == True
+        assert args == ['../some/dir']
+
+        rtn,out,err = util.call_capture_output(
+                        cmdline.parse_command_line,
+                        [ '-v', '--save-results=/res/ults', '../some/dir' ] )
+        assert not out.strip() and not err.strip()
+        opts,dopts,args = rtn
+        assert opts.save_results == '/res/ults'
+        assert args == ['../some/dir']
+
+
 class deprecations( vtu.vvtestTestCase ):
 
     def test_deprecated_options_that_should_error_out(self):
