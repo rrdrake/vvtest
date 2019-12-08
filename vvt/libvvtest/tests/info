@@ -206,6 +206,21 @@ class info_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-i --sort d', chdir=tdir )
         assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
 
+    def test_sorting_with_near_duplicate_tests(self):
+        ""
+        util.writefile( 'dupname.vvt', """
+            #VVT: parameterize : np = 1 4
+            pass
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-i --sort n', chdir=tdir )
+        assert test_names( vrun ) == ['dupname', 'dupname']
+
     def test_using_the_files_option_with_a_multi_test_xml_file(self):
         ""
         util.writefile( "multi.xml", """

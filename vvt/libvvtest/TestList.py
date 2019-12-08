@@ -281,7 +281,7 @@ class TestList:
 
         tL = []
 
-        for tcase in self.tcasemap.values():
+        for idx,tcase in enumerate( self.tcasemap.values() ):
             t = tcase.getSpec()
             if not tcase.getStat().skipTest():
                 subL = []
@@ -299,7 +299,7 @@ class TestList:
                     elif c == 's':
                         subL.append( tcase.getStat().getResultStatus() )
 
-                subL.append( tcase )
+                subL.extend( [ idx, tcase ] )
                 tL.append( subL )
         tL.sort()
         if 'r' in sorting:
