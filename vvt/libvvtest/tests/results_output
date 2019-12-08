@@ -10,12 +10,15 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 from os.path import getsize as getfsize
+import glob
 
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
+from vvtestutils import adjust_sys_path_for_unit_testing
 
 import libvvtest.outpututils as outpututils
 
@@ -131,6 +134,49 @@ class html_output_format_tests( vtu.vvtestTestCase ):
             doc = util.read_xml_file( 'tr.html' )
             lines = get_status_lines_from_html( doc )
             self.assert_tests_in_html( lines )
+
+
+class save_results_output( vtu.vvtestTestCase ):
+
+    def test_methods_for_specifying_the_save_results_directory(self):
+        ""
+        os.mkdir( 'plugout' )
+        os.mkdir( 'envout' )
+        os.mkdir( 'cmdout' )
+
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize: np=1 4
+            pass
+            """ )
+
+        util.writefile( "adir/platform_plugin.py", """
+            import os, sys
+            def initialize( platobj ):
+                platobj.setattr( 'testingdir', '"""+abspath('plugout')+"""' )
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+
+        with util.set_environ( TESTING_DIRECTORY=None ):
+
+            vrun = vtu.runvvtest( '-i --save-results', raise_on_error=False )
+            assert vrun.x != 0
+            assert 'vvtest error' in vrun.out
+
+            vrun = vtu.runvvtest( '-i --save-results --config '+abspath('adir') )
+            assert len( glob.glob( 'plugout/results.*' ) ) == 1
+
+            assert len( glob.glob( 'envout/*' ) ) == 0
+            os.environ['TESTING_DIRECTORY'] = abspath('envout')
+            vrun = vtu.runvvtest( '-i --save-results --config '+abspath('adir') )
+            assert len( glob.glob( 'envout/results.*' ) ) == 1
+
+            assert len( glob.glob( 'cmdout/*' ) ) == 0
+            vrun = vtu.runvvtest( '-i --save-results='+abspath('cmdout'),
+                                  '--config '+abspath('adir') )
+            assert len( glob.glob( 'cmdout/results.*' ) ) == 1
 
 
 def write_three_test_files():

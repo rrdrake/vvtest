@@ -902,14 +902,27 @@ def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):
     ""
     import libvvtest.listwriter as listwriter
 
-    wlistobj = listwriter.ListWriter( perms,
-                                      platobj.testingDirectory(),
-                                      test_dir )
+    todir = get_testing_directory( opts, platobj )
+
+    wlistobj = listwriter.ListWriter( perms, todir, test_dir )
 
     wlistobj.setOutputDate( opts.results_date )
     wlistobj.setNamingTags( optD['onopts'], opts.results_tag )
 
     return wlistobj
+
+
+def get_testing_directory( opts, platobj ):
+    ""
+    if type( opts.save_results ) == type(''):
+        return opts.save_results
+
+    tdir = platobj.testingDirectory()
+
+    if not tdir:
+        raise FatalError( 'failed to determine --save-results directory' )
+
+    return tdir
 
 
 def run_test_exec_list( opts, optD, rtdata,

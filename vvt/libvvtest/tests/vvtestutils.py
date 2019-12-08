@@ -164,6 +164,40 @@ def run_vvtest_with_hook( vvtest_args, envspec, batch=False ):
     return x, out
 
 
+def adjust_sys_path_for_unit_testing():
+    """
+    Use like this:
+
+        savepath = adjust_sys_path_for_unit_testing()
+        try:
+            # do stuff with sys.path
+        finally:
+            sys.path[:] = savepath
+    """
+    save = list( sys.path )
+
+    len1 = len( sys.path )
+    len0 = len1+1
+    while len0 != len1:
+        for i,path in enumerate(sys.path):
+            if os.path.exists( pjoin( path, 'idplatform.py' ) ) or \
+               os.path.exists( pjoin( path, 'platform_plugin.py' ) ):
+                sys.path.pop(i)
+                break
+        len0 = len1
+        len1 = len( sys.path )
+
+    # this https://justus.science/blog/2015/04/19/sys.modules-is-dangerous.html
+    # says don't reload or remove modules from sys.modules, but we should be
+    # safe in the confines of the unit test scripts
+    if 'idplatform' in sys.modules:
+        del sys.modules['idplatform']
+    if 'platform_plugin' in sys.modules:
+        del sys.modules['platform_plugin']
+
+    return save
+
+
 def remove_results():
     """
     Removes all TestResults from the current working directory.
