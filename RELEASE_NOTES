@@ -1,6 +1,14 @@
 
 Improvements:
 
+    - Optionally, the --save-results command line option can specify a
+      directory, such as --save-results=/some/directory (using an equals
+      sign is required).
+
+    - The --save-results directory can now be scp-like, such as
+      "sparky:/some/path" or "sparky.gov:relative/path", in which case
+      vvtest will scp the test results file to a remote machine.
+
     - The vvtest_util.py and .sh utility files now contain a list of
       processor ids, RESOURCE_IDS_np, and the total number of processors
       available, RESOURCE_TOTAL_np.  The id list will be integers between
