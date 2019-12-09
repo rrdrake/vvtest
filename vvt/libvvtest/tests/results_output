@@ -21,6 +21,9 @@ from testutils import print3
 from vvtestutils import adjust_sys_path_for_unit_testing
 
 import libvvtest.outpututils as outpututils
+import libvvtest.listwriter as listwriter
+from libvvtest.TestList import TestList
+import libvvtest.fmtresults as fmtresults
 
 
 class misc_tests( vtu.vvtestTestCase ):
@@ -177,6 +180,99 @@ class save_results_output( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '-i --save-results='+abspath('cmdout'),
                                   '--config '+abspath('adir') )
             assert len( glob.glob( 'cmdout/results.*' ) ) == 1
+
+    def test_getting_relative_root_path_with_marker_file(self):
+        ""
+        tcase = make_fake_test_in_subdir( 'adir' )
+        time.sleep(1)
+
+        rel = fmtresults.determine_rootrel( tcase.getSpec(), {} )
+        assert not rel
+
+        add_runtimes_marker_file( 'adir' )
+        rel = fmtresults.determine_rootrel( tcase.getSpec(), {} )
+        assert rel == 'adir/sdir'
+
+    def prep_testlist(self, subdir):
+        ""
+        tcase = make_fake_test_in_subdir( 'adir' )
+        add_runtimes_marker_file( 'adir' )
+
+        tlist = TestList( 'testlist' )
+        tlist.addTest( tcase )
+        time.sleep(1)
+
+        return tcase, tlist
+
+    def test_writing_testlist_results_file(self):
+        ""
+        tcase,tlist = self.prep_testlist( 'adir' )
+
+        perm = DummyPermissionSetter()
+        attrs = { 'platform':'Xbox', 'compiler':'gcc' }
+
+        lwr = listwriter.ListWriter( perm, 'odir', abspath('tdir') )
+
+        lwr.writeList( tlist, attrs )
+        fL = util.grepfiles( 'adir/sdir/atest.np=4', 'odir/results.*' )
+        assert len(fL) == 1
+
+    def test_recognizing_scp_like_directory(self):
+        ""
+        assert not listwriter.is_target_like_scp( '/abs/path' )
+        assert not listwriter.is_target_like_scp( '/abs/path/with:colon' )
+        assert not listwriter.is_target_like_scp( 'rel/path_with:colon' )
+        assert listwriter.is_target_like_scp( 'sparky:rel/path' )
+        assert listwriter.is_target_like_scp( 'sparky:/abs/path' )
+        assert listwriter.is_target_like_scp( 'sparky:/abs/path/with:colon' )
+        assert listwriter.is_target_like_scp( 'sparky.edu:/abs/path' )
+        assert listwriter.is_target_like_scp( 'sparky.edu:rel/path' )
+
+    def test_writing_testlist_results_file_to_remote_machine(self):
+        ""
+        util.writescript( 'fakescp', """
+            #!"""+sys.executable+"""
+            import sys, subprocess
+            dest = sys.argv[-1].split(':',1)[1] + '.scp'
+            argv = [ 'cp' ] + sys.argv[1:-1] + [ dest ]
+            sys.exit( subprocess.call( argv ) )
+            """ )
+
+        os.mkdir( 'odir' )
+
+        tcase,tlist = self.prep_testlist( 'adir' )
+
+        perm = DummyPermissionSetter()
+        attrs = { 'platform':'Xbox', 'compiler':'gcc' }
+
+        lwr = listwriter.ListWriter( perm, 'sparky:'+abspath('odir'),
+                                     abspath('tdir'), scpexe=abspath('fakescp') )
+        lwr.writeList( tlist, attrs )
+
+        fL = util.grepfiles( 'adir/sdir/atest.np=4', 'odir/results.*.scp' )
+        assert len(fL) == 1
+
+
+def make_fake_test_in_subdir( subdir ):
+    ""
+    os.makedirs( subdir+'/sdir' )
+
+    with util.change_directory( subdir ):
+        tcase = vtu.make_fake_TestCase()
+
+    return tcase
+
+
+def add_runtimes_marker_file( rootdir ):
+    ""
+    tr = fmtresults.TestResults()
+    tr.writeRuntimes( abspath(rootdir), None )
+
+
+class DummyPermissionSetter:
+    def __init__(self): pass
+    def set(self, path): pass
+    def recurse(self, path): pass
 
 
 def write_three_test_files():

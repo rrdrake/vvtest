@@ -904,6 +904,9 @@ def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):
 
     todir = get_testing_directory( opts, platobj )
 
+    if not listwriter.is_target_like_scp( todir ):
+        todir = normpath( abspath( todir ) )
+
     wlistobj = listwriter.ListWriter( perms, todir, test_dir )
 
     wlistobj.setOutputDate( opts.results_date )
@@ -915,9 +918,9 @@ def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):
 def get_testing_directory( opts, platobj ):
     ""
     if type( opts.save_results ) == type(''):
-        return opts.save_results
-
-    tdir = platobj.testingDirectory()
+        tdir = opts.save_results
+    else:
+        tdir = platobj.testingDirectory()
 
     if not tdir:
         raise FatalError( 'failed to determine --save-results directory' )

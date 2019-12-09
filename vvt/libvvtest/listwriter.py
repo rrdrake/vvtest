@@ -32,11 +32,12 @@ class ListWriter:
     is given on the vvtest command line, then that date is used instead.
     """
 
-    def __init__(self, permsetter, output_dir, results_test_dir):
+    def __init__(self, permsetter, output_dir, results_test_dir, scpexe='scp'):
         ""
         self.permsetter = permsetter
-        self.outdir = os.path.normpath( os.path.abspath( output_dir ) )
+        self.outdir = output_dir
         self.testdir = results_test_dir
+        self.scpexe = scpexe
 
         self.datestamp = None
         self.onopts = []
@@ -73,21 +74,34 @@ class ListWriter:
         datestamp = atestlist.getDateStamp( time.time() )
         datestr = outpututils.make_date_stamp( datestamp, self.datestamp )
 
-        fname = self.makeFilename( datestr, runattrs )
-        absfname = os.path.join( self.outdir, fname )
+        if is_target_like_scp( self.outdir ):
+            todir = self.testdir
+        else:
+            todir = self.outdir
 
-        if not os.path.isdir( self.outdir ):
-            os.mkdir( self.outdir )
+        fname = self.makeFilename( datestr, runattrs )
+
+        self._write_results_to_file( atestlist, runattrs, inprogress,
+                                     todir, fname )
+
+        if todir != self.outdir:
+            scp_file_to_remote( self.scpexe, todir, fname, self.outdir )
+
+    def _write_results_to_file(self, atestlist, runattrs, inprogress,
+                                     todir, fname):
+        ""
+        if not os.path.isdir( todir ):
+            os.mkdir( todir )
+
+        tofile = os.path.join( todir, fname )
 
         try:
             tcaseL = atestlist.getActiveTests()
-
-            print3( "Writing results of", len(tcaseL), "tests to", absfname )
-
-            self.writeTestResults( tcaseL, absfname, runattrs, inprogress )
+            print3( "Writing results of", len(tcaseL), "tests to", tofile )
+            self.writeTestResults( tcaseL, tofile, runattrs, inprogress )
 
         finally:
-            self.permsetter.set( absfname )
+            self.permsetter.set( tofile )
 
     def makeFilename(self, datestr, runattrs):
         ""
@@ -122,3 +136,33 @@ class ListWriter:
         mach = os.uname()[1]
 
         tr.writeResults( filename, pname, cplr, mach, self.testdir, inprogress )
+
+
+def is_target_like_scp( tdir ):
+    ""
+    sL = tdir.split( ':', 1 )
+    if len(sL) == 2:
+        if os.pathsep not in sL[0] and '/' not in sL[0]:
+            return True
+
+    return False
+
+
+def scp_file_to_remote( scpexe, fromdir, fname, destdir ):
+    ""
+    import subprocess
+    import pipes
+
+    fromfile = os.path.join( fromdir, fname )
+    tofile = os.path.join( destdir, fname )
+
+    cmd = scpexe + ' -p '+pipes.quote(fromfile)+' '+pipes.quote(tofile)
+
+    print3( cmd )
+    sys.stdout.flush() ; sys.stderr.flush()
+
+    x = subprocess.call( cmd, shell=True )
+
+    if x != 0:
+        sys.stdout.flush() ; sys.stderr.flush()
+        print3( '\n*** vvtest warning: scp seems to have failed\n' )

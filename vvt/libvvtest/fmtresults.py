@@ -725,13 +725,13 @@ def determine_rootrel( testspec, dcache ):
     rootrel = dcache.get( tdir, None )
 
     if rootrel == None:
-      rootrel = _svn_rootrel( tdir )
-      if rootrel == None:
-        rootrel = file_rootrel( tdir )
-      if rootrel == None:
-        # mark this directory so we don't waste time trying again
-        rootrel = ''
-      dcache[tdir] = rootrel
+        rootrel = _svn_rootrel( tdir )
+        if rootrel == None:
+            rootrel = file_rootrel( tdir )
+        if rootrel == None:
+            # mark this directory so we don't waste time trying again
+            rootrel = ''
+        dcache[tdir] = rootrel
 
     return rootrel
 
