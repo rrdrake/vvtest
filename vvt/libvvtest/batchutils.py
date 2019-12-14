@@ -35,16 +35,18 @@ class Batcher:
 
         self.namer = BatchFileNamer( test_dir, testlist_name )
 
+        jobmon = BatchJobMonitor( read_interval, read_timeout )
+
         self.scheduler = BatchScheduler(
                             tlist, xlist,
                             self.accountant, self.namer,
                             perms, plat, qsublimit,
-                            clean_exit_marker )
+                            clean_exit_marker,
+                            jobmon )
 
         suffix = tlist.getResultsSuffix()
         self.handler = JobHandler( suffix, self.namer, plat,
                                    vvtestcmd,
-                                   read_interval, read_timeout,
                                    clean_exit_marker )
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
@@ -227,15 +229,12 @@ def apply_queue_timeout_bump_factor( qtime ):
 class JobHandler:
 
     def __init__(self, suffix, filenamer, platform,
-                       basevvtestcmd, read_interval, read_timeout,
-                       clean_exit_marker):
+                       basevvtestcmd, clean_exit_marker):
         ""
         self.suffix = suffix
         self.namer = filenamer
         self.plat = platform
         self.vvtestcmd = basevvtestcmd
-        self.read_interval = read_interval
-        self.read_timeout = read_timeout
         self.clean_exit_marker = clean_exit_marker
 
     def createJob(self, qnumber, testL):
@@ -248,8 +247,7 @@ class JobHandler:
         pout = self.namer.getBatchOutputName( qnumber )
         tout = self.namer.getTestListName( qnumber ) + '.' + self.suffix
 
-        bjob = BatchJob( qnumber, maxnp, pout, tout, tlist,
-                         self.read_interval, self.read_timeout )
+        bjob = BatchJob( qnumber, maxnp, pout, tout, tlist )
 
         return bjob
 
@@ -298,7 +296,8 @@ class BatchScheduler:
 
     def __init__(self, tlist, xlist,
                        accountant, namer, perms,
-                       plat, maxjobs, clean_exit_marker):
+                       plat, maxjobs, clean_exit_marker,
+                       jobmon):
         ""
         self.tlist = tlist
         self.xlist = xlist
@@ -308,6 +307,7 @@ class BatchScheduler:
         self.plat = plat
         self.maxjobs = maxjobs
         self.clean_exit_marker = clean_exit_marker
+        self.jobmon = jobmon
 
     def numInFlight(self):
         """
@@ -344,7 +344,8 @@ class BatchScheduler:
                     pin = self.namer.getBatchScriptName( qid )
                     tdir = self.namer.getTestResultsRoot()
                     jobid = self.plat.Qsubmit( tdir, bjob.outfile, pin )
-                    self.accountant.markJobStarted( qid, jobid )
+                    self.accountant.markJobStarted( qid )
+                    self.jobmon.start( bjob, jobid )
                     return qid
         return None
 
@@ -370,17 +371,18 @@ class BatchScheduler:
             for qid,bjob in list( startlist ):
                 if self.checkJobDone( bjob, statusD[ bjob.jobid ], tnow ):
                     self.accountant.markJobStopped( qid )
+                    self.jobmon.stop( bjob )
                     qdoneL.append( qid )
 
         tnow = time.time()
         tdoneL = []
         for qid,bjob in list( self.accountant.getStopped() ):
-            if bjob.timeToCheckIfFinished( tnow ):
+            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
                 if self.checkJobFinished( bjob.outfile, bjob.resultsfile ):
                     # load the results into the TestList
                     tdoneL.extend( self.finalizeJob( qid, bjob, 'clean' ) )
                 else:
-                    if not bjob.extendFinishCheck( tnow ):
+                    if not self.jobmon.extendFinishCheck( bjob, tnow ):
                         # too many attempts to read; assume the queue job
                         # failed somehow, but force a read anyway
                         tdoneL.extend( self.finalizeJob( qid, bjob ) )
@@ -483,6 +485,7 @@ class BatchScheduler:
             for tcase0 in bjob.getTests():
                 notrunL.append( (tcase0,tcase1) )
             self.accountant.markJobDone( qid, 'notrun' )
+            self.jobmon.finished( bjob, 'notrun' )
 
         # TODO: rather than only reporting the jobs left on qtodo as not run,
         #       loop on all jobs in qread and look for 'notrun' mark
@@ -526,6 +529,7 @@ class BatchScheduler:
             mark = 'fail'
 
         self.accountant.markJobDone( qid, mark )
+        self.jobmon.finished( bjob, mark )
 
         return tL
 
@@ -544,16 +548,13 @@ class BatchScheduler:
 
 class BatchJob:
 
-    def __init__(self, qnumber, maxnp, fout, resultsfile, tlist,
-                       read_interval, read_timeout):
+    def __init__(self, qnumber, maxnp, fout, resultsfile, tlist):
         ""
         self.qnumber = qnumber
         self.maxnp = maxnp
         self.outfile = fout
         self.resultsfile = resultsfile
         self.tlist = tlist  # a TestList object
-        self.read_interval = read_interval
-        self.read_timeout = read_timeout
 
         self.jobid = None
         self.tstart = None
@@ -567,39 +568,54 @@ class BatchJob:
     def getTestList(self): return self.tlist
     def getTests(self): return self.tlist.getTests()
 
-    def start(self, jobid):
-        """
-        """
+    def setJobID(self, jobid):
+        ""
         self.jobid = jobid
-        self.tstart = time.time()
 
-    def stop(self):
-        """
-        """
-        self.tstop = time.time()
-        self.tcheck = self.tstop + self.read_interval
+    def setStartTime(self, tstart):
+        ""
+        self.tstart = tstart
 
-    def timeToCheckIfFinished(self, current_time):
-        """
-        """
-        return self.tcheck < current_time
 
-    def extendFinishCheck(self, current_time):
+# magic: - remove bjob direct accesses (use interface funcs)
+
+class BatchJobMonitor:
+
+    def __init__(self, read_interval, read_timeout):
+        ""
+        self.read_interval = read_interval
+        self.read_timeout = read_timeout
+
+    def start(self, bjob, jobid):
+        ""
+        bjob.setJobID( jobid )
+        bjob.setStartTime( time.time() )
+
+    def timeToCheckIfFinished(self, bjob, current_time):
+        ""
+        return bjob.tcheck < current_time
+
+    def extendFinishCheck(self, bjob, current_time):
         """
         Resets the finish check time to a time into the future.  Returns
         False if the number of extensions has been exceeded.
         """
-        if current_time < self.tstop+self.read_timeout:
+        if current_time < bjob.tstop+self.read_timeout:
             # set the time for the next read attempt
-            self.tcheck = current_time + self.read_interval
+            bjob.tcheck = current_time + self.read_interval
             return False
+
         return True
 
-    def finished(self, result):
-        """
-        """
+    def stop(self, bjob):
+        ""
+        bjob.tstop = time.time()
+        bjob.tcheck = bjob.tstop + self.read_interval
+
+    def finished(self, bjob, result):
+        ""
         assert result in ['clean','notrun','notdone','fail']
-        self.result = result
+        bjob.result = result
 
 
 class BatchFileNamer:
@@ -709,22 +725,19 @@ class BatchAccountant:
         ""
         return self.qdone.items()
 
-    def markJobStarted(self, qid, jobid):
+    def markJobStarted(self, qid):
         ""
         jb = self.popJob( qid )
-        jb.start( jobid )
         self.qstart[ qid ] = jb
 
     def markJobStopped(self, qid):
         ""
         jb = self.popJob( qid )
-        jb.stop()
         self.qstop[ qid ] = jb
 
     def markJobDone(self, qid, done_mark):
         ""
         jb = self.popJob( qid )
-        jb.finished( done_mark )
         self.qdone[ qid ] = jb
 
     def popJob(self, qid):
