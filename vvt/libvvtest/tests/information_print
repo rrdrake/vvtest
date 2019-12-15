@@ -154,7 +154,7 @@ def make_mock_Batcher( tlist ):
     batch.jobmon.addJob( bjob )
 
     jid = 42
-    batch.jobmon.markJobStarted( batchid, jid )
+    batch.jobmon.markJobStarted( bjob, jid )
 
     return batch
 

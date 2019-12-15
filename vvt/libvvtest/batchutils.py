@@ -36,10 +36,10 @@ class Batcher:
         self.jobmon = BatchJobMonitor( read_interval, read_timeout,
                                        clean_exit_marker )
 
-        self.scheduler = BatchScheduler(
-                            tlist, xlist,
-                            self.namer, self.jobmon,
-                            perms, plat, qsublimit )
+        results = ResultsHandler( tlist, xlist )
+
+        self.scheduler = BatchScheduler( results, self.namer, self.jobmon,
+                                         perms, plat, qsublimit )
 
         suffix = tlist.getResultsSuffix()
         self.handler = JobHandler( suffix, self.namer, plat,
@@ -291,17 +291,15 @@ class JobHandler:
 
 class BatchScheduler:
 
-    def __init__(self, tlist, xlist,
-                       namer, jobmon,
+    def __init__(self, results, namer, jobmon,
                        perms, plat, maxjobs):
         ""
-        self.tlist = tlist
-        self.xlist = xlist
+        self.results = results
         self.namer = namer
+        self.jobmon = jobmon
         self.perms = perms
         self.plat = plat
         self.maxjobs = maxjobs
-        self.jobmon = jobmon
 
     def numInFlight(self):
         """
@@ -334,7 +332,7 @@ class BatchScheduler:
         """
         if self.jobmon.numStarted() < self.maxjobs:
             for bid,bjob in self.jobmon.getNotStarted():
-                if self.getBlockingDependency( bjob ) == None:
+                if self.results.getBlockingDependency( bjob ) == None:
                     self.startJob( bjob )
                     return bid
         return None
@@ -345,7 +343,7 @@ class BatchScheduler:
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
         jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
-        self.jobmon.markJobStarted( bid, jobid )
+        self.jobmon.markJobStarted( bjob, jobid )
 
     def checkdone(self):
         """
@@ -363,12 +361,6 @@ class BatchScheduler:
         qdoneL = self.checkGetStoppedJobs()
         tdoneL = self.checkGetFinishedTests()
 
-        # magic: see if test handling within batch jobs can be placed in
-        #        a separate class; more separation of duties
-        #           - the blocking dependency thing
-        #           - the test results scan
-        #           - the test results read
-
         return qdoneL, tdoneL
 
     def checkGetStoppedJobs(self):
@@ -383,7 +375,7 @@ class BatchScheduler:
             for bid,bjob in startlist:
                 check_set_outfile_permissions( bjob, self.perms )
                 status = statusD[ bjob.getJobID() ]
-                if self.jobmon.checkJobStopped( bid, status, tnow ):
+                if self.jobmon.checkJobStopped( bjob, status, tnow ):
                     qdoneL.append( bid )
 
         return qdoneL
@@ -402,11 +394,10 @@ class BatchScheduler:
     def checkJobFinish(self, bjob, current_time):
         ""
         tdoneL = []
-        bid = bjob.getBatchID()
 
         if self.checkForCleanFinish( bjob ):
-            tdoneL = self.readJobResults( bjob )
-            self.jobmon.markJobDone( bid, 'clean' )
+            tdoneL = self.results.readJobResults( bjob )
+            self.jobmon.markJobDone( bjob, 'clean' )
 
         elif not self.jobmon.extendFinishCheck( bjob, current_time ):
             # too many attempts to read; assume the queue job
@@ -444,10 +435,7 @@ class BatchScheduler:
 
         notrunL = []
         for bjob in jobL:
-            tcase1 = self.getBlockingDependency( bjob )
-            assert tcase1 != None  # otherwise checkstart() should have run it
-            for tcase0 in bjob.getTests():
-                notrunL.append( (tcase0,tcase1) )
+            notrunL.extend( self.results.getFailedDependencies( bjob ) )
 
         notrun,notdone = self.jobmon.getUnfinishedJobIDs()
 
@@ -462,15 +450,22 @@ class BatchScheduler:
 
         elif os.path.exists( bjob.getResultsFile() ):
             mark = 'notdone'
-            tL.extend( self.readJobResults( bjob ) )
+            tL.extend( self.results.readJobResults( bjob ) )
 
         else:
             mark = 'fail'
 
-        bid = bjob.getBatchID()
-        self.jobmon.markJobDone( bid, mark )
+        self.jobmon.markJobDone( bjob, mark )
 
         return tL
+
+
+class ResultsHandler:
+
+    def __init__(self, tlist, xlist):
+        ""
+        self.tlist = tlist
+        self.xlist = xlist
 
     def readJobResults(self, bjob):
         ""
@@ -493,6 +488,17 @@ class BatchScheduler:
                 self.xlist.testDone( tcase )
 
         return tL
+
+    def getFailedDependencies(self, bjob):
+        ""
+        depL = []
+
+        tcase1 = self.getBlockingDependency( bjob )
+        assert tcase1 != None  # otherwise the job should have run
+        for tcase0 in bjob.getTests():
+            depL.append( (tcase0,tcase1) )
+
+        return depL
 
     def getBlockingDependency(self, bjob):
         """
@@ -625,33 +631,36 @@ class BatchJobMonitor:
         ""
         return self.qdone.items()
 
-    def markJobStarted(self, batchid, jobid):
+    def markJobStarted(self, bjob, jobid):
         ""
         tm = time.time()
+        bid = bjob.getBatchID()
 
-        bjob = self._pop_job( batchid )
-        self.qstart[ batchid ] = bjob
+        self._pop_job( bid )
+        self.qstart[ bid ] = bjob
 
         bjob.setJobID( jobid )
         bjob.setStartTime( tm )
 
-    def markJobStopped(self, batchid):
+    def markJobStopped(self, bjob):
         ""
         tm = time.time()
+        bid = bjob.getBatchID()
 
-        bjob = self._pop_job( batchid )
-        self.qstop[ batchid ] = bjob
+        self._pop_job( bid )
+        self.qstop[ bid ] = bjob
 
         bjob.setStopTime( tm )
         bjob.setCheckTime( tm + self.read_interval )
 
-    def markJobDone(self, batchid, result):
+    def markJobDone(self, bjob, result):
         ""
-        bjob = self._pop_job( batchid )
-        self.qdone[ batchid ] = bjob
+        bid = bjob.getBatchID()
+        self._pop_job( bid )
+        self.qdone[ bid ] = bjob
         bjob.setResult( result )
 
-    def checkJobStopped(self, batchid, queue_status, current_time):
+    def checkJobStopped(self, bjob, queue_status, current_time):
         """
         If job 'queue_status' is empty (meaning the job is not in the queue),
         then return True if enough time has elapsed since the job started or
@@ -660,11 +669,10 @@ class BatchJobMonitor:
         started = False
 
         if not queue_status:
-            bjob = self.qstart[ batchid ]
             elapsed = current_time - bjob.getStartTime()
             if elapsed > 30 or bjob.outfileSeen():
                 started = True
-                self.markJobStopped( batchid )
+                self.markJobStopped( bjob )
 
         return started
 
@@ -720,7 +728,7 @@ class BatchJobMonitor:
         jobs = []
 
         for bid,bjob in list( self.getNotStarted() ):
-            self.markJobDone( bid, 'notrun' )
+            self.markJobDone( bjob, 'notrun' )
             jobs.append( bjob )
 
         return jobs
