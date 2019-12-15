@@ -173,6 +173,20 @@ class TestListReader:
             self.tests.update( tlr.getTests() )
 
 
+def file_is_marked_finished( filename ):
+    ""
+    finished = False
+
+    try:
+        tlr = TestListReader( filename )
+        if tlr.scanForFinishDate() != None:
+            finished = True
+    except Exception:
+        pass
+
+    return finished
+
+
 def inline_include_files( filename ):
     """
     For each "include" line in the given test list file, the include statement

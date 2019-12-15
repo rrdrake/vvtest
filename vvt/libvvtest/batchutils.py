@@ -35,14 +35,13 @@ class Batcher:
 
         self.namer = BatchFileNamer( test_dir, testlist_name )
 
-        jobmon = BatchJobMonitor( read_interval, read_timeout )
+        jobmon = BatchJobMonitor( read_interval, read_timeout,
+                                  clean_exit_marker )
 
         self.scheduler = BatchScheduler(
                             tlist, xlist,
-                            self.accountant, self.namer,
-                            perms, plat, qsublimit,
-                            clean_exit_marker,
-                            jobmon )
+                            self.accountant, self.namer, jobmon,
+                            perms, plat, qsublimit )
 
         suffix = tlist.getResultsSuffix()
         self.handler = JobHandler( suffix, self.namer, plat,
@@ -295,9 +294,8 @@ class JobHandler:
 class BatchScheduler:
 
     def __init__(self, tlist, xlist,
-                       accountant, namer, perms,
-                       plat, maxjobs, clean_exit_marker,
-                       jobmon):
+                       accountant, namer, jobmon,
+                       perms, plat, maxjobs):
         ""
         self.tlist = tlist
         self.xlist = xlist
@@ -306,7 +304,6 @@ class BatchScheduler:
         self.perms = perms
         self.plat = plat
         self.maxjobs = maxjobs
-        self.clean_exit_marker = clean_exit_marker
         self.jobmon = jobmon
 
     def numInFlight(self):
@@ -343,7 +340,7 @@ class BatchScheduler:
                 if self.getBlockingDependency( bjob ) == None:
                     pin = self.namer.getBatchScriptName( qid )
                     tdir = self.namer.getTestResultsRoot()
-                    jobid = self.plat.Qsubmit( tdir, bjob.outfile, pin )
+                    jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
                     self.accountant.markJobStarted( qid )
                     self.jobmon.start( bjob, jobid )
                     return qid
@@ -369,7 +366,8 @@ class BatchScheduler:
             statusD = self.plat.Qquery( jobidL )
             tnow = time.time()
             for qid,bjob in list( startlist ):
-                if self.checkJobDone( bjob, statusD[ bjob.jobid ], tnow ):
+                check_set_outfile_permissions( bjob, self.perms )
+                if self.jobmon.checkJobStarted( bjob, statusD[ bjob.getJobID() ], tnow ):
                     self.accountant.markJobStopped( qid )
                     self.jobmon.stop( bjob )
                     qdoneL.append( qid )
@@ -378,7 +376,8 @@ class BatchScheduler:
         tdoneL = []
         for qid,bjob in list( self.accountant.getStopped() ):
             if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
-                if self.checkJobFinished( bjob.outfile, bjob.resultsfile ):
+                if self.checkJobFinished( bjob.getOutputFile(),
+                                          bjob.getResultsFile() ):
                     # load the results into the TestList
                     tdoneL.extend( self.finalizeJob( qid, bjob, 'clean' ) )
                 else:
@@ -389,77 +388,11 @@ class BatchScheduler:
 
         return qdoneL, tdoneL
 
-    def checkJobDone(self, bjob, queue_status, current_time):
-        """
-        If either the output file exists or enough time has elapsed since the
-        job was submitted, then mark the BatchJob as having started.
-
-        Returns true if the job was started.
-        """
-        started = False
-        elapsed = current_time - bjob.tstart
-
-        if not queue_status:
-            if elapsed > 30 or os.path.exists( bjob.outfile ):
-                started = True
-
-        if os.path.exists( bjob.outfile ):
-            self.perms.set( bjob.outfile )
-
-        return started
-
     def checkJobFinished(self, outfilename, resultsname):
         ""
         finished = False
-        if self.scanBatchOutput( outfilename ):
-            finished = self.testListFinished( resultsname )
-        return finished
-
-    def scanBatchOutput(self, outfile):
-        """
-        Tries to read the batch output file, then looks for the marker
-        indicating a clean job script finish.  Returns true for a clean finish.
-        """
-        clean = False
-
-        try:
-            # compute file seek offset, and open the file
-            sz = os.path.getsize( outfile )
-            off = max(sz-512, 0)
-            fp = open( outfile, 'r' )
-        except Exception:
-            pass
-        else:
-            try:
-                # only read the end of the file
-                fp.seek(off)
-                buf = fp.read(512)
-            except Exception:
-                pass
-            else:
-                if self.clean_exit_marker in buf:
-                    clean = True
-            try:
-                fp.close()
-            except Exception:
-                pass
-
-        return clean
-
-    def testListFinished(self, resultsname):
-        """
-        Opens the test list file produced by a batch job and looks for the
-        finish date mark.  Returns true if found.
-        """
-        finished = False
-
-        try:
-            tlr = testlistio.TestListReader( resultsname )
-            if tlr.scanForFinishDate() != None:
-                finished = True
-        except Exception:
-            pass
-
+        if self.jobmon.scanBatchOutput( outfilename ):
+            finished = testlistio.file_is_marked_finished( resultsname )
         return finished
 
     def flush(self):
@@ -493,8 +426,8 @@ class BatchScheduler:
         notrun = []
         notdone = []
         for qid,bjob in self.accountant.getDone():
-            if bjob.result == 'notrun': notrun.append( str(qid) )
-            elif bjob.result == 'notdone': notdone.append( str(qid) )
+            if bjob.getResult() == 'notrun': notrun.append( str(qid) )
+            elif bjob.getResult() == 'notdone': notdone.append( str(qid) )
 
         return notrun, notdone, notrunL
 
@@ -502,16 +435,16 @@ class BatchScheduler:
         ""
         tL = []
 
-        if not os.path.exists( bjob.outfile ):
+        if not os.path.exists( bjob.getOutputFile() ):
             mark = 'notrun'
 
-        elif os.path.exists( bjob.resultsfile ):
+        elif os.path.exists( bjob.getResultsFile() ):
             if mark == None:
                 mark = 'notdone'
 
-            self.tlist.readTestResults( bjob.resultsfile )
+            self.tlist.readTestResults( bjob.getResultsFile() )
 
-            tlr = testlistio.TestListReader( bjob.resultsfile )
+            tlr = testlistio.TestListReader( bjob.getResultsFile() )
             tlr.read()
             jobtests = tlr.getTests()
 
@@ -546,6 +479,14 @@ class BatchScheduler:
         return None
 
 
+def check_set_outfile_permissions( bjob, perms ):
+    ""
+    ofile = bjob.getOutputFile()
+    if not bjob.outfileExists() and os.path.exists( ofile ):
+        perms.set( ofile )
+        bjob.setOutfileExists()
+
+
 class BatchJob:
 
     def __init__(self, qnumber, maxnp, fout, resultsfile, tlist):
@@ -558,6 +499,7 @@ class BatchJob:
 
         self.jobid = None
         self.tstart = None
+        self.outfile_exists = False
         self.tstop = None
         self.tcheck = None
         self.result = None
@@ -568,6 +510,18 @@ class BatchJob:
     def getTestList(self): return self.tlist
     def getTests(self): return self.tlist.getTests()
 
+    def getJobID(self): return self.jobid
+
+    def getStartTime(self): return self.tstart
+    def getCheckTime(self): return self.tcheck
+    def getStopTime(self): return self.tstop
+
+    def getResult(self): return self.result
+
+    def getOutputFile(self): return self.outfile
+    def outfileExists(self): return self.outfile_exists
+    def getResultsFile(self): return self.resultsfile
+
     def setJobID(self, jobid):
         ""
         self.jobid = jobid
@@ -576,46 +530,109 @@ class BatchJob:
         ""
         self.tstart = tstart
 
+    def setOutfileExists(self):
+        ""
+        self.outfile_exists = True
 
-# magic: - remove bjob direct accesses (use interface funcs)
+    def setCheckTime(self, tcheck):
+        ""
+        self.tcheck = tcheck
+
+    def setStopTime(self, tstop):
+        ""
+        self.tstop = tstop
+
+    def setResult(self, result):
+        ""
+        self.result = result
+
 
 class BatchJobMonitor:
 
-    def __init__(self, read_interval, read_timeout):
+    def __init__(self, read_interval, read_timeout, clean_exit_marker):
         ""
         self.read_interval = read_interval
         self.read_timeout = read_timeout
+        self.clean_exit_marker = clean_exit_marker
 
     def start(self, bjob, jobid):
         ""
         bjob.setJobID( jobid )
         bjob.setStartTime( time.time() )
 
+    def checkJobStarted(self, bjob, queue_status, current_time):
+        """
+        If either the output file exists or enough time has elapsed since the
+        job was submitted, then mark the BatchJob as having started.
+
+        Returns true if the job was started.
+        """
+        started = False
+        elapsed = current_time - bjob.getStartTime()
+
+        if not queue_status:
+            if elapsed > 30 or bjob.outfileExists():
+                started = True
+
+        return started
+
     def timeToCheckIfFinished(self, bjob, current_time):
         ""
-        return bjob.tcheck < current_time
+        return bjob.getCheckTime() < current_time
 
     def extendFinishCheck(self, bjob, current_time):
         """
         Resets the finish check time to a time into the future.  Returns
         False if the number of extensions has been exceeded.
         """
-        if current_time < bjob.tstop+self.read_timeout:
+        if current_time < bjob.getStopTime()+self.read_timeout:
             # set the time for the next read attempt
-            bjob.tcheck = current_time + self.read_interval
+            bjob.setCheckTime( current_time + self.read_interval )
             return False
 
         return True
 
     def stop(self, bjob):
         ""
-        bjob.tstop = time.time()
-        bjob.tcheck = bjob.tstop + self.read_interval
+        tm = time.time()
+        bjob.setStopTime( tm )
+        bjob.setCheckTime( tm + self.read_interval )
 
     def finished(self, bjob, result):
         ""
         assert result in ['clean','notrun','notdone','fail']
-        bjob.result = result
+        bjob.setResult( result )
+
+    def scanBatchOutput(self, outfile):
+        """
+        Tries to read the batch output file, then looks for the marker
+        indicating a clean job script finish.  Returns true for a clean finish.
+        """
+        clean = False
+
+        try:
+            # compute file seek offset, and open the file
+            sz = os.path.getsize( outfile )
+            off = max(sz-512, 0)
+            fp = open( outfile, 'r' )
+        except Exception:
+            pass
+        else:
+            try:
+                # only read the end of the file
+                fp.seek(off)
+                buf = fp.read(512)
+            except Exception:
+                pass
+            else:
+                if self.clean_exit_marker in buf:
+                    clean = True
+            try:
+                fp.close()
+            except Exception:
+                pass
+
+        return clean
 
 
 class BatchFileNamer:

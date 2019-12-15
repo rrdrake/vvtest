@@ -10,10 +10,12 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 import glob
 import tempfile
 import stat
+import struct
 
 import vvtestutils as vtu
 import testutils as util
@@ -150,7 +152,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         rootdir = os.getcwd()
-        tfile = os.path.abspath( 'tests.out' )
+        tfile = abspath( 'tests.out' )
 
         os.chdir( 'rundir' )
         tlr = tio.TestListReader( tfile )
@@ -291,7 +293,7 @@ class inlining_includes( vtu.vvtestTestCase ):
         assert len( util.grepfiles( 'Attrs', 'tests.out' ) ) == 1
 
         rootdir = os.getcwd()
-        tfile = os.path.abspath( 'tests.out' )
+        tfile = abspath( 'tests.out' )
 
         os.chdir( 'rundir' )
         tio.inline_include_files( tfile )
@@ -395,6 +397,9 @@ class TestList_results_file( vtu.vvtestTestCase ):
 
         read_TestList_and_check_fake_test( rfile )
 
+
+class scan_finish_mark( vtu.vvtestTestCase ):
+
     def test_scan_an_unfinished_test_list_file(self):
         ""
         tl = TestList.TestList( 'testlist' )
@@ -407,6 +412,37 @@ class TestList_results_file( vtu.vvtestTestCase ):
         tlr = tio.TestListReader( rfile )
         tm = tlr.scanForFinishDate()
         assert tm == None
+
+    def test_function_to_test_for_finished_date(self):
+        ""
+        tl = TestList.TestList( 'testlist' )
+        rfile = tl.initializeResultsFile()
+        tcase = create_TestCase()
+        tl.appendTestResult( tcase )
+
+        time.sleep(1)
+
+        assert tio.file_is_marked_finished( rfile ) == False
+
+        tl.writeFinished()
+        time.sleep(1)
+
+        assert tio.file_is_marked_finished( rfile ) == True
+
+    def test_for_finished_date_is_robust(self):
+        ""
+        # create file with binary data
+        fp = open( 'afile.dat', 'wb' )
+        buf = struct.pack( 'b', -128 ) * 10
+        for i in range( -127, 128 ):
+            buf += struct.pack( 'b', i ) * 10
+        fp.write( buf )
+        fp.close()
+        time.sleep(1)
+
+        assert tio.file_is_marked_finished( abspath('foobar') ) == False
+        assert os.path.exists( 'afile.dat' )
+        assert tio.file_is_marked_finished( 'afile.dat' ) == False
 
 
 class format_versions( vtu.vvtestTestCase ):
