@@ -17,7 +17,6 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
                test_dir, qsublimit ):
     ""
     numjobs = batch.getNumNotRun()
-    schedule = batch.getScheduler()
 
     print3( 'Total number of batch jobs: ' + str(batch.getNumNotRun()) + \
             ', maximum concurrent jobs: ' + str(qsublimit) )
@@ -39,16 +38,16 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
     try:
         while True:
 
-            qid = schedule.checkstart()
+            qid = batch.checkstart()
             if qid != None:
                 # nothing to print here because the qsubmit prints
                 pass
-            elif schedule.numInFlight() == 0:
+            elif batch.numInFlight() == 0:
                 break
             else:
                 sleep_with_info_check( info, qsleep )
 
-            qidL,doneL = schedule.checkdone()
+            qidL,doneL = batch.checkdone()
             
             if len(qidL) > 0:
                 ids = ' '.join( [ str(qid) for qid in qidL ] )
@@ -57,14 +56,14 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
                 ts = XstatusString( tcase, test_dir, cwd )
                 print3( "Finished:", ts )
 
-            uthook.check( schedule.numInFlight(), schedule.numPastQueue() )
+            uthook.check( batch.numInFlight(), batch.numPastQueue() )
 
             results_writer.midrun( tlist )
 
             if len(doneL) > 0:
-                jpct = 100 * float(schedule.numDone()) / float(numjobs)
-                jdiv = 'jobs '+str(schedule.numDone())+'/'+str(numjobs)
-                jflt = '(in flight '+str(schedule.numStarted())+')'
+                jpct = 100 * float(batch.numDone()) / float(numjobs)
+                jdiv = 'jobs '+str(batch.numDone())+'/'+str(numjobs)
+                jflt = '(in flight '+str(batch.numStarted())+')'
                 ndone = xlist.numDone()
                 ntot = tlist.numActive()
                 tpct = 100 * float(ndone) / float(ntot)
@@ -76,7 +75,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
                         'time = '+dt )
 
         # any remaining tests cannot be run; flush then print warnings
-        NS, NF, nrL = schedule.flush()
+        NS, NF, nrL = batch.flush()
 
     finally:
         tlist.writeFinished()

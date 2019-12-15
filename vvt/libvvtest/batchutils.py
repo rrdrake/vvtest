@@ -21,7 +21,9 @@ class Batcher:
                        test_dir, qsublimit,
                        batch_length, max_timeout):
         ""
+        self.plat = plat
         self.perms = perms
+        self.maxjobs = qsublimit
 
         clean_exit_marker = "queue job finished cleanly"
 
@@ -36,10 +38,7 @@ class Batcher:
         self.jobmon = BatchJobMonitor( read_interval, read_timeout,
                                        clean_exit_marker )
 
-        results = ResultsHandler( tlist, xlist )
-
-        self.scheduler = BatchScheduler( results, self.namer, self.jobmon,
-                                         perms, plat, qsublimit )
+        self.results = ResultsHandler( tlist, xlist )
 
         suffix = tlist.getResultsSuffix()
         self.handler = JobHandler( suffix, self.namer, plat,
@@ -51,8 +50,163 @@ class Batcher:
 
         self.qsub_testfilenames = []
 
-    def getScheduler(self):
-        return self.scheduler
+    def numInFlight(self):
+        """
+        Returns the number of batch jobs are still running or stopped but
+        whose results have not been read yet.
+        """
+        return self.jobmon.numInFlight()
+
+    def numPastQueue(self):
+        ""
+        return self.jobmon.numPastQueue()
+
+    def numStarted(self):
+        """
+        Number of batch jobs currently running (those that have been started
+        and still appear to be in the batch queue).
+        """
+        return self.jobmon.numStarted()
+
+    def numDone(self):
+        """
+        Number of batch jobs that ran and completed.
+        """
+        return self.jobmon.numDone()
+
+    def checkstart(self):
+        """
+        Launches a new batch job if possible.  If it does, the batch id is
+        returned.
+        """
+        if self.jobmon.numStarted() < self.maxjobs:
+            for bid,bjob in self.jobmon.getNotStarted():
+                if self.results.getBlockingDependency( bjob ) == None:
+                    self.startJob( bjob )
+                    return bid
+        return None
+
+    def startJob(self, bjob):
+        ""
+        bid = bjob.getBatchID()
+        pin = self.namer.getBatchScriptName( bid )
+        tdir = self.namer.getRootDir()
+        jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
+        self.jobmon.markJobStarted( bjob, jobid )
+
+    def checkdone(self):
+        """
+        Uses the platform to find batch jobs that ran but are now no longer
+        in the batch queue.  These jobs are moved from the started list to
+        the stopped list.
+
+        Then the jobs in the "stopped" list are visited and their test
+        results are read.  When a job is successfully read, the job is moved
+        from the "stopped" list to the "read" list.
+
+        Returns a list of job ids that were removed from the batch queue,
+        and a list of tests that were successfully read in.
+        """
+        qdoneL = self.checkGetStoppedJobs()
+        tdoneL = self.checkGetFinishedTests()
+
+        return qdoneL, tdoneL
+
+    def checkGetStoppedJobs(self):
+        ""
+        qdoneL = []
+
+        startlist = list( self.jobmon.getStarted() )
+        if len(startlist) > 0:
+            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
+            statusD = self.plat.Qquery( jobidL )
+            tnow = time.time()
+            for bid,bjob in startlist:
+                check_set_outfile_permissions( bjob, self.perms )
+                status = statusD[ bjob.getJobID() ]
+                if self.jobmon.checkJobStopped( bjob, status, tnow ):
+                    qdoneL.append( bid )
+
+        return qdoneL
+
+    def checkGetFinishedTests(self):
+        ""
+        tnow = time.time()
+        tdoneL = []
+        for bid,bjob in list( self.jobmon.getStopped() ):
+            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
+                tL = self.checkJobFinish( bjob, tnow )
+                tdoneL.extend( tL )
+
+        return tdoneL
+
+    def checkJobFinish(self, bjob, current_time):
+        ""
+        tdoneL = []
+
+        if self.checkForCleanFinish( bjob ):
+            tdoneL = self.results.readJobResults( bjob )
+            self.jobmon.markJobDone( bjob, 'clean' )
+
+        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
+            # too many attempts to read; assume the queue job
+            # failed somehow, but force a read anyway
+            tdoneL = self.finalizeJob( bjob )
+
+        return tdoneL
+
+    def checkForCleanFinish(self, bjob):
+        ""
+        ofile = bjob.getOutputFile()
+        rfile = bjob.getResultsFile()
+
+        finished = False
+        if self.jobmon.scanBatchOutput( ofile ):
+            finished = testlistio.file_is_marked_finished( rfile )
+
+        return finished
+
+    def flush(self):
+        """
+        Remove any remaining jobs from the "todo" list, add them to the "read"
+        list, but mark them as not run.
+
+        Returns a triple
+            - a list of batch ids that were not run
+            - a list of batch ids that did not finish
+            - a list of the tests that did not run, each of which is a
+              pair (a test, failed dependency test)
+        """
+        # should not be here if there are jobs currently running
+        assert self.jobmon.numInFlight() == 0
+
+        jobL = self.jobmon.markNotStartedJobsAsDone()
+
+        notrunL = []
+        for bjob in jobL:
+            notrunL.extend( self.results.getFailedDependencies( bjob ) )
+
+        notrun,notdone = self.jobmon.getUnfinishedJobIDs()
+
+        return notrun, notdone, notrunL
+
+    def finalizeJob(self, bjob):
+        ""
+        tL = []
+
+        if not os.path.exists( bjob.getOutputFile() ):
+            mark = 'notrun'
+
+        elif os.path.exists( bjob.getResultsFile() ):
+            mark = 'notdone'
+            tL.extend( self.results.readJobResults( bjob ) )
+
+        else:
+            mark = 'fail'
+
+        self.jobmon.markJobDone( bjob, mark )
+
+        return tL
 
     def getNumNotRun(self):
         ""
@@ -287,177 +441,6 @@ class JobHandler:
         fp.writelines( [ 'echo "'+self.clean_exit_marker+'"\n' ] )
 
         fp.close()
-
-
-class BatchScheduler:
-
-    def __init__(self, results, namer, jobmon,
-                       perms, plat, maxjobs):
-        ""
-        self.results = results
-        self.namer = namer
-        self.jobmon = jobmon
-        self.perms = perms
-        self.plat = plat
-        self.maxjobs = maxjobs
-
-    def numInFlight(self):
-        """
-        Returns the number of batch jobs are still running or stopped but
-        whose results have not been read yet.
-        """
-        return self.jobmon.numInFlight()
-
-    def numPastQueue(self):
-        ""
-        return self.jobmon.numPastQueue()
-
-    def numStarted(self):
-        """
-        Number of batch jobs currently running (those that have been started
-        and still appear to be in the batch queue).
-        """
-        return self.jobmon.numStarted()
-
-    def numDone(self):
-        """
-        Number of batch jobs that ran and completed.
-        """
-        return self.jobmon.numDone()
-
-    def checkstart(self):
-        """
-        Launches a new batch job if possible.  If it does, the batch id is
-        returned.
-        """
-        if self.jobmon.numStarted() < self.maxjobs:
-            for bid,bjob in self.jobmon.getNotStarted():
-                if self.results.getBlockingDependency( bjob ) == None:
-                    self.startJob( bjob )
-                    return bid
-        return None
-
-    def startJob(self, bjob):
-        ""
-        bid = bjob.getBatchID()
-        pin = self.namer.getBatchScriptName( bid )
-        tdir = self.namer.getRootDir()
-        jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
-        self.jobmon.markJobStarted( bjob, jobid )
-
-    def checkdone(self):
-        """
-        Uses the platform to find batch jobs that ran but are now no longer
-        in the batch queue.  These jobs are moved from the started list to
-        the stopped list.
-
-        Then the jobs in the "stopped" list are visited and their test
-        results are read.  When a job is successfully read, the job is moved
-        from the "stopped" list to the "read" list.
-
-        Returns a list of job ids that were removed from the batch queue,
-        and a list of tests that were successfully read in.
-        """
-        qdoneL = self.checkGetStoppedJobs()
-        tdoneL = self.checkGetFinishedTests()
-
-        return qdoneL, tdoneL
-
-    def checkGetStoppedJobs(self):
-        ""
-        qdoneL = []
-
-        startlist = list( self.jobmon.getStarted() )
-        if len(startlist) > 0:
-            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
-            statusD = self.plat.Qquery( jobidL )
-            tnow = time.time()
-            for bid,bjob in startlist:
-                check_set_outfile_permissions( bjob, self.perms )
-                status = statusD[ bjob.getJobID() ]
-                if self.jobmon.checkJobStopped( bjob, status, tnow ):
-                    qdoneL.append( bid )
-
-        return qdoneL
-
-    def checkGetFinishedTests(self):
-        ""
-        tnow = time.time()
-        tdoneL = []
-        for bid,bjob in list( self.jobmon.getStopped() ):
-            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
-                tL = self.checkJobFinish( bjob, tnow )
-                tdoneL.extend( tL )
-
-        return tdoneL
-
-    def checkJobFinish(self, bjob, current_time):
-        ""
-        tdoneL = []
-
-        if self.checkForCleanFinish( bjob ):
-            tdoneL = self.results.readJobResults( bjob )
-            self.jobmon.markJobDone( bjob, 'clean' )
-
-        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
-            # too many attempts to read; assume the queue job
-            # failed somehow, but force a read anyway
-            tdoneL = self.finalizeJob( bjob )
-
-        return tdoneL
-
-    def checkForCleanFinish(self, bjob):
-        ""
-        ofile = bjob.getOutputFile()
-        rfile = bjob.getResultsFile()
-
-        finished = False
-        if self.jobmon.scanBatchOutput( ofile ):
-            finished = testlistio.file_is_marked_finished( rfile )
-
-        return finished
-
-    def flush(self):
-        """
-        Remove any remaining jobs from the "todo" list, add them to the "read"
-        list, but mark them as not run.
-
-        Returns a triple
-            - a list of batch ids that were not run
-            - a list of batch ids that did not finish
-            - a list of the tests that did not run, each of which is a
-              pair (a test, failed dependency test)
-        """
-        # should not be here if there are jobs currently running
-        assert self.jobmon.numInFlight() == 0
-
-        jobL = self.jobmon.markNotStartedJobsAsDone()
-
-        notrunL = []
-        for bjob in jobL:
-            notrunL.extend( self.results.getFailedDependencies( bjob ) )
-
-        notrun,notdone = self.jobmon.getUnfinishedJobIDs()
-
-        return notrun, notdone, notrunL
-
-    def finalizeJob(self, bjob):
-        ""
-        tL = []
-
-        if not os.path.exists( bjob.getOutputFile() ):
-            mark = 'notrun'
-
-        elif os.path.exists( bjob.getResultsFile() ):
-            mark = 'notdone'
-            tL.extend( self.results.readJobResults( bjob ) )
-
-        else:
-            mark = 'fail'
-
-        self.jobmon.markJobDone( bjob, mark )
-
-        return tL
 
 
 class ResultsHandler:
