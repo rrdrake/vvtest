@@ -27,14 +27,9 @@ class Batcher:
 
         clean_exit_marker = "queue job finished cleanly"
 
-        # allow these values to be set by environment variable, mainly for
-        # unit testing; if setting these is needed more regularly then a
-        # command line option should be added
-        read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
-        read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
-
         self.namer = BatchFileNamer( test_dir, testlist_name )
 
+        read_interval, read_timeout = determine_job_read_intervals()
         self.jobmon = BatchJobMonitor( read_interval, read_timeout,
                                        clean_exit_marker )
 
@@ -46,9 +41,27 @@ class Batcher:
                                    clean_exit_marker )
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
-        self.grouper.construct()
 
         self.qsub_testfilenames = []
+
+    def writeQsubScripts(self):
+        ""
+        self.grouper.construct()
+        self._remove_batch_directories()
+
+        for bid,qL in enumerate( self.grouper.getGroups() ):
+            self._create_job_and_write_script( bid, qL )
+
+    def getNumNotRun(self):
+        ""
+        return self.jobmon.numToDo()
+
+    def getNumStarted(self):
+        """
+        Number of batch jobs currently running (those that have been started
+        and still appear to be in the batch queue).
+        """
+        return self.jobmon.numStarted()
 
     def numInFlight(self):
         """
@@ -61,18 +74,15 @@ class Batcher:
         ""
         return self.jobmon.numPastQueue()
 
-    def numStarted(self):
-        """
-        Number of batch jobs currently running (those that have been started
-        and still appear to be in the batch queue).
-        """
-        return self.jobmon.numStarted()
-
-    def numDone(self):
+    def getNumDone(self):
         """
         Number of batch jobs that ran and completed.
         """
         return self.jobmon.numDone()
+
+    def getStarted(self):
+        ""
+        return self.jobmon.getStarted()
 
     def checkstart(self):
         """
@@ -82,17 +92,9 @@ class Batcher:
         if self.jobmon.numStarted() < self.maxjobs:
             for bid,bjob in self.jobmon.getNotStarted():
                 if self.results.getBlockingDependency( bjob ) == None:
-                    self.startJob( bjob )
+                    self._start_job( bjob )
                     return bid
         return None
-
-    def startJob(self, bjob):
-        ""
-        bid = bjob.getBatchID()
-        pin = self.namer.getBatchScriptName( bid )
-        tdir = self.namer.getRootDir()
-        jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
-        self.jobmon.markJobStarted( bjob, jobid )
 
     def checkdone(self):
         """
@@ -107,64 +109,10 @@ class Batcher:
         Returns a list of job ids that were removed from the batch queue,
         and a list of tests that were successfully read in.
         """
-        qdoneL = self.checkGetStoppedJobs()
-        tdoneL = self.checkGetFinishedTests()
+        qdoneL = self._check_get_stopped_jobs()
+        tdoneL = self._check_get_finished_tests()
 
         return qdoneL, tdoneL
-
-    def checkGetStoppedJobs(self):
-        ""
-        qdoneL = []
-
-        startlist = list( self.jobmon.getStarted() )
-        if len(startlist) > 0:
-            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
-            statusD = self.plat.Qquery( jobidL )
-            tnow = time.time()
-            for bid,bjob in startlist:
-                check_set_outfile_permissions( bjob, self.perms )
-                status = statusD[ bjob.getJobID() ]
-                if self.jobmon.checkJobStopped( bjob, status, tnow ):
-                    qdoneL.append( bid )
-
-        return qdoneL
-
-    def checkGetFinishedTests(self):
-        ""
-        tnow = time.time()
-        tdoneL = []
-        for bid,bjob in list( self.jobmon.getStopped() ):
-            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
-                tL = self.checkJobFinish( bjob, tnow )
-                tdoneL.extend( tL )
-
-        return tdoneL
-
-    def checkJobFinish(self, bjob, current_time):
-        ""
-        tdoneL = []
-
-        if self.checkForCleanFinish( bjob ):
-            tdoneL = self.results.readJobResults( bjob )
-            self.jobmon.markJobDone( bjob, 'clean' )
-
-        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
-            # too many attempts to read; assume the queue job
-            # failed somehow, but force a read anyway
-            tdoneL = self.finalizeJob( bjob )
-
-        return tdoneL
-
-    def checkForCleanFinish(self, bjob):
-        ""
-        ofile = bjob.getOutputFile()
-        rfile = bjob.getResultsFile()
-
-        finished = False
-        if self.jobmon.scanBatchOutput( ofile ):
-            finished = testlistio.file_is_marked_finished( rfile )
-
-        return finished
 
     def flush(self):
         """
@@ -190,7 +138,75 @@ class Batcher:
 
         return notrun, notdone, notrunL
 
-    def finalizeJob(self, bjob):
+    def getIncludeFiles(self):
+        ""
+        return self.qsub_testfilenames
+
+    #####################################################################
+
+    def _start_job(self, bjob):
+        ""
+        bid = bjob.getBatchID()
+        pin = self.namer.getBatchScriptName( bid )
+        tdir = self.namer.getRootDir()
+        jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
+        self.jobmon.markJobStarted( bjob, jobid )
+
+    def _check_get_stopped_jobs(self):
+        ""
+        qdoneL = []
+
+        startlist = list( self.jobmon.getStarted() )
+        if len(startlist) > 0:
+            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
+            statusD = self.plat.Qquery( jobidL )
+            tnow = time.time()
+            for bid,bjob in startlist:
+                check_set_outfile_permissions( bjob, self.perms )
+                status = statusD[ bjob.getJobID() ]
+                if self.jobmon.checkJobStopped( bjob, status, tnow ):
+                    qdoneL.append( bid )
+
+        return qdoneL
+
+    def _check_get_finished_tests(self):
+        ""
+        tnow = time.time()
+        tdoneL = []
+        for bid,bjob in list( self.jobmon.getStopped() ):
+            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
+                tL = self._check_job_finish( bjob, tnow )
+                tdoneL.extend( tL )
+
+        return tdoneL
+
+    def _check_job_finish(self, bjob, current_time):
+        ""
+        tdoneL = []
+
+        if self._check_for_clean_finish( bjob ):
+            tdoneL = self.results.readJobResults( bjob )
+            self.jobmon.markJobDone( bjob, 'clean' )
+
+        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
+            # too many attempts to read; assume the queue job
+            # failed somehow, but force a read anyway
+            tdoneL = self._finish_job( bjob )
+
+        return tdoneL
+
+    def _check_for_clean_finish(self, bjob):
+        ""
+        ofile = bjob.getOutputFile()
+        rfile = bjob.getResultsFile()
+
+        finished = False
+        if self.jobmon.scanBatchOutput( ofile ):
+            finished = testlistio.file_is_marked_finished( rfile )
+
+        return finished
+
+    def _finish_job(self, bjob):
         ""
         tL = []
 
@@ -207,29 +223,6 @@ class Batcher:
         self.jobmon.markJobDone( bjob, mark )
 
         return tL
-
-    def getNumNotRun(self):
-        ""
-        return self.jobmon.numToDo()
-
-    def getNumStarted(self):
-        ""
-        return self.jobmon.numStarted()
-
-    def getStarted(self):
-        ""
-        return self.jobmon.getStarted()
-
-    def writeQsubScripts(self):
-        ""
-        self._remove_batch_directories()
-
-        for bid,qL in enumerate( self.grouper.getGroups() ):
-            self._create_job_and_write_script( bid, qL )
-
-    def getIncludeFiles(self):
-        ""
-        return self.qsub_testfilenames
 
     def _remove_batch_directories(self):
         ""
@@ -375,6 +368,18 @@ def apply_queue_timeout_bump_factor( qtime ):
         qtime += min( 15*60, 10*60 + int( float(30*60-10*60) * 0.3 ) )
 
     return qtime
+
+
+def determine_job_read_intervals():
+    """
+    allow these values to be set by environment variable, mainly for
+    unit testing; if setting these is needed more regularly then a
+    command line option should be added
+    """
+    read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
+    read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
+
+    return read_interval, read_timeout
 
 
 class JobHandler:

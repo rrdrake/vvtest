@@ -61,9 +61,9 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
             results_writer.midrun( tlist )
 
             if len(doneL) > 0:
-                jpct = 100 * float(batch.numDone()) / float(numjobs)
-                jdiv = 'jobs '+str(batch.numDone())+'/'+str(numjobs)
-                jflt = '(in flight '+str(batch.numStarted())+')'
+                jpct = 100 * float(batch.getNumDone()) / float(numjobs)
+                jdiv = 'jobs '+str(batch.getNumDone())+'/'+str(numjobs)
+                jflt = '(in flight '+str(batch.getNumStarted())+')'
                 ndone = xlist.numDone()
                 ntot = tlist.numActive()
                 tpct = 100 * float(ndone) / float(ntot)
