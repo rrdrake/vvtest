@@ -133,15 +133,15 @@ class MockBatcher:
 
     def __init__(self):
         ""
-        self.tracker = batchutils.JobTracker()
+        self.jobmon = batchutils.BatchJobMonitor( 1, 1, 'foobar' )
 
     def getNumStarted(self):
         ""
-        return self.tracker.numStarted()
+        return self.jobmon.numStarted()
 
     def getStarted(self):
         ""
-        return self.tracker.getStarted()
+        return self.jobmon.getStarted()
 
 
 def make_mock_Batcher( tlist ):
@@ -152,11 +152,8 @@ def make_mock_Batcher( tlist ):
     qid = 0
     jid = 42
 
-    batch.tracker.addJob( qid, bjob )
-    batch.tracker.markJobStarted( qid )
-
-    bjob.setJobID( jid )
-    bjob.setStartTime( time.time() )
+    batch.jobmon.addJob( qid, bjob )
+    batch.jobmon.markJobStarted( qid, jid )
 
     return batch
 
