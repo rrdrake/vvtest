@@ -92,7 +92,7 @@ class Batcher:
         qtime = self.grouper.computeQueueTime( jb.getTestList() )
         self.handler.writeJob( jb, qtime )
 
-        incl = self.namer.getTestListName( qnumber, relative=True )
+        incl = self.namer.getBasePath( qnumber, relative=True )
         self.qsub_testfilenames.append( incl )
 
         d = self.namer.getSubdir( qnumber )
@@ -236,13 +236,13 @@ class JobHandler:
 
     def createJob(self, qnumber, testL):
         ""
-        testlistfname = self.namer.getTestListName( qnumber )
+        testlistfname = self.namer.getBasePath( qnumber )
         tlist = make_batch_TestList( testlistfname, self.suffix, testL )
 
         maxnp = compute_max_np( tlist )
 
         pout = self.namer.getBatchOutputName( qnumber )
-        tout = self.namer.getTestListName( qnumber ) + '.' + self.suffix
+        tout = self.namer.getBasePath( qnumber ) + '.' + self.suffix
 
         bjob = BatchJob( qnumber, maxnp, pout, tout, tlist )
 
@@ -260,7 +260,7 @@ class JobHandler:
         fn = self.namer.getBatchScriptName( qidstr )
         fp = open( fn, "w" )
 
-        tdir = self.namer.getTestResultsRoot()
+        tdir = self.namer.getRootDir()
         pout = self.namer.getBatchOutputName( bjob.getQNumber() )
 
         hdr = self.plat.getQsubScriptHeader( maxnp, qtime, tdir, pout )
@@ -342,7 +342,7 @@ class BatchScheduler:
     def startJob(self, bjob, qid):
         ""
         pin = self.namer.getBatchScriptName( qid )
-        tdir = self.namer.getTestResultsRoot()
+        tdir = self.namer.getRootDir()
         jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
         self.jobmon.markJobStarted( qid, jobid )
 
@@ -393,23 +393,35 @@ class BatchScheduler:
         tdoneL = []
         for qid,bjob in list( self.jobmon.getStopped() ):
             if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
-                if self.checkJobFinished( bjob.getOutputFile(),
-                                          bjob.getResultsFile() ):
-                    # load the results into the TestList
-                    tdoneL.extend( self.finalizeJob( qid, bjob, 'clean' ) )
-                else:
-                    if not self.jobmon.extendFinishCheck( bjob, tnow ):
-                        # too many attempts to read; assume the queue job
-                        # failed somehow, but force a read anyway
-                        tdoneL.extend( self.finalizeJob( qid, bjob ) )
+                tL = self.checkJobFinish( qid, bjob, tnow )
+                tdoneL.extend( tL )
 
         return tdoneL
 
-    def checkJobFinished(self, outfilename, resultsname):
+    def checkJobFinish(self, qid, bjob, current_time):
         ""
+        tdoneL = []
+
+        if self.checkForCleanFinish( bjob ):
+            tdoneL = self.readJobResults( bjob )
+            self.jobmon.markJobDone( qid, 'clean' )
+
+        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
+            # too many attempts to read; assume the queue job
+            # failed somehow, but force a read anyway
+            tdoneL = self.finalizeJob( qid, bjob )
+
+        return tdoneL
+
+    def checkForCleanFinish(self, bjob):
+        ""
+        ofile = bjob.getOutputFile()
+        rfile = bjob.getResultsFile()
+
         finished = False
-        if self.jobmon.scanBatchOutput( outfilename ):
-            finished = testlistio.file_is_marked_finished( resultsname )
+        if self.jobmon.scanBatchOutput( ofile ):
+            finished = testlistio.file_is_marked_finished( rfile )
+
         return finished
 
     def flush(self):
@@ -439,7 +451,7 @@ class BatchScheduler:
 
         return notrun, notdone, notrunL
 
-    def finalizeJob(self, qid, bjob, mark=None):
+    def finalizeJob(self, qid, bjob):
         ""
         tL = []
 
@@ -447,29 +459,35 @@ class BatchScheduler:
             mark = 'notrun'
 
         elif os.path.exists( bjob.getResultsFile() ):
-            if mark == None:
-                mark = 'notdone'
-
-            self.tlist.readTestResults( bjob.getResultsFile() )
-
-            tlr = testlistio.TestListReader( bjob.getResultsFile() )
-            tlr.read()
-            jobtests = tlr.getTests()
-
-            # only add tests to the stopped list that are done
-            for tcase in bjob.getTests():
-
-                tid = tcase.getSpec().getID()
-
-                job_tcase = jobtests.get( tid, None )
-                if job_tcase and job_tcase.getStat().isDone():
-                    tL.append( tcase )
-                    self.xlist.testDone( tcase )
+            mark = 'notdone'
+            tL.extend( self.readJobResults( bjob ) )
 
         else:
             mark = 'fail'
 
         self.jobmon.markJobDone( qid, mark )
+
+        return tL
+
+    def readJobResults(self, bjob):
+        ""
+        tL = []
+
+        self.tlist.readTestResults( bjob.getResultsFile() )
+
+        tlr = testlistio.TestListReader( bjob.getResultsFile() )
+        tlr.read()
+        jobtests = tlr.getTests()
+
+        # only add tests to the stopped list that are done
+        for tcase in bjob.getTests():
+
+            tid = tcase.getSpec().getID()
+
+            job_tcase = jobtests.get( tid, None )
+            if job_tcase and job_tcase.getStat().isDone():
+                tL.append( tcase )
+                self.xlist.testDone( tcase )
 
         return tL
 
@@ -723,29 +741,25 @@ class BatchJobMonitor:
 
 class BatchFileNamer:
 
-    def __init__(self, rootdir, listbasename):
-        """
-        """
+    def __init__(self, rootdir, basename=None):
+        ""
         self.rootdir = rootdir
-        self.listbasename = listbasename
+        self.basename = basename
 
-    def getTestResultsRoot(self):
+    def getRootDir(self):
         ""
         return self.rootdir
 
-    def getTestListName(self, qid, relative=False):
-        """
-        """
-        return self.getPath( self.listbasename, qid, relative )
+    def getBasePath(self, qid, relative=False):
+        ""
+        return self.getPath( self.basename, qid, relative )
 
     def getBatchScriptName(self, qid):
-        """
-        """
+        ""
         return self.getPath( 'qbat', qid )
 
     def getBatchOutputName(self, qid):
-        """
-        """
+        ""
         return self.getPath( 'qbat-out', qid )
 
     def getPath(self, basename, qid, relative=False):
@@ -756,6 +770,8 @@ class BatchFileNamer:
         directory.
         """
         subd = self.getSubdir( qid, relative )
+        if basename == None:
+            basename = 'batch'
         fn = os.path.join( subd, basename+'.'+str(qid) )
         return fn
 
