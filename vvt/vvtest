@@ -1025,15 +1025,15 @@ def restartTests( opts, optD, rtdata ):
 
     call_user_prologue( rtdata )
 
-    qid = opts.qsub_id
-    if qid == None:
+    batchid = opts.qsub_id
+    if batchid == None:
         tfile = pjoin( test_dir, testlist_name )
         apply_filters = True
     else:
         # batch jobs have --qsub-id set and land here
         import libvvtest.batchutils as batchutils
         namer = batchutils.BatchFileNamer( test_dir, testlist_name )
-        tfile = namer.getBasePath( qid )
+        tfile = namer.getBasePath( batchid )
         apply_filters = False
 
     tlist = make_TestList( rtdata, tfile )
@@ -1044,11 +1044,11 @@ def restartTests( opts, optD, rtdata ):
 
     check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
 
-    if qid == None:
+    if batchid == None:
         timehandler = rtdata.getTestTimeHandler()
         timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
     else:
-        symlink_batch_files_in_tests( tlist, namer, qid )
+        symlink_batch_files_in_tests( tlist, namer, batchid )
 
     reld = rtdata.getFilterPath()
 
@@ -1112,10 +1112,10 @@ def baselineTests( opts, optD, rtdata ):
         execute.run_baseline( xlist, plat )
 
 
-def symlink_batch_files_in_tests( tlist, namer, qid ):
+def symlink_batch_files_in_tests( tlist, namer, batchid ):
     ""
-    qbat = namer.getBatchScriptName( qid )
-    qout = namer.getBatchOutputName( qid )
+    qbat = namer.getBatchScriptName( batchid )
+    qout = namer.getBatchOutputName( batchid )
 
     for tcase in tlist.getTests():
         tcase.getSpec().addLinkFile( qbat )

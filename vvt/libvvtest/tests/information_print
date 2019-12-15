@@ -147,13 +147,14 @@ class MockBatcher:
 def make_mock_Batcher( tlist ):
     ""
     batch = MockBatcher()
-    bjob = batchutils.BatchJob( 0, None, None, None, tlist )
 
-    qid = 0
+    batchid = 0
+    bjob = batchutils.BatchJob( batchid, None, None, None, tlist )
+
+    batch.jobmon.addJob( bjob )
+
     jid = 42
-
-    batch.jobmon.addJob( qid, bjob )
-    batch.jobmon.markJobStarted( qid, jid )
+    batch.jobmon.markJobStarted( batchid, jid )
 
     return batch
 
