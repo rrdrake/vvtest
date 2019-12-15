@@ -31,7 +31,7 @@ class Batcher:
         read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
         read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
 
-        self.accountant = BatchAccountant()
+        self.tracker = JobTracker()
 
         self.namer = BatchFileNamer( test_dir, testlist_name )
 
@@ -40,7 +40,7 @@ class Batcher:
 
         self.scheduler = BatchScheduler(
                             tlist, xlist,
-                            self.accountant, self.namer, jobmon,
+                            self.tracker, self.namer, jobmon,
                             perms, plat, qsublimit )
 
         suffix = tlist.getResultsSuffix()
@@ -58,15 +58,15 @@ class Batcher:
 
     def getNumNotRun(self):
         ""
-        return self.accountant.numToDo()
+        return self.tracker.numToDo()
 
     def getNumStarted(self):
         ""
-        return self.accountant.numStarted()
+        return self.tracker.numStarted()
 
     def getStarted(self):
         ""
-        return self.accountant.getStarted()
+        return self.tracker.getStarted()
 
     def writeQsubScripts(self):
         ""
@@ -89,7 +89,7 @@ class Batcher:
         ""
         jb = self.handler.createJob( qnumber, testL )
 
-        self.accountant.addJob( qnumber, jb )
+        self.tracker.addJob( qnumber, jb )
 
         qtime = self.grouper.computeQueueTime( jb.getTestList() )
         self.handler.writeJob( jb, qtime )
@@ -294,12 +294,12 @@ class JobHandler:
 class BatchScheduler:
 
     def __init__(self, tlist, xlist,
-                       accountant, namer, jobmon,
+                       tracker, namer, jobmon,
                        perms, plat, maxjobs):
         ""
         self.tlist = tlist
         self.xlist = xlist
-        self.accountant = accountant
+        self.tracker = tracker
         self.namer = namer
         self.perms = perms
         self.plat = plat
@@ -311,37 +311,37 @@ class BatchScheduler:
         Returns the number of batch jobs are still running or stopped but
         whose results have not been read yet.
         """
-        return self.accountant.numInFlight()
+        return self.tracker.numInFlight()
 
     def numPastQueue(self):
         ""
-        return self.accountant.numPastQueue()
+        return self.tracker.numPastQueue()
 
     def numStarted(self):
         """
         Number of batch jobs currently running (those that have been started
         and still appear to be in the batch queue).
         """
-        return self.accountant.numStarted()
+        return self.tracker.numStarted()
 
     def numDone(self):
         """
         Number of batch jobs that ran and completed.
         """
-        return self.accountant.numDone()
+        return self.tracker.numDone()
 
     def checkstart(self):
         """
         Launches a new batch job if possible.  If it does, the batch id is
         returned.
         """
-        if self.accountant.numStarted() < self.maxjobs:
-            for qid,bjob in self.accountant.getNotStarted():
+        if self.tracker.numStarted() < self.maxjobs:
+            for qid,bjob in self.tracker.getNotStarted():
                 if self.getBlockingDependency( bjob ) == None:
                     pin = self.namer.getBatchScriptName( qid )
                     tdir = self.namer.getTestResultsRoot()
                     jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
-                    self.accountant.markJobStarted( qid )
+                    self.tracker.markJobStarted( qid )
                     self.jobmon.start( bjob, jobid )
                     return qid
         return None
@@ -360,7 +360,7 @@ class BatchScheduler:
         and a list of tests that were successfully read in.
         """
         qdoneL = []
-        startlist = self.accountant.getStarted()
+        startlist = self.tracker.getStarted()
         if len(startlist) > 0:
             jobidL = [ jb.jobid for qid,jb in startlist ]
             statusD = self.plat.Qquery( jobidL )
@@ -368,13 +368,13 @@ class BatchScheduler:
             for qid,bjob in list( startlist ):
                 check_set_outfile_permissions( bjob, self.perms )
                 if self.jobmon.checkJobStarted( bjob, statusD[ bjob.getJobID() ], tnow ):
-                    self.accountant.markJobStopped( qid )
+                    self.tracker.markJobStopped( qid )
                     self.jobmon.stop( bjob )
                     qdoneL.append( qid )
 
         tnow = time.time()
         tdoneL = []
-        for qid,bjob in list( self.accountant.getStopped() ):
+        for qid,bjob in list( self.tracker.getStopped() ):
             if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
                 if self.checkJobFinished( bjob.getOutputFile(),
                                           bjob.getResultsFile() ):
@@ -407,25 +407,25 @@ class BatchScheduler:
               pair (a test, failed dependency test)
         """
         # should not be here if there are jobs currently running
-        assert self.accountant.numInFlight() == 0
+        assert self.tracker.numInFlight() == 0
 
         # force remove the rest of the jobs that were not run and gather
         # the list of tests that were not run
         notrunL = []
-        for qid,bjob in list( self.accountant.getNotStarted() ):
+        for qid,bjob in list( self.tracker.getNotStarted() ):
             tcase1 = self.getBlockingDependency( bjob )
             assert tcase1 != None  # otherwise checkstart() should have ran it
             for tcase0 in bjob.getTests():
                 notrunL.append( (tcase0,tcase1) )
-            self.accountant.markJobDone( qid, 'notrun' )
-            self.jobmon.finished( bjob, 'notrun' )
+            self.tracker.markJobDone( qid, 'notrun' )
+            bjob.setResult( 'notrun' )
 
         # TODO: rather than only reporting the jobs left on qtodo as not run,
         #       loop on all jobs in qread and look for 'notrun' mark
 
         notrun = []
         notdone = []
-        for qid,bjob in self.accountant.getDone():
+        for qid,bjob in self.tracker.getDone():
             if bjob.getResult() == 'notrun': notrun.append( str(qid) )
             elif bjob.getResult() == 'notdone': notdone.append( str(qid) )
 
@@ -461,8 +461,8 @@ class BatchScheduler:
         else:
             mark = 'fail'
 
-        self.accountant.markJobDone( qid, mark )
-        self.jobmon.finished( bjob, mark )
+        self.tracker.markJobDone( qid, mark )
+        bjob.setResult( mark )
 
         return tL
 
@@ -482,9 +482,9 @@ class BatchScheduler:
 def check_set_outfile_permissions( bjob, perms ):
     ""
     ofile = bjob.getOutputFile()
-    if not bjob.outfileExists() and os.path.exists( ofile ):
+    if not bjob.outfileSeen() and os.path.exists( ofile ):
         perms.set( ofile )
-        bjob.setOutfileExists()
+        bjob.setOutfileSeen()
 
 
 class BatchJob:
@@ -499,7 +499,7 @@ class BatchJob:
 
         self.jobid = None
         self.tstart = None
-        self.outfile_exists = False
+        self.outfile_seen = False
         self.tstop = None
         self.tcheck = None
         self.result = None
@@ -519,7 +519,7 @@ class BatchJob:
     def getResult(self): return self.result
 
     def getOutputFile(self): return self.outfile
-    def outfileExists(self): return self.outfile_exists
+    def outfileSeen(self): return self.outfile_seen
     def getResultsFile(self): return self.resultsfile
 
     def setJobID(self, jobid):
@@ -530,9 +530,9 @@ class BatchJob:
         ""
         self.tstart = tstart
 
-    def setOutfileExists(self):
+    def setOutfileSeen(self):
         ""
-        self.outfile_exists = True
+        self.outfile_seen = True
 
     def setCheckTime(self, tcheck):
         ""
@@ -571,7 +571,7 @@ class BatchJobMonitor:
         elapsed = current_time - bjob.getStartTime()
 
         if not queue_status:
-            if elapsed > 30 or bjob.outfileExists():
+            if elapsed > 30 or bjob.outfileSeen():
                 started = True
 
         return started
@@ -597,11 +597,6 @@ class BatchJobMonitor:
         tm = time.time()
         bjob.setStopTime( tm )
         bjob.setCheckTime( tm + self.read_interval )
-
-    def finished(self, bjob, result):
-        ""
-        assert result in ['clean','notrun','notdone','fail']
-        bjob.setResult( result )
 
     def scanBatchOutput(self, outfile):
         """
@@ -694,17 +689,14 @@ class BatchFileNamer:
         return dL
 
 
-class BatchAccountant:
+class JobTracker:
 
     def __init__(self):
-        # queue jobs to be submitted, qid -> BatchJob
-        self.qtodo = {}
-        # queue jobs submitted, qid -> BatchJob
-        self.qstart = {}
-        # queue jobs submitted then have left the queue, qid -> BatchJob
-        self.qstop  = {}
-        # queue jobs whose final results have been read, qid -> BatchJob
-        self.qdone  = {}
+        ""
+        self.qtodo  = {}  # to be submitted
+        self.qstart = {}  # submitted
+        self.qstop  = {}  # no longer in the queue
+        self.qdone  = {}  # final results have been read
 
     def addJob(self, qid, batchjob ):
         ""
@@ -759,10 +751,9 @@ class BatchAccountant:
 
     def popJob(self, qid):
         ""
-        if qid in self.qtodo: return self.qtodo.pop( qid )
-        if qid in self.qstart: return self.qstart.pop( qid )
-        if qid in self.qstop: return self.qstop.pop( qid )
-        if qid in self.qdone: return self.qdone.pop( qid )
+        for qD in [ self.qtodo, self.qstart, self.qstop, self.qdone ]:
+            if qid in qD:
+                return qD.pop( qid )
         raise Exception( 'job id not found: '+str(qid) )
 
 
