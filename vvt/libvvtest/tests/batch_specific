@@ -203,6 +203,29 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
             assert x < y
             assert y-x < max_bump
 
+    def test_batch_jobs_are_killed_upon_user_interrupt(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize: cnt = 1 2 3 4 5
+            import time
+            import vvtest_util as vvt
+            time.sleep( int(vvt.cnt) )
+            print ( 'past sleep '+str(vvt.cnt) )
+            """ )
+        time.sleep(1)
+
+        t0 = time.time()
+        x,out = vtu.interrupt_vvtest_batch( '--batch-limit=5 --batch-length=0',
+                                            count=1, signum='SIGINT' )
+        t1 = time.time()
+        time.sleep(5)
+
+        assert len( util.greplines( 'Cancelling jobs:', out ) ) == 1
+        assert len( util.greplines( 'kill -s', out ) ) >= 3
+        lineL = util.grepfiles( 'past sleep', 'TestResults*/*/execute.log' )
+        assert len( lineL ) >= 1 and len( lineL ) < 5
+        assert t1-t0 < 6
+
 
 ########################################################################
 

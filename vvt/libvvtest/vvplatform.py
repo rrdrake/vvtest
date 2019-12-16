@@ -136,14 +136,12 @@ class Platform:
         return hdr
 
     def getDefaultQsubLimit(self):
-        """
-        """
+        ""
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
     def Qsubmit(self, workdir, outfile, scriptname):
-        """
-        """
+        ""
         q = self.attrs.get( 'queue', None )
         acnt = self.attrs.get( 'account', None )
         cmd, out, jobid, err = \
@@ -156,14 +154,19 @@ class Platform:
         return jobid
 
     def Qquery(self, jobidL):
-        """
-        """
+        ""
         cmd, out, err, jobD = self.batch.query( jobidL )
         if err:
             print3( cmd + os.linesep + out + os.linesep + err )
-        return jobD
         
         return jobD
+
+    def Qcancel(self, jobidL):
+        ""
+        if hasattr( self.batch, 'cancel' ):
+            print3( '\nCancelling jobs:', jobidL )
+            for jid in jobidL:
+                self.batch.cancel( jid )
 
     def initProcs(self, set_num, set_max):
         """

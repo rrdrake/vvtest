@@ -1,6 +1,9 @@
 
 Improvements:
 
+    - Batch jobs that have started are now cancelled upon keyboard interrupt.
+      Currently only implemented for SLURM.
+
     - Optionally, the --save-results command line option can specify a
       directory, such as --save-results=/some/directory (using an equals
       sign is required).

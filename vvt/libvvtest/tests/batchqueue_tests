@@ -10,11 +10,8 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-import re
+from os.path import abspath
 import time
-import subprocess
-import shutil
-from glob import glob
 
 import vvtestutils as vtu
 import testutils as util
@@ -27,18 +24,18 @@ class the_tests( vtu.vvtestTestCase ):
         ""
         util.writefile( 'script', """
             echo "running script"
-            touch """+os.path.abspath( 'touch.txt' )+"""
+            touch """+abspath( 'touch.txt' )+"""
             """ )
-        script = os.path.abspath('script')
+        script = abspath('script')
         workdir = os.getcwd()
-        outfile = os.path.abspath('out.txt')
+        outfile = abspath('out.txt')
         time.sleep(1)
 
         from libvvtest.procbatch import ProcessBatch
 
         obj = ProcessBatch( 8 )
 
-        hdr = obj.header( 8, 123, workdir, os.path.abspath('out.txt') , {} )
+        hdr = obj.header( 8, 123, workdir, abspath('out.txt') , {} )
 
         cmd,out,jobid,err = obj.submit( script, workdir, outfile )
 
@@ -58,7 +55,7 @@ class the_tests( vtu.vvtestTestCase ):
         obj = BatchSLURM( 16 )
         obj.setRunCommand( mock_slurm_run_command )
 
-        hdr = obj.header( 8, 123, os.getcwd(), os.path.abspath('out.txt') , {} )
+        hdr = obj.header( 8, 123, os.getcwd(), abspath('out.txt') , {} )
         assert 'SBATCH' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -80,10 +77,19 @@ class the_tests( vtu.vvtestTestCase ):
         obj = BatchSLURM( 16 )
         obj.setRunCommand( mock_slurm_run_command )
 
-        hdr = obj.header( 8, 123, os.getcwd(), os.path.abspath('out.txt') , {'QoS': 'long'} )
+        hdr = obj.header( 8, 123, os.getcwd(), abspath('out.txt') , {'QoS': 'long'} )
         print("This is hdr", hdr)
         assert '#SBATCH --qos=long' in hdr
 
+    def test_slurm_cancel_function(self):
+        ""
+        from libvvtest.slurm import BatchSLURM
+
+        obj = BatchSLURM( 16 )
+        obj.setRunCommand( mock_slurm_run_command )
+
+        obj.cancel( 123456 )
+        assert int( slurm_cmds[-1][-1] ) == 123456
 
     def test_craypbs_smoke_test(self):
         ""
@@ -92,7 +98,7 @@ class the_tests( vtu.vvtestTestCase ):
         obj = BatchCrayPBS( 16 )
         obj.setRunCommand( mock_craypbs_run_command )
 
-        hdr = obj.header( 8, 123, os.getcwd(), os.path.abspath('out.txt'), {} )
+        hdr = obj.header( 8, 123, os.getcwd(), abspath('out.txt'), {} )
         assert 'MSUB' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -113,7 +119,7 @@ class the_tests( vtu.vvtestTestCase ):
         obj = BatchPBS( 16 )
         obj.setRunCommand( mock_pbs_run_command )
 
-        hdr = obj.header( 8, 123, os.getcwd(), os.path.abspath('out.txt'), {})
+        hdr = obj.header( 8, 123, os.getcwd(), abspath('out.txt'), {})
         assert 'PBS' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -140,8 +146,12 @@ class the_tests( vtu.vvtestTestCase ):
 
 #############################################################
 
+slurm_cmds = []
+
 def mock_slurm_run_command( cmdL, changedir=None ):
     ""
+    slurm_cmds.append( cmdL )
+
     if cmdL[0] == 'sbatch':
         return 0, 'Submitted batch job 291041'
 
@@ -153,6 +163,10 @@ def mock_slurm_run_command( cmdL, changedir=None ):
 16001384 R
 16001384 CD
 """
+
+    if cmdL[0] == 'scancel':
+        return 0, ''
+
     raise Exception( 'mock failure' )
 
 

@@ -6,6 +6,8 @@
 
 import os, sys
 import time
+import signal
+import subprocess
 
 from .runcmd import runcmd
 
@@ -88,6 +90,78 @@ class ProcessBatch:
 
         out = ' '.join( [ str(jid) for jid in jobidL ] )
         return 'ps', out, '', jobD
+
+    def cancel(self, jobid):
+        ""
+        print ( 'kill -s '+str(int(signal.SIGINT))+' '+str(jobid) )
+        for pid in get_process_descendants( int(jobid) ):
+            os.kill( pid, signal.SIGINT )
+
+
+def get_process_descendants( parent ):
+    ""
+    lineL = get_process_list()
+
+    pidset = set( [ parent ] )
+
+    setlen = len( pidset )
+    while True:
+        for usr,pid,ppid in lineL:
+            if ppid in pidset:
+                pidset.add( pid )
+        newlen = len( pidset )
+        if newlen == setlen:
+            break
+        setlen = newlen
+
+    return list( pidset )
+
+
+def get_process_list():
+    """
+    Return a python list of all processes on the current machine, where each
+    entry is a length three list of form
+
+            [ user, pid, ppid ]
+    """
+    p = subprocess.Popen( 'ps -o user,pid,ppid -e',
+                          shell=True, stdout=subprocess.PIPE )
+    sout,serr = p.communicate()
+
+    sout = _STRING_(sout).strip()+'\n'
+
+    # strip off first non-empty line (the header)
+
+    first = True
+    lineL = []
+    for line in sout.split( os.linesep ):
+        line = line.strip()
+        if line:
+            if first:
+                first = False
+            else:
+                L = line.split()
+                if len(L) == 3:
+                    try:
+                        L[1] = int(L[1])
+                        L[2] = int(L[2])
+                    except Exception:
+                        pass
+                    else:
+                        lineL.append( L )
+
+    return lineL
+
+if sys.version_info[0] < 3:
+    def _STRING_(b): return b
+
+else:
+    bytes_type = type( ''.encode() )
+
+    def _STRING_(b):
+        if type(b) == bytes_type:
+            return b.decode()
+        return b
 
 
 #########################################################################

@@ -21,13 +21,12 @@ class BatchSLURM:
         self.runcmd = run_function
 
     def header(self, np, qtime, workdir, outfile, plat_attrs):
-        """
-        """
+        ""
         if np <= 0: np = 1
         nnodes = int( np/self.ppn )
         if (np%self.ppn) != 0:
             nnodes += 1
-        
+
         hdr = '#SBATCH --time=' + self.HMSformat(qtime) + '\n' + \
               '#SBATCH --nodes=' + str(nnodes) + '\n' + \
               '#SBATCH --output=' + outfile + '\n' + \
@@ -38,9 +37,8 @@ class BatchSLURM:
         QoS = plat_attrs.get('QoS', None)
         if QoS is not None:
             hdr += '\n#SBATCH --qos=' + QoS
-        
-        return hdr
 
+        return hdr
 
     def submit(self, fname, workdir, outfile,
                      queue=None, account=None, confirm=False, **kwargs):
@@ -69,9 +67,9 @@ class BatchSLURM:
         cmdL.append('--chdir='+workdir)
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
-        
+
         x, out = self.runcmd( cmdL, workdir )
-        
+
         # output should contain something like the following
         #    sbatch: Submitted batch job 291041
         jobid = None
@@ -86,11 +84,11 @@ class BatchSLURM:
                         jobid = L[3]
                     else:
                         jobid = None
-        
+
         if jobid == None:
             return cmd, out, None, "batch submission failed or could not parse " + \
                                    "output to obtain the job id"
-        
+
         if confirm:
             time.sleep(1)
             ok = 0
@@ -103,7 +101,7 @@ class BatchSLURM:
             if not ok:
                 return cmd, out, None, "could not confirm that the job entered " + \
                           "the queue after 20 seconds (job id " + str(jobid) + ")"
-        
+
         return cmd, out, jobid, ""
 
     def query(self, jobidL):
@@ -117,11 +115,11 @@ class BatchSLURM:
         cmdL = ['squeue', '--noheader', '-o', '%i %t']
         cmd = ' '.join( cmdL )
         x, out = self.runcmd(cmdL)
-        
+
         stateD = {}
         for jid in jobidL:
             stateD[jid] = ''  # default to done
-        
+
         err = ''
         for line in out.strip().split( os.linesep ):
             try:
@@ -143,9 +141,14 @@ class BatchSLURM:
             except Exception:
                 e = sys.exc_info()[1]
                 err = "failed to parse squeue output: " + str(e)
-        
+
         return cmd, out, err, stateD
-    
+
+    def cancel(self, jobid):
+        ""
+        print ( 'scancel '+str(jobid) )
+        x, out = self.runcmd( [ 'scancel', str(jobid) ] )
+
     def HMSformat(self, nseconds):
         """
         Formats 'nseconds' in H:MM:SS format.  If the argument is a string, then

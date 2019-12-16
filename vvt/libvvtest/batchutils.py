@@ -36,9 +36,8 @@ class Batcher:
         self.results = ResultsHandler( tlist, xlist )
 
         suffix = tlist.getResultsSuffix()
-        self.handler = JobHandler( suffix, self.namer, plat,
-                                   vvtestcmd,
-                                   clean_exit_marker )
+        self.maker = JobMaker( suffix, self.namer, plat,
+                               vvtestcmd, clean_exit_marker )
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
 
@@ -142,6 +141,12 @@ class Batcher:
         ""
         return self.qsub_testfilenames
 
+    def cancelStartedJobs(self):
+        ""
+        jL = [ bjob.getJobID() for _,bjob in self.jobmon.getStarted() ]
+        if len(jL) > 0:
+            self.plat.Qcancel( jL )
+
     #####################################################################
 
     def _start_job(self, bjob):
@@ -232,12 +237,12 @@ class Batcher:
 
     def _create_job_and_write_script(self, batchid, testL):
         ""
-        bjob = self.handler.createJob( batchid, testL )
+        bjob = self.maker.createJob( batchid, testL )
 
         self.jobmon.addJob( bjob )
 
         qtime = self.grouper.computeQueueTime( bjob.getTestList() )
-        self.handler.writeJob( bjob, qtime )
+        self.maker.writeJob( bjob, qtime )
 
         incl = self.namer.getBasePath( batchid, relative=True )
         self.qsub_testfilenames.append( incl )
@@ -382,7 +387,7 @@ def determine_job_read_intervals():
     return read_interval, read_timeout
 
 
-class JobHandler:
+class JobMaker:
 
     def __init__(self, suffix, filenamer, platform,
                        basevvtestcmd, clean_exit_marker):
