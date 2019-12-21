@@ -55,11 +55,11 @@ class info_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=4, npass=2, diff=1, fail=1 )
         tdir = vrun.resultsDir()
 
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         # cd into the run directory and check the -i output
-        vrun = vtu.runvvtest( '-i', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir )
         vrun.assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         vtu.remove_results()
@@ -70,7 +70,7 @@ class info_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=4, npass=2, diff=1, fail=1 )
         tdir = vrun.resultsDir()
 
-        vrun = vtu.runvvtest( '-i', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir )
         vrun.assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         vtu.remove_results()
@@ -124,8 +124,8 @@ class info_tests( vtu.vvtestTestCase ):
         assert_files( vrun, [ 'DiffTest.xml', 'FailTest.xml', 'keys.xml',
                               'param.xml', 'sdir/skeys.xml'] )
 
-        vtu.runvvtest( '-i', chdir=tdir ).assertCounts( total=6 )
-        vrun = vtu.runvvtest( '-i', chdir=tdir+'/sdir' )
+        vtu.runvvtest( '-i -v', chdir=tdir ).assertCounts( total=6 )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir+'/sdir' )
         vrun.assertCounts( total=1 )
         assert vrun.countTestLines( ' skeys' ) == 1
 
@@ -188,22 +188,22 @@ class info_tests( vtu.vvtestTestCase ):
 
         tdir = vrun.resultsDir()
 
-        vrun = vtu.runvvtest( '-i', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir )
         assert test_names( vrun ) == ['marmot','zebra','ardvark','otter']
 
-        vrun = vtu.runvvtest( '-i --sort nx', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort nx', chdir=tdir )
         assert test_names( vrun ) == ['ardvark','marmot','otter','zebra']
 
-        vrun = vtu.runvvtest( '-i --sort x', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort x', chdir=tdir )
         assert test_names( vrun ) == ['marmot','zebra','ardvark','otter']
 
-        vrun = vtu.runvvtest( '-i --sort t', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort t', chdir=tdir )
         assert test_names( vrun ) == ['zebra','marmot','ardvark','otter']
 
-        vrun = vtu.runvvtest( '-i --sort sr', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort sr', chdir=tdir )
         assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
 
-        vrun = vtu.runvvtest( '-i --sort d', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort d', chdir=tdir )
         assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
 
     def test_sorting_with_near_duplicate_tests(self):
@@ -218,7 +218,7 @@ class info_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=2, npass=2 )
         tdir = vrun.resultsDir()
 
-        vrun = vtu.runvvtest( '-i --sort n', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v --sort n', chdir=tdir )
         assert test_names( vrun ) == ['dupname', 'dupname']
 
     def test_using_the_files_option_with_a_multi_test_xml_file(self):
@@ -319,19 +319,19 @@ class info_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
         assert vrun.getTestIds() == [ 'foo' ]
 
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'bar', 'foo' ]
 
-        vrun = vtu.runvvtest( '-i -k bar' )
+        vrun = vtu.runvvtest( '-i -v -k bar' )
         vrun.assertCounts( total=1, npass=1 )
         assert vrun.getTestIds() == [ 'bar' ]
 
-        vrun = vtu.runvvtest( '-i', chdir=rdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=rdir )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'bar', 'foo' ]
 
-        vrun = vtu.runvvtest( '-i -k bar', chdir=rdir )
+        vrun = vtu.runvvtest( '-i -v -k bar', chdir=rdir )
         vrun.assertCounts( total=1, npass=1 )
         assert vrun.getTestIds() == [ 'bar' ]
 

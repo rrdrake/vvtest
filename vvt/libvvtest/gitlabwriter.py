@@ -53,7 +53,7 @@ class GitLabWriter:
         ""
         self.period = period_in_seconds
 
-    def prerun(self, atestlist, runinfo, abbreviate=True):
+    def prerun(self, atestlist, runinfo, verbosity):
         ""
         if self.outurl:
             self._dispatch_submission( atestlist, runinfo )

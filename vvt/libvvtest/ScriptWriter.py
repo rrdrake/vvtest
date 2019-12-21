@@ -101,20 +101,10 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                     n2 = '_'.join( n )
                     w.add( 'PARAM_'+n2+' = ' + repr(L) )
 
-        L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
+        L = generate_dependency_list( dep_list, test_dir )
         w.add( '', 'DEPDIRS = '+repr(L) )
 
-        # generate a multi-valued map of the dependencies
-        D = {}
-        for T in dep_list:
-            S = D.get( T[0], None )
-            if S == None:
-                S = set()
-                D[ T[0] ] = S
-            S.add( pjoin( test_dir, T[1] ) )
-        for k,S in D.items():
-            D[ k ] = list( S )
-            D[ k ].sort()
+        D = generate_dependency_map( dep_list, test_dir )
         w.add( '', 'DEPDIRMAP = '+repr(D) )
 
         w.add( '',
@@ -200,7 +190,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                     L2 = [ '/'.join( v ) for v in L ]
                     w.add( 'PARAM_'+n2+'="' + ' '.join(L2) + '"' )
 
-        L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
+        L = generate_dependency_list( dep_list, test_dir )
         w.add( '', 'DEPDIRS="'+' '.join(L)+'"' )
 
         sprocs = [ str(procid) for procid in resourceobj.procs ]
@@ -229,8 +219,7 @@ class LineWriter:
         self.lineL = []
 
     def add(self, *args):
-        """
-        """
+        ""
         if len(args) > 0:
             indent = ''
             if type(args[0]) == type(2):
@@ -244,8 +233,7 @@ class LineWriter:
                     self.lineL.append( indent+line )
 
     def _split(self, s):
-        """
-        """
+        ""
         off = None
         lineL = []
         for line in s.split( '\n' ):
@@ -263,8 +251,32 @@ class LineWriter:
         return [ line[off:] for line in lineL ]
 
     def write(self, filename):
-        """
-        """
+        ""
         fp = open( filename, 'w' )
         fp.write( '\n'.join( self.lineL ) + '\n' )
         fp.close()
+
+
+def generate_dependency_list( dep_list, test_dir ):
+    ""
+    L = [ pjoin( test_dir, T[1] ) for T in dep_list ]
+    L.sort()
+    return L
+
+
+def generate_dependency_map( dep_list, test_dir ):
+    ""
+    D = {}
+
+    for T in dep_list:
+        S = D.get( T[0], None )
+        if S == None:
+            S = set()
+            D[ T[0] ] = S
+        S.add( pjoin( test_dir, T[1] ) )
+
+    for k,S in D.items():
+        D[ k ] = list( S )
+        D[ k ].sort()
+
+    return D

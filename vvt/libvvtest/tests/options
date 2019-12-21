@@ -35,7 +35,7 @@ class options_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
         assert len( glob.glob( 'TestResults*' ) ) == 1
 
-        vtu.runvvtest( '-i' ).assertCounts( total=1, npass=1 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=1, npass=1 )
 
         vtu.runvvtest( '-b' )
 

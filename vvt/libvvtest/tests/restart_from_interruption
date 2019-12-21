@@ -47,22 +47,22 @@ class restart_tests( vtu.vvtestTestCase ):
 
         # run the test set but provide a false interruption
         vtu.interrupt_vvtest_run( '-n 2', count=1 )
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         cntD = vtu.parse_vvtest_counts( vrun.out )
         assert cntD['total'] == 4 and cntD['notrun'] > 0
 
         # restart with no keywords
         vtu.runvvtest( '-n 2' )
-        vtu.runvvtest( '-i' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         # restart using results keyword
         vtu.interrupt_vvtest_run( '-n 2 -w', count=1 )
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         cntD = vtu.parse_vvtest_counts( vrun.out )
         assert cntD['total'] == 4 and cntD['notrun'] > 0
 
         vtu.runvvtest( '-n 2 -k notrun/notdone' )
-        vtu.runvvtest( '-i' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         # none should restart now
         vtu.runvvtest( '-n 2' ).assertCounts( total=0 )
@@ -93,22 +93,22 @@ class restart_tests( vtu.vvtestTestCase ):
 
         # run the test set but provide a false interruption
         vtu.interrupt_vvtest_run( '-n 2', count=1 )
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         cntD = vtu.parse_vvtest_counts( vrun.out )
         assert cntD['total'] == 4 and cntD['notrun'] > 0
 
         # restart with no keywords
         vtu.runvvtest( '-n 2' )
-        vtu.runvvtest( '-i' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         # restart using results keyword
         vtu.interrupt_vvtest_run( '-n 2 -w', count=1 )
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         cntD = vtu.parse_vvtest_counts( vrun.out )
         assert cntD['total'] == 4 and cntD['notrun'] > 0
 
         vtu.runvvtest( '-n 2 -k notrun/notdone' )
-        vtu.runvvtest( '-i' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=4, npass=2, diff=1, fail=1 )
 
         # none should restart now
         vtu.runvvtest( '-n 2' ).assertCounts( total=0 )

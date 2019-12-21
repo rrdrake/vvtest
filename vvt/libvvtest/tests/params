@@ -44,10 +44,10 @@ class parameter_tests( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( "-p 'np<=8'", batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
-            vrun = vtu.runvvtest( "-i", batch=batch )
+            vrun = vtu.runvvtest( "-i -v", batch=batch )
             vrun.assertCounts( total=3, npass=3 )
 
-            vrun = vtu.runvvtest( "-i -p 'np=4'", batch=batch )
+            vrun = vtu.runvvtest( "-i -v -p 'np=4'", batch=batch )
             vrun.assertCounts( total=1, npass=1 )
 
     def test_multiple_parameterize(self):
@@ -323,9 +323,9 @@ class parameter_tests( vtu.vvtestTestCase ):
             assert len( sL ) == 1
 
             # parameter names are also keywords, but not parameter values
-            vtu.runvvtest( '-i -k animal' ).assertCounts( total=2, npass=2 )
-            vtu.runvvtest( '-i -k dog' ).assertCounts( total=0 )
-            vtu.runvvtest( '-i -k Z' ).assertCounts( total=4, npass=4 )
+            vtu.runvvtest( '-i -v -k animal' ).assertCounts( total=2, npass=2 )
+            vtu.runvvtest( '-i -v -k dog' ).assertCounts( total=0 )
+            vtu.runvvtest( '-i -v -k Z' ).assertCounts( total=4, npass=4 )
 
     def test_parameterize_parse_errors(self):
         ""

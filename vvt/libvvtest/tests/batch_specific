@@ -105,7 +105,7 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         assert len( glob.glob( 'TestResults*/lazy*/touch*.txt' ) ) == 3
 
         # all three tests should show as completed
-        vtu.runvvtest( '-i' ).assertCounts( total=3, npass=3 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=3, npass=3 )
 
     def test_failed_batch_job_issues_warning_about_not_finishing(self):
         ""

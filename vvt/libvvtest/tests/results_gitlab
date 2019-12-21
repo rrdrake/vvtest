@@ -369,7 +369,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         ""
         wr,recorder = self.make_recording_GitLabWriter( 'destdir' )
 
-        wr.prerun( None, None )
+        wr.prerun( None, None, 0 )
         assert recorder == []
 
         wr.midrun( None, None )
@@ -385,7 +385,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         ""
         wr,recorder = self.make_recording_GitLabWriter( 'file:///some/dir' )
 
-        wr.prerun( None, None )
+        wr.prerun( None, None, 0 )
         assert recorder == [ 'submit' ]
 
         wr.midrun( None, None )
@@ -402,7 +402,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         wr,recorder = self.make_recording_GitLabWriter( 'file:///some/dir' )
         wr.setOutputPeriod( 2 )
 
-        wr.prerun( None, None )
+        wr.prerun( None, None, 0 )
         assert recorder == [ 'submit' ]
         wr.midrun( None, None )
         assert recorder == ['submit']

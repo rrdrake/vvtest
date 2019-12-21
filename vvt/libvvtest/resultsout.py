@@ -25,10 +25,10 @@ class ResultsWriters:
         ""
         self.runattrs.update( kwargs )
 
-    def prerun(self, atestlist, abbreviate=True):
+    def prerun(self, atestlist, verbosity):
         ""
         for wr in self.writers:
-            wr.prerun( atestlist, self.runattrs, abbreviate )
+            wr.prerun( atestlist, self.runattrs, verbosity )
 
     def midrun(self, atestlist):
         ""

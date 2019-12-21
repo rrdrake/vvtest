@@ -12,7 +12,7 @@ from . import outpututils
 
 class ConsoleWriter:
 
-    def __init__(self, output_file_obj, results_test_dir, verbose=1):
+    def __init__(self, output_file_obj, results_test_dir, verbose=0):
         ""
         self.fileobj = output_file_obj
         self.testdir = results_test_dir
@@ -21,8 +21,6 @@ class ConsoleWriter:
 
         self.sortspec = None
         self.maxnonpass = 32
-
-        self.suppress_info = False
 
     def setSortingSpecification(self, sortspec):
         ""
@@ -33,14 +31,12 @@ class ConsoleWriter:
         assert num > 0
         self.maxnonpass = num
 
-    def setSuppressInfo(self):
+    def prerun(self, atestlist, runinfo, verbosity):
         ""
-        self.suppress_info = True
+        level = get_prerun_list_level( verbosity, self.verbose )
 
-    def prerun(self, atestlist, runinfo, abbreviate=True):
-        ""
-        self.writeActiveList( atestlist, abbreviate )
-        self.writeListSummary( atestlist, 'Test list:' )
+        self._write_test_list_results( atestlist, level )
+        self._write_summary( atestlist, 'Test list:' )
 
     def midrun(self, atestlist, runinfo):
         ""
@@ -49,41 +45,22 @@ class ConsoleWriter:
     def postrun(self, atestlist, runinfo):
         ""
         if atestlist.numActive() > 0:
-            self.writeResultsList( atestlist )
-            self.writeListSummary( atestlist, 'Summary:' )
+            level = 1 + self.verbose
+            self._write_test_list_results( atestlist, level )
+            self._write_summary( atestlist, 'Summary:' )
 
-        fin = runinfo['finishepoch']
-        fdate = time.ctime( fin )
-
-        dt = fin - runinfo['startepoch']
-        elapsed = outpututils.pretty_time( dt )
-
-        self.write( "\nFinish date:", fdate, "(elapsed time "+elapsed+")" )
+        self.write( make_finish_info_string( runinfo ) )
 
     def info(self, atestlist, runinfo):
         ""
-        if not self.suppress_info:
-            self.writeActiveList( atestlist, abbreviate=False )
-            self.writeListSummary( atestlist, 'Summary:' )
+        level = 1 + self.verbose
+        self._write_test_list_results( atestlist, level )
+        self._write_summary( atestlist, 'Summary:' )
 
-    def writeListSummary(self, atestlist, label):
+    def _write_summary(self, atestlist, label):
         ""
         self.write( label )
-        self._write_summary( atestlist )
 
-    def writeActiveList(self, atestlist, abbreviate):
-        ""
-        if self.verbose > 1:
-            self._write_test_list_results( atestlist, 1 )
-        elif not abbreviate:
-            self._write_test_list_results( atestlist, 2 )
-
-    def writeResultsList(self, atestlist):
-        ""
-        self._write_test_list_results( atestlist, 1 )
-
-    def _write_summary(self, atestlist):
-        ""
         tcaseL = atestlist.getTests()
         parts = outpututils.partition_tests_by_result( tcaseL )
 
@@ -141,25 +118,28 @@ class ConsoleWriter:
                 self.iwrite( label+':', n  )
 
     def _write_test_list_results(self, atestlist, level):
-        ""
-        level = self._adjust_detail_level_by_verbose( level )
-
+        """
+            level = 0 : no list
+                    1 : only non-pass and with truncate
+                    2 : active
+                    3 : all (include skips)
+        """
         cwd = os.getcwd()
 
-        self.write( "==================================================" )
+        if level <= 2:
+            tcaseL = atestlist.getActiveTests( self.sortspec )
+        else:
+            tcaseL = atestlist.getTests()
 
-        tcaseL = atestlist.getActiveTests( self.sortspec )
+        if len( tcaseL ) > 0:
+            self.write( "==================================================" )
+
+        numwritten = 0
 
         if level == 1:
             numwritten = self._write_nonpass_notdone( tcaseL, cwd )
 
-        elif level == 2:
-            for tcase in tcaseL:
-                self.writeTest( tcase, cwd )
-            numwritten = len( tcaseL )
-
-        elif level > 2:
-            tcaseL = atestlist.getTests()
+        elif level >= 2:
             for tcase in tcaseL:
                 self.writeTest( tcase, cwd )
             numwritten = len( tcaseL )
@@ -190,7 +170,7 @@ class ConsoleWriter:
 
         if numwritten < numnonpass:
             self.write( '... non-pass list too long'
-                        ' (use -v for full list or run with -i later)' )
+                        ' (add -v for full list or run again with -iv)' )
 
         return numwritten
 
@@ -218,3 +198,37 @@ class ConsoleWriter:
         ""
         astr = outpututils.XstatusString( tcase, self.testdir, cwd )
         self.write( astr )
+
+
+def make_finish_info_string( runinfo ):
+    ""
+    s = '\n'
+
+    if 'finishepoch' in runinfo:
+        fin = runinfo['finishepoch']
+        fdate = time.ctime( fin )
+        s += 'Finish date: '+fdate
+
+        if 'startepoch' in runinfo:
+            dt = fin - runinfo['startepoch']
+            elapsed = outpututils.pretty_time( dt )
+            s += ' (elapsed time '+elapsed+')'
+
+    else:
+        s += 'Finish date: '+time.ctime()
+
+    return s
+
+
+def get_prerun_list_level( verbosity, verbose ):
+    ""
+    if verbose < 2:
+        level = verbosity + verbose
+        if level == 1:
+            # skip level=1 for prerun (only listing non-pass has no value)
+            level += 1
+    else:
+        # align with postrun -vv
+        level = verbose + 1
+
+    return level

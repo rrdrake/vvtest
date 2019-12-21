@@ -69,6 +69,11 @@ Fixes:
 
 Changes:
 
+    - The console test list output default has changed for vvtest -i.  It
+      now defaults to just writing the non-pass tests (the same as the
+      default list output after a vvtest execution).  Use vvtest -iv to get
+      the previous output behavior.
+
     - The console test list output format has changed.  Each test result
       line started with the test name, but not any more.  Also, the runtime
       of each test changed to hh:mm:ss.  For example,

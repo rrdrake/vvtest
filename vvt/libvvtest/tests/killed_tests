@@ -121,7 +121,7 @@ class running_after_vvtest_is_killed( vtu.vvtestTestCase ):
             vrun.assertCounts( total=1, npass=1 )
             assert vrun.countLines( 'rror*another process' ) == 0
 
-            vtu.runvvtest( '-i' ).assertCounts( total=2, npass=2 )
+            vtu.runvvtest( '-i -v' ).assertCounts( total=2, npass=2 )
 
 
 ########################################################################

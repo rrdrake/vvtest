@@ -101,7 +101,7 @@ class parameterize_analyze_dependency_handling( vtu.vvtestTestCase ):
             vrun.assertCounts( total=1, notrun=1 )
 
             # double check the state
-            vrun = vtu.runvvtest( '-i', batch=batch )
+            vrun = vtu.runvvtest( '-i -v', batch=batch )
             vrun.assertCounts( total=3, npass=1, fail=1, notrun=1 )
 
             # "fix" the failure
@@ -116,7 +116,7 @@ class parameterize_analyze_dependency_handling( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( batch=batch )
             vrun.assertCounts( total=1, npass=1 )
 
-            vrun = vtu.runvvtest( '-i', batch=batch )
+            vrun = vtu.runvvtest( '-i -v', batch=batch )
             vrun.assertCounts( total=3, npass=3, fail=0, notrun=0 )
 
     def test_rerun_with_analyze_deps(self):
@@ -219,7 +219,7 @@ class parameterize_analyze_dependency_handling( vtu.vvtestTestCase ):
         vrun.assertCounts( total=3, npass=1, fail=1, notrun=1 )
 
         # the analyze should show up in the listing here
-        vrun = vtu.runvvtest( '-i -k notrun/pass' )
+        vrun = vtu.runvvtest( '-i -v -k notrun/pass' )
         vrun.assertCounts( total=2, npass=1, notrun=1 )
 
 

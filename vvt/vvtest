@@ -81,7 +81,7 @@ class MainEntry:
         ""
         exitstat = 0
 
-        if self.opts.dash_i or self.opts.keys or self.opts.files:
+        if information_mode( self.opts ):
             mode = InformationMode( self.opts, self.optD, self.rtdata )
             exitstat = mode.run( self.dirs )
 
@@ -521,7 +521,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
 
     tlist.applyPermanentFilters()
 
-    rtdata.getResultsWriter().prerun( tlist, abbreviate=False )
+    rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()
 
     location.createTestDir( testsubdir, perms, opts.dash_M )
@@ -754,7 +754,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     results_writer = rtdata.getResultsWriter()
 
-    results_writer.prerun( tlist )
+    results_writer.prerun( tlist, verbosity=0 )
     print3()
 
     if tlist.numActive() > 0:
@@ -792,14 +792,28 @@ def check_for_currently_running_vvtest( resultsfiles, optforce ):
                 sys.exit(1)
 
 
-def determine_verbose_integer( dash_v ):
+def get_output_verbosity_integer( dash_v ):
     ""
     if dash_v:
-        verb = 1 + dash_v
+        verb = dash_v
     else:
-        verb = 1
+        verb = 0
 
     return verb
+
+
+def information_mode( opts ):
+    ""
+    return opts.dash_i or opts.keys or opts.files
+
+
+def need_console_output( opts ):
+    ""
+    if information_mode( opts ):
+        if opts.html or opts.junit or opts.gitlab or opts.save_results:
+            return False
+
+    return True
 
 
 def construct_results_writers( opts, optD,
@@ -811,8 +825,9 @@ def construct_results_writers( opts, optD,
 
     writers = resultsout.ResultsWriters()
 
-    conobj = construct_console_writer( test_dir, opts, optD )
-    writers.addWriter( conobj )
+    if need_console_output( opts ):
+        conobj = construct_console_writer( test_dir, opts, optD )
+        writers.addWriter( conobj )
 
     if opts.qsub_id == None:
 
@@ -853,14 +868,11 @@ def construct_console_writer( test_dir, opts, optD ):
     ""
     import libvvtest.consolewriter as consolewriter
 
-    verb = determine_verbose_integer( opts.dash_v )
+    verb = get_output_verbosity_integer( opts.dash_v )
 
-    conobj = consolewriter.ConsoleWriter( sys.stdout, test_dir, verbose=verb )
+    conobj = consolewriter.ConsoleWriter( sys.stdout, test_dir, verb )
 
     conobj.setSortingSpecification( optD['sort_letters'] )
-
-    if opts.html or opts.junit or opts.gitlab or opts.save_results:
-        conobj.setSuppressInfo()
 
     return conobj
 
@@ -1060,7 +1072,7 @@ def restartTests( opts, optD, rtdata ):
 
     results_writer = rtdata.getResultsWriter()
 
-    results_writer.prerun( tlist )
+    results_writer.prerun( tlist, verbosity=0 )
     print3()
 
     if tlist.numActive() > 0:
@@ -1098,7 +1110,7 @@ def baselineTests( opts, optD, rtdata ):
     tlist.determineActiveTests( filter_dir=rtdata.getFilterPath(),
                                 baseline=True )
 
-    rtdata.getResultsWriter().prerun( tlist, abbreviate=False )
+    rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()
 
     if tlist.numActive() > 0:

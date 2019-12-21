@@ -62,11 +62,11 @@ class tdd_tests( vtu.vvtestTestCase ):
 
         tdir = vrun.resultsDir()
 
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'testthree', 'testtwo' ]
 
-        vrun = vtu.runvvtest( '-i', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'testthree', 'testtwo' ]
 
@@ -90,14 +90,14 @@ class tdd_tests( vtu.vvtestTestCase ):
                                       'testthree',
                                       'testtwo' ]
 
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=4, npass=4 )
         assert vrun.getTestIds() == [ 'testfour',
                                       'testone',
                                       'testthree',
                                       'testtwo' ]
 
-        vrun = vtu.runvvtest( '-i', chdir=tdir )
+        vrun = vtu.runvvtest( '-i -v', chdir=tdir )
         vrun.assertCounts( total=4, npass=4 )
         assert vrun.getTestIds() == [ 'testfour',
                                       'testone',

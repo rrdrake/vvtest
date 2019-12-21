@@ -26,7 +26,7 @@ class JUnitWriter:
         ""
         self.datestamp = datestamp
 
-    def prerun(self, atestlist, runinfo, abbreviate=True):
+    def prerun(self, atestlist, runinfo, verbosity):
         ""
         pass
 

@@ -41,7 +41,7 @@ class filter_and_parameters( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '-N 10', batch=batch )
             vrun.assertCounts( total=3, npass=3 )
 
-            vrun = vtu.runvvtest( '-i', batch=batch )
+            vrun = vtu.runvvtest( '-i -v', batch=batch )
             vrun.assertCounts( total=3, npass=3 )
 
             vtu.remove_results()

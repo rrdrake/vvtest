@@ -52,7 +52,7 @@ class ListWriter:
         self.onopts = on_option_list
         self.ftag = final_tag
 
-    def prerun(self, atestlist, runinfo, abbreviate=True):
+    def prerun(self, atestlist, runinfo, verbosity):
         ""
         self.writeList( atestlist, runinfo, inprogress=True )
 

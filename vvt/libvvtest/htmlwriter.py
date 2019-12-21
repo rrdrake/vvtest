@@ -19,7 +19,7 @@ class HTMLWriter:
         self.filename = os.path.normpath( os.path.abspath( output_filename ) )
         self.testdir = results_test_dir
 
-    def prerun(self, atestlist, runinfo, abbreviate=True):
+    def prerun(self, atestlist, runinfo, verbosity):
         ""
         pass
 

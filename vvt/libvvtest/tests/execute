@@ -289,7 +289,7 @@ class execute_tests( vtu.vvtestTestCase ):
 
         vtu.runvvtest( '-S hello=jupiter' ).assertCounts( total=2, npass=2 )
 
-        vrun = vtu.runvvtest( '-i' )
+        vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=6, npass=6 )
 
         assert vrun.countTestLines( 'hello=jupiter' ) == 2

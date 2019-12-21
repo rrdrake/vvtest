@@ -40,13 +40,13 @@ class runtimes_and_tmin_tmax( vtu.vvtestTestCase ):
 
         vtu.runvvtest().assertCounts( total=3, npass=3 )
 
-        vtu.runvvtest( '-i' ).assertCounts( total=3, npass=3 )
+        vtu.runvvtest( '-i -v' ).assertCounts( total=3, npass=3 )
 
-        vrun = vtu.runvvtest( '-i --tmax 6' )
+        vrun = vtu.runvvtest( '-i -v --tmax 6' )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'AA', 'BB' ]
 
-        vrun = vtu.runvvtest( '-i --tmin 3' )
+        vrun = vtu.runvvtest( '-i -v --tmin 3' )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'BB', 'CC' ]
 
@@ -94,7 +94,7 @@ class runtimes_and_tmin_tmax( vtu.vvtestTestCase ):
             vrun.assertCounts( total=0 )
 
             # check that the test list in TestResults.* directory is intact
-            vrun = vtu.runvvtest( '-i', chdir=tdir )
+            vrun = vtu.runvvtest( '-i -v', chdir=tdir )
             vrun.assertCounts( total=6, npass=6 )
 
             vrun = vtu.runvvtest( '-R --tmin 3 tests', batch=batch )
@@ -103,7 +103,7 @@ class runtimes_and_tmin_tmax( vtu.vvtestTestCase ):
                         [ 'BB.planet=mars', 'BB.planet=venus', 'CC' ]
 
             # check that the test list in TestResults.* directory has old results
-            vrun = vtu.runvvtest( '-i', chdir=tdir )
+            vrun = vtu.runvvtest( '-i -v', chdir=tdir )
             vrun.assertCounts( total=6, npass=6 )
 
 
