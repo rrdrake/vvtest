@@ -84,13 +84,16 @@ def CEELAN():
     """
     Returns True if the current machine appears to be on the Sandia CEE LAN.
     """
+    if os.environ.get( 'SNLSYSTEM', '' ) == 'cee':
+        return True
+
     netfile = '/etc/sysconfig/network'
     if os.path.exists( netfile ):
         try:
             fp = open( netfile, 'r' )
             L = fp.readlines()
             fp.close()
-        except:
+        except Exception:
             pass
         else:
             for line in L:
