@@ -8,7 +8,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-from os.path import abspath, normpath
+from os.path import abspath, normpath, basename
 import time
 import pipes
 import shutil
@@ -31,69 +31,72 @@ class GitInterface:
         3 : print the directory, the git command, and the output
     """
 
-    def __init__(self, origin_url=None, rootdir=None, **options):
+    def __init__(self, origin_url=None, directory=None, **options):
         """
-        If 'origin_url' is not None, then same as clone( origin_url, rootdir ).
-        If 'rootdir' is not None, then define it as the root directory on disk.
+        If 'origin_url' is not None, then same as clone( origin_url, directory ).
+        Else if 'directory' is not None, then use it as the local repository.
         """
-        self.root = None
-        self._initialize( origin_url, rootdir, options )
+        self.top = None
+        self.envars = {}
+        self.gitexe = 'git'
 
-    def getRootDir(self, verbose=0):
+        self._initialize( origin_url, directory, options )
+
+    def get_toplevel(self, verbose=0):
         ""
-        if self.root:
-            return self.root
+        if self.top:
+            return self.top
 
-        x,root = self.run( 'rev-parse --show-toplevel',
-                           raise_on_error=False, capture=True, verbose=verbose )
+        x,top = self.run( 'rev-parse --show-toplevel',
+                          raise_on_error=False, capture=True, verbose=verbose )
 
-        if x != 0 or not root.strip():
-            raise GitInterfaceError( 'could not determine root '
+        if x != 0 or not top.strip():
+            raise GitInterfaceError( 'could not determine top level '
                                      '(are you in a Git repo?)' )
 
-        return root.strip()
+        return top.strip()
 
-    def create(self, rootdir=None, bare=False, verbose=0):
+    def create(self, directory=None, bare=False, verbose=0):
         """
-        If 'rootdir' is not None, it is created and will contain the repo.
+        If 'directory' is not None, it is created and will contain the repo.
         """
-        self.root = None
+        self.top = None
 
         cmd = self.gitexe + ' init'
         if bare:
             cmd += ' --bare'
 
-        if rootdir:
-            cd, name = split_and_create_directory( rootdir )
+        if directory:
+            cd, name = split_and_create_directory( directory )
             cmd += ' '+name
-            root = normpath( abspath( rootdir ) )
+            top = normpath( abspath( directory ) )
         else:
             cd = None
-            root = os.getcwd()
+            top = os.getcwd()
 
         runcmd( cmd, cd, verbose=verbose )
 
-        self.root = root
+        self.top = top
 
-    def clone(self, url, rootdir=None, branch=None, bare=False, verbose=0):
+    def clone(self, url, directory=None, branch=None, bare=False, verbose=0):
         """
         If 'branch' is None, all branches are fetched.  If a branch name, such
         as "master", then only that branch is fetched.  Returns the url to
         the local clone.
 
-        If 'rootdir' is not None, it will contain the repo on disk.
+        If 'directory' is not None, it will be the repository top level.
         """
-        self.root = None
+        self.top = None
 
         if branch and bare:
             raise GitInterfaceError( 'cannot bare clone a single branch' )
 
         if branch:
-            self._branch_clone( url, rootdir, branch, verbose )
+            self._branch_clone( url, directory, branch, verbose )
         else:
-            self._full_clone( url, rootdir, bare, verbose )
+            self._full_clone( url, directory, bare, verbose )
 
-        return 'file://'+self.root
+        return 'file://'+self.top
 
     def add(self, *files, **kwargs):
         ""
@@ -164,7 +167,7 @@ class GitInterface:
         """
         Returns None if in a detached HEAD state.
         """
-        loc = ( self.root if self.root else os.getcwd() )
+        loc = ( self.top if self.top else os.getcwd() )
 
         x,out = self.run( 'branch', capture=True, verbose=verbose )
 
@@ -301,7 +304,7 @@ class GitInterface:
                 create_repo_with_files( self.gitexe, message, pathL,
                                         verbose=verbose )
 
-            with change_directory( self.getRootDir() ):
+            with change_directory( self.get_toplevel() ):
                 self.run( 'fetch', tmpdir, 'master:'+branchname, verbose=verbose )
                 self.run( 'checkout', branchname, verbose=verbose )
                 self.run( 'push -u origin', branchname, verbose=verbose )
@@ -360,19 +363,19 @@ class GitInterface:
             raise GitInterfaceError(
                         'unexpected response from rev-parse: '+str(out) )
 
-    def _full_clone(self, url, rootdir, bare, verbose):
+    def _full_clone(self, url, directory, bare, verbose):
         ""
         cmd = 'clone'
         if bare:
             cmd += ' --bare'
 
-        if rootdir:
+        if directory:
             if not repository_url_match( url ) and is_a_local_repository( url ):
                 url = abspath( url )
 
-            with make_and_change_directory( rootdir ):
+            with make_and_change_directory( directory ):
                 self.run( cmd+' '+url, '.', verbose=verbose )
-                self.root = os.getcwd()
+                self.top = os.getcwd()
 
         else:
             self.run( cmd+' '+url, verbose=verbose )
@@ -380,7 +383,7 @@ class GitInterface:
             dname = self._repo_directory_from_url( url, bare )
 
             assert os.path.isdir( dname )
-            self.root = abspath( dname )
+            self.top = abspath( dname )
 
     def _repo_directory_from_url(self, url, bare=False):
         ""
@@ -390,14 +393,14 @@ class GitInterface:
         else:
             return name
 
-    def _branch_clone(self, url, rootdir, branch, verbose):
+    def _branch_clone(self, url, directory, branch, verbose):
         ""
-        if not rootdir:
-            rootdir = repo_name_from_url( url )
+        if not directory:
+            directory = repo_name_from_url( url )
 
-        with make_and_change_directory( rootdir ):
+        with make_and_change_directory( directory ):
             self.run( 'init', verbose=verbose )
-            self.root = os.getcwd()
+            self.top = os.getcwd()
             self.run( 'remote add -f -t', branch, '-m', branch, 'origin', url,
                       verbose=verbose )
             self.run( 'checkout', branch, verbose=verbose )
@@ -436,10 +439,8 @@ class GitInterface:
                 raise GitInterfaceError( 'branch appears on remote but ' + \
                                 'fetch plus checkout failed: '+branchname )
 
-    def _initialize(self, origin_url, rootdir, options):
+    def _initialize(self, origin_url, directory, options):
         ""
-        self.envars = {}
-
         self.gitexe = options.pop( 'gitexe', 'git' )
         verbose = options.pop( 'verbose', 0 )
 
@@ -452,9 +453,10 @@ class GitInterface:
             raise GitInterfaceError( "unknown options: "+str(options) )
 
         if origin_url:
-            self.clone( origin_url, rootdir=rootdir, verbose=verbose )
-        elif rootdir:
-            self.root = abspath( rootdir )
+            self.clone( origin_url, directory=directory, verbose=verbose )
+        elif directory:
+            # magic: instead of setting this to top, run get_toplevel()
+            self.top = abspath( directory )
 
     def run(self, arg0, *args, **kwargs):
         ""
@@ -466,7 +468,7 @@ class GitInterface:
 
         with set_environ( **self.envars ):
             x,out = runcmd( cmd,
-                            chdir=self.root,
+                            chdir=self.top,
                             raise_on_error=roe,
                             capture=cap,
                             verbose=verbose )
@@ -486,7 +488,7 @@ def safe_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
                 push_branches_and_tags( work_git, to_url, verbose=verbose )
 
         else:
-            work_git.clone( from_url, rootdir=work_clone,
+            work_git.clone( from_url, directory=work_clone,
                             bare=True, verbose=verbose )
             push_branches_and_tags( work_git, to_url, verbose=verbose )
 
@@ -494,7 +496,7 @@ def safe_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
         tdir = tempfile.mkdtemp( dir=os.getcwd() )
 
         try:
-            work_git.clone( from_url, rootdir=tdir, bare=True, verbose=verbose )
+            work_git.clone( from_url, directory=tdir, bare=True, verbose=verbose )
             push_branches_and_tags( work_git, to_url, verbose=verbose )
 
         finally:
@@ -541,12 +543,10 @@ def repository_url_match( url ):
 def is_a_local_repository( directory ):
     ""
     if not os.path.isdir( directory ) and os.path.isdir( directory+'.git' ):
-        rootdir = directory+'.git'
-    else:
-        rootdir = directory
+        directory += '.git'
 
     try:
-        with change_directory( rootdir ):
+        with change_directory( directory ):
             git = GitInterface()
             x,out = git.run( 'rev-parse --is-bare-repository',
                              raise_on_error=False, capture=True )
@@ -578,7 +578,7 @@ def verify_repository_url( url ):
 
 def repo_name_from_url( url ):
     ""
-    name = os.path.basename( normpath(url) )
+    name = basename( normpath(url) )
     if name.endswith( '.git' ):
         name = name[:-4]
     return name
@@ -655,7 +655,7 @@ def split_and_create_directory( repo_path ):
 
 def copy_path_to_current_directory( filepath ):
     ""
-    bn = os.path.basename( filepath )
+    bn = basename( filepath )
 
     if os.path.islink( filepath ):
         os.symlink( os.readlink( filepath ), bn )

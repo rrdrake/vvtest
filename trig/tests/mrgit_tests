@@ -53,7 +53,7 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ src_url ] )
 
         assert os.path.isdir( 'cool' )
-        git = GitInterface( rootdir='cool' )
+        git = GitInterface( directory='cool' )
         assert 'topic' in git.listRemoteBranches()
 
     def test_command_line_clone_a_single_repository(self):
@@ -64,7 +64,7 @@ class cloning( trigutil.trigTestCase ):
 
         assert x == 0
         assert os.path.isdir( 'myclone' )
-        git = GitInterface( rootdir='myclone' )
+        git = GitInterface( directory='myclone' )
         assert 'topic' in git.listRemoteBranches()
 
     def test_cloning_two_repositories_puts_second_under_the_first(self):
@@ -74,9 +74,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ cool_url, ness_url ] )
 
         assert os.path.isdir( 'cool' )
-        git = GitInterface( rootdir='cool' )
+        git = GitInterface( directory='cool' )
         assert 'nessie' not in git.listTags()
-        git = GitInterface( rootdir='cool/ness' )
+        git = GitInterface( directory='cool/ness' )
         assert 'nessie' in git.listTags()
 
     def test_command_line_clone_multiple_repos(self):
@@ -87,9 +87,9 @@ class cloning( trigutil.trigTestCase ):
                              ness_url+' '+cool_url+' myclone' )
 
         assert os.path.isdir( 'myclone' )
-        git = GitInterface( rootdir='myclone' )
+        git = GitInterface( directory='myclone' )
         assert 'nessie' in git.listTags()
-        git = GitInterface( rootdir='myclone/cool' )
+        git = GitInterface( directory='myclone/cool' )
         assert 'nessie' not in git.listTags()
 
     def test_clone_an_mrgit_clone_by_pointing_to_the_manifests(self):
@@ -101,9 +101,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( rootdir='clone2' )
+        git = GitInterface( directory='clone2' )
         assert 'nessie' not in git.listTags()
-        git = GitInterface( rootdir='clone2/ness' )
+        git = GitInterface( directory='clone2/ness' )
         assert 'nessie' in git.listTags()
 
     def test_clone_an_mrgit_clone_via_manifests_with_only_one_repo(self):
@@ -115,7 +115,7 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( rootdir='clone2' )
+        git = GitInterface( directory='clone2' )
         assert 'nessie' in git.listTags()
 
     def test_clone_an_mrgit_clone(self):
@@ -127,9 +127,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( rootdir='clone2' )
+        git = GitInterface( directory='clone2' )
         assert 'nessie' not in git.listTags()
-        git = GitInterface( rootdir='clone2/ness' )
+        git = GitInterface( directory='clone2/ness' )
         assert 'nessie' in git.listTags()
 
     def test_clone_an_mrgit_clone_using_a_file_url(self):
@@ -141,9 +141,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'file://'+abspath('clone1'), 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( rootdir='clone2' )
+        git = GitInterface( directory='clone2' )
         assert 'nessie' not in git.listTags()
-        git = GitInterface( rootdir='clone2/ness' )
+        git = GitInterface( directory='clone2/ness' )
         assert 'nessie' in git.listTags()
 
     def test_clone_a_genesis_repo(self):
@@ -544,7 +544,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg.createMRGitRepo()
 
         rmap = mrlib.RepoMap()
-        git = GitInterface( rootdir='.mrgit' )
+        git = GitInterface( directory='.mrgit' )
         baseurl = 'file://'+os.getcwd()
         mrlib.check_load_mrgit_repo( cfg, baseurl, git )
 
@@ -645,7 +645,7 @@ class commit_and_push( trigutil.trigTestCase ):
             mrlib.commit( ['-m','add new file'] )
             mrlib.push( [] )
 
-        GitInterface( src_url, rootdir='check', verbose=3 )
+        GitInterface( src_url, directory='check', verbose=3 )
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1
 
 

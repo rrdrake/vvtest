@@ -78,7 +78,7 @@ def fetch( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git = gititf.GitInterface( directory=pjoin( top, path ) )
         git.run( 'fetch', verbose=3 )
 
 
@@ -88,7 +88,7 @@ def pull( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git = gititf.GitInterface( directory=pjoin( top, path ) )
         git.run( 'pull', verbose=3 )
 
 
@@ -98,7 +98,7 @@ def add( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git = gititf.GitInterface( directory=pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'add', *args, verbose=3 )
 
@@ -109,7 +109,7 @@ def commit( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git = gititf.GitInterface( directory=pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'commit', *args, verbose=3 )
 
@@ -120,7 +120,7 @@ def push( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( rootdir=pjoin( top, path ) )
+        git = gititf.GitInterface( directory=pjoin( top, path ) )
         git.run( 'push', verbose=3 )
 
 
@@ -129,7 +129,7 @@ def load_configuration():
     cfg = Configuration()
     top = find_mrgit_top_level()
     cfg.setTopDir( top )
-    git = gititf.GitInterface( rootdir=top+'/.mrgit' )
+    git = gititf.GitInterface( directory=top+'/.mrgit' )
     cfg.loadManifests( git )
     cfg.computeLocalRepoMap()
 
@@ -247,7 +247,7 @@ def load_config_from_google_manifests( cfg, git ):
     ""
     import xml.etree.ElementTree as ET
 
-    with change_directory( git.getRootDir() ):
+    with change_directory( git.get_toplevel() ):
 
         parse_google_manifest_file( 'default.xml' )
 
@@ -462,7 +462,7 @@ def clone_repo( url, into_dir, verbose=2 ):
         git.clone( url, tmp, verbose=verbose )
         move_directory_contents( tmp, into_dir )
 
-        git = gititf.GitInterface( rootdir=into_dir )
+        git = gititf.GitInterface( directory=into_dir )
 
     else:
         git.clone( url, into_dir, verbose=verbose )
@@ -517,8 +517,8 @@ class TempDirectory:
 
 def check_load_mrgit_repo( cfg, baseurl, git ):
     ""
-    mfestfn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
-    genfn = pjoin( git.getRootDir(), GENESIS_FILENAME )
+    mfestfn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
+    genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
     if os.path.isfile( mfestfn ):
         if REPOMAP_BRANCH in git.listBranches() or \
@@ -667,7 +667,7 @@ class Configuration:
     def commitLocalRepoMap(self):
         ""
         mrgit = pjoin( self.topdir, '.mrgit' )
-        git = gititf.GitInterface( rootdir=mrgit )
+        git = gititf.GitInterface( directory=mrgit )
         checkout_repo_map_branch( git )
 
         try:
@@ -876,7 +876,7 @@ def parse_attribute_line( line ):
 
 def read_mrgit_manifests_file( manifests, git ):
     ""
-    fn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
+    fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
 
     git.checkoutBranch( 'master' )
 
@@ -886,7 +886,7 @@ def read_mrgit_manifests_file( manifests, git ):
 
 def write_first_manifests_file( manifests, git ):
     ""
-    fn = pjoin( git.getRootDir(), MANIFESTS_FILENAME )
+    fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
 
     manifests.writeToFile( fn )
     git.add( MANIFESTS_FILENAME )
@@ -898,7 +898,7 @@ def read_mrgit_repo_map_file( repomap, baseurl, git ):
     git.checkoutBranch( REPOMAP_BRANCH )
 
     try:
-        with change_directory( git.getRootDir() ):
+        with change_directory( git.get_toplevel() ):
             repomap.readFromFile( REPOMAP_FILENAME, baseurl )
     finally:
         git.checkoutBranch( 'master' )
@@ -906,17 +906,17 @@ def read_mrgit_repo_map_file( repomap, baseurl, git ):
 
 def read_genesis_map_file( repomap, git ):
     ""
-    fn = pjoin( git.getRootDir(), GENESIS_FILENAME )
+    fn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
     git.checkoutBranch( 'master' )
 
-    with change_directory( git.getRootDir() ):
+    with change_directory( git.get_toplevel() ):
         repomap.readFromFile( GENESIS_FILENAME )
 
 
 def write_mrgit_repo_map_file( repomap, git ):
     ""
-    with change_directory( git.getRootDir() ):
+    with change_directory( git.get_toplevel() ):
 
         if os.path.exists( REPOMAP_FILENAME ):
             repomap.writeToFile( REPOMAP_TEMPFILE )

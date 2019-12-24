@@ -22,7 +22,7 @@ class GitResults:
 
     def getCloneDirectory(self):
         ""
-        return self.git.getRootDir()
+        return self.git.get_toplevel()
 
     def createBranchLocation(self, directory_suffix='',
                                    epochdate=None,
@@ -53,7 +53,7 @@ class GitResults:
 
     def cleanup(self):
         ""
-        check_remove_directory( self.git.getRootDir() )
+        check_remove_directory( self.git.get_toplevel() )
 
 
 class GitResultsReader:
@@ -64,7 +64,7 @@ class GitResultsReader:
 
     def iterateDirectories(self):
         ""
-        top = self.git.getRootDir()
+        top = self.git.get_toplevel()
 
         for branch in self.iterateBranches():
             self.git.checkoutBranch( branch )
@@ -79,7 +79,7 @@ class GitResultsReader:
 
     def cleanup(self):
         ""
-        check_remove_directory( self.git.getRootDir() )
+        check_remove_directory( self.git.get_toplevel() )
 
     branchpat = re.compile( 'results_2[01][0-9][0-9]_[0123][0-9]' )
     dirpat = re.compile( '2[01][0-9][0-9]_[0123][0-9].*' )
@@ -207,7 +207,7 @@ def map_git_url_to_web_url( giturl ):
 
 def get_results_orphan_branch( git, branch, subdir ):
     ""
-    with change_directory( git.getRootDir() ):
+    with change_directory( git.get_toplevel() ):
 
         if branch in git.listRemoteBranches():
 
