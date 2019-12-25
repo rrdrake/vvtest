@@ -35,6 +35,7 @@ class GitInterface:
         """
         If 'origin_url' is not None, then same as clone( origin_url, directory ).
         Else if 'directory' is not None, then use it as the local repository.
+        Options can be 'https_proxy', 'gitexe', and 'verbose'.
         """
         self.top = None
         self.envars = {}
@@ -128,7 +129,7 @@ class GitInterface:
                 cmd += ' '+repository
 
         else:
-            br = self.currentBranch()
+            br = self.get_branch()
             if not br:
                 raise GitInterfaceError( 'you must be on a branch to push' )
 
@@ -141,10 +142,10 @@ class GitInterface:
 
     def pull(self, verbose=0):
         ""
-        if self.isBare():
+        if self.is_bare():
             raise GitInterfaceError( 'cannot pull into a bare repository' )
 
-        curbranch = self.currentBranch()
+        curbranch = self.get_branch()
 
         if curbranch == None:
             raise GitInterfaceError( 'cannot pull when HEAD is detached '
@@ -163,9 +164,9 @@ class GitInterface:
 
         self.run( 'tag -d GITINTERFACE_PULL_BACKUP' )
 
-    def currentBranch(self, verbose=0):
+    def get_branch(self, verbose=0):
         """
-        Returns None if in a detached HEAD state.
+        The current branch name, or None if in a detached HEAD state.
         """
         loc = ( self.top if self.top else os.getcwd() )
 
@@ -179,7 +180,7 @@ class GitInterface:
 
         raise GitInterfaceError( 'no branches found, DIR='+str(loc) )
 
-    def listBranches(self, remotes=False, verbose=0):
+    def get_branches(self, remotes=False, verbose=0):
         ""
         bL = []
 
@@ -209,7 +210,7 @@ class GitInterface:
         'url' is None, then the URL of the current repository is used.
         """
         if url == None:
-            url = self.getRemoteURL()
+            url = self.get_remote_URL()
             if not url:
                 raise GitInterfaceError(
                         'url not given and no local remote found' )
@@ -228,26 +229,26 @@ class GitInterface:
         bL.sort()
         return bL
 
-    def checkoutBranch(self, branchname, verbose=0):
+    def checkout_branch(self, branchname, verbose=0):
         ""
-        if branchname != self.currentBranch():
-            if branchname in self.listBranches():
+        if branchname != self.get_branch():
+            if branchname in self.get_branches():
                 self.run( 'checkout', branchname, verbose=verbose )
-            elif branchname in self.listBranches( remotes=True ):
+            elif branchname in self.get_branches( remotes=True ):
                 self.run( 'checkout --track origin/'+branchname, verbose=verbose )
             elif branchname in self.listRemoteBranches():
                 self._fetch_then_checkout_branch( branchname, verbose=verbose )
             else:
                 raise GitInterfaceError( 'branch does not exist: '+branchname )
 
-    def createBranch(self, branchname, verbose=0):
+    def create_branch(self, branchname, verbose=0):
         ""
-        if branchname in self.listBranches():
+        if branchname in self.get_branches():
             raise GitInterfaceError( 'branch already exists: '+branchname )
 
         self.run( 'checkout -b '+branchname, verbose=verbose )
 
-    def getRemoteURL(self, verbose=0):
+    def get_remote_URL(self, verbose=0):
         ""
         x,out = self.run( 'config --get remote.origin.url',
                           raise_on_error=False, capture=True,
@@ -261,13 +262,13 @@ class GitInterface:
         Create a branch on the remote, checkout, and track it locally.
         Any local changes are not pushed, but are merged onto the new branch.
         """
-        curbranch = self.currentBranch()
+        curbranch = self.get_branch()
 
         if branchname in self.listRemoteBranches():
             raise GitInterfaceError(
                     'branch name already exists on remote: '+branchname )
 
-        if curbranch not in self.listBranches( remotes=True ):
+        if curbranch not in self.get_branches( remotes=True ):
             raise GitInterfaceError(
                     'current branch must be tracking a remote: '+curbranch )
 
@@ -285,7 +286,7 @@ class GitInterface:
         """
         verbose = kwargs.get( 'verbose', 0 )
 
-        if not self.currentBranch():
+        if not self.get_branch():
             raise GitInterfaceError( 'must currently be on a branch' )
 
         if branchname in self.listRemoteBranches():
@@ -314,7 +315,7 @@ class GitInterface:
 
     def deleteRemoteBranch(self, branchname, verbose=0):
         ""
-        curbranch = self.currentBranch()
+        curbranch = self.get_branch()
         if branchname == curbranch:
             raise GitInterfaceError(
                     'cannot delete current branch: '+branchname )
@@ -323,12 +324,12 @@ class GitInterface:
             raise GitInterfaceError(
                     'branch name does not exist on remote: '+branchname )
 
-        if branchname in self.listBranches():
+        if branchname in self.get_branches():
             self.run( 'branch -d', branchname )
 
         self.run( 'push --delete origin', branchname, verbose=verbose )
 
-    def listTags(self, verbose=0):
+    def get_tags(self, verbose=0):
         ""
         x,out = self.run( 'tag --list --no-column',
                           capture=True, verbose=verbose )
@@ -344,12 +345,7 @@ class GitInterface:
 
         return tagL
 
-    def gitVersion(self, verbose=0):
-        ""
-        x,out = self.run( '--version', capture=True, verbose=verbose )
-        return [ int(s) for s in out.strip().split()[2].split('.') ]
-
-    def isBare(self, verbose=0):
+    def is_bare(self, verbose=0):
         ""
         x,out = self.run( 'rev-parse --is-bare-repository',
                           capture=True, verbose=verbose )
@@ -507,7 +503,7 @@ def mirror_remote_repo_into_pwd( remote_url, verbose=0 ):
     ""
     git = GitInterface()
 
-    if not git.isBare():
+    if not git.is_bare():
         raise GitInterfaceError( 'work_clone must be a bare repository' )
 
     git.run( 'fetch', remote_url,

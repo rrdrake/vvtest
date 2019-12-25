@@ -42,7 +42,7 @@ class GitResults:
 
     def pushResults(self, message):
         ""
-        branch = self.git.currentBranch()
+        branch = self.git.get_branch()
 
         print3( 'Pushing results...' )
         self.git.add( self.subdir )
@@ -67,7 +67,7 @@ class GitResultsReader:
         top = self.git.get_toplevel()
 
         for branch in self.iterateBranches():
-            self.git.checkoutBranch( branch )
+            self.git.checkout_branch( branch )
             for dn in self._iterate_results_dirs( top ):
                 yield branch,dn
 
@@ -211,7 +211,7 @@ def get_results_orphan_branch( git, branch, subdir ):
 
         if branch in git.listRemoteBranches():
 
-            git.checkoutBranch( branch )
+            git.checkout_branch( branch )
 
             if not os.path.exists( subdir ):
                 os.mkdir( subdir )

@@ -42,7 +42,7 @@ class the_GitResults_class( unittest.TestCase ):
 
         create_orphan_branch( git, 'resbranch', 'resdir' )
 
-        assert git.currentBranch() == 'resbranch'
+        assert git.get_branch() == 'resbranch'
         assert os.path.isfile( 'example/resdir/.create' )
         assert not os.path.exists( 'example/file.txt' )
 
@@ -153,7 +153,7 @@ class the_GitResults_class( unittest.TestCase ):
 
         git2 = GitInterface( self.url, 'check2nd' )
         assert os.path.exists( 'check2nd/file.txt' )
-        git2.checkoutBranch( branch )
+        git2.checkout_branch( branch )
 
         dat = util.readfile( 'check2nd/'+subdir+'/data1.txt' )
         assert dat.strip() == 'data file one'
@@ -181,7 +181,7 @@ class the_GitResults_class( unittest.TestCase ):
 
         git2 = GitInterface( self.url, 'check2nd' )
         assert os.path.exists( 'check2nd/file.txt' )
-        git2.checkoutBranch( branch )
+        git2.checkout_branch( branch )
 
         dat = util.readfile( 'check2nd/'+subdir+'/data1.txt' )
         assert dat.strip() == 'data file one'

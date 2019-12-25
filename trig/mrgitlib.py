@@ -521,7 +521,7 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
     genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
     if os.path.isfile( mfestfn ):
-        if REPOMAP_BRANCH in git.listBranches() or \
+        if REPOMAP_BRANCH in git.get_branches() or \
            REPOMAP_BRANCH in git.listRemoteBranches():
 
             cfg.loadManifests( git )
@@ -673,7 +673,7 @@ class Configuration:
         try:
             write_mrgit_repo_map_file( self.local, git )
         finally:
-            git.checkoutBranch( 'master' )
+            git.checkout_branch( 'master' )
 
     def createMRGitRepo(self):
         ""
@@ -878,7 +878,7 @@ def read_mrgit_manifests_file( manifests, git ):
     ""
     fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
 
-    git.checkoutBranch( 'master' )
+    git.checkout_branch( 'master' )
 
     with open( fn, 'r' ) as fp:
         manifests.readFromFile( fp )
@@ -895,20 +895,20 @@ def write_first_manifests_file( manifests, git ):
 
 def read_mrgit_repo_map_file( repomap, baseurl, git ):
     ""
-    git.checkoutBranch( REPOMAP_BRANCH )
+    git.checkout_branch( REPOMAP_BRANCH )
 
     try:
         with change_directory( git.get_toplevel() ):
             repomap.readFromFile( REPOMAP_FILENAME, baseurl )
     finally:
-        git.checkoutBranch( 'master' )
+        git.checkout_branch( 'master' )
 
 
 def read_genesis_map_file( repomap, git ):
     ""
     fn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
-    git.checkoutBranch( 'master' )
+    git.checkout_branch( 'master' )
 
     with change_directory( git.get_toplevel() ):
         repomap.readFromFile( GENESIS_FILENAME )
@@ -940,10 +940,10 @@ def commit_repo_map_file_if_changed( git ):
 
 def checkout_repo_map_branch( git ):
     ""
-    if REPOMAP_BRANCH in git.listBranches():
-        git.checkoutBranch( REPOMAP_BRANCH )
+    if REPOMAP_BRANCH in git.get_branches():
+        git.checkout_branch( REPOMAP_BRANCH )
     else:
-        git.createBranch( REPOMAP_BRANCH )
+        git.create_branch( REPOMAP_BRANCH )
 
 
 def print3( *args ):
