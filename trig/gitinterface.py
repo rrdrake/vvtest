@@ -37,11 +37,12 @@ class GitInterface:
         Else if 'directory' is not None, then use it as the local repository.
         Options can be 'https_proxy', 'gitexe', and 'verbose'.
         """
-        self.top = None
-        self.envars = {}
-        self.gitexe = 'git'
+        verb = options.pop( 'verbose', 0 )
 
-        self._initialize( origin_url, directory, options )
+        self.top = None
+        self.grun = GitRunner( **options )
+
+        self._initialize( origin_url, directory, verb )
 
     def get_toplevel(self, verbose=0):
         ""
@@ -60,10 +61,14 @@ class GitInterface:
     def create(self, directory=None, bare=False, verbose=0):
         """
         If 'directory' is not None, it is created and will contain the repo.
+        Otherwise the current directory is used.  The 'options' are the same as
+        for the GitInterface constructor.
+
+        Returns a GitInterface object.
         """
         self.top = None
 
-        cmd = self.gitexe + ' init'
+        cmd = 'init'
         if bare:
             cmd += ' --bare'
 
@@ -75,7 +80,7 @@ class GitInterface:
             cd = None
             top = os.getcwd()
 
-        runcmd( cmd, cd, verbose=verbose )
+        self.grun.run( cmd, chdir=cd, verbose=verbose )
 
         self.top = top
 
@@ -102,6 +107,8 @@ class GitInterface:
     def add(self, *files, **kwargs):
         ""
         verbose = kwargs.pop( 'verbose', 0 )
+
+        # magic: the files should be relative to the cwd first, then toplevel
 
         if len( files ) > 0:
             fL = [ pipes.quote(f) for f in files ]
@@ -302,8 +309,8 @@ class GitInterface:
         tmpdir = tempfile.mkdtemp( '.gitinterface' )
         try:
             with change_directory( tmpdir ):
-                create_repo_with_files( self.gitexe, message, pathL,
-                                        verbose=verbose )
+                _create_repo_with_files( self.grun, message, pathL,
+                                         verbose=verbose )
 
             with change_directory( self.get_toplevel() ):
                 self.run( 'fetch', tmpdir, 'master:'+branchname, verbose=verbose )
@@ -435,10 +442,29 @@ class GitInterface:
                 raise GitInterfaceError( 'branch appears on remote but ' + \
                                 'fetch plus checkout failed: '+branchname )
 
-    def _initialize(self, origin_url, directory, options):
+    def _initialize(self, origin_url, directory, verbose):
         ""
+        if origin_url:
+            self.clone( origin_url, directory=directory, verbose=verbose )
+        elif directory:
+            # magic: instead of setting this to top, run get_toplevel()
+            self.top = abspath( directory )
+
+    def run(self, arg0, *args, **kwargs):
+        ""
+        if self.top:
+            kwargs['chdir'] = self.top
+
+        return self.grun.run( arg0, *args, **kwargs )
+
+
+class GitRunner:
+
+    def __init__(self, **options):
+        ""
+        self.envars = {}
+
         self.gitexe = options.pop( 'gitexe', 'git' )
-        verbose = options.pop( 'verbose', 0 )
 
         prox = options.pop( 'https_proxy', None )
         if prox:
@@ -448,23 +474,20 @@ class GitInterface:
         if len( options ) > 0:
             raise GitInterfaceError( "unknown options: "+str(options) )
 
-        if origin_url:
-            self.clone( origin_url, directory=directory, verbose=verbose )
-        elif directory:
-            # magic: instead of setting this to top, run get_toplevel()
-            self.top = abspath( directory )
-
     def run(self, arg0, *args, **kwargs):
         ""
         roe = kwargs.pop( 'raise_on_error', True )
         cap = kwargs.pop( 'capture', False )
+        cd = kwargs.pop( 'chdir', None )
         verbose = kwargs.pop( 'verbose', 0 )
+
+        assert len(kwargs) == 0
 
         cmd = self.gitexe + ' ' + ' '.join( (arg0,)+args )
 
         with set_environ( **self.envars ):
             x,out = runcmd( cmd,
-                            chdir=self.top,
+                            chdir=cd,
                             raise_on_error=roe,
                             capture=cap,
                             verbose=verbose )
@@ -663,17 +686,17 @@ def copy_path_to_current_directory( filepath ):
     return bn
 
 
-def create_repo_with_files( gitexe, message, pathL, verbose=0 ):
+def _create_repo_with_files( gitrun, message, pathL, verbose=0 ):
     ""
-    runcmd( gitexe + ' init', verbose=verbose )
+    gitrun.run( 'init', verbose=verbose )
 
     fL = []
     for pn in pathL:
         fn = copy_path_to_current_directory( pn )
         fL.append( pipes.quote(fn) )
 
-    runcmd( gitexe + ' add ' + ' '.join( fL ), verbose=verbose )
-    runcmd( gitexe + ' commit -m ' + pipes.quote( message ), verbose=verbose )
+    gitrun.run( 'add', *fL, verbose=verbose )
+    gitrun.run( 'commit -m', pipes.quote( message ), verbose=verbose )
 
 
 def runcmd( cmd, chdir=None,
