@@ -58,32 +58,6 @@ class GitInterface:
 
         return top.strip()
 
-    def create(self, directory=None, bare=False, verbose=0):
-        """
-        If 'directory' is not None, it is created and will contain the repo.
-        Otherwise the current directory is used.  The 'options' are the same as
-        for the GitInterface constructor.
-
-        Returns a GitInterface object.
-        """
-        self.top = None
-
-        cmd = 'init'
-        if bare:
-            cmd += ' --bare'
-
-        if directory:
-            cd, name = split_and_create_directory( directory )
-            cmd += ' '+name
-            top = normpath( abspath( directory ) )
-        else:
-            cd = None
-            top = os.getcwd()
-
-        self.grun.run( cmd, chdir=cd, verbose=verbose )
-
-        self.top = top
-
     def clone(self, url, directory=None, branch=None, bare=False, verbose=0):
         """
         If 'branch' is None, all branches are fetched.  If a branch name, such
@@ -458,41 +432,33 @@ class GitInterface:
         return self.grun.run( arg0, *args, **kwargs )
 
 
-class GitRunner:
+def create_repo( directory=None, bare=False, **options):
+    """
+    If 'directory' is not None, it is created and will contain the new repo.
+    Otherwise the current directory is used.  The 'options' are the same as
+    for the GitInterface constructor.
 
-    def __init__(self, **options):
-        ""
-        self.envars = {}
+    Returns a GitInterface object set to the new repo.
+    """
+    verb = options.pop( 'verbose', 0 )
 
-        self.gitexe = options.pop( 'gitexe', 'git' )
+    grun = GitRunner( **options )
 
-        prox = options.pop( 'https_proxy', None )
-        if prox:
-            self.envars['https_proxy'] = prox
-            self.envars['HTTPS_PROXY'] = prox
+    cmd = 'init'
+    if bare:
+        cmd += ' --bare'
 
-        if len( options ) > 0:
-            raise GitInterfaceError( "unknown options: "+str(options) )
+    if directory:
+        cd, name = _split_and_create_directory( directory )
+        cmd += ' '+name
+        top = normpath( abspath( directory ) )
+    else:
+        cd = None
+        top = os.getcwd()
 
-    def run(self, arg0, *args, **kwargs):
-        ""
-        roe = kwargs.pop( 'raise_on_error', True )
-        cap = kwargs.pop( 'capture', False )
-        cd = kwargs.pop( 'chdir', None )
-        verbose = kwargs.pop( 'verbose', 0 )
+    grun.run( cmd, chdir=cd, verbose=verb )
 
-        assert len(kwargs) == 0
-
-        cmd = self.gitexe + ' ' + ' '.join( (arg0,)+args )
-
-        with set_environ( **self.envars ):
-            x,out = runcmd( cmd,
-                            chdir=cd,
-                            raise_on_error=roe,
-                            capture=cap,
-                            verbose=verbose )
-
-        return x, out
+    return GitInterface( directory=top, **options )
 
 
 def safe_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
@@ -595,6 +561,43 @@ def verify_repository_url( url ):
 
 ########################################################################
 
+class GitRunner:
+
+    def __init__(self, **options):
+        ""
+        self.envars = {}
+
+        self.gitexe = options.pop( 'gitexe', 'git' )
+
+        prox = options.pop( 'https_proxy', None )
+        if prox:
+            self.envars['https_proxy'] = prox
+            self.envars['HTTPS_PROXY'] = prox
+
+        if len( options ) > 0:
+            raise GitInterfaceError( "unknown options: "+str(options) )
+
+    def run(self, arg0, *args, **kwargs):
+        ""
+        roe = kwargs.pop( 'raise_on_error', True )
+        cap = kwargs.pop( 'capture', False )
+        cd = kwargs.pop( 'chdir', None )
+        verbose = kwargs.pop( 'verbose', 0 )
+
+        assert len(kwargs) == 0
+
+        cmd = self.gitexe + ' ' + ' '.join( (arg0,)+args )
+
+        with set_environ( **self.envars ):
+            x,out = runcmd( cmd,
+                            chdir=cd,
+                            raise_on_error=roe,
+                            capture=cap,
+                            verbose=verbose )
+
+        return x, out
+
+
 def repo_name_from_url( url ):
     ""
     name = basename( normpath(url) )
@@ -659,7 +662,7 @@ class set_environ:
                 del os.environ[n]
 
 
-def split_and_create_directory( repo_path ):
+def _split_and_create_directory( repo_path ):
     ""
     path,name = os.path.split( normpath( repo_path ) )
 

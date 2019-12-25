@@ -23,6 +23,7 @@ from testutils import print3
 
 from gitinterface import GitInterfaceError, GitInterface
 from gitinterface import set_environ, change_directory
+from gitinterface import create_repo
 from gitinterface import copy_path_to_current_directory
 from gitinterface import runcmd
 from gitinterface import safe_repository_mirror
@@ -90,20 +91,19 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_create_repository_in_existing_directory(self):
         ""
-        git = GitInterface()
-        git.create()
+        create_repo()
 
         time.sleep(1)
         assert os.path.exists( '.git/config' )
 
     def test_create_repository_in_a_new_directory(self):
         ""
-        git = GitInterface()
-        git.create( 'newrepo' )
+        git = create_repo( 'newrepo' )
 
         time.sleep(1)
         assert not os.path.exists( '.git' )
         assert os.path.exists( 'newrepo/.git/config' )
+        assert not git.get_remote_URL( verbose=3 )
 
     def write_git_wrapper(self):
         ""
@@ -126,8 +126,7 @@ class create_and_clone( trigutil.trigTestCase ):
         ""
         self.write_git_wrapper()
 
-        git = GitInterface( gitexe=abspath( 'mygit/gitwrapper' ) )
-        git.create( 'newrepo' )
+        create_repo( 'newrepo', gitexe=abspath( 'mygit/gitwrapper' ) )
 
         time.sleep(1)
         assert os.path.exists( 'touchfile.txt' )
@@ -157,8 +156,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_create_bare_repository(self):
         ""
-        git = GitInterface()
-        git.create( 'newrepo.git', bare=True )
+        git = create_repo( 'newrepo.git', bare=True )
         assert git.is_bare()
 
         time.sleep(1)
@@ -532,8 +530,7 @@ class commit_and_push( trigutil.trigTestCase ):
         util.writefile( 'grepo/file.txt', "file contents" )
         time.sleep(1)
 
-        git = GitInterface()
-        git.create( 'grepo' )
+        git = create_repo( 'grepo' )
         git.add( 'file.txt' )
         git.commit( 'first commit message' )
 

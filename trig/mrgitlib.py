@@ -679,8 +679,7 @@ class Configuration:
         ""
         repodir = pjoin( self.topdir, '.mrgit' )
 
-        git = gititf.GitInterface()
-        git.create( repodir, verbose=3 )
+        git = gititf.create_repo( repodir, verbose=3 )
 
         write_first_manifests_file( self.mfest, git )
 
