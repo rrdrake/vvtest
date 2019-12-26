@@ -31,7 +31,7 @@ class the_GitResults_class( unittest.TestCase ):
         ""
         util.setup_test()
 
-        self.url = util.create_local_bare_repository( 'example' )
+        self.url = util.create_bare_repo( 'example' )
         util.push_file_to_repo( self.url, 'file.txt', 'file contents' )
         time.sleep(1)
 
@@ -270,7 +270,7 @@ class results_reader_tests( trigutil.trigTestCase ):
         time.sleep(1)
         x,out = util.runcmd( trigutil.vvtest_file + \
                              ' -vv -n 4 --plat '+core_platform_name() + \
-                             ' --gitlab '+giturl )
+                             ' --gitlab '+giturl, verbose=2 )
 
     def test_get_elapsed_time_function(self):
         ""
@@ -285,7 +285,7 @@ class results_reader_tests( trigutil.trigTestCase ):
 
     def test_parsing_a_test_results_file_into_a_results_data_object(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'resrepo' )
+        url = util.create_bare_repo_with_file_and_branch( 'resrepo' )
         self.run_pass_fail_diff_tests( url )
 
         rdr = GitResultsReader( url )
@@ -342,7 +342,7 @@ def core_platform_name():
 
 def create_fake_results_repo( reponame ):
     ""
-    url = util.create_bare_repo_with_topic_branch( 'resrepo' )
+    url = util.create_bare_repo_with_file_and_branch( 'resrepo' )
 
     gr = GitResults( url )
 

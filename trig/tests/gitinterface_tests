@@ -93,8 +93,8 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_getting_a_repository_toplevel(self):
         ""
-        url = util.create_local_bare_repository( 'example' )
-        baredir = util.globfile( 'bare_*/example.git' )
+        url = util.create_bare_repo( 'example', 'baredir' )
+        baredir = 'baredir/example.git'
         util.push_file_to_repo( url, 'subdir/myfile.txt', 'hello\n' )
         util.runcmd( 'git clone '+url+' myclone' )
 
@@ -153,28 +153,12 @@ class create_and_clone( trigutil.trigTestCase ):
         assert os.path.exists( 'newrepo/.git/config' )
         assert not git.get_remote_URL( verbose=3 )
 
-    def write_git_wrapper(self):
-        ""
-        touchfile = abspath( 'touchfile.txt' )
-        util.writescript( 'mygit/gitwrapper', """
-            #!"""+sys.executable+"""
-            import os, sys, subprocess
-            fp = open( '"""+touchfile+"""', 'w' )
-            prox = os.environ.get( 'https_proxy', 'None' )
-            fp.write( 'https_proxy=' + prox + os.linesep )
-            prox = os.environ.get( 'HTTPS_PROXY', 'None' )
-            fp.write( 'HTTPS_PROXY=' + prox + os.linesep )
-            fp.close()
-            x = subprocess.call( ' '.join( ['git']+sys.argv[1:] ), shell=True )
-            assert x == 0
-            """ )
-        time.sleep(1)
-
     def test_specify_git_executable_to_use(self):
         ""
-        self.write_git_wrapper()
+        scr = write_git_wrapper()
+        time.sleep(1)
 
-        create_repo( 'newrepo', gitexe=abspath( 'mygit/gitwrapper' ) )
+        create_repo( 'newrepo', gitexe=scr )
 
         time.sleep(1)
         assert os.path.exists( 'touchfile.txt' )
@@ -193,7 +177,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_clone_a_local_repository(self):
         ""
-        url = util.create_local_bare_repository( 'example' )
+        url = util.create_bare_repo( 'example' )
         util.push_file_to_repo( url, 'file.txt', 'file contents' )
 
         git = clone_repo( url )
@@ -205,17 +189,18 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_specify_https_proxy(self):
         ""
-        self.write_git_wrapper()
+        scr = write_git_wrapper()
+        time.sleep(1)
 
         with set_environ( https_proxy=None, HTTPS_PROXY=None ):
 
-            url = util.create_local_bare_repository( 'example' )
+            url = util.create_bare_repo( 'example' )
             util.push_file_to_repo( url, 'file.txt', 'file contents' )
 
             assert 'https_proxy' not in os.environ
             assert 'HTTPS_PROXY' not in os.environ
 
-            git = clone_repo( url, gitexe=abspath( 'mygit/gitwrapper' ),
+            git = clone_repo( url, gitexe=scr,
                                    https_proxy='fakeurl://some/thing' )
 
         assert len( util.grepfiles( 'https_proxy=fakeurl://some/thing',
@@ -225,6 +210,7 @@ class create_and_clone( trigutil.trigTestCase ):
         os.remove( 'touchfile.txt' )
         time.sleep(1)
 
+        # this should run the git wrapper again
         br = git.get_branch()
 
         assert br == 'master'
@@ -238,7 +224,7 @@ class create_and_clone( trigutil.trigTestCase ):
         os.mkdir( 'adir' )
         time.sleep(1)
 
-        bare_url = util.create_local_bare_repository( 'example' )
+        bare_url = util.create_bare_repo( 'example' )
         util.push_file_to_repo( bare_url, 'file.txt', 'file contents' )
 
         with change_directory( 'adir' ):
@@ -253,6 +239,7 @@ class create_and_clone( trigutil.trigTestCase ):
         url = 'file://'+abspath('fakerepo')
         os.mkdir( 'curdir' )
         time.sleep(1)
+
         os.chdir( 'curdir' )
 
         sout,serr = call_expect_GitInterfaceError_capture_output(
@@ -286,7 +273,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_clone_master_branch_only(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         # default clone first; a checkout of the branch should succeed
         git = clone_repo( url )
@@ -302,7 +289,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_clone_into_a_subdirectory(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         git1 = clone_repo( url, directory='ex1' )
         url1 = 'file://'+git1.get_toplevel()
@@ -321,12 +308,9 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_exercise_toplevel_method(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
+        util.push_file_to_repo( url, 'subdir/afile', 'my file' )
         git1 = clone_repo( url, directory='ex1', verbose=3 )
-        util.writefile( 'ex1/subdir/afile', 'my file' )
-        git1.add( 'subdir' )
-        git1.commit( 'add subdir' )
-        git1.push()
 
         clone_repo( url )
 
@@ -345,7 +329,7 @@ class create_and_clone( trigutil.trigTestCase ):
         os.mkdir( 'baredir' )
         time.sleep(1)
 
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         bare_url = self.make_bare_clone_in_subdirectory( url, 'baredir' )
         assert os.path.isdir( 'baredir/example.git' )
@@ -363,7 +347,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_a_bare_clone_into_a_specified_directory(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         bare_git = clone_repo( url, directory='bare_clone_subdir', bare=True )
         assert os.path.isdir( 'bare_clone_subdir' )
@@ -378,15 +362,13 @@ class create_and_clone( trigutil.trigTestCase ):
         os.mkdir( 'baredir' )
         time.sleep(1)
 
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         bare_url = self.make_bare_clone_in_subdirectory( url, 'baredir' )
 
         git = clone_repo( bare_url )
         assert 'baredir' in git.get_remote_URL()
-        util.writefile( 'example/file.txt', "yep ;)" )
-        git.add( 'file.txt' )
-        git.commit( 'cool message' )
+        write_and_commit_file( git, 'cool message', 'file.txt', "yep ;)" )
         git.push()
 
         git2 = clone_repo( bare_url, directory='checkrepo' )
@@ -394,15 +376,13 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_can_push_from_a_bare_clone(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         bare_git = clone_repo( orig_url, directory='bareclone', bare=True )
         bare_url = 'file://'+bare_git.get_toplevel()
 
         git = clone_repo( bare_url, directory='pushclone' )
-        util.writefile( 'pushclone/file.txt', "make a mod" )
-        git.add( 'file.txt' )
-        git.commit( 'a msg' )
+        write_and_commit_file( git, 'a msg', 'file.txt', "make a mod" )
         git.push()
 
         bare_git.push()
@@ -412,7 +392,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_a_bare_clone_gets_all_branches_and_tags(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example', tag='atag' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example', tag='atag' )
 
         bare_git = clone_repo( orig_url, directory='bareclone', bare=True )
         bare_url = 'file://'+bare_git.get_toplevel()
@@ -425,7 +405,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_can_push_all_branches_from_a_bare_clone(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         bare_git = clone_repo( orig_url, directory='bareclone', bare=True )
         bare_url = 'file://'+bare_git.get_toplevel()
@@ -444,7 +424,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_can_push_all_tags_from_a_bare_clone(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example', tag='atag' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example', tag='atag' )
 
         bare_git = clone_repo( orig_url, directory='bareclone', bare=True )
         bare_url = 'file://'+bare_git.get_toplevel()
@@ -460,38 +440,34 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_pushing_to_a_different_repository(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
 
-        bare_git = clone_repo( orig_url, directory='bareclone', bare=True )
+        bare_git = clone_repo( orig_url, 'bareclone', bare=True )
         bare_url = 'file://'+bare_git.get_toplevel()
 
-        git = clone_repo( bare_url, directory='workclone' )
-        util.writefile( 'workclone/file.txt', 'modify this guy' )
-        git.add( 'file.txt' )
-        git.commit( 'a mod' )
+        git = clone_repo( bare_url, 'workclone' )
+        write_and_commit_file( git, 'a mod', 'file.txt', "modify this guy" )
 
         git.push( repository=orig_url )
 
-        clone_repo( orig_url, directory='checkclone' )
+        clone_repo( orig_url, 'checkclone' )
         assert util.readfile( 'checkclone/file.txt' ).strip() == 'modify this guy'
 
-        clone_repo( bare_url, directory='checktwo' )
+        clone_repo( bare_url, 'checktwo' )
         assert util.readfile( 'checktwo/file.txt' ).strip() == 'file contents'
 
         git.create_remote_branch( 'newbranch' )
-        util.writefile( 'workclone/file.txt', 'branch mod' )
-        git.add( 'file.txt' )
-        git.commit( 'b mod' )
+        write_and_commit_file( git, 'b mod', 'file.txt', "branch mod" )
 
         git.push( all_branches=True, repository=orig_url )
 
-        chkit = clone_repo( orig_url, directory='checkclone2' )
+        chkit = clone_repo( orig_url, 'checkclone2' )
         chkit.checkout_branch( 'newbranch' )
         assert util.readfile( 'checkclone2/file.txt' ).strip() == 'branch mod'
 
     def test_verbose_prints_git_command_and_output(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         git,out,err = util.call_capture_output( clone_repo,
                                                 orig_url, 'dest0', verbose=0 )
@@ -534,7 +510,7 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_verbose_print_with_a_command_that_captures_output(self):
         ""
-        orig_url = util.create_bare_repo_with_topic_branch( 'example' )
+        orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         git = clone_repo( orig_url, 'dest' )
 
@@ -545,26 +521,6 @@ class create_and_clone( trigutil.trigTestCase ):
         print3( out, err )
         assert 'origin/master' in out and 'origin/topic' in out
         assert not err.strip()
-
-
-def call_expect_GitInterfaceError_capture_output( func, *args, **kwargs ):
-    ""
-    caught = False
-    redir = util.RedirectStdout( 'stdout.log', 'stderr.log' )
-    try:
-        func( *args, **kwargs )
-    except GitInterfaceError:
-        caught = True
-    except:
-        redir.close()
-        raise
-
-    redir.close()
-    time.sleep(1)
-
-    assert caught
-
-    return util.readfile('stdout.log'), util.readfile('stderr.log')
 
 
 class commit_and_push( trigutil.trigTestCase ):
@@ -580,14 +536,12 @@ class commit_and_push( trigutil.trigTestCase ):
 
     def test_commit_and_push_a_new_file(self):
         ""
-        url = util.create_local_bare_repository( 'myrepo' )
+        url = util.create_bare_repo( 'myrepo' )
         util.push_file_to_repo( url, 'file.txt', 'file contents' )
         time.sleep(1)
 
         git = clone_repo( url )
-        util.writefile( 'myrepo/another.txt', 'another contents' )
-        git.add( 'another.txt' )
-        git.commit( 'adding file' )
+        write_and_commit_file( git, 'adding file', 'another.txt', "another contents" )
         git.push()
 
         assert len( util.grepfiles( 'another', 'myrepo/another.txt' ) ) == 1
@@ -601,13 +555,11 @@ class commit_and_push( trigutil.trigTestCase ):
 
     def test_add_commit_push_every_changed_file_in_a_directory(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
 
         git = clone_repo( url )
 
-        util.writefile( 'example/adir/afile.txt', 'whatever' )
-        git.add( 'adir/afile.txt' )
-        git.commit( 'create directory' )
+        write_and_commit_file( git, 'create directory', 'adir/afile.txt', "whatever" )
         git.push()
 
         util.writefile( 'example/adir/afile.txt', 'changed' )
@@ -631,7 +583,7 @@ class branches( trigutil.trigTestCase ):
         ""
         trigutil.trigTestCase.setUp( self )
 
-        self.url = util.create_bare_repo_with_topic_branch( 'example' )
+        self.url = util.create_bare_repo_with_file_and_branch( 'example' )
         time.sleep(1)
 
     def test_listing_branches(self):
@@ -798,9 +750,7 @@ class branches( trigutil.trigTestCase ):
     def test_create_remote_branch_does_not_push_local_changes(self):
         ""
         git1 = clone_repo( self.url )
-        util.writefile( 'example/file.txt', 'modified contents' )
-        git1.add( 'file.txt' )
-        git1.commit( 'modify file' )
+        write_and_commit_file( git1, 'modify file', 'file.txt', "modified contents" )
         git1.create_remote_branch( 'nasa' )
 
         git2 = clone_repo( self.url, 'check1' )
@@ -821,9 +771,7 @@ class branches( trigutil.trigTestCase ):
         git2.checkout_branch( 'nasa' )
         assert util.readfile( 'check1/file.txt' ).strip() == 'file contents'
 
-        util.writefile( 'example/file.txt', 'modified contents' )
-        git1.add( 'file.txt' )
-        git1.commit( 'modify file' )
+        write_and_commit_file( git1, 'modify file', 'file.txt', "modified contents" )
         git1.push()
 
         git2.pull()
@@ -928,7 +876,7 @@ class pulling( trigutil.trigTestCase ):
         ""
         trigutil.trigTestCase.setUp( self )
 
-        self.url = util.create_bare_repo_with_topic_branch( 'example' )
+        self.url = util.create_bare_repo_with_file_and_branch( 'example' )
         time.sleep(1)
 
     def clone_twice_and_modify_and_push_file_txt(self):
@@ -936,9 +884,7 @@ class pulling( trigutil.trigTestCase ):
         git1 = clone_repo( self.url, 'ex1' )
         git2 = clone_repo( self.url, 'ex2' )
 
-        util.writefile( 'ex2/file.txt', 'modified contents' )
-        git2.add( 'file.txt' )
-        git2.commit( 'modify and push' )
+        write_and_commit_file( git2, 'modify and push', 'file.txt', "modified contents" )
         git2.push()
 
         return git1, git2
@@ -949,9 +895,8 @@ class pulling( trigutil.trigTestCase ):
 
         # pull with no changes
         git1.pull()
-        util.writefile( 'ex1/filetwo.txt', 'file two contents' )
-        git1.add( 'filetwo.txt' )
-        git1.commit( 'adding another file' )
+        write_and_commit_file( git1, 'adding another file',
+                               'filetwo.txt', "file two contents" )
         git1.push()
 
         time.sleep(1)
@@ -968,9 +913,8 @@ class pulling( trigutil.trigTestCase ):
         assert util.readfile( 'ex2/filetwo.txt' ).strip() == 'file two contents'
 
         # pull with committed changes
-        util.writefile( 'ex1/filetwo.txt', 'for the third time!' )
-        git1.add( 'filetwo.txt' )
-        git1.commit( 'third change' )
+        write_and_commit_file( git1, 'third change',
+                               'filetwo.txt', "for the third time!" )
         git1.pull()
 
         time.sleep(1)
@@ -980,9 +924,8 @@ class pulling( trigutil.trigTestCase ):
         ""
         git1, git2 = self.clone_twice_and_modify_and_push_file_txt()
 
-        util.writefile( 'ex1/file.txt', 'also modified contents' )
-        git1.add( 'file.txt' )
-        git1.commit( 'this will conflict' )
+        write_and_commit_file( git1, 'this will conflict',
+                               'file.txt', "also modified contents" )
 
         # let this fail due to a conflict
         x,out = runcmd( 'git pull', chdir='ex1', raise_on_error=False )
@@ -995,9 +938,8 @@ class pulling( trigutil.trigTestCase ):
         ""
         git1, git2 = self.clone_twice_and_modify_and_push_file_txt()
 
-        util.writefile( 'ex1/file.txt', 'also modified contents' )
-        git1.add( 'file.txt' )
-        git1.commit( 'this will conflict' )
+        write_and_commit_file( git1, 'this will conflict',
+                               'file.txt', "also modified contents" )
 
         self.assertRaises( GitInterfaceError, git1.pull )
 
@@ -1043,7 +985,7 @@ class orphan_branches( trigutil.trigTestCase ):
 
     def run_create_orphan_branch_test(self, initial_branchname=None):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
         util.writefile( 'readme.txt', 'this is adam' )
         time.sleep(1)
 
@@ -1065,7 +1007,7 @@ class orphan_branches( trigutil.trigTestCase ):
 
     def test_orphan_branch_creation_errors(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'example' )
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
         util.push_file_to_repo( url, 'file.txt', 'new contents' )
 
         util.writefile( 'readme.txt', 'this is adam' )
@@ -1087,10 +1029,10 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_copy_one_repo_to_a_second_empty_repo(self):
         ""
-        src_url = util.create_local_bare_repository( 'foobar', 'src' )
+        src_url = util.create_bare_repo( 'foobar', 'src' )
         util.push_file_to_repo( src_url, 'file.txt', 'file contents' )
 
-        cpy_url = util.create_local_bare_repository( 'example', 'cpy' )
+        cpy_url = util.create_bare_repo( 'example', 'cpy' )
 
         update_repository_mirror( src_url, cpy_url, verbose=True )
 
@@ -1101,7 +1043,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_update_a_second_repo(self):
         ""
-        src_url = util.create_local_bare_repository( 'example' )
+        src_url = util.create_bare_repo( 'example' )
         util.push_file_to_repo( src_url, 'file.txt', 'file contents' )
 
         git1 = clone_repo( src_url, directory='cpy', bare=True )
@@ -1117,11 +1059,11 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_that_branches_and_tags_are_copied(self):
         ""
-        src_url = util.create_bare_repo_with_topic_branch( 'example',
-                                                           subdir='srcrepo',
-                                                           tag='FANCYTAG' )
+        src_url = util.create_bare_repo_with_file_and_branch( 'example',
+                                                              subdir='srcrepo',
+                                                              tag='FANCYTAG' )
 
-        cpy_url = util.create_local_bare_repository( 'cpyrepo' )
+        cpy_url = util.create_bare_repo( 'cpyrepo' )
 
         update_repository_mirror( src_url, cpy_url )
 
@@ -1143,11 +1085,11 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_update_a_second_repo_using_an_existing_working_repo(self):
         ""
-        src_url = util.create_bare_repo_with_topic_branch( 'example',
-                                                           subdir='srcrepo',
-                                                           tag='FANCYTAG' )
+        src_url = util.create_bare_repo_with_file_and_branch( 'example',
+                                                              subdir='srcrepo',
+                                                              tag='FANCYTAG' )
 
-        cpy_url = util.create_local_bare_repository( 'cpyrepo' )
+        cpy_url = util.create_bare_repo( 'cpyrepo' )
 
         git = clone_repo( src_url, directory='wrkclone', bare=True )
         wrkdir = git.get_toplevel()
@@ -1168,11 +1110,11 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_using_an_existing_working_non_bare_repo_is_an_error(self):
         ""
-        src_url = util.create_bare_repo_with_topic_branch( 'example',
-                                                           subdir='srcrepo',
-                                                           tag='FANCYTAG' )
+        src_url = util.create_bare_repo_with_file_and_branch( 'example',
+                                                              subdir='srcrepo',
+                                                              tag='FANCYTAG' )
 
-        cpy_url = util.create_local_bare_repository( 'cpyrepo' )
+        cpy_url = util.create_bare_repo( 'cpyrepo' )
 
         git = clone_repo( src_url, directory='wrkclone' )
         wrkdir = git.get_toplevel()
@@ -1182,11 +1124,11 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_the_work_dir_will_be_created_if_it_doesnt_exist(self):
         ""
-        src_url = util.create_bare_repo_with_topic_branch( 'example',
-                                                           subdir='srcrepo',
-                                                           tag='FANCYTAG' )
+        src_url = util.create_bare_repo_with_file_and_branch( 'example',
+                                                              subdir='srcrepo',
+                                                              tag='FANCYTAG' )
 
-        cpy_url = util.create_local_bare_repository( 'cpyrepo' )
+        cpy_url = util.create_bare_repo( 'cpyrepo' )
 
         wrkdir = 'workclone'
         update_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
@@ -1196,11 +1138,11 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
     def test_an_update_fails_if_history_would_be_changed(self):
         ""
-        src_url = util.create_bare_repo_with_topic_branch( 'example',
-                                                           subdir='srcrepo',
-                                                           tag='FANCYTAG' )
+        src_url = util.create_bare_repo_with_file_and_branch( 'example',
+                                                              subdir='srcrepo',
+                                                              tag='FANCYTAG' )
 
-        cpy_url = util.create_local_bare_repository( 'cpyrepo' )
+        cpy_url = util.create_bare_repo( 'cpyrepo' )
 
         update_repository_mirror( src_url, cpy_url )
 
@@ -1223,7 +1165,7 @@ class misc_functions( trigutil.trigTestCase ):
         ""
         os.makedirs( 'subdir/deep' )
         os.mkdir( 'sub:dir' )
-        url = util.create_bare_repo_with_topic_branch( 'cool', 'barerepo' )
+        url = util.create_bare_repo_with_file_and_branch( 'cool', 'barerepo' )
         clone_repo( url )
         clone_repo( url, 'mrdir/.mrgit' )
         git = clone_repo( url, 'bare_mrdir/.mrgit.git', bare=True )
@@ -1258,7 +1200,7 @@ class misc_functions( trigutil.trigTestCase ):
 
     def test_function_is_a_local_repository(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'cool', 'barerepo' )
+        url = util.create_bare_repo_with_file_and_branch( 'cool', 'barerepo' )
         clone_repo( url )
         time.sleep(1)
 
@@ -1273,7 +1215,7 @@ class misc_functions( trigutil.trigTestCase ):
 
     def test_function_verify_repository_url(self):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'cool', 'barerepo' )
+        url = util.create_bare_repo_with_file_and_branch( 'cool', 'barerepo' )
         clone_repo( url, directory='dir1/coolclone' )
         clone_repo( url, directory='dir2/bareclone.git', bare=True )
         time.sleep(1)
@@ -1298,6 +1240,55 @@ class misc_functions( trigutil.trigTestCase ):
         assert verify_repository_url( pre+'/dir1/coolclone' )
         assert verify_repository_url( pre+'/dir2/bareclone.git' )
         assert verify_repository_url( pre+'/dir2/bareclone' )
+
+
+def call_expect_GitInterfaceError_capture_output( func, *args, **kwargs ):
+    ""
+    caught = False
+    redir = util.RedirectStdout( 'stdout.log', 'stderr.log' )
+    try:
+        func( *args, **kwargs )
+    except GitInterfaceError:
+        caught = True
+    except:
+        redir.close()
+        raise
+
+    redir.close()
+    time.sleep(1)
+
+    assert caught
+
+    return util.readfile('stdout.log'), util.readfile('stderr.log')
+
+
+def write_git_wrapper():
+    ""
+    touchfile = abspath( 'touchfile.txt' )
+    fname = 'mygit/gitwrapper'
+
+    util.writescript( fname, """
+        #!"""+sys.executable+"""
+        import os, sys, subprocess
+
+        with open( '"""+touchfile+"""', 'w' ) as fp:
+            for name in ['https_proxy','HTTPS_PROXY']:
+                val = os.environ.get( name, 'None' )
+                fp.write( name+'=' + val + os.linesep )
+
+        x = subprocess.call( ' '.join( ['git']+sys.argv[1:] ), shell=True )
+        assert x == 0
+        """ )
+
+    return abspath( fname )
+
+
+def write_and_commit_file( git, message, fname, content ):
+    ""
+    with util.change_directory( git.get_toplevel() ):
+        util.writefile( fname, content )
+        git.add( fname )
+        git.commit( message )
 
 
 def create_local_repo_with_a_commit( directory ):
