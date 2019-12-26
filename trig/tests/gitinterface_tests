@@ -478,7 +478,7 @@ class create_and_clone( trigutil.trigTestCase ):
         clone_repo( bare_url, directory='checktwo' )
         assert util.readfile( 'checktwo/file.txt' ).strip() == 'file contents'
 
-        git.createRemoteBranch( 'newbranch' )
+        git.create_remote_branch( 'newbranch' )
         util.writefile( 'workclone/file.txt', 'branch mod' )
         git.add( 'file.txt' )
         git.commit( 'b mod' )
@@ -718,7 +718,7 @@ class branches( trigutil.trigTestCase ):
         assert git.get_branches() == [ 'master' ]
         assert git.get_branches( remotes=True ) == [ 'master', 'topic' ]
         assert get_remote_branches( self.url ) == [ 'master', 'newtopic', 'topic' ]
-        git.checkout_branch( 'newtopic' )
+        git.checkout_branch( 'newtopic', verbose=3 )
         assert git.get_branch() == 'newtopic'
         assert git.get_branches( remotes=True ) == [ 'master', 'newtopic', 'topic' ]
 
@@ -767,7 +767,7 @@ class branches( trigutil.trigTestCase ):
     def test_creating_a_remote_branch(self):
         ""
         git = clone_repo( self.url )
-        git.createRemoteBranch( 'nasa' )
+        git.create_remote_branch( 'nasa' )
 
         git = clone_repo( self.url, 'check' )
         git.checkout_branch( 'nasa' )
@@ -775,7 +775,7 @@ class branches( trigutil.trigTestCase ):
 
     def create_a_remote_branch_and_push_a_change(self, git):
         ""
-        git.createRemoteBranch( 'nasa' )
+        git.create_remote_branch( 'nasa' )
         util.writefile( 'example/newfile.txt', 'new contents' )
         git.add( 'newfile.txt' )
         git.commit( 'add file to new branch' )
@@ -801,7 +801,7 @@ class branches( trigutil.trigTestCase ):
         util.writefile( 'example/file.txt', 'modified contents' )
         git1.add( 'file.txt' )
         git1.commit( 'modify file' )
-        git1.createRemoteBranch( 'nasa' )
+        git1.create_remote_branch( 'nasa' )
 
         git2 = clone_repo( self.url, 'check1' )
         git2.checkout_branch( 'nasa' )
@@ -815,7 +815,7 @@ class branches( trigutil.trigTestCase ):
     def test_create_remote_branch_within_a_single_branch_clone(self):
         ""
         git1 = clone_repo( self.url, branch='master' )
-        git1.createRemoteBranch( 'nasa' )
+        git1.create_remote_branch( 'nasa' )
 
         git2 = clone_repo( self.url, 'check1' )
         git2.checkout_branch( 'nasa' )
@@ -833,7 +833,7 @@ class branches( trigutil.trigTestCase ):
         ""
         git = clone_repo( self.url )
         try:
-            git.createRemoteBranch( 'topic' )
+            git.create_remote_branch( 'topic' )
         except GitInterfaceError as e:
             err = str(e)
         else:
@@ -844,7 +844,7 @@ class branches( trigutil.trigTestCase ):
         ""
         git = create_local_repo_with_a_commit( 'noremote' )
         try:
-            git.createRemoteBranch( 'topic' )
+            git.create_remote_branch( 'topic' )
         except GitInterfaceError as e:
             err = str(e)
         else:
@@ -856,21 +856,21 @@ class branches( trigutil.trigTestCase ):
         git = clone_repo( self.url )
         util.create_local_branch( 'example', 'proximus' )
         assert git.get_branch() == 'proximus'
-        self.assertRaises( GitInterfaceError, git.createRemoteBranch, 'nasa' )
+        self.assertRaises( GitInterfaceError, git.create_remote_branch, 'nasa' )
 
     def test_create_remote_branch_of_same_name_as_current_branch_is_an_error(self):
         ""
         git = clone_repo( self.url )
         git.checkout_branch( 'topic' )
         assert git.get_branch() == 'topic'
-        self.assertRaises( GitInterfaceError, git.createRemoteBranch, 'topic' )
+        self.assertRaises( GitInterfaceError, git.create_remote_branch, 'topic' )
 
     def test_create_remote_branch_with_added_files_should_succeed(self):
         ""
         git = clone_repo( self.url )
         util.writefile( 'example/file.txt', 'modified contents' )
         git.add( 'file.txt' )
-        git.createRemoteBranch( 'nasa' )
+        git.create_remote_branch( 'nasa' )
 
         git = clone_repo( self.url, 'check' )
         git.checkout_branch( 'nasa' )
@@ -880,7 +880,7 @@ class branches( trigutil.trigTestCase ):
         ""
         git = clone_repo( self.url )
         util.writefile( 'example/file.txt', 'modified contents' )
-        git.createRemoteBranch( 'nasa' )
+        git.create_remote_branch( 'nasa' )
 
         git = clone_repo( self.url, 'check' )
         git.checkout_branch( 'nasa' )
@@ -891,7 +891,7 @@ class branches( trigutil.trigTestCase ):
         git = clone_repo( self.url )
         assert 'topic' in git.get_branches( remotes=True )
         assert 'topic' in get_remote_branches( git.get_remote_URL() )
-        git.deleteRemoteBranch( 'topic' )
+        git.delete_remote_branch( 'topic' )
         assert 'topic' not in git.get_branches( remotes=True )
         assert 'topic' not in get_remote_branches( git.get_remote_URL() )
 
@@ -906,7 +906,7 @@ class branches( trigutil.trigTestCase ):
         git.checkout_branch( 'master' )
         assert 'topic' in git.get_branches()
         assert 'topic' in git.get_branches( remotes=True )
-        git.deleteRemoteBranch( 'topic' )
+        git.delete_remote_branch( 'topic' )
         assert 'topic' not in git.get_branches()
         assert 'topic' not in git.get_branches( remotes=True )
         assert 'topic' not in get_remote_branches( git.get_remote_URL() )
@@ -919,7 +919,7 @@ class branches( trigutil.trigTestCase ):
         ""
         git = clone_repo( self.url )
         git.checkout_branch( 'topic' )
-        self.assertRaises( GitInterfaceError, git.deleteRemoteBranch, 'topic' )
+        self.assertRaises( GitInterfaceError, git.delete_remote_branch, 'topic' )
 
 
 class pulling( trigutil.trigTestCase ):
@@ -1048,7 +1048,7 @@ class orphan_branches( trigutil.trigTestCase ):
         time.sleep(1)
 
         git = clone_repo( url, 'ex', initial_branchname )
-        git.createRemoteOrphanBranch( 'loner', 'start fresh', 'readme.txt' )
+        git.create_remote_orphan_branch( 'loner', 'start fresh', 'readme.txt' )
 
         assert git.get_branch() == 'loner'
         assert 'loner' in get_remote_branches( git.get_remote_URL() )
@@ -1075,12 +1075,12 @@ class orphan_branches( trigutil.trigTestCase ):
         util.checkout_to_previous_sha1( git.get_toplevel() )
 
         self.assertRaises( GitInterfaceError,
-            git.createRemoteOrphanBranch, 'loner', 'start it', 'readme.txt' )
+            git.create_remote_orphan_branch, 'loner', 'start it', 'readme.txt' )
 
         git = clone_repo( url, 'ex2' )
         assert git.get_branch() == 'master'
         self.assertRaises( GitInterfaceError,
-            git.createRemoteOrphanBranch, 'topic', 'start it', 'readme.txt' )
+            git.create_remote_orphan_branch, 'topic', 'start it', 'readme.txt' )
 
 
 class mirroring_repositories( trigutil.trigTestCase ):

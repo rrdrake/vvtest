@@ -41,8 +41,8 @@ class GitInterface:
         verb = options.pop( 'verbose', 0 )
 
         self.grun = GitRunner( **options )
-
         self.top = get_repo_toplevel( self.grun, directory, verbose=verb )
+        self.grun.setRunDirectory( self.top )
 
     def get_toplevel(self, verbose=0):
         ""
@@ -160,7 +160,7 @@ class GitInterface:
             else:
                 url = self.get_remote_URL()
                 if url and branchname in get_remote_branches( url, verbose=verbose):
-                    self._fetch_then_checkout_branch( branchname, verbose=verbose )
+                    _fetch_then_checkout_branch( self.grun, branchname, verbose )
                 else:
                     raise GitInterfaceError( 'branch does not exist: '+branchname )
 
@@ -180,7 +180,7 @@ class GitInterface:
             return None
         return out.strip()
 
-    def createRemoteBranch(self, branchname, verbose=0):
+    def create_remote_branch(self, branchname, verbose=0):
         """
         Create a branch on the remote, checkout, and track it locally.
         Any local changes are not pushed, but are merged onto the new branch.
@@ -204,8 +204,8 @@ class GitInterface:
         self.run( 'push -u origin', branchname, verbose=verbose )
         self.run( 'merge', curbranch, verbose=verbose )
 
-    def createRemoteOrphanBranch(self, branchname, message, path0, *paths,
-                                       **kwargs):
+    def create_remote_orphan_branch(self, branchname, message, path0, *paths,
+                                          **kwargs):
         """
         Create and push a branch containing a copy of the given paths
         (files and/or directories), with the given intial commit message.
@@ -232,9 +232,7 @@ class GitInterface:
 
         tmpdir = tempfile.mkdtemp( '.gitinterface' )
         try:
-            with change_directory( tmpdir ):
-                _create_repo_with_files( self.grun, message, pathL,
-                                         verbose=verbose )
+            _create_repo_with_files( self.grun, tmpdir, message, pathL, verbose )
 
             with change_directory( self.get_toplevel() ):
                 self.run( 'fetch', tmpdir, 'master:'+branchname, verbose=verbose )
@@ -244,7 +242,7 @@ class GitInterface:
         finally:
             shutil.rmtree( tmpdir )
 
-    def deleteRemoteBranch(self, branchname, verbose=0):
+    def delete_remote_branch(self, branchname, verbose=0):
         ""
         curbranch = self.get_branch()
         if branchname == curbranch:
@@ -294,43 +292,11 @@ class GitInterface:
             raise GitInterfaceError(
                         'unexpected response from rev-parse: '+str(out) )
 
-    def _fetch_then_checkout_branch(self, branchname, verbose=0):
-        ""
-        self.run( 'fetch origin' )
-
-        x,out = self.run( 'checkout --track origin/'+branchname,
-                          raise_on_error=False, capture=True,
-                          verbose=verbose )
-        if x != 0:
-            # try adding the branch in the fetch list
-            x,out2 = self.run( 'config --add remote.origin.fetch ' + \
-                               '+refs/heads/'+branchname + \
-                               ':refs/remotes/origin/'+branchname,
-                               raise_on_error=False, capture=True,
-                               verbose=verbose )
-            out += out2
-
-            if x == 0:
-                x,out3 = self.run( 'fetch origin',
-                                   raise_on_error=False, capture=True,
-                                   verbose=verbose )
-                out += out3
-
-                if x == 0:
-                    x,out4 = self.run( 'checkout --track origin/'+branchname,
-                                       raise_on_error=False, capture=True,
-                                       verbose=verbose )
-                    out += out4
-
-            if x != 0:
-                if verbose >= 2:
-                    print3( out )
-                raise GitInterfaceError( 'branch appears on remote but ' + \
-                                'fetch plus checkout failed: '+branchname )
-
     def run(self, arg0, *args, **kwargs):
-        ""
-        kwargs['chdir'] = self.top
+        """
+        Run a raw git command.  For example, run( 'status', 'myfile' ) would
+        execute "git status myfile" at the toplevel of the repository.
+        """
         return self.grun.run( arg0, *args, **kwargs )
 
 
@@ -511,8 +477,9 @@ def verify_repository_url( url ):
 
 class GitRunner:
 
-    def __init__(self, **options):
+    def __init__(self, directory=None, **options):
         ""
+        self.chdir = directory
         self.envars = {}
 
         self.gitexe = options.pop( 'gitexe', 'git' )
@@ -529,7 +496,7 @@ class GitRunner:
         ""
         roe = kwargs.pop( 'raise_on_error', True )
         cap = kwargs.pop( 'capture', False )
-        cd = kwargs.pop( 'chdir', None )
+        cd = kwargs.pop( 'chdir', self.chdir )
         verbose = kwargs.pop( 'verbose', 0 )
 
         assert len(kwargs) == 0
@@ -544,6 +511,10 @@ class GitRunner:
                             verbose=verbose )
 
         return x, out
+
+    def setRunDirectory(self, rundir):
+        ""
+        self.chdir = rundir
 
 
 def get_repo_toplevel( gitrun, directory=None, verbose=0 ):
@@ -653,6 +624,41 @@ def _repo_directory_from_url( url, bare=False ):
         return name
 
 
+def _fetch_then_checkout_branch( gitrun, branchname, verbose ):
+    ""
+    gitrun.run( 'fetch origin', verbose=verbose )
+
+    x,out = gitrun.run( 'checkout --track origin/'+branchname,
+                        raise_on_error=False, capture=True,
+                        verbose=verbose )
+    if x != 0:
+        # try adding the branch in the fetch list
+        x,out2 = gitrun.run( 'config --add remote.origin.fetch ' + \
+                             '+refs/heads/'+branchname + \
+                             ':refs/remotes/origin/'+branchname,
+                             raise_on_error=False, capture=True,
+                             verbose=verbose )
+        out += out2
+
+        if x == 0:
+            x,out3 = gitrun.run( 'fetch origin',
+                                 raise_on_error=False, capture=True,
+                                 verbose=verbose )
+            out += out3
+
+            if x == 0:
+                x,out4 = gitrun.run( 'checkout --track origin/'+branchname,
+                                     raise_on_error=False, capture=True,
+                                     verbose=verbose )
+                out += out4
+
+        if x != 0:
+            if verbose >= 2:
+                print3( out )
+            raise GitInterfaceError( 'branch appears on remote but ' + \
+                            'fetch plus checkout failed: '+branchname )
+
+
 class change_directory:
 
     def __init__(self, directory):
@@ -736,17 +742,20 @@ def copy_path_to_current_directory( filepath ):
     return bn
 
 
-def _create_repo_with_files( gitrun, message, pathL, verbose=0 ):
+def _create_repo_with_files( gitrun, directory, message, pathL, verbose ):
     ""
-    gitrun.run( 'init', verbose=verbose )
+    with change_directory( directory ):
 
-    fL = []
-    for pn in pathL:
-        fn = copy_path_to_current_directory( pn )
-        fL.append( pipes.quote(fn) )
+        gitrun.run( 'init', chdir=None, verbose=verbose )
 
-    gitrun.run( 'add', *fL, verbose=verbose )
-    gitrun.run( 'commit -m', pipes.quote( message ), verbose=verbose )
+        fL = []
+        for pn in pathL:
+            fn = copy_path_to_current_directory( pn )
+            fL.append( pipes.quote(fn) )
+
+        gitrun.run( 'add', *fL, chdir=None, verbose=verbose )
+        gitrun.run( 'commit -m', pipes.quote( message ),
+                    chdir=None, verbose=verbose )
 
 
 def runcmd( cmd, chdir=None,

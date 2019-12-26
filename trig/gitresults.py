@@ -265,7 +265,7 @@ def create_orphan_branch( git, branchname, resultsdir ):
             fp.write( time.ctime() + '\n' )
 
         cmtmsg = "Start results branch"
-        git.createRemoteOrphanBranch( branchname, cmtmsg, rdir )
+        git.create_remote_orphan_branch( branchname, cmtmsg, rdir )
 
     finally:
         shutil.rmtree( tmpdir )
