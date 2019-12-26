@@ -137,7 +137,8 @@ class GitInterface:
                 self.run( 'checkout --track origin/'+branchname, verbose=verbose )
             else:
                 url = self.get_remote_URL()
-                if url and branchname in get_remote_branches( url, verbose=verbose):
+                if url and branchname in _remote_branch_list( self.grun, url,
+                                                              verbose=verbose):
                     _fetch_then_checkout_branch( self.grun, branchname, verbose )
                 else:
                     raise GitInterfaceError( 'branch does not exist: '+branchname )
@@ -169,7 +170,7 @@ class GitInterface:
         if not url:
             raise GitInterfaceError( 'no remote URL for origin in config file' )
 
-        if branchname in get_remote_branches( url, verbose=verbose ):
+        if branchname in _remote_branch_list( self.grun, url, verbose=verbose ):
             raise GitInterfaceError(
                     'branch name already exists on remote: '+branchname )
 
@@ -198,7 +199,7 @@ class GitInterface:
         if not url:
             raise GitInterfaceError( 'no remote URL for origin in config file' )
 
-        if branchname in get_remote_branches( url, verbose=verbose ):
+        if branchname in _remote_branch_list( self.grun, url, verbose=verbose ):
             raise GitInterfaceError(
                     'branch name already exists on remote: '+branchname )
 
@@ -217,7 +218,7 @@ class GitInterface:
         if not url:
             raise GitInterfaceError( 'no remote URL for origin in config file' )
 
-        if branchname not in get_remote_branches( url, verbose=verbose ):
+        if branchname not in _remote_branch_list( self.grun, url, verbose=verbose ):
             raise GitInterfaceError(
                     'branch name does not exist on remote: '+branchname )
 
@@ -275,7 +276,6 @@ def create_repo( directory=None, bare=False, **options):
     Returns a GitInterface object set to the new repo.
     """
     verb = options.pop( 'verbose', 0 )
-
     grun = GitRunner( **options )
 
     cmd = 'init'
@@ -306,7 +306,6 @@ def clone_repo( url, directory=None, branch=None, bare=False, **options ):
     Returns a GitInterface object set to the cloned repository.
     """
     verb = options.pop( 'verbose', 0 )
-
     grun = GitRunner( **options )
 
     if branch and bare:
@@ -321,48 +320,39 @@ def clone_repo( url, directory=None, branch=None, bare=False, **options ):
     return GitInterface( top, **options )
 
 
-def get_remote_branches( url, verbose=0 ):
+def get_remote_branches( url, **options ):
     """
     Get the list of branches on the remote repository 'url' (which can be
     a directory).
     """
-    bL = []
+    verb = options.pop( 'verbose', 0 )
+    grun = GitRunner( **options )
 
-    grun = GitRunner()
-    x,out = grun.run( 'ls-remote --heads', url, capture=True, verbose=verbose )
-
-    for line in out.strip().splitlines():
-        lineL = line.strip().split( None, 1 )
-        if len( lineL ) == 2:
-            if lineL[1].startswith( 'refs/heads/' ):
-                bL.append( lineL[1][11:] )
-
-    bL.sort()
-
-    return bL
+    return _remote_branch_list( grun, url, verb )
 
 
-def update_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
+def update_repository_mirror( from_url, to_url, work_clone=None, **options ):
     ""
+    verb = options.get( 'verbose', 0 )
+
     if work_clone:
 
         if os.path.isdir( work_clone ):
             with change_directory( work_clone ):
-                work_git = GitInterface()
-                _mirror_remote_repo_into_pwd( from_url, verbose=verbose )
-                _push_branches_and_tags( work_git, to_url, verbose=verbose )
+                work_git = GitInterface( **options )
+                _mirror_remote_repo_into_pwd( work_git, from_url, verbose=verb )
+                _push_branches_and_tags( work_git, to_url, verbose=verb )
 
         else:
-            work_git = clone_repo( from_url, work_clone,
-                                   bare=True, verbose=verbose )
-            _push_branches_and_tags( work_git, to_url, verbose=verbose )
+            work_git = clone_repo( from_url, work_clone, bare=True, **options )
+            _push_branches_and_tags( work_git, to_url, verbose=verb )
 
     else:
         tmpdir = tempfile.mkdtemp( dir=os.getcwd() )
 
         try:
-            work_git = clone_repo( from_url, tmpdir, bare=True, verbose=verbose )
-            _push_branches_and_tags( work_git, to_url, verbose=verbose )
+            work_git = clone_repo( from_url, tmpdir, bare=True, **options )
+            _push_branches_and_tags( work_git, to_url, verbose=verb )
 
         finally:
             shutil.rmtree( tmpdir )
@@ -386,33 +376,24 @@ def repository_url_match( url ):
     return False
 
 
-def is_a_local_repository( directory ):
+def is_a_local_repository( directory, **options ):
     ""
-    if not os.path.isdir( directory ) and os.path.isdir( directory+'.git' ):
-        directory += '.git'
+    verb = options.pop( 'verbose', 0 )
+    grun = GitRunner( directory, **options )
 
-    try:
-        git = GitInterface( directory )
-        x,out = git.run( 'rev-parse --is-bare-repository',
-                         raise_on_error=False, capture=True )
-    except Exception:
-        return False
-
-    if x == 0 and out.strip().lower() in ['true','false']:
-        return True
-
-    return False
+    return _is_local_repo( grun, directory, verb )
 
 
-def verify_repository_url( url ):
+def verify_repository_url( url, **options ):
     ""
-    if is_a_local_repository( url ):
+    if is_a_local_repository( url, **options ):
         return True
 
     else:
-        grun = GitRunner()
+        verb = options.pop( 'verbose', 0 )
+        grun = GitRunner( **options )
         x,out = grun.run( 'ls-remote', url,
-                          raise_on_error=False, capture=True )
+                          raise_on_error=False, capture=True, verbose=verb )
         if x == 0:
             return True
 
@@ -543,7 +524,7 @@ def _full_clone( grun, url, directory, bare, verbose ):
         cmd += ' --bare'
 
     if directory:
-        if not repository_url_match( url ) and is_a_local_repository( url ):
+        if not repository_url_match( url ) and _is_local_repo( grun, url, verbose ):
             url = abspath( url )
 
         with make_and_change_directory( directory ):
@@ -721,17 +702,48 @@ def _split_and_create_directory( repo_path ):
     return path, name
 
 
-def _mirror_remote_repo_into_pwd( remote_url, verbose=0 ):
+def _remote_branch_list( gitrun, url, verbose ):
     ""
-    git = GitInterface()
+    x,out = gitrun.run( 'ls-remote --heads', url, capture=True, verbose=verbose )
 
-    if not git.is_bare():
+    bL = []
+    for line in out.strip().splitlines():
+        lineL = line.strip().split( None, 1 )
+        if len( lineL ) == 2:
+            if lineL[1].startswith( 'refs/heads/' ):
+                bL.append( lineL[1][11:] )
+
+    bL.sort()
+
+    return bL
+
+
+def _is_local_repo( gitrun, directory, verbose ):
+    ""
+    if not os.path.isdir( directory ) and os.path.isdir( directory+'.git' ):
+        directory += '.git'
+
+    try:
+        x,out = gitrun.run( 'rev-parse --is-bare-repository', chdir=directory,
+                            raise_on_error=False, capture=True, verbose=verbose )
+    except Exception:
+        return False
+
+    if x == 0 and out.strip().lower() in ['true','false']:
+        return True
+
+    return False
+
+
+def _mirror_remote_repo_into_pwd( work_git, remote_url, verbose=0 ):
+    ""
+    if not work_git.is_bare( verbose=verbose ):
         raise GitInterfaceError( 'work_clone must be a bare repository' )
 
-    git.run( 'fetch', remote_url,
-             '"refs/heads/*:refs/heads/*"',
-             '"refs/tags/*:refs/tags/*"',
-             verbose=verbose )
+    work_git.run( 'fetch', remote_url,
+                  '"refs/heads/*:refs/heads/*"',
+                  '"refs/tags/*:refs/tags/*"',
+                  verbose=verbose )
 
 
 def _push_branches_and_tags( work_git, to_url, verbose=0 ):
