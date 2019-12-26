@@ -28,6 +28,7 @@ mrgit_file = os.path.join( mrgit_dir, 'mrgit' )
 
 
 from gitinterface import GitInterface
+from gitinterface import get_remote_branches, clone_repo, create_repo
 
 
 class help_message( trigutil.trigTestCase ):
@@ -53,8 +54,8 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ src_url ] )
 
         assert os.path.isdir( 'cool' )
-        git = GitInterface( directory='cool' )
-        assert 'topic' in git.listRemoteBranches()
+        git = GitInterface( 'cool' )
+        assert 'topic' in get_remote_branches( git.get_remote_URL() )
 
     def test_command_line_clone_a_single_repository(self):
         ""
@@ -64,8 +65,8 @@ class cloning( trigutil.trigTestCase ):
 
         assert x == 0
         assert os.path.isdir( 'myclone' )
-        git = GitInterface( directory='myclone' )
-        assert 'topic' in git.listRemoteBranches()
+        git = GitInterface( 'myclone' )
+        assert 'topic' in get_remote_branches( git.get_remote_URL() )
 
     def test_cloning_two_repositories_puts_second_under_the_first(self):
         ""
@@ -74,9 +75,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ cool_url, ness_url ] )
 
         assert os.path.isdir( 'cool' )
-        git = GitInterface( directory='cool' )
+        git = GitInterface( 'cool' )
         assert 'nessie' not in git.get_tags()
-        git = GitInterface( directory='cool/ness' )
+        git = GitInterface( 'cool/ness' )
         assert 'nessie' in git.get_tags()
 
     def test_command_line_clone_multiple_repos(self):
@@ -87,9 +88,9 @@ class cloning( trigutil.trigTestCase ):
                              ness_url+' '+cool_url+' myclone' )
 
         assert os.path.isdir( 'myclone' )
-        git = GitInterface( directory='myclone' )
+        git = GitInterface( 'myclone' )
         assert 'nessie' in git.get_tags()
-        git = GitInterface( directory='myclone/cool' )
+        git = GitInterface( 'myclone/cool' )
         assert 'nessie' not in git.get_tags()
 
     def test_clone_an_mrgit_clone_by_pointing_to_the_manifests(self):
@@ -101,9 +102,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( directory='clone2' )
+        git = GitInterface( 'clone2' )
         assert 'nessie' not in git.get_tags()
-        git = GitInterface( directory='clone2/ness' )
+        git = GitInterface( 'clone2/ness' )
         assert 'nessie' in git.get_tags()
 
     def test_clone_an_mrgit_clone_via_manifests_with_only_one_repo(self):
@@ -115,7 +116,7 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( directory='clone2' )
+        git = GitInterface( 'clone2' )
         assert 'nessie' in git.get_tags()
 
     def test_clone_an_mrgit_clone(self):
@@ -127,9 +128,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'clone1', 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( directory='clone2' )
+        git = GitInterface( 'clone2' )
         assert 'nessie' not in git.get_tags()
-        git = GitInterface( directory='clone2/ness' )
+        git = GitInterface( 'clone2/ness' )
         assert 'nessie' in git.get_tags()
 
     def test_clone_an_mrgit_clone_using_a_file_url(self):
@@ -141,9 +142,9 @@ class cloning( trigutil.trigTestCase ):
         mrlib.clone( [ 'file://'+abspath('clone1'), 'clone2' ] )
 
         assert os.path.isdir( 'clone2' )
-        git = GitInterface( directory='clone2' )
+        git = GitInterface( 'clone2' )
         assert 'nessie' not in git.get_tags()
-        git = GitInterface( directory='clone2/ness' )
+        git = GitInterface( 'clone2/ness' )
         assert 'nessie' in git.get_tags()
 
     def test_clone_a_genesis_repo(self):
@@ -522,11 +523,11 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         cfg.createMRGitRepo()
 
-        git = GitInterface( 'repo/.mrgit', 'checkrepo' )
+        git = clone_repo( 'repo/.mrgit', 'checkrepo' )
         assert os.path.isfile( 'checkrepo/'+mrlib.MANIFESTS_FILENAME )
         assert not os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
 
-        assert mrlib.REPOMAP_BRANCH in git.listRemoteBranches()
+        assert mrlib.REPOMAP_BRANCH in get_remote_branches( git.get_remote_URL() )
         git.checkout_branch( mrlib.REPOMAP_BRANCH )
         assert os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
 
@@ -544,7 +545,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg.createMRGitRepo()
 
         rmap = mrlib.RepoMap()
-        git = GitInterface( directory='.mrgit' )
+        git = create_repo( '.mrgit' )
         baseurl = 'file://'+os.getcwd()
         mrlib.check_load_mrgit_repo( cfg, baseurl, git )
 
@@ -645,7 +646,7 @@ class commit_and_push( trigutil.trigTestCase ):
             mrlib.commit( ['-m','add new file'] )
             mrlib.push( [] )
 
-        GitInterface( src_url, directory='check', verbose=3 )
+        clone_repo( src_url, directory='check', verbose=3 )
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1
 
 

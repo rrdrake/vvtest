@@ -22,7 +22,7 @@ from testutils import print3
 from gitresults import GitResults, GitResultsReader, ResultsSummary
 from gitresults import create_orphan_branch, branch_name_and_directory
 from gitresults import map_git_url_to_web_url, get_elapsed_time
-from gitinterface import GitInterface
+from gitinterface import clone_repo
 
 
 class the_GitResults_class( unittest.TestCase ):
@@ -37,8 +37,7 @@ class the_GitResults_class( unittest.TestCase ):
 
     def test_create_orphan_branch(self):
         ""
-        git = GitInterface()
-        git.clone( self.url, branch='master' )
+        git = clone_repo( self.url, branch='master' )
 
         create_orphan_branch( git, 'resbranch', 'resdir' )
 
@@ -46,8 +45,7 @@ class the_GitResults_class( unittest.TestCase ):
         assert os.path.isfile( 'example/resdir/.create' )
         assert not os.path.exists( 'example/file.txt' )
 
-        git2 = GitInterface()
-        git2.clone( self.url, 'ex', 'resbranch' )
+        git2 = clone_repo( self.url, 'ex', 'resbranch' )
         assert os.path.isfile( 'ex/resdir/.create' )
         assert not os.path.exists( 'ex/file.txt' )
 
@@ -99,8 +97,7 @@ class the_GitResults_class( unittest.TestCase ):
         branch = res.pushResults( 'my first results' )
 
         # check that the branch got pushed
-        git = GitInterface()
-        git.clone( self.url, 'check', branch )
+        git = clone_repo( self.url, 'check', branch )
         assert not os.path.exists( 'check/file.txt' )
         dat = util.readfile( 'check/'+subdir+'/data1.txt' )
         assert dat.strip() == 'data file one'
@@ -126,8 +123,7 @@ class the_GitResults_class( unittest.TestCase ):
 
         branch = res.pushResults( 'my second results' )
 
-        git2 = GitInterface()
-        git2.clone( self.url, 'check2nd', branch )
+        git2 = clone_repo( self.url, 'check2nd', branch )
         assert not os.path.exists( 'check/file.txt' )
         dat = util.readfile( 'check2nd/'+subdir+'/data1.txt' )
         assert dat.strip() == 'data file one'
@@ -151,7 +147,7 @@ class the_GitResults_class( unittest.TestCase ):
 
         branch = res.pushResults( 'my second, overlapping results' )
 
-        git2 = GitInterface( self.url, 'check2nd' )
+        git2 = clone_repo( self.url, 'check2nd' )
         assert os.path.exists( 'check2nd/file.txt' )
         git2.checkout_branch( branch )
 
@@ -179,7 +175,7 @@ class the_GitResults_class( unittest.TestCase ):
         # this push must include a pull, otherwise the push will fail
         res.pushResults( 'my second results' )
 
-        git2 = GitInterface( self.url, 'check2nd' )
+        git2 = clone_repo( self.url, 'check2nd' )
         assert os.path.exists( 'check2nd/file.txt' )
         git2.checkout_branch( branch )
 

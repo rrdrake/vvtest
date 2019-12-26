@@ -78,7 +78,7 @@ def fetch( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( directory=pjoin( top, path ) )
+        git = gititf.GitInterface( pjoin( top, path ) )
         git.run( 'fetch', verbose=3 )
 
 
@@ -88,7 +88,7 @@ def pull( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( directory=pjoin( top, path ) )
+        git = gititf.GitInterface( pjoin( top, path ) )
         git.run( 'pull', verbose=3 )
 
 
@@ -98,7 +98,7 @@ def add( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( directory=pjoin( top, path ) )
+        git = gititf.GitInterface( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'add', *args, verbose=3 )
 
@@ -109,7 +109,7 @@ def commit( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( directory=pjoin( top, path ) )
+        git = gititf.GitInterface( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'commit', *args, verbose=3 )
 
@@ -120,7 +120,7 @@ def push( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( directory=pjoin( top, path ) )
+        git = gititf.GitInterface( pjoin( top, path ) )
         git.run( 'push', verbose=3 )
 
 
@@ -129,7 +129,7 @@ def load_configuration():
     cfg = Configuration()
     top = find_mrgit_top_level()
     cfg.setTopDir( top )
-    git = gititf.GitInterface( directory=top+'/.mrgit' )
+    git = gititf.GitInterface( top+'/.mrgit' )
     cfg.loadManifests( git )
     cfg.computeLocalRepoMap()
 
@@ -189,13 +189,13 @@ def clone_from_single_url( cfg, url, directory ):
 
     try:
         # prefer an .mrgit repo under the given url
-        git = clone_repo( url+'/.mrgit', tmpd.path(), verbose=1 )
+        git = robust_clone( url+'/.mrgit', tmpd.path(), verbose=1 )
         baseurl = url
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
         tmpd.removeFiles()
-        git = clone_repo( url, tmpd.path() )
+        git = robust_clone( url, tmpd.path() )
         baseurl = dirname( url )
 
     if check_load_mrgit_repo( cfg, baseurl, git ):
@@ -229,7 +229,7 @@ def clone_from_google_repo_manifests( cfg, url, directory ):
     ""
     tmpd = TempDirectory( directory )
 
-    git = clone_repo( url, tmpd.path() )
+    git = robust_clone( url, tmpd.path() )
 
     gconv = GoogleConverter( tmpd.path() )
     gconv.readManifestFiles()
@@ -447,25 +447,23 @@ def clone_repositories_from_config( cfg ):
 
     with change_directory( topdir ):
         for url,loc in cfg.getRemoteRepoList():
-            clone_repo( url, loc )
+            robust_clone( url, loc )
 
 
-def clone_repo( url, into_dir, verbose=2 ):
+def robust_clone( url, into_dir, verbose=2 ):
     ""
-    git = gititf.GitInterface()
-
     if os.path.exists( into_dir ):
 
         assert '.git' not in os.listdir( into_dir )
 
         tmp = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( into_dir ) )
-        git.clone( url, tmp, verbose=verbose )
+        gititf.clone_repo( url, tmp, verbose=verbose )
         move_directory_contents( tmp, into_dir )
 
-        git = gititf.GitInterface( directory=into_dir )
+        git = gititf.GitInterface( into_dir )
 
     else:
-        git.clone( url, into_dir, verbose=verbose )
+        git = gititf.clone_repo( url, into_dir, verbose=verbose )
 
     return git
 
@@ -521,8 +519,9 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
     genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
     if os.path.isfile( mfestfn ):
+        url = git.get_remote_URL()
         if REPOMAP_BRANCH in git.get_branches() or \
-           REPOMAP_BRANCH in git.listRemoteBranches():
+           REPOMAP_BRANCH in gititf.get_remote_branches( url ):
 
             cfg.loadManifests( git )
             cfg.loadRepoMap( git, baseurl )
@@ -667,7 +666,7 @@ class Configuration:
     def commitLocalRepoMap(self):
         ""
         mrgit = pjoin( self.topdir, '.mrgit' )
-        git = gititf.GitInterface( directory=mrgit )
+        git = gititf.GitInterface( mrgit )
         checkout_repo_map_branch( git )
 
         try:

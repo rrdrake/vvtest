@@ -8,7 +8,8 @@ import tempfile
 import shutil
 import re
 
-from gitinterface import GitInterface, GitInterfaceError
+from gitinterface import GitInterfaceError
+from gitinterface import clone_repo, get_remote_branches
 from gitinterface import change_directory, print3
 
 
@@ -73,7 +74,8 @@ class GitResultsReader:
 
     def iterateBranches(self):
         ""
-        for branch in self.git.listRemoteBranches():
+        url = self.git.get_remote_URL()
+        for branch in get_remote_branches( url ):
             if GitResultsReader.branchpat.match( branch ):
                 yield branch
 
@@ -209,7 +211,7 @@ def get_results_orphan_branch( git, branch, subdir ):
     ""
     with change_directory( git.get_toplevel() ):
 
-        if branch in git.listRemoteBranches():
+        if branch in get_remote_branches( git.get_remote_URL() ):
 
             git.checkout_branch( branch )
 
@@ -278,10 +280,8 @@ def clone_results_repo( giturl, working_directory, branch=None ):
 
     tmpdir = tempfile.mkdtemp( '', 'gitresults_work_clone_', os.getcwd() )
 
-    git = GitInterface()
-
     print3( 'Cloning', giturl, 'into', tmpdir )
-    git.clone( giturl, tmpdir, branch='master' )
+    git = clone_repo( giturl, tmpdir, branch='master' )
 
     return git
 
