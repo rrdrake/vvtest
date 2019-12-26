@@ -68,26 +68,15 @@ class GitInterface:
             all_tags=True : push all tags
             repository=URL : push to this repository (defaults to origin)
         """
-        cmd = 'push'
-
         if all_branches or all_tags:
-            if all_branches: cmd += ' --all'
-            if all_tags:     cmd += ' --tags'
-
-            if repository:
-                cmd += ' '+repository
+            _push_all( self.grun, all_branches, all_tags, repository, verbose )
 
         else:
             br = self.get_branch()
             if not br:
                 raise GitInterfaceError( 'you must be on a branch to push' )
 
-            if repository:
-                cmd += ' '+repository+' '+br
-            else:
-                cmd += ' origin '+br
-
-        self.run( cmd, verbose=verbose )
+            _push_branch( self.grun, br, repository, verbose )
 
     def pull(self, verbose=0):
         ""
@@ -125,29 +114,18 @@ class GitInterface:
             elif line.startswith( '* ' ):
                 return line[2:].strip()
 
-        raise GitInterfaceError( 'no branches found, DIR='+str(self.top) )
+        raise GitInterfaceError( 'no branches found in '+str(self.top) )
 
     def get_branches(self, remotes=False, verbose=0):
         ""
-        bL = []
-
         cmd = 'branch'
         if remotes:
             cmd += ' -r'
 
         x,out = self.run( cmd, capture=True, verbose=verbose )
 
-        for line in out.splitlines():
-            if line.startswith( '* (' ):
-                pass
-            elif line.startswith( '* ' ) or line.startswith( '  ' ):
-                if ' -> ' not in line:
-                    line = line[2:]
-                    if line.startswith( 'origin/' ):
-                        line = line[7:]
-                    bL.append( line )
+        bL = _parse_branch_listing_output( out )
 
-        bL.sort()
         return bL
 
     def checkout_branch(self, branchname, verbose=0):
@@ -224,23 +202,9 @@ class GitInterface:
             raise GitInterfaceError(
                     'branch name already exists on remote: '+branchname )
 
-        # newer versions of git have a git checkout --orphan option; the
-        # implementation here creates a temporary repo with an initial
-        # commit then fetches that into the current repository
+        pathlist = [ abspath(p) for p in (path0,)+paths ]
 
-        pathL = [ abspath(p) for p in (path0,)+paths ]
-
-        tmpdir = tempfile.mkdtemp( '.gitinterface' )
-        try:
-            _create_repo_with_files( self.grun, tmpdir, message, pathL, verbose )
-
-            with change_directory( self.get_toplevel() ):
-                self.run( 'fetch', tmpdir, 'master:'+branchname, verbose=verbose )
-                self.run( 'checkout', branchname, verbose=verbose )
-                self.run( 'push -u origin', branchname, verbose=verbose )
-
-        finally:
-            shutil.rmtree( tmpdir )
+        _make_orphan_branch( self.grun, branchname, message, pathlist, verbose )
 
     def delete_remote_branch(self, branchname, verbose=0):
         ""
@@ -294,8 +258,9 @@ class GitInterface:
 
     def run(self, arg0, *args, **kwargs):
         """
-        Run a raw git command.  For example, run( 'status', 'myfile' ) would
-        execute "git status myfile" at the toplevel of the repository.
+        Run a raw git command and return exit status and output.  For example,
+        run( 'status', 'myfile' ) would execute "git status myfile" at the
+        toplevel of the repository.
         """
         return self.grun.run( arg0, *args, **kwargs )
 
@@ -377,49 +342,30 @@ def get_remote_branches( url, verbose=0 ):
     return bL
 
 
-def safe_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
+def update_repository_mirror( from_url, to_url, work_clone=None, verbose=0 ):
     ""
     if work_clone:
 
         if os.path.isdir( work_clone ):
             with change_directory( work_clone ):
                 work_git = GitInterface()
-                mirror_remote_repo_into_pwd( from_url, verbose=verbose )
-                push_branches_and_tags( work_git, to_url, verbose=verbose )
+                _mirror_remote_repo_into_pwd( from_url, verbose=verbose )
+                _push_branches_and_tags( work_git, to_url, verbose=verbose )
 
         else:
-            work_git = clone_repo( from_url, directory=work_clone,
+            work_git = clone_repo( from_url, work_clone,
                                    bare=True, verbose=verbose )
-            push_branches_and_tags( work_git, to_url, verbose=verbose )
+            _push_branches_and_tags( work_git, to_url, verbose=verbose )
 
     else:
-        tdir = tempfile.mkdtemp( dir=os.getcwd() )
+        tmpdir = tempfile.mkdtemp( dir=os.getcwd() )
 
         try:
-            work_git = clone_repo( from_url, directory=tdir, bare=True, verbose=verbose )
-            push_branches_and_tags( work_git, to_url, verbose=verbose )
+            work_git = clone_repo( from_url, tmpdir, bare=True, verbose=verbose )
+            _push_branches_and_tags( work_git, to_url, verbose=verbose )
 
         finally:
-            shutil.rmtree( tdir )
-
-
-def mirror_remote_repo_into_pwd( remote_url, verbose=0 ):
-    ""
-    git = GitInterface()
-
-    if not git.is_bare():
-        raise GitInterfaceError( 'work_clone must be a bare repository' )
-
-    git.run( 'fetch', remote_url,
-             '"refs/heads/*:refs/heads/*"',
-             '"refs/tags/*:refs/tags/*"',
-             verbose=verbose )
-
-
-def push_branches_and_tags( work_git, to_url, verbose=0 ):
-    ""
-    work_git.push( all_branches=True, repository=to_url, verbose=verbose )
-    work_git.push( all_tags=True, repository=to_url, verbose=verbose )
+            shutil.rmtree( tmpdir )
 
 
 # match the form [user@]host.xz:path/to/repo.git/
@@ -624,6 +570,52 @@ def _repo_directory_from_url( url, bare=False ):
         return name
 
 
+def _push_all( gitrun, all_branches, all_tags, repository, verbose ):
+    ""
+    cmd = 'push'
+
+    if all_branches: cmd += ' --all'
+    if all_tags:     cmd += ' --tags'
+
+    if repository:
+        cmd += ' '+repository
+
+    gitrun.run( cmd, verbose=verbose )
+
+
+def _push_branch( gitrun, branch, repository, verbose ):
+    ""
+    cmd = 'push'
+
+    if repository:
+        cmd += ' '+repository+' '+branch
+    else:
+        cmd += ' origin '+branch
+
+    gitrun.run( cmd, verbose=verbose )
+
+
+def _parse_branch_listing_output( output ):
+    ""
+    bL = []
+
+    for line in output.splitlines():
+
+        if line.startswith( '* (' ):
+            pass
+
+        elif line.startswith( '* ' ) or line.startswith( '  ' ):
+            if ' -> ' not in line:
+                line = line[2:]
+                if line.startswith( 'origin/' ):
+                    line = line[7:]
+                bL.append( line )
+
+    bL.sort()
+
+    return bL
+
+
 def _fetch_then_checkout_branch( gitrun, branchname, verbose ):
     ""
     gitrun.run( 'fetch origin', verbose=verbose )
@@ -631,6 +623,7 @@ def _fetch_then_checkout_branch( gitrun, branchname, verbose ):
     x,out = gitrun.run( 'checkout --track origin/'+branchname,
                         raise_on_error=False, capture=True,
                         verbose=verbose )
+
     if x != 0:
         # try adding the branch in the fetch list
         x,out2 = gitrun.run( 'config --add remote.origin.fetch ' + \
@@ -728,7 +721,60 @@ def _split_and_create_directory( repo_path ):
     return path, name
 
 
-def copy_path_to_current_directory( filepath ):
+def _mirror_remote_repo_into_pwd( remote_url, verbose=0 ):
+    ""
+    git = GitInterface()
+
+    if not git.is_bare():
+        raise GitInterfaceError( 'work_clone must be a bare repository' )
+
+    git.run( 'fetch', remote_url,
+             '"refs/heads/*:refs/heads/*"',
+             '"refs/tags/*:refs/tags/*"',
+             verbose=verbose )
+
+
+def _push_branches_and_tags( work_git, to_url, verbose=0 ):
+    ""
+    work_git.push( all_branches=True, repository=to_url, verbose=verbose )
+    work_git.push( all_tags=True, repository=to_url, verbose=verbose )
+
+
+def _make_orphan_branch( gitrun, branch, message, pathlist, verbose ):
+    ""
+    # newer versions of git have a git checkout --orphan option; the
+    # implementation here creates a temporary repo with an initial
+    # commit then fetches that into the current repository
+
+    tmpdir = tempfile.mkdtemp( '.gitinterface' )
+    try:
+        _create_repo_with_files( gitrun, tmpdir, message, pathlist, verbose )
+
+        gitrun.run( 'fetch', tmpdir, 'master:'+branch, verbose=verbose )
+        gitrun.run( 'checkout', branch, verbose=verbose )
+        gitrun.run( 'push -u origin', branch, verbose=verbose )
+
+    finally:
+        shutil.rmtree( tmpdir )
+
+
+def _create_repo_with_files( gitrun, directory, message, pathL, verbose ):
+    ""
+    with change_directory( directory ):
+
+        gitrun.run( 'init', chdir=None, verbose=verbose )
+
+        fL = []
+        for pn in pathL:
+            fn = _copy_path_to_current_directory( pn )
+            fL.append( pipes.quote(fn) )
+
+        gitrun.run( 'add', *fL, chdir=None, verbose=verbose )
+        gitrun.run( 'commit -m', pipes.quote( message ),
+                    chdir=None, verbose=verbose )
+
+
+def _copy_path_to_current_directory( filepath ):
     ""
     bn = basename( filepath )
 
@@ -740,22 +786,6 @@ def copy_path_to_current_directory( filepath ):
         shutil.copyfile( filepath, bn )
 
     return bn
-
-
-def _create_repo_with_files( gitrun, directory, message, pathL, verbose ):
-    ""
-    with change_directory( directory ):
-
-        gitrun.run( 'init', chdir=None, verbose=verbose )
-
-        fL = []
-        for pn in pathL:
-            fn = copy_path_to_current_directory( pn )
-            fL.append( pipes.quote(fn) )
-
-        gitrun.run( 'add', *fL, chdir=None, verbose=verbose )
-        gitrun.run( 'commit -m', pipes.quote( message ),
-                    chdir=None, verbose=verbose )
 
 
 def runcmd( cmd, chdir=None,

@@ -25,9 +25,9 @@ from gitinterface import GitInterfaceError, GitInterface, GitRunner
 from gitinterface import set_environ, change_directory
 from gitinterface import create_repo, clone_repo
 from gitinterface import get_repo_toplevel
-from gitinterface import copy_path_to_current_directory
+from gitinterface import _copy_path_to_current_directory
 from gitinterface import runcmd
-from gitinterface import safe_repository_mirror
+from gitinterface import update_repository_mirror
 from gitinterface import repository_url_match
 from gitinterface import is_a_local_repository
 from gitinterface import verify_repository_url
@@ -1019,9 +1019,9 @@ class orphan_branches( trigutil.trigTestCase ):
         cwd = os.getcwd()
 
         os.chdir( dest )
-        f1 = copy_path_to_current_directory( src+'/adir' )
-        f2 = copy_path_to_current_directory( src+'/myfile.txt' )
-        f3 = copy_path_to_current_directory( src+'/linkfile' )
+        f1 = _copy_path_to_current_directory( src+'/adir' )
+        f2 = _copy_path_to_current_directory( src+'/myfile.txt' )
+        f3 = _copy_path_to_current_directory( src+'/linkfile' )
 
         time.sleep(1)
 
@@ -1092,7 +1092,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
         cpy_url = util.create_local_bare_repository( 'example', 'cpy' )
 
-        safe_repository_mirror( src_url, cpy_url, verbose=True )
+        update_repository_mirror( src_url, cpy_url, verbose=True )
 
         time.sleep(1)
         git = clone_repo( cpy_url )
@@ -1109,7 +1109,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
         util.push_file_to_repo( src_url, 'file.txt', 'new contents' )
 
-        safe_repository_mirror( src_url, cpy_url )
+        update_repository_mirror( src_url, cpy_url )
 
         time.sleep(1)
         git2 = clone_repo( cpy_url, directory='checkclone' )
@@ -1123,7 +1123,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
         cpy_url = util.create_local_bare_repository( 'cpyrepo' )
 
-        safe_repository_mirror( src_url, cpy_url )
+        update_repository_mirror( src_url, cpy_url )
 
         time.sleep(1)
         git = clone_repo( cpy_url, directory='checkclone1', bare=True )
@@ -1134,7 +1134,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
                                         'file.txt', 'cool contents' )
         util.push_tag_to_repo( src_url, 'COOLTAG' )
 
-        safe_repository_mirror( src_url, cpy_url )
+        update_repository_mirror( src_url, cpy_url )
 
         time.sleep(1)
         git = clone_repo( cpy_url, directory='checkclone2', bare=True )
@@ -1158,7 +1158,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
                                         'file.txt', 'cool contents' )
         util.push_tag_to_repo( src_url, 'NEWTAG' )
 
-        safe_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
+        update_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
 
         time.sleep(1)
         git = clone_repo( cpy_url, directory='checkclone' )
@@ -1178,7 +1178,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
         wrkdir = git.get_toplevel()
 
         self.assertRaises( GitInterfaceError,
-                safe_repository_mirror, src_url, cpy_url, work_clone=wrkdir )
+                update_repository_mirror, src_url, cpy_url, work_clone=wrkdir )
 
     def test_the_work_dir_will_be_created_if_it_doesnt_exist(self):
         ""
@@ -1189,7 +1189,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
         cpy_url = util.create_local_bare_repository( 'cpyrepo' )
 
         wrkdir = 'workclone'
-        safe_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
+        update_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
 
         git = GitInterface( wrkdir )
         assert git.is_bare()
@@ -1202,12 +1202,12 @@ class mirroring_repositories( trigutil.trigTestCase ):
 
         cpy_url = util.create_local_bare_repository( 'cpyrepo' )
 
-        safe_repository_mirror( src_url, cpy_url )
+        update_repository_mirror( src_url, cpy_url )
 
         util.push_file_to_repo( cpy_url, 'file.txt', 'careful...' )
 
         self.assertRaises( GitInterfaceError,
-                safe_repository_mirror, src_url, cpy_url )
+                update_repository_mirror, src_url, cpy_url )
 
 
 class misc_functions( trigutil.trigTestCase ):
