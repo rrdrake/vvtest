@@ -25,7 +25,7 @@ from testutils import print3
 from gitinterface import GitInterfaceError, GitInterface, GitRunner
 from gitinterface import set_environ, change_directory
 from gitinterface import create_repo, clone_repo
-from gitinterface import get_repo_toplevel
+from gitinterface import get_repo_toplevel, _find_toplevel_bare_git_repo
 from gitinterface import _copy_path_to_current_directory
 from gitinterface import runcmd
 from gitinterface import update_repository_mirror
@@ -139,6 +139,10 @@ class create_and_clone( trigutil.trigTestCase ):
         top = get_repo_toplevel( grun, baredir+'/branches' )
         assert os.path.samefile( top, baredir )
 
+        # check unlikely case of bare repo not found
+        top = _find_toplevel_bare_git_repo( '/usr/bin' )
+        assert not top
+
     def test_create_repository_in_existing_directory(self):
         ""
         create_repo()
@@ -148,12 +152,17 @@ class create_and_clone( trigutil.trigTestCase ):
 
     def test_create_repository_in_a_new_directory(self):
         ""
-        git = create_repo( 'newrepo' )
+        git1 = create_repo( 'newrepo' )
+        git2 = create_repo( 'adir/aclone' )
 
         time.sleep(1)
+
         assert not os.path.exists( '.git' )
         assert os.path.exists( 'newrepo/.git/config' )
-        assert not git.get_remote_URL( verbose=3 )
+        assert not git1.get_remote_URL( verbose=3 )
+
+        assert os.path.exists( 'adir/aclone/.git/config' )
+        assert not git2.get_remote_URL( verbose=3 )
 
     def test_specify_git_executable_to_use(self):
         ""
@@ -235,6 +244,10 @@ class create_and_clone( trigutil.trigTestCase ):
         git2 = GitInterface( 'adir/example' )
         assert not git2.is_bare()
         assert git2.get_branch() == 'master'
+
+        # check if unknown keyword arguments given
+        GitInterface( 'adir/example', verbose=3 )
+        self.assertRaises( GitInterfaceError, GitInterface, 'adir/example', foobar=42 )
 
     def test_using_verbose_setting_with_exceptions(self):
         ""
@@ -440,6 +453,13 @@ class create_and_clone( trigutil.trigTestCase ):
         tagL = git2.get_tags()
         assert tagL == [ 'atag', 'sosad' ]
 
+    def test_cannot_bare_clone_a_single_branch(self):
+        ""
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
+
+        self.assertRaises( GitInterfaceError,
+                           clone_repo, url, branch='master', bare=True )
+
     def test_pushing_to_a_different_repository(self):
         ""
         orig_url = util.create_bare_repo_with_file_and_branch( 'example' )
@@ -618,21 +638,25 @@ class commit_and_push( trigutil.trigTestCase ):
     def test_add_method_accepts_a_deleted_file(self):
         """
         but PWD must be within the repo, and the path must be relative to PWD
+        and Git version must be >= 2.0
         """
-        git = create_repo( 'myrepo' )
+        mj,mn,mc = git_version()
+        if mj >= 2:
 
-        write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
-        write_and_commit_file( git, 'msg2', 'adir/file2.txt', 'content2' )
+            git = create_repo( 'myrepo' )
 
-        os.remove( 'myrepo/file1.txt' )
-        with change_directory( 'myrepo' ):
-            git.add( 'file1.txt', verbose=3 )
-        git.commit( 'msg3' )
+            write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
+            write_and_commit_file( git, 'msg2', 'adir/file2.txt', 'content2' )
 
-        os.remove( 'myrepo/adir/file2.txt' )
-        with change_directory( 'myrepo' ):
-            git.add( 'adir/file2.txt', verbose=3 )
-        git.commit( 'msg4' )
+            os.remove( 'myrepo/file1.txt' )
+            with change_directory( 'myrepo' ):
+                git.add( 'file1.txt', verbose=3 )
+            git.commit( 'msg3' )
+
+            os.remove( 'myrepo/adir/file2.txt' )
+            with change_directory( 'myrepo' ):
+                git.add( 'adir/file2.txt', verbose=3 )
+            git.commit( 'msg4' )
 
     def test_its_and_error_to_add_a_file_not_in_the_repo(self):
         ""
@@ -861,6 +885,17 @@ class branches( trigutil.trigTestCase ):
         git2.pull()
         assert util.readfile( 'check1/file.txt' ).strip() == 'modified contents'
 
+    def test_checkout_a_branch_after_a_single_branch_clone(self):
+        ""
+        git = clone_repo( self.url, branch='master' )
+        assert util.readfile( 'example/file.txt' ).strip() == 'file contents'
+
+        git.checkout_branch( 'topic' )
+        assert util.readfile( 'example/file.txt' ).strip() == 'new contents'
+
+        git.checkout_branch( 'master' )
+        assert util.readfile( 'example/file.txt' ).strip() == 'file contents'
+
     def test_create_remote_branch_that_already_exists_is_an_error(self):
         ""
         git = clone_repo( self.url )
@@ -953,6 +988,11 @@ class branches( trigutil.trigTestCase ):
         git.checkout_branch( 'topic' )
         self.assertRaises( GitInterfaceError, git.delete_remote_branch, 'topic' )
 
+    def test_deleting_an_unknown_branch_is_an_error(self):
+        ""
+        git = clone_repo( self.url )
+        self.assertRaises( GitInterfaceError, git.delete_remote_branch, 'foobar' )
+
 
 class pulling( trigutil.trigTestCase ):
 
@@ -1029,6 +1069,12 @@ class pulling( trigutil.trigTestCase ):
 
         assert git1.get_branch() == 'master'
         assert util.readfile( 'ex1/file.txt' ).strip() == 'also modified contents'
+
+    def test_cannot_pull_into_a_bare_repo(self):
+        ""
+        url = util.create_bare_repo_with_file_and_branch( 'example' )
+        git = clone_repo( url, 'ex', bare=True )
+        self.assertRaises( GitInterfaceError, git.pull )
 
 
 class orphan_branches( trigutil.trigTestCase ):
@@ -1410,6 +1456,13 @@ def create_local_repo_with_a_commit( directory ):
     git = create_repo( directory )
     write_and_commit_file( git, 'new file', 'something', 'content' )
     return git
+
+
+def git_version():
+    ""
+    x,out = util.runcmd( 'git --version' )
+    vL = out.split()[-1].split('.')
+    return int(vL[0]), int(vL[1]), int(vL[2])
 
 
 #######################################################################

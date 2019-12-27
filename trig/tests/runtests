@@ -39,6 +39,10 @@ OPTIONS
     -r          : for tests that accept a remote python version (option -r),
                   iterate on a list of python versions and execute with -r
     --coverage  : generate python coverage data; viewable as html afterwards
+                  It assumes your python contains the coverage.py package and
+                  is configured to check for coverage on python startup.  More
+                  info in this runtests script in the pydoc for the function
+                  prepare_to_run_python_coverage.
 """
 
 
@@ -257,15 +261,15 @@ def prepare_to_run_python_coverage():
 
     Here is what I did to install python with coverage support:
 
-        1. install python Python-2.7.12.tar.xz
+        1. install python, Python-2.7.12.tar.xz
             $ configure --prefix /home/rrdrake/bin/pycov/py27
             $ make
             $ make install
-        2. install setup setuptools-39.0.1.tar.gz
+        2. install setup, setuptools-39.0.1.tar.gz
             $ (first set path to use new python)
             $ python bootstrap.py
             $ python setup.py install
-        3. install coverage.py coveragepy-coverage-4.5.1.tar.gz
+        3. install coverage.py, coveragepy-coverage-4.5.1.tar.gz
             $ (first set path to use new python)
             $ python setup.py install
         4. add sitecustomize.py file in python install area
