@@ -10,7 +10,8 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-from os.path import abspath, dirname
+from os.path import abspath, dirname, normpath
+from os.path import join as pjoin
 import time
 import shutil
 import glob
@@ -33,6 +34,7 @@ from gitinterface import is_a_local_repository
 from gitinterface import verify_repository_url
 from gitinterface import repo_name_from_url
 from gitinterface import get_remote_branches
+from gitinterface import is_subdir
 
 
 class with_set_environ( trigutil.trigTestCase ):
@@ -575,6 +577,71 @@ class commit_and_push( trigutil.trigTestCase ):
         git2 = clone_repo( url, 'check' )
         assert os.path.isfile( 'check/adir/deep/file.txt' )
         assert util.readfile( 'check/adir/afile.txt' ).strip() == 'changed'
+
+    def test_add_method_is_relative_to_current_directory_or_toplevel(self):
+        """
+        but have not tried absolute paths
+        """
+        os.mkdir( 'work' )
+        time.sleep(1)
+
+        git = create_repo( 'myrepo' )
+
+        write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
+        write_and_commit_file( git, 'msg2', 'subdir/file2.txt', 'content2' )
+
+        self.assertRaises( GitInterfaceError, git.add, 'file.no.exist' )
+
+        with change_directory( 'myrepo/subdir' ):
+            util.writefile( 'file1.txt', 'subcontent1' )
+            git.add( 'file1.txt', verbose=2 )
+            git.commit( 'msg3', verbose=2 )
+
+        util.writefile( 'myrepo/subdir/file4.txt', 'content4' )
+        git.add( 'myrepo/subdir/file4.txt' )
+        git.commit( 'msg4' )
+
+        util.writefile( 'myrepo/file5.txt', 'content5' )
+        git.add( 'myrepo/file5.txt' )
+        git.commit( 'msg5' )
+
+        util.writefile( 'myrepo/subdir/file6.txt', 'content6' )
+        with change_directory( 'work' ):
+            git.add( 'subdir/file6.txt' )
+        git.commit( 'msg6' )
+
+        util.writefile( 'myrepo/file7.txt', 'content7' )
+        with change_directory( 'work' ):
+            git.add( 'file7.txt' )
+        git.commit( 'msg7' )
+
+    def test_add_method_accepts_a_deleted_file(self):
+        """
+        but PWD must be within the repo, and the path must be relative to PWD
+        """
+        git = create_repo( 'myrepo' )
+
+        write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
+        write_and_commit_file( git, 'msg2', 'adir/file2.txt', 'content2' )
+
+        os.remove( 'myrepo/file1.txt' )
+        with change_directory( 'myrepo' ):
+            git.add( 'file1.txt', verbose=3 )
+        git.commit( 'msg3' )
+
+        os.remove( 'myrepo/adir/file2.txt' )
+        with change_directory( 'myrepo' ):
+            git.add( 'adir/file2.txt', verbose=3 )
+        git.commit( 'msg4' )
+
+    def test_its_and_error_to_add_a_file_not_in_the_repo(self):
+        ""
+        git = create_repo( 'myrepo' )
+
+        write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
+
+        util.writefile( 'file2.txt', 'content2' )
+        self.assertRaises( GitInterfaceError, git.add, 'file2.txt', verbose=3 )
 
 
 class branches( trigutil.trigTestCase ):
@@ -1241,6 +1308,36 @@ class misc_functions( trigutil.trigTestCase ):
         assert verify_repository_url( pre+'/dir2/bareclone.git' )
         assert verify_repository_url( pre+'/dir2/bareclone' )
 
+    def test_is_subdir_function(self):
+        ""
+        os.mkdir( 'dir1' )
+        os.mkdir( 'dir2' )
+        time.sleep(1)
+
+        assert is_subdir( '.', '.' )
+        assert is_subdir( '.', os.getcwd() )
+        assert is_subdir( os.getcwd(), '.' )
+        assert is_subdir( os.getcwd(), os.getcwd() )
+
+        assert is_subdir( '..', '.' )
+
+        assert is_subdir( '.', 'dir1/..' )
+        assert is_subdir( os.getcwd(), 'dir1/..' )
+        assert is_subdir( os.getcwd(), pjoin( abspath('dir1'), '..' ) )
+        assert is_subdir( '.', pjoin( abspath('dir1'), '..' ) )
+
+        assert is_subdir( '.', 'dir1' )
+        assert is_subdir( os.getcwd(), 'dir1' )
+        assert not is_subdir( 'dir1', '.' )
+        assert not is_subdir( 'dir1', os.getcwd() )
+
+        with change_directory( 'dir2' ):
+            assert is_subdir( '..', '../dir1' )
+            assert not is_subdir( '.', '../dir1' )
+            assert not is_subdir( '.', normpath( abspath('../dir1') ) )
+            assert is_subdir( '.', pjoin( '..', 'dir1', '..', 'dir2' ) )
+            assert is_subdir( os.getcwd(), pjoin( '..', 'dir1', '..', 'dir2' ) )
+
 
 def call_expect_GitInterfaceError_capture_output( func, *args, **kwargs ):
     ""
@@ -1294,9 +1391,7 @@ def write_and_commit_file( git, message, fname, content ):
 def create_local_repo_with_a_commit( directory ):
     ""
     git = create_repo( directory )
-    util.writefile( directory+'/something', 'content' )
-    git.add( 'something' )
-    git.commit( 'new file' )
+    write_and_commit_file( git, 'new file', 'something', 'content' )
     return git
 
 

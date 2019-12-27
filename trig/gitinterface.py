@@ -53,8 +53,7 @@ class GitInterface:
         verbose = kwargs.pop( 'verbose', 0 )
 
         if len( files ) > 0:
-            fL = [ pipes.quote(f) for f in files ]
-            self.run( 'add', *fL, verbose=verbose )
+            _add_files_to_index( self.grun, files, verbose )
 
     def commit(self, message, verbose=0):
         ""
@@ -443,6 +442,10 @@ class GitRunner:
         ""
         self.chdir = rundir
 
+    def getRunDirectory(self):
+        ""
+        return self.chdir
+
 
 def get_repo_toplevel( gitrun, directory=None, verbose=0 ):
     ""
@@ -549,6 +552,66 @@ def _repo_directory_from_url( url, bare=False ):
         return name+'.git'
     else:
         return name
+
+
+def _add_files_to_index( gitrun, files, verbose ):
+    ""
+    top = gitrun.getRunDirectory()
+
+    # use first file to determine if paths are relative to the current
+    # directory or relative to the toplevel
+
+    if os.path.islink( files[0] ) or os.path.exists( files[0] ):
+
+        if is_subdir( top, '.' ):
+            gitrun.run( 'add', *_quote_files(files), chdir=None, verbose=verbose )
+
+        else:
+            fL = _make_files_relative_to_toplevel( top, files )
+            gitrun.run( 'add', *_quote_files(fL), verbose=verbose )
+
+    else:
+        path0 = pjoin( top, files[0] )
+        if os.path.islink( path0 ) or os.path.exists( path0 ):
+            gitrun.run( 'add', *_quote_files(files), verbose=verbose )
+
+        else:
+            # fall back to executing git add in the current directory
+            gitrun.run( 'add', *_quote_files(files), chdir=None, verbose=verbose )
+
+
+def _quote_files( filelist ):
+    ""
+    return [ pipes.quote(f) for f in filelist ]
+
+
+def _make_files_relative_to_toplevel( top, files ):
+    ""
+    top = normpath( abspath( top ) )
+    lentop = len(top)
+
+    fL = []
+    for path in files:
+
+        if not is_subdir( top, path ):
+            raise GitInterfaceError( 'path not in the repository: '+path )
+
+        rel = _chop_root_path( lentop, path )
+
+        fL.append( rel )
+
+    return fL
+
+
+def _chop_root_path( choplen, path ):
+    ""
+    npath = normpath( abspath( path ) )
+    rel = normpath( npath[choplen:] )
+
+    if rel.startswith( os.path.sep ):
+        rel = rel.strip( os.path.sep )
+
+    return rel
 
 
 def _push_all( gitrun, all_branches, all_tags, repository, verbose ):
@@ -687,6 +750,25 @@ class set_environ:
                 os.environ[n] = self.save_environ[n]
             elif v != None:
                 del os.environ[n]
+
+
+def is_subdir( parent, subdir ):
+    ""
+    subdir = normpath( abspath( subdir ) )
+
+    while True:
+
+        if os.path.samefile( parent, subdir ):
+            return True
+
+        d2 = dirname( subdir )
+
+        if d2 == subdir:
+            break
+
+        subdir = d2
+
+    return False
 
 
 def _split_and_create_directory( repo_path ):
