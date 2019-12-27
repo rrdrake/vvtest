@@ -78,7 +78,7 @@ def fetch( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( pjoin( top, path ) )
+        git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'fetch', verbose=3 )
 
 
@@ -88,7 +88,7 @@ def pull( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( pjoin( top, path ) )
+        git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'pull', verbose=3 )
 
 
@@ -98,7 +98,7 @@ def add( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( pjoin( top, path ) )
+        git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'add', *args, verbose=3 )
 
@@ -109,7 +109,7 @@ def commit( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( pjoin( top, path ) )
+        git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'commit', *args, verbose=3 )
 
@@ -120,7 +120,7 @@ def push( argv ):
 
     top = cfg.getTopDir()
     for path in cfg.getLocalRepoPaths():
-        git = gititf.GitInterface( pjoin( top, path ) )
+        git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'push', verbose=3 )
 
 
@@ -129,7 +129,7 @@ def load_configuration():
     cfg = Configuration()
     top = find_mrgit_top_level()
     cfg.setTopDir( top )
-    git = gititf.GitInterface( top+'/.mrgit' )
+    git = gititf.GitRepo( top+'/.mrgit' )
     cfg.loadManifests( git )
     cfg.computeLocalRepoMap()
 
@@ -460,7 +460,7 @@ def robust_clone( url, into_dir, verbose=2 ):
         gititf.clone_repo( url, tmp, verbose=verbose )
         move_directory_contents( tmp, into_dir )
 
-        git = gititf.GitInterface( into_dir )
+        git = gititf.GitRepo( into_dir )
 
     else:
         git = gititf.clone_repo( url, into_dir, verbose=verbose )
@@ -666,7 +666,7 @@ class Configuration:
     def commitLocalRepoMap(self):
         ""
         mrgit = pjoin( self.topdir, '.mrgit' )
-        git = gititf.GitInterface( mrgit )
+        git = gititf.GitRepo( mrgit )
         checkout_repo_map_branch( git )
 
         try:

@@ -22,7 +22,7 @@ class GitInterfaceError( Exception ):
     pass
 
 
-class GitInterface:
+class GitRepo:
     """
     Most functions take the optional 'verbose' keyword argument:
 
@@ -276,7 +276,7 @@ def create_repo( directory=None, bare=False, **options):
 
     Options can be 'https_proxy', 'gitexe', and 'verbose'.
 
-    Returns a GitInterface object set to the new repo.
+    Returns a GitRepo object set to the new repo.
     """
     verb = options.pop( 'verbose', 0 )
     grun = GitRunner( **options )
@@ -295,7 +295,7 @@ def create_repo( directory=None, bare=False, **options):
 
     grun.run( cmd, chdir=cd, verbose=verb )
 
-    return GitInterface( directory=top, **options )
+    return GitRepo( directory=top, **options )
 
 
 def clone_repo( url, directory=None, branch=None, bare=False, **options ):
@@ -306,7 +306,7 @@ def clone_repo( url, directory=None, branch=None, bare=False, **options ):
 
     Options can be 'verbose', 'https_proxy', 'gitexe'.
 
-    Returns a GitInterface object set to the cloned repository.
+    Returns a GitRepo object set to the cloned repository.
     """
     verb = options.pop( 'verbose', 0 )
     grun = GitRunner( **options )
@@ -320,7 +320,7 @@ def clone_repo( url, directory=None, branch=None, bare=False, **options ):
         top = _full_clone( grun, url, directory, bare, verb )
 
     options['verbose'] = verb
-    return GitInterface( top, **options )
+    return GitRepo( top, **options )
 
 
 def get_remote_branches( url, **options ):
@@ -342,7 +342,7 @@ def update_repository_mirror( from_url, to_url, work_clone=None, **options ):
 
         if os.path.isdir( work_clone ):
             with change_directory( work_clone ):
-                work_git = GitInterface( **options )
+                work_git = GitRepo( **options )
                 _mirror_remote_repo_into_pwd( work_git, from_url, verbose=verb )
                 _push_branches_and_tags( work_git, to_url, verbose=verb )
 

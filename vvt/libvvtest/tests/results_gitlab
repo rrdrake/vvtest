@@ -31,7 +31,7 @@ from libvvtest.gitlabwriter import make_submit_info
 from libvvtest.TestSpecCreator import TestCreator
 from libvvtest.teststatus import TestStatus, DIFF_EXIT_STATUS
 from libvvtest.testcase import TestCase
-from gitinterface import GitInterface
+from gitinterface import GitRepo
 
 
 class gitlab_output_format_tests( vtu.vvtestTestCase ):
@@ -466,7 +466,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
                     'myname':'my value' }
         wr._dispatch_submission( None, runinfo )
 
-        git = GitInterface( url, 'checkrepo' )
+        git = GitRepo( url, 'checkrepo' )
         branch = get_results_branch( git )
         assert branch == 'results_2019_06'
         git.checkoutBranch( branch )
@@ -587,7 +587,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=5, npass=2, diff=2, fail=1 )
         time.sleep(1)
 
-        git = GitInterface( url, 'checkrepo' )
+        git = GitRepo( url, 'checkrepo' )
         branch = get_results_branch( git )
         assert branch == 'results_2019_06'
         git.checkoutBranch( branch )

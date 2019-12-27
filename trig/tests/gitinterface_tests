@@ -22,7 +22,7 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
-from gitinterface import GitInterfaceError, GitInterface, GitRunner
+from gitinterface import GitInterfaceError, GitRepo, GitRunner
 from gitinterface import set_environ, change_directory
 from gitinterface import create_repo, clone_repo
 from gitinterface import get_repo_toplevel, _find_toplevel_bare_git_repo
@@ -241,13 +241,13 @@ class create_and_clone( trigutil.trigTestCase ):
         with change_directory( 'adir' ):
             clone_repo( bare_url )
 
-        git2 = GitInterface( 'adir/example' )
+        git2 = GitRepo( 'adir/example' )
         assert not git2.is_bare()
         assert git2.get_branch() == 'master'
 
         # check if unknown keyword arguments given
-        GitInterface( 'adir/example', verbose=3 )
-        self.assertRaises( GitInterfaceError, GitInterface, 'adir/example', foobar=42 )
+        GitRepo( 'adir/example', verbose=3 )
+        self.assertRaises( GitInterfaceError, GitRepo, 'adir/example', foobar=42 )
 
     def test_using_verbose_setting_with_exceptions(self):
         ""
@@ -331,13 +331,13 @@ class create_and_clone( trigutil.trigTestCase ):
 
         top = os.path.abspath( 'example' )
 
-        git = GitInterface( 'example' )
+        git = GitRepo( 'example' )
         assert os.path.samefile( git.get_toplevel(), top )
 
-        git = GitInterface( 'example/subdir', verbose=3 )
+        git = GitRepo( 'example/subdir', verbose=3 )
         assert os.path.samefile( git.get_toplevel(), top )
 
-        self.assertRaises( GitInterfaceError, GitInterface, '/' )
+        self.assertRaises( GitInterfaceError, GitRepo, '/' )
 
     def test_a_bare_clone_can_be_cloned(self):
         ""
@@ -733,7 +733,7 @@ class branches( trigutil.trigTestCase ):
         git.checkout_branch( 'topic' )
         assert git.get_branch() == 'topic'
 
-        git = GitInterface( 'example' )
+        git = GitRepo( 'example' )
         git.get_branch() == 'topic'
 
     def test_current_branch_returns_None_if_in_detached_HEAD_state(self):
@@ -752,7 +752,7 @@ class branches( trigutil.trigTestCase ):
         with util.change_directory( 'arepo' ):
             runcmd( 'git init' )
 
-        git = GitInterface( 'arepo' )
+        git = GitRepo( 'arepo' )
         self.assertRaises( GitInterfaceError, git.get_branch )
 
     def test_a_push_fails_if_not_on_a_branch(self):
@@ -1263,7 +1263,7 @@ class mirroring_repositories( trigutil.trigTestCase ):
         wrkdir = 'workclone'
         update_repository_mirror( src_url, cpy_url, work_clone=wrkdir )
 
-        git = GitInterface( wrkdir )
+        git = GitRepo( wrkdir )
         assert git.is_bare()
 
     def test_an_update_fails_if_history_would_be_changed(self):
