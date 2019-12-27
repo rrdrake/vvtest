@@ -49,11 +49,15 @@ class GitInterface:
         return self.top
 
     def add(self, *files, **kwargs):
-        ""
-        verbose = kwargs.pop( 'verbose', 0 )
+        """
+        If update=True, then same as git add -u.
+        """
+        verb = kwargs.pop( 'verbose', 0 )
 
         if len( files ) > 0:
-            _add_files_to_index( self.grun, files, verbose )
+            _add_files_to_index( self.grun, files, verb )
+        elif kwargs.get( 'update', False ):
+            self.grun.run( 'add -u', verbose=verb )
 
     def commit(self, message, verbose=0):
         ""

@@ -643,6 +643,23 @@ class commit_and_push( trigutil.trigTestCase ):
         util.writefile( 'file2.txt', 'content2' )
         self.assertRaises( GitInterfaceError, git.add, 'file2.txt', verbose=3 )
 
+    def test_add_method_using_the_update_option(self):
+        ""
+        git = create_repo( 'myrepo' )
+
+        write_and_commit_file( git, 'msg1', 'file1.txt', 'content1' )
+        write_and_commit_file( git, 'msg2', 'adir/file2.txt', 'content2' )
+
+        util.writefile( 'myrepo/file1.txt', 'new content1' )
+        util.writefile( 'myrepo/adir/file2.txt', 'new content2' )
+
+        git.add( update=True )
+        git.commit( 'msg3' )
+
+        clone_repo( git.get_toplevel(), 'checkrepo' )
+        assert 'new content1' in util.readfile( 'checkrepo/file1.txt' )
+        assert 'new content2' in util.readfile( 'checkrepo/adir/file2.txt' )
+
 
 class branches( trigutil.trigTestCase ):
 
