@@ -71,7 +71,7 @@ class the_tests( trigutil.trigTestCase ):
 
     def make_dual_test_results(self, joblabel1=None, joblabel2=None):
         ""
-        url = util.create_bare_repo_with_topic_branch( 'resrepo' )
+        url = util.create_bare_repo_with_file_and_branch( 'resrepo' )
 
         self.epoch1 = 1561499669.31  # Tue Jun 25 15:54:29 2019
         self.run_pass_fail_diff_tests( url, self.epoch1, joblabel=joblabel1 )

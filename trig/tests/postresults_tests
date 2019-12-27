@@ -29,7 +29,7 @@ class the_tests( unittest.TestCase ):
         ""
         util.setup_test()
 
-        self.url = util.create_local_bare_repository( 'example' )
+        self.url = util.create_bare_repo( 'example' )
         util.push_file_to_repo( self.url, 'afile.txt', 'file contents' )
         time.sleep(1)
 
