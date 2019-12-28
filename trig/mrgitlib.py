@@ -68,7 +68,7 @@ def clone( argv ):
 def init( argv ):
     ""
     cfg = Configuration()
-    cfg.setTopDir( os.getcwd() )
+    cfg.setTopDir( '.' )
     cfg.createMRGitRepo()
 
 
@@ -156,31 +156,45 @@ def find_mrgit_top_level():
 def parse_url_list( args ):
     ""
     directory = None
+    urls = []
 
-    if len( args ) <= 1 or \
-       gititf.repository_url_match( args[-1] ) or \
-       gititf.is_a_local_repository( args[-1] ) or \
-       gititf.is_a_local_repository( args[-1]+'/.mrgit' ):
-        urls = list( args )
+    if len( args ) < 1:
+        pass
+
+    elif len( args ) == 1:
+        urls = [ make_absolute_url_path( args[0] ) ]
+
+    elif specifies_a_repository( args[-1] ):
+        urls = [ make_absolute_url_path(url) for url in args ]
+
     else:
         directory = args[-1]
-        urls = args[:-1]
-
-    urls = abspath_local_repository_urls( urls )
+        urls = [ make_absolute_url_path(url) for url in args[:-1] ]
 
     return urls, directory
 
 
-def abspath_local_repository_urls( urls ):
+def specifies_a_repository( url ):
     ""
-    newurls = []
-    for url in urls:
-        if gititf.is_a_local_repository( url ):
-            newurls.append( abspath( url ) )
-        else:
-            newurls.append( url )
+    return gititf.repository_url_match( url ) or \
+           gititf.is_a_local_repository( url ) or \
+           gititf.is_a_local_repository( url+'/.mrgit' )
 
-    return newurls
+
+def make_absolute_url_path( url ):
+    ""
+    if gititf.repository_url_match( url ):
+        if url == 'file://':
+            raise MRGitExitError( 'invalid URL: '+repr(url) )
+        elif url.startswith( 'file://' ):
+            tail = url[7:]
+            absurl = 'file://'+abspath( tail )
+        else:
+            absurl = url
+    else:
+        absurl = abspath( url )
+
+    return absurl
 
 
 def clone_from_single_url( cfg, url, directory ):
@@ -212,7 +226,8 @@ def clone_from_single_url( cfg, url, directory ):
         cfg.createFromURLs( [ url ] )
         cfg.computeLocalRepoMap()
         topdir = cfg.setTopDir( directory )
-        tmpd.moveTo( topdir )
+        url,loc = cfg.getRemoteRepoList()[0]
+        tmpd.moveTo( pjoin( topdir, loc ) )
         cfg.createMRGitRepo()
 
 
@@ -505,10 +520,10 @@ class TempDirectory:
 
         if self.subdir:
             tdir = abspath( self.subdir )
-            tmpdir = tempfile.mkdtemp( '', 'mrgit_tempclone_', tdir )
+            tmpdir = tempfile.mkdtemp( '', 'mrgit_tmpdir_', tdir )
         else:
-            tmpdir1 = tempfile.mkdtemp( '', 'mrgit_tempclone_', os.getcwd() )
-            tmpdir  = tempfile.mkdtemp( '', 'mrgit_tempclone_', tmpdir1 )
+            tmpdir1 = tempfile.mkdtemp( '', 'mrgit_tmpdir1_', os.getcwd() )
+            tmpdir  = tempfile.mkdtemp( '', 'mrgit_tmpdir2_', tmpdir1 )
 
         return tmpdir
 
@@ -519,9 +534,8 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
     genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
 
     if os.path.isfile( mfestfn ):
-        url = git.get_remote_URL()
         if REPOMAP_BRANCH in git.get_branches() or \
-           REPOMAP_BRANCH in gititf.get_remote_branches( url ):
+           REPOMAP_BRANCH in git.get_branches( remotes=True ):
 
             cfg.loadManifests( git )
             cfg.loadRepoMap( git, baseurl )
@@ -581,14 +595,10 @@ class Configuration:
 
     def createFromURLs(self, urls):
         ""
-        groupname = None
-        for i,url in enumerate(urls):
+        groupname = ''
+        for url in urls:
             name = gititf.repo_name_from_url( url )
-            if i == 0:
-                groupname = name
-                path = '.'
-            else:
-                path = name
+            path = name
 
             self.mfest.addRepo( groupname, name, path )
             self.remote.setRepoLocation( name, url=url )
@@ -615,7 +625,7 @@ class Configuration:
 
     def computeLocalRepoMap(self):
         ""
-        grp = self.mfest.findGroup( None )
+        grp = self.mfest.getDefaultGroup()
 
         if grp != None:
             for spec in grp.getRepoList():
@@ -626,11 +636,13 @@ class Configuration:
         if directory:
             self.topdir = abspath( normpath( directory ) )
         else:
-            grp = self.mfest.findGroup( None )
+            grp = self.mfest.getDefaultGroup()
             if grp == None:
                 self.topdir = abspath( urlname )
-            else:
+            elif grp.getName():
                 self.topdir = abspath( grp.getName() )
+            else:
+                self.topdir = abspath( '.' )
 
         return self.topdir
 
@@ -642,7 +654,7 @@ class Configuration:
         ""
         paths = []
 
-        grp = self.mfest.findGroup( None )
+        grp = self.mfest.getDefaultGroup()
         if grp != None:
             for spec in grp.getRepoList():
                 paths.append( spec['path'] )
@@ -653,7 +665,7 @@ class Configuration:
         ""
         repolist = []
 
-        grp = self.mfest.findGroup( None )
+        grp = self.mfest.getDefaultGroup()
 
         if grp != None:
             for spec in grp.getRepoList():
@@ -697,36 +709,36 @@ class Manifests:
 
     def __init__(self):
         ""
-        self.groups = []
+        self.groups = []  # order matters - the first group is the default group
 
     def addRepo(self, groupname, reponame, path):
         ""
-        grp = self.findGroup( groupname, create=True )
+        grp = self.findGroup( groupname )
+        if grp == None:
+            grp = RepoGroup( groupname )
+            self.groups.append( grp )
         grp.setRepo( reponame, path )
 
-    def findGroup(self, groupname, create=False):
+    def getDefaultGroup(self):
+        ""
+        if len( self.groups ) > 0:
+            return self.groups[0]
+        return None
+
+    def findGroup(self, groupname):
         ""
         grp = None
 
-        if not groupname:
-            if len( self.groups ) > 0:
-                grp = self.groups[0]
-
-        else:
-            for igrp in self.groups:
-                if igrp.getName() == groupname:
-                    grp = igrp
-                    break
-
-            if not grp and create:
-                grp = RepoGroup( groupname )
-                self.groups.append( grp )
+        for igrp in self.groups:
+            if igrp.getName() == groupname:
+                grp = igrp
+                break
 
         return grp
 
     def writeToFile(self, filename):
         ""
-        with open( filename, 'w' ) as fp:
+        with open( filename, 'wt' ) as fp:
             for grp in self.groups:
                 fp.write( '[ group '+grp.getName()+' ]\n' )
                 for spec in grp.getRepoList():
@@ -736,23 +748,35 @@ class Manifests:
 
                 fp.write( '\n' )
 
-    def readFromFile(self, fileobj):
+    def readFromFile(self, filename):
+        ""
+        with open( filename, 'rt' ) as fp:
+
+            groupname = None
+
+            for line in fp:
+                line = line.strip()
+                if line.startswith( '#' ):
+                    pass
+                elif line.startswith( '[' ):
+                    groupname = self._parse_group_name( line )
+                elif groupname != None:
+                    attrs = parse_attribute_line( line )
+                    if 'repo' in attrs and 'path' in attrs:
+                        self.addRepo( groupname, attrs['repo'], attrs['path'] )
+
+    def _parse_group_name(self, line):
         ""
         groupname = None
 
-        for line in fileobj:
-            line = line.strip()
-            if line.startswith( '#' ):
-                pass
-            elif line.startswith( '[' ):
-                groupname = None
-                sL = line.strip('[').strip(']').strip().split()
-                if len(sL) == 2 and sL[0] == 'group':
-                    groupname = sL[1]
-            elif groupname:
-                attrs = parse_attribute_line( line )
-                if 'repo' in attrs and 'path' in attrs:
-                    self.addRepo( groupname, attrs['repo'], attrs['path'] )
+        sL = line.strip('[').strip(']').strip().split()
+        if len(sL) > 0 and sL[0] == 'group':
+            if len(sL) > 1:
+                groupname = sL[1]
+            else:
+                groupname = ''
+
+        return groupname
 
 
 class RepoGroup:
@@ -772,19 +796,17 @@ class RepoGroup:
 
     def setRepo(self, reponame, path):
         ""
-        spec = self.findRepo( reponame, create=True )
+        spec = self.findRepo( reponame )
+        if spec == None:
+            spec = { 'repo':reponame }
+            self.repos.append( spec )
         spec['path'] = path
 
-    def findRepo(self, reponame, create=False):
+    def findRepo(self, reponame):
         ""
         for spec in self.repos:
             if spec['repo'] == reponame:
                 return spec
-
-        if create:
-            spec = { 'repo':reponame }
-            self.repos.append( spec )
-            return spec
 
         return None
 
@@ -815,7 +837,7 @@ class RepoMap:
 
     def writeToFile(self, filename):
         ""
-        with open( filename, 'w' ) as fp:
+        with open( filename, 'wt' ) as fp:
             for name,loc in self.repomap.items():
                 fp.write( 'repo='+name )
                 if loc[0]:
@@ -828,7 +850,7 @@ class RepoMap:
 
     def readFromFile(self, filename, baseurl=None):
         ""
-        with open( filename, 'r' ) as fp:
+        with open( filename, 'rt' ) as fp:
 
             for line in fp:
                 line = line.strip()
@@ -874,12 +896,10 @@ def parse_attribute_line( line ):
 
 def read_mrgit_manifests_file( manifests, git ):
     ""
-    fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
-
     git.checkout_branch( 'master' )
 
-    with open( fn, 'r' ) as fp:
-        manifests.readFromFile( fp )
+    fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
+    manifests.readFromFile( fn )
 
 
 def write_first_manifests_file( manifests, git ):

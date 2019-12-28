@@ -21,6 +21,7 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
+from mrgitlib import MRGitExitError
 import mrgitlib as mrlib
 
 mrgit_dir = os.path.dirname( trigutil.testsrcdir )
@@ -52,72 +53,86 @@ class cloning( trigutil.trigTestCase ):
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
         mrlib.clone( [ src_url ] )
+        self.assert_single_clone( '.' )
 
-        assert os.path.isdir( 'cool' )
-        git = GitRepo( 'cool' )
-        assert 'topic' in get_remote_branches( git.get_remote_URL() )
+    def assert_single_clone(self, subdir):
+        ""
+        assert os.path.isdir( subdir+'/cool' )
+        git = GitRepo( subdir+'/cool' )
+        assert 'topic' in git.get_branches( remotes=True )
+
+    def test_clone_a_single_repository_into_a_directory(self):
+        ""
+        src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
+
+        mrlib.clone( [ src_url, 'adir' ] )
+        self.assert_single_clone( 'adir' )
 
     def test_command_line_clone_a_single_repository(self):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
         x,out = util.runcmd( mrgit_file+' clone '+src_url+' myclone' )
-
         assert x == 0
-        assert os.path.isdir( 'myclone' )
-        git = GitRepo( 'myclone' )
-        assert 'topic' in get_remote_branches( git.get_remote_URL() )
+        self.assert_single_clone( 'myclone' )
 
-    def test_cloning_two_repositories_puts_second_under_the_first(self):
+    def test_cloning_two_repos_puts_them_side_by_side(self):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url ] )
+        self.assert_dual_clone( '.' )
 
-        assert os.path.isdir( 'cool' )
-        git = GitRepo( 'cool' )
+    def assert_dual_clone(self, subdir):
+        ""
+        assert os.path.isdir( subdir+'/cool' ) and os.path.isdir( subdir+'/ness' )
+        git = GitRepo( subdir+'/cool' )
         assert 'nessie' not in git.get_tags()
-        git = GitRepo( 'cool/ness' )
+        git = GitRepo( subdir+'/ness' )
         assert 'nessie' in git.get_tags()
 
-    def test_command_line_clone_multiple_repos(self):
+    def test_command_line_clone_of_two_repos(self):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        x,out = util.runcmd( mrgit_file+' clone ' + \
-                             ness_url+' '+cool_url+' myclone' )
+        x,out = util.runcmd( mrgit_file+' clone '+cool_url+' '+ness_url )
+        assert x == 0
+        self.assert_dual_clone( '.' )
 
-        assert os.path.isdir( 'myclone' )
-        git = GitRepo( 'myclone' )
-        assert 'nessie' in git.get_tags()
-        git = GitRepo( 'myclone/cool' )
-        assert 'nessie' not in git.get_tags()
+    def test_cloning_two_repos_into_a_directory(self):
+        ""
+        cool_url, ness_url = make_coolness_repositories()
+
+        mrlib.clone( [ cool_url, ness_url, 'adir' ] )
+        self.assert_dual_clone( 'adir' )
+
+    def test_command_line_clone_of_two_repos_into_a_directory(self):
+        ""
+        cool_url, ness_url = make_coolness_repositories()
+
+        x,out = util.runcmd( mrgit_file+' clone '+cool_url+' '+ness_url+' adir' )
+        assert x == 0
+        self.assert_dual_clone( 'adir' )
 
     def test_clone_an_mrgit_clone_by_pointing_to_the_manifests(self):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
-
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
-        assert os.path.isdir( 'clone2' )
-        git = GitRepo( 'clone2' )
-        assert 'nessie' not in git.get_tags()
-        git = GitRepo( 'clone2/ness' )
-        assert 'nessie' in git.get_tags()
+        self.assert_dual_clone( 'clone2' )
 
     def test_clone_an_mrgit_clone_via_manifests_with_only_one_repo(self):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ ness_url, 'clone1' ] )
-
+        mrlib.clone( [ cool_url, 'clone1' ] )
         mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
 
-        assert os.path.isdir( 'clone2' )
-        git = GitRepo( 'clone2' )
-        assert 'nessie' in git.get_tags()
+        assert os.path.isdir( 'clone2/cool' )
+        git = GitRepo( 'clone2/cool' )
+        assert 'clone1' in git.get_remote_URL()
 
     def test_clone_an_mrgit_clone(self):
         ""
@@ -127,11 +142,13 @@ class cloning( trigutil.trigTestCase ):
 
         mrlib.clone( [ 'clone1', 'clone2' ] )
 
-        assert os.path.isdir( 'clone2' )
-        git = GitRepo( 'clone2' )
-        assert 'nessie' not in git.get_tags()
+        assert os.path.isdir( 'clone2/cool' )
+        git = GitRepo( 'clone2/cool' )
+        assert 'clone1' in git.get_remote_URL()
+
+        assert os.path.isdir( 'clone2/ness' )
         git = GitRepo( 'clone2/ness' )
-        assert 'nessie' in git.get_tags()
+        assert 'clone1' in git.get_remote_URL()
 
     def test_clone_an_mrgit_clone_using_a_file_url(self):
         ""
@@ -141,8 +158,8 @@ class cloning( trigutil.trigTestCase ):
 
         mrlib.clone( [ 'file://'+abspath('clone1'), 'clone2' ] )
 
-        assert os.path.isdir( 'clone2' )
-        git = GitRepo( 'clone2' )
+        assert os.path.isdir( 'clone2/cool' )
+        git = GitRepo( 'clone2/cool' )
         assert 'nessie' not in git.get_tags()
         git = GitRepo( 'clone2/ness' )
         assert 'nessie' in git.get_tags()
@@ -221,6 +238,131 @@ def create_example_genesis_repo():
         """ )
 
     return genesis_url, ness_url
+
+
+class startup_logic( trigutil.trigTestCase ):
+
+    def test_empty_clone_args(self):
+        ""
+        urls,into = mrlib.parse_url_list( [] )
+        assert len( urls ) == 0
+        assert into == None
+
+    def test_a_single_clone_arg_is_always_treated_as_a_url(self):
+        ""
+        urls,into = mrlib.parse_url_list( [ 'reldir' ] )
+        assert into == None and len(urls) == 1
+        assert urls[0] == abspath( 'reldir' )
+
+        urls,into = mrlib.parse_url_list( [ '/abs/dir' ] )
+        assert into == None and len(urls) == 1
+        assert urls[0] == '/abs/dir'
+
+        urls,into = mrlib.parse_url_list( [ 'file://rel/dir' ] )
+        assert into == None and len(urls) == 1
+        assert urls[0] == 'file://'+abspath( 'rel/dir' )
+
+        urls,into = mrlib.parse_url_list( [ 'file:///abs/dir' ] )
+        assert into == None and len(urls) == 1
+        assert urls[0] == 'file:///abs/dir'
+
+        urls,into = mrlib.parse_url_list( [ 'https://location' ] )
+        assert into == None and len(urls) == 1
+        assert urls[0] == 'https://location'
+
+        self.assertRaises( MRGitExitError, mrlib.parse_url_list, [ 'file://' ] )
+
+    def test_clone_args_where_a_directory_in_last(self):
+        ""
+        urls,into = mrlib.parse_url_list( [ 'path1', 'path2' ] )
+        assert into == 'path2' and len(urls) == 1
+        assert urls[0] == abspath('path1')
+
+        urls,into = mrlib.parse_url_list( [ abspath('path1'), 'path2' ] )
+        assert into == 'path2' and len(urls) == 1
+        assert urls[0] == abspath('path1')
+
+        urls,into = mrlib.parse_url_list( [ 'file://path1', abspath('path2') ] )
+        assert into == abspath('path2') and len(urls) == 1
+        assert urls[0] == 'file://'+abspath('path1')
+
+    def test_clone_args_where_a_repo_is_last(self):
+        ""
+        util.writefile( 'bringit/afile', 'file contents' )
+        url1 = util.create_bare_repo_with_file_and_branch( 'bear', 'adir' )
+        clone_repo( url1, 'fox' )
+        clone_repo( url1, 'bdir/.mrgit' )
+
+        urls,into = mrlib.parse_url_list( [ 'path1', 'bringit' ] )
+        assert into == 'bringit' and len(urls) == 1
+
+        urls,into = mrlib.parse_url_list( [ 'path1', abspath('bringit') ] )
+        assert into == abspath('bringit') and len(urls) == 1
+
+        urls,into = mrlib.parse_url_list( [ 'path1', 'fox' ] )
+        assert into == None and len(urls) == 2
+        assert urls[0] == abspath('path1')
+        assert urls[1] == abspath('fox')
+
+        urls,into = mrlib.parse_url_list( [ 'path1', 'adir/bear' ] )
+        assert into == None and len(urls) == 2
+        assert urls[0] == abspath('path1')
+        assert urls[1] == abspath('adir/bear')
+
+        urls,into = mrlib.parse_url_list( [ 'path1', 'bdir' ] )
+        assert into == None and len(urls) == 2
+        assert urls[0] == abspath('path1')
+        assert urls[1] == abspath('bdir')
+
+        urls,into = mrlib.parse_url_list( [ 'path1', 'bdir/.mrgit' ] )
+        assert into == None and len(urls) == 2
+        assert urls[0] == abspath('path1')
+        assert urls[1] == abspath('bdir/.mrgit')
+
+
+class manifests_handling( trigutil.trigTestCase ):
+
+    def test_finding_repo_groups(self):
+        ""
+        mfest = mrlib.Manifests()
+        mfest.addRepo( 'grp1', 'foo', 'bar' )
+        mfest.addRepo( 'grp2', 'mars', 'pluto' )
+
+        grp = mfest.findGroup( 'grp2' )
+        assert grp.getName() == 'grp2'
+
+        grp = mfest.findGroup( 'grp1' )
+        assert grp.getName() == 'grp1'
+
+        grp = mfest.getDefaultGroup()
+        assert grp.getName() == 'grp1' or grp.getName() == 'grp2'
+
+        grp = mfest.findGroup( '' )
+        assert grp == None
+
+    def test_read_write_and_find_en_empty_group_name(self):
+        ""
+        mfest = mrlib.Manifests()
+        mfest.addRepo( '', 'foo', 'bar' )
+
+        grp = mfest.findGroup( '' )
+        assert grp.getName() == ''
+
+        mfest.writeToFile( 'checkme' )
+
+        mf2 = mrlib.Manifests()
+        mf2.readFromFile( 'checkme' )
+
+        grp = mf2.findGroup( '' )
+        assert grp.getName() == ''
+        spec = grp.findRepo( 'foo' )
+        assert spec['repo'] == 'foo'
+        assert spec['path'] == 'bar'
+
+    def magic_test_RepoGroup_class(self):
+        ""
+        pass
+        # use this testing to remove the 'create=False' argument to findRepo()
 
 
 class google_repo_manifests( trigutil.trigTestCase ):
@@ -476,25 +618,34 @@ proj3_xml = """\
 
 class mrgit_configuration_tests( trigutil.trigTestCase ):
 
-    def create_config_with_two_urls(self):
-        ""
-        cfg = mrlib.Configuration()
-        cfg.createFromURLs( [ 'file:///one/repo.git', 'ssh:///and/two.git' ] )
-        cfg.setTopDir( None )
-        cfg.computeLocalRepoMap()
-
-        return cfg
-
     def test_create_config_from_a_single_url(self):
         ""
         cfg = mrlib.Configuration()
         cfg.createFromURLs( [ 'file:///one/repo.git' ] )
-        cfg.setTopDir( None )
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 1
-        assert list( repos[0] ) == [ 'file:///one/repo.git', '.' ]
-        assert cfg.getTopDir() == abspath( 'repo' )
+        assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
+
+        cfg.setTopDir( None )
+        assert cfg.getTopDir() == os.getcwd()
+
+        cfg.setTopDir( 'topdir' )
+        assert cfg.getTopDir() == abspath( 'topdir' )
+
+    def create_config_with_two_urls(self):
+        ""
+        cfg = mrlib.Configuration()
+        cfg.createFromURLs( [ 'file:///one/repo.git', 'ssh:///and/two.git' ] )
+        cfg.computeLocalRepoMap()
+
+        cfg.setTopDir( None )
+        assert cfg.getTopDir() == os.getcwd()
+
+        cfg.setTopDir( 'topdir' )
+        assert cfg.getTopDir() == abspath( 'topdir' )
+
+        return cfg
 
     def test_create_config_from_two_urls(self):
         ""
@@ -502,41 +653,26 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 2
-        assert list( repos[0] ) == [ 'file:///one/repo.git', '.' ]
+        assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
-        assert cfg.getTopDir() == abspath( 'repo' )
-
-    def test_write_manifests_file(self):
-        ""
-        cfg = self.create_config_with_two_urls()
-
-        cfg.mfest.writeToFile( 'mfests' )
-
-        assert len( util.grepfiles( 'group repo', 'mfests' ) ) == 1
-        assert len( util.grepfiles( 'repo=repo', 'mfests' ) ) == 1
-        assert len( util.grepfiles( 'repo=two', 'mfests' ) ) == 1
 
     def test_create_initial_mrgit_repository(self):
         ""
         cfg = self.create_config_with_two_urls()
-
         cfg.createMRGitRepo()
 
-        git = clone_repo( 'repo/.mrgit', 'checkrepo' )
-        assert os.path.isfile( 'checkrepo/'+mrlib.MANIFESTS_FILENAME )
+        git = clone_repo( 'topdir/.mrgit', 'checkrepo' )
         assert not os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
 
-        assert mrlib.REPOMAP_BRANCH in get_remote_branches( git.get_remote_URL() )
+        mfest = mrlib.Manifests()
+        mfest.readFromFile( 'checkrepo/'+mrlib.MANIFESTS_FILENAME )
+        grp = mfest.findGroup( '' )
+        assert grp.getName() == '' and grp.findRepo( 'repo' ) != None
+
         git.checkout_branch( mrlib.REPOMAP_BRANCH )
-        assert os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
-
-        lines = util.grepfiles( 'repo=repo', 'checkrepo/'+mrlib.REPOMAP_FILENAME )
-        assert len( lines ) == 1
-        assert 'path=.' in lines[0]
-
-        lines = util.grepfiles( 'repo=two', 'checkrepo/'+mrlib.REPOMAP_FILENAME )
-        assert len( lines ) == 1
-        assert 'path=two' in lines[0]
+        rmap = mrlib.RepoMap()
+        rmap.readFromFile( 'checkrepo/'+mrlib.REPOMAP_FILENAME, '/fake' )
+        assert rmap.getRepoURL( 'two' ) == '/fake/two'
 
     def test_load_config_from_mrgit_checkout(self):
         ""
@@ -550,9 +686,9 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 2
-        assert list( repos[0] ) == [ 'file:///one/repo.git', '.' ]
+        assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
-        assert cfg.getTopDir() == abspath( 'repo' )
+        assert cfg.getTopDir() == abspath( 'topdir' )
 
 
 class mrgit_init( trigutil.trigTestCase ):
