@@ -177,6 +177,8 @@ class cloning( trigutil.trigTestCase ):
         assert len( glob.glob( 'ness*' ) ) == 0
         assert len( glob.glob( 'cool*' ) ) == 0
         assert os.path.isdir( 'code/.mrgit' )
+        assert os.path.isdir( 'code/.git' )
+        assert os.path.isdir( 'code/ness/.git' )
 
     #   - use case:
     #       - have an mrgit clone with no top level git repo (because
@@ -223,21 +225,22 @@ class cloning( trigutil.trigTestCase ):
 
 def create_example_genesis_repo():
     ""
-    cool_url, genesis_url = make_coolness_repositories()
-    ness_url = util.create_bare_repo( 'ness' )
+    cool_url = util.create_bare_repo_with_file_and_branch( 'cool' )
+    ness_url = util.create_bare_repo_with_file_and_branch( 'ness', tag='nessie' )
+    gen_url  = util.create_bare_repo( 'gensis' )
 
-    util.push_file_to_repo( genesis_url, mrlib.MANIFESTS_FILENAME, """
+    util.push_file_to_repo( gen_url, mrlib.MANIFESTS_FILENAME, """
         [ group code ]
             repo=cool, path=.
             repo=ness, path=ness
         """ )
 
-    util.push_file_to_repo( genesis_url, mrlib.GENESIS_FILENAME, """
+    util.push_file_to_repo( gen_url, mrlib.GENESIS_FILENAME, """
         repo=cool, url="""+cool_url+"""
         repo=ness, url="""+ness_url+"""
         """ )
 
-    return genesis_url, ness_url
+    return gen_url, ness_url
 
 
 class startup_logic( trigutil.trigTestCase ):
@@ -359,11 +362,6 @@ class manifests_handling( trigutil.trigTestCase ):
         assert spec['repo'] == 'foo'
         assert spec['path'] == 'bar'
 
-    def magic_test_RepoGroup_class(self):
-        ""
-        pass
-        # use this testing to remove the 'create=False' argument to findRepo()
-
 
 class google_repo_manifests( trigutil.trigTestCase ):
 
@@ -444,9 +442,9 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv.readManifestFiles()
 
         cfg = mrlib.Configuration()
-        gconv.createRemoteURLMap( cfg )
+        gconv.fillRepoMap( cfg.getRemoteMap(), None )
 
-        rmap = cfg.getRemoteRepoMap()
+        rmap = cfg.getRemoteMap()
         assert rmap.getRepoURL( 'service.git' ) == 'file:///special/path/service.git'
         assert rmap.getRepoURL( 'afrl.git' ) == 'file:///special/path/afrl.git'
         assert rmap.getRepoURL( 'bar.git' ) == 'file:///special/path/bar.git'
@@ -462,7 +460,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv.readManifestFiles()
 
         cfg = mrlib.Configuration()
-        gconv.createRepoGroups( cfg )
+        gconv.fillManifests( cfg.getManifests() )
 
         mfest = cfg.getManifests()
 
@@ -493,7 +491,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv.readManifestFiles()
 
         cfg = mrlib.Configuration()
-        gconv.createRepoGroups( cfg )
+        gconv.fillManifests( cfg.getManifests() )
 
         mfest = cfg.getManifests()
 
@@ -621,29 +619,26 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
     def test_create_config_from_a_single_url(self):
         ""
         cfg = mrlib.Configuration()
-        cfg.createFromURLs( [ 'file:///one/repo.git' ] )
+        upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git' ] )
+        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillRepoMap( cfg.getRemoteMap(), None )
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 1
         assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
 
-        cfg.setTopDir( None )
-        assert cfg.getTopDir() == os.getcwd()
-
-        cfg.setTopDir( 'topdir' )
-        assert cfg.getTopDir() == abspath( 'topdir' )
-
     def create_config_with_two_urls(self):
         ""
         cfg = mrlib.Configuration()
-        cfg.createFromURLs( [ 'file:///one/repo.git', 'ssh:///and/two.git' ] )
+        upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git',
+                                         'ssh:///and/two.git' ] )
+        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillRepoMap( cfg.getRemoteMap(), None )
         cfg.computeLocalRepoMap()
 
-        cfg.setTopDir( None )
-        assert cfg.getTopDir() == os.getcwd()
-
-        cfg.setTopDir( 'topdir' )
-        assert cfg.getTopDir() == abspath( 'topdir' )
+        top = mrlib.path_for_toplevel( cfg.getManifests(), 'foo' )
+        assert top == os.getcwd()
+        cfg.setTopLevel( abspath('topdir') )
 
         return cfg
 
@@ -681,14 +676,13 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         rmap = mrlib.RepoMap()
         git = create_repo( '.mrgit' )
-        baseurl = 'file://'+os.getcwd()
-        mrlib.check_load_mrgit_repo( cfg, baseurl, git )
+        mrlib.check_for_mrgit_repo( cfg, git )
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 2
         assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
-        assert cfg.getTopDir() == abspath( 'topdir' )
+        assert cfg.getTopLevel() == abspath( 'topdir' )
 
 
 class mrgit_init( trigutil.trigTestCase ):

@@ -68,7 +68,7 @@ def clone( argv ):
 def init( argv ):
     ""
     cfg = Configuration()
-    cfg.setTopDir( '.' )
+    cfg.setTopLevel( os.getcwd() )
     cfg.createMRGitRepo()
 
 
@@ -76,7 +76,7 @@ def fetch( argv ):
     ""
     cfg = load_configuration()
 
-    top = cfg.getTopDir()
+    top = cfg.getTopLevel()
     for path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'fetch', verbose=3 )
@@ -86,7 +86,7 @@ def pull( argv ):
     ""
     cfg = load_configuration()
 
-    top = cfg.getTopDir()
+    top = cfg.getTopLevel()
     for path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'pull', verbose=3 )
@@ -96,7 +96,7 @@ def add( argv ):
     ""
     cfg = load_configuration()
 
-    top = cfg.getTopDir()
+    top = cfg.getTopLevel()
     for path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
@@ -107,7 +107,7 @@ def commit( argv ):
     ""
     cfg = load_configuration()
 
-    top = cfg.getTopDir()
+    top = cfg.getTopLevel()
     for path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
@@ -118,7 +118,7 @@ def push( argv ):
     ""
     cfg = load_configuration()
 
-    top = cfg.getTopDir()
+    top = cfg.getTopLevel()
     for path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'push', verbose=3 )
@@ -127,8 +127,9 @@ def push( argv ):
 def load_configuration():
     ""
     cfg = Configuration()
+
     top = find_mrgit_top_level()
-    cfg.setTopDir( top )
+    cfg.setTopLevel( top )
     git = gititf.GitRepo( top+'/.mrgit' )
     cfg.loadManifests( git )
     cfg.computeLocalRepoMap()
@@ -202,30 +203,39 @@ def clone_from_single_url( cfg, url, directory ):
     tmpd = TempDirectory( directory )
 
     try:
-        # prefer an .mrgit repo under the given url
+        # prefer a .mrgit repo under the given url
         git = robust_clone( url+'/.mrgit', tmpd.path(), verbose=1 )
-        baseurl = url
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
         tmpd.removeFiles()
         git = robust_clone( url, tmpd.path() )
-        baseurl = dirname( url )
 
-    if check_load_mrgit_repo( cfg, baseurl, git ):
+    upstream = check_for_mrgit_repo( cfg, git )
 
-        # we just cloned an mrgit manifests repo
+    if upstream:
+
+        # we just cloned an mrgit or genesis repo
+
+        # magic: can the repo be moved/renamed to .mrgit right here??
+        #   - then the manifest can be loaded by the upstream
+        #   - goal is move cfg construction into the upstreams, which can
+        #     be reused for cfg construction of local mrgit case (as well as
+        #     reducing the code in this bootstrapping region)
+        cfg.loadManifests( git )
+        topdir = upstream.computeTopLevel( cfg, directory )
         cfg.computeLocalRepoMap()
-        urlname = gititf.repo_name_from_url( baseurl )
-        topdir = cfg.setTopDir( directory, urlname )
         tmpd.moveTo( topdir+'/.mrgit' )
+        upstream.fillRepoMap( cfg.getRemoteMap(), topdir )
         clone_repositories_from_config( cfg )
 
     else:
         # repo is not an mrgit manifests
-        cfg.createFromURLs( [ url ] )
+        upstream = UpstreamURLs( [ url ] )
+        upstream.fillManifests( cfg.getManifests() )
+        topdir = upstream.computeTopLevel( cfg, directory )
+        upstream.fillRepoMap( cfg.getRemoteMap(), None )
         cfg.computeLocalRepoMap()
-        topdir = cfg.setTopDir( directory )
         url,loc = cfg.getRemoteRepoList()[0]
         tmpd.moveTo( pjoin( topdir, loc ) )
         cfg.createMRGitRepo()
@@ -233,9 +243,11 @@ def clone_from_single_url( cfg, url, directory ):
 
 def clone_from_multiple_urls( cfg, urls, directory ):
     ""
-    cfg.createFromURLs( urls )
+    upstream = UpstreamURLs( urls )
+    upstream.fillManifests( cfg.getManifests() )
+    upstream.computeTopLevel( cfg, directory )
+    upstream.fillRepoMap( cfg.getRemoteMap(), None )
     cfg.computeLocalRepoMap()
-    cfg.setTopDir( directory )
     clone_repositories_from_config( cfg )
     cfg.createMRGitRepo()
 
@@ -248,36 +260,124 @@ def clone_from_google_repo_manifests( cfg, url, directory ):
 
     gconv = GoogleConverter( tmpd.path() )
     gconv.readManifestFiles()
-    gconv.createRemoteURLMap( cfg )
-    gconv.createRepoGroups( cfg )
+    gconv.fillManifests( cfg.getManifests() )
+
+    top = gconv.computeTopLevel( cfg, directory )
 
     cfg.computeLocalRepoMap()
-    topdir = cfg.setTopDir( directory )
+    gconv.fillRepoMap( cfg.getRemoteMap(), None )
     cfg.createMRGitRepo()
-    tmpd.moveTo( pjoin( topdir, '.mrgit', 'google_manifests' ) )
+    tmpd.moveTo( pjoin( top, '.mrgit', 'google_manifests' ) )
     clone_repositories_from_config( cfg )
 
 
-def load_config_from_google_manifests( cfg, git ):
+class MRGitUpstream:
+
+    def __init__(self, url):
+        ""
+        # should always end in "/.mrgit", such as file:///some/path/.mrgit
+        self.url = url
+
+    def remoteName(self):
+        ""
+        return gititf.repo_name_from_url( dirname( self.url ) )
+
+    def computeTopLevel(self, cfg, directory):
+        ""
+        top = compute_path_for_toplevel( directory,
+                                         cfg.getManifests(),
+                                         self.remoteName() )
+        cfg.setTopLevel( top )
+
+        return top
+
+    def fillRepoMap(self, rmap, toplevel):
+        ""
+        git = gititf.GitRepo( toplevel+'/.mrgit' )
+        read_mrgit_repo_map_file( rmap, dirname( self.url ), git )
+
+
+class GenesisUpstream:
+
+    def __init__(self, url):
+        ""
+        self.url = url
+
+    def remoteName(self):
+        ""
+        return gititf.repo_name_from_url( self.url )
+
+    def computeTopLevel(self, cfg, directory):
+        ""
+        top = compute_path_for_toplevel( directory,
+                                         cfg.getManifests(),
+                                         self.remoteName() )
+        cfg.setTopLevel( top )
+
+        return top
+
+    def fillRepoMap(self, rmap, toplevel):
+        ""
+        git = gititf.GitRepo( toplevel+'/.mrgit' )
+        read_genesis_map_file( rmap, git )
+
+
+def compute_path_for_toplevel( directory, mfest, remotename ):
     ""
-    import xml.etree.ElementTree as ET
+    if directory:
+        top = normpath( abspath( directory ) )
+    else:
+        top = path_for_toplevel( mfest, remotename )
 
-    with change_directory( git.get_toplevel() ):
+    return top
 
-        parse_google_manifest_file( 'default.xml' )
 
-        for fn in glob.glob( '*.xml' ):
+def path_for_toplevel( mfest, remotename ):
+    ""
+    grp = mfest.getDefaultGroup()
+    if grp == None:
+        # only from an empty mrgit init, or a clone of one
+        top = abspath( remotename )
 
-            groupname = os.path.splitext(fn)[0]
+    elif grp.getName():
+        top = abspath( grp.getName() )
 
-            root = ET.parse( fn ).getroot()
-            baseurl = get_xml_remote_url( root )
+    else:
+        # when cloning a repo which is a clone of a list of URLs
+        top = abspath( '.' )
 
-        for nd in root:
-            if nd.tag == 'project':
-                name = nd.attrib['name']
-                path = nd.attrib['path']
-                cfg.addManifestRepo( groupname, name, path )
+    return top
+
+
+class UpstreamURLs:
+
+    def __init__(self, url_list):
+        ""
+        self.urls = url_list
+
+    def computeTopLevel(self, cfg, directory):
+        ""
+        if directory:
+            top = directory
+        else:
+            top = '.'
+
+        cfg.setTopLevel( normpath( abspath( top ) ) )
+
+        return top
+
+    def fillManifests(self, mfest):
+        ""
+        groupname = ''
+        for url in self.urls:
+            name = gititf.repo_name_from_url( url )
+            mfest.addRepo( groupname, name, name )
+
+    def fillRepoMap(self, rmap, toplevel):
+        ""
+        for url in self.urls:
+            name = gititf.repo_name_from_url( url )
+            rmap.setRepoLocation( name, url=url )
 
 
 class GoogleConverter:
@@ -315,24 +415,37 @@ class GoogleConverter:
 
         return url
 
-    def createRemoteURLMap(self, cfg):
+    def fillRepoMap(self, rmap, toplevel):
         ""
         for gmr in [ self.default ] + self.manifests:
             for reponame in gmr.getRepoNames():
                 url = self.getPrimaryURL( reponame )
-                cfg.addRepoURL( reponame, url )
+                rmap.setRepoLocation( reponame, url )
 
-    def createRepoGroups(self, cfg):
+    def fillManifests(self, mfest):
         ""
         for gmr in [ self.default ] + self.manifests:
-            self._create_group_from_manifest( gmr, cfg )
+            self._create_group_from_manifest( gmr, mfest )
 
-    def _create_group_from_manifest(self, gmr, cfg):
+    def computeTopLevel(self, cfg, directory):
+        ""
+        if directory:
+            top = normpath( abspath( directory ) )
+        else:
+            gname = self.default.getGroupName()
+            assert gname, 'default google manifest group name cannot be empty'
+            top = normpath( abspath( gname ) )
+
+        cfg.setTopLevel( top )
+
+        return top
+
+    def _create_group_from_manifest(self, gmr, mfest):
         ""
         if self._all_urls_are_primary( gmr ):
             for name,url,path in gmr.getProjectList():
                 groupname = gmr.getGroupName()
-                cfg.addManifestRepo( groupname, name, path )
+                mfest.addRepo( groupname, name, path )
 
     def _all_urls_are_primary(self, gmr):
         ""
@@ -456,7 +569,7 @@ class GoogleManifestReader:
 
 def clone_repositories_from_config( cfg ):
     ""
-    topdir = cfg.getTopDir()
+    topdir = cfg.getTopLevel()
 
     check_make_directory( topdir )
 
@@ -484,6 +597,10 @@ def robust_clone( url, into_dir, verbose=2 ):
 
 
 class TempDirectory:
+
+    # magic: I think I can get rid of the second level temp directory
+    #   - if 'directory' is given, create that and chdir to it immediately
+    #   - if not, there is no value in a two level temp
 
     def __init__(self, subdir):
         """
@@ -528,7 +645,7 @@ class TempDirectory:
         return tmpdir
 
 
-def check_load_mrgit_repo( cfg, baseurl, git ):
+def check_for_mrgit_repo( cfg, git ):
     ""
     mfestfn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
     genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
@@ -537,16 +654,12 @@ def check_load_mrgit_repo( cfg, baseurl, git ):
         if REPOMAP_BRANCH in git.get_branches() or \
            REPOMAP_BRANCH in git.get_branches( remotes=True ):
 
-            cfg.loadManifests( git )
-            cfg.loadRepoMap( git, baseurl )
-            return True
+            return MRGitUpstream( git.get_remote_URL() )
 
         elif os.path.isfile( genfn ):
-            cfg.loadManifests( git )
-            cfg.loadGenesisMap( git )
-            return True
+            return GenesisUpstream( git.get_remote_URL() )
 
-    return False
+    return None
 
 
 def remove_all_files_in_directory( path ):
@@ -589,39 +702,22 @@ class Configuration:
     def __init__(self):
         ""
         self.topdir = None
+        self.upstream = None  # magic: eventually contain the upstream specification
         self.mfest = Manifests()
         self.remote = RepoMap()
         self.local = RepoMap()
 
-    def createFromURLs(self, urls):
+    def getRemoteMap(self):
         ""
-        groupname = ''
-        for url in urls:
-            name = gititf.repo_name_from_url( url )
-            path = name
+        return self.remote
 
-            self.mfest.addRepo( groupname, name, path )
-            self.remote.setRepoLocation( name, url=url )
+    def getManifests(self):
+        ""
+        return self.mfest
 
     def loadManifests(self, git):
         ""
         read_mrgit_manifests_file( self.mfest, git )
-
-    def loadRepoMap(self, git, baseurl):
-        ""
-        read_mrgit_repo_map_file( self.remote, baseurl, git )
-
-    def loadGenesisMap(self, git):
-        ""
-        read_genesis_map_file( self.remote, git )
-
-    def addRepoURL(self, reponame, url):
-        ""
-        self.remote.setRepoLocation( reponame, url )
-
-    def addManifestRepo(self, groupname, reponame, path):
-        ""
-        self.mfest.addRepo( groupname, reponame, path )
 
     def computeLocalRepoMap(self):
         ""
@@ -631,22 +727,11 @@ class Configuration:
             for spec in grp.getRepoList():
                 self.local.setRepoLocation( spec['repo'], path=spec['path'] )
 
-    def setTopDir(self, directory, urlname=None):
+    def setTopLevel(self, directory):
         ""
-        if directory:
-            self.topdir = abspath( normpath( directory ) )
-        else:
-            grp = self.mfest.getDefaultGroup()
-            if grp == None:
-                self.topdir = abspath( urlname )
-            elif grp.getName():
-                self.topdir = abspath( grp.getName() )
-            else:
-                self.topdir = abspath( '.' )
+        self.topdir = directory
 
-        return self.topdir
-
-    def getTopDir(self):
+    def getTopLevel(self):
         ""
         return self.topdir
 
@@ -690,26 +775,18 @@ class Configuration:
         ""
         repodir = pjoin( self.topdir, '.mrgit' )
 
-        git = gititf.create_repo( repodir, verbose=3 )
+        git = init_mrgit_repo( repodir )
 
-        write_first_manifests_file( self.mfest, git )
+        write_mrgit_manifests_file( self.mfest, git )
 
         self.commitLocalRepoMap()
-
-    def getRemoteRepoMap(self):
-        ""
-        return self.remote
-
-    def getManifests(self):
-        ""
-        return self.mfest
 
 
 class Manifests:
 
     def __init__(self):
         ""
-        self.groups = []  # order matters - the first group is the default group
+        self.groups = []  # order matters - the first group is the default
 
     def addRepo(self, groupname, reponame, path):
         ""
@@ -902,13 +979,29 @@ def read_mrgit_manifests_file( manifests, git ):
     manifests.readFromFile( fn )
 
 
-def write_first_manifests_file( manifests, git ):
+def init_mrgit_repo( repodir ):
+    ""
+    git = gititf.create_repo( repodir, verbose=3 )
+
+    fn = pjoin( repodir, 'README.txt' )
+    with open( fn, 'wt' ) as fp:
+        fp.write( 'This directory managed by the mrgit program.\n' )
+
+    git.add( 'README.txt' )
+    git.commit( 'initialize mrgit' )
+
+    return git
+
+
+def write_mrgit_manifests_file( manifests, git ):
     ""
     fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
 
+    git.checkout_branch( 'master' )
+
     manifests.writeToFile( fn )
     git.add( MANIFESTS_FILENAME )
-    git.commit( 'init '+MANIFESTS_FILENAME )
+    git.commit( 'set '+MANIFESTS_FILENAME )
 
 
 def read_mrgit_repo_map_file( repomap, baseurl, git ):
