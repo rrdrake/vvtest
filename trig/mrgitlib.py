@@ -238,15 +238,19 @@ def clone_from_single_url( cfg, url, directory ):
         tmptop.rename( topdir )
 
     else:
-        # repo is not an mrgit or genesis repo
+        # not an mrgit or genesis repo, just a generic repository
+
+        loc = pjoin( tmptop.path(), gititf.repo_name_from_url( url ) )
+        move_directory_contents( git.get_toplevel(), loc )
+
         upstream = UpstreamURLs( [ url ] )
+
         upstream.fillManifests( cfg.getManifests() )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
         cfg.computeLocalRepoMap()
         cfg.createMRGitRepo()
 
-        url,loc = cfg.getRemoteRepoList()[0]
-        os.rename( git.get_toplevel(), pjoin( tmptop.path(), loc ) )
+        clone_repositories_from_config( cfg )
 
         topdir = upstream.computeTopLevel( cfg, directory )
         tmptop.rename( topdir )
@@ -254,19 +258,27 @@ def clone_from_single_url( cfg, url, directory ):
 
 def clone_from_multiple_urls( cfg, urls, directory ):
     ""
+    tmptop = TempDirectory( directory )
+    cfg.setTopLevel( tmptop.path() )
+
     upstream = UpstreamURLs( urls )
+
     upstream.fillManifests( cfg.getManifests() )
     upstream.fillRepoMap( cfg.getRemoteMap(), None )
     cfg.computeLocalRepoMap()
-    upstream.computeTopLevel( cfg, directory )
-    clone_repositories_from_config( cfg )
     cfg.createMRGitRepo()
+
+    clone_repositories_from_config( cfg )
+
+    topdir = upstream.computeTopLevel( cfg, directory )
+    tmptop.rename( topdir )
 
 
 
 def clone_from_google_repo_manifests( cfg, url, directory ):
     ""
     tmptop = TempDirectory( directory )
+    cfg.setTopLevel( tmptop.path() )
 
     git = temp_clone( url, tmptop.path() )
     tmpbname = basename( git.get_toplevel() )
@@ -274,19 +286,18 @@ def clone_from_google_repo_manifests( cfg, url, directory ):
     gconv = GoogleConverter( git.get_toplevel() )
     gconv.readManifestFiles()
     gconv.fillManifests( cfg.getManifests() )
+    gconv.fillRepoMap( cfg.getRemoteMap(), None )
+    cfg.computeLocalRepoMap()
+    cfg.createMRGitRepo()
+
+    clone_repositories_from_config( cfg )
 
     top = gconv.computeTopLevel( cfg, directory )
     tmptop.rename( top )
 
-    cfg.computeLocalRepoMap()
-    gconv.fillRepoMap( cfg.getRemoteMap(), None )
-    cfg.createMRGitRepo()
-
     src = pjoin( top, tmpbname )
     dst = pjoin( top, '.mrgit', 'google_manifests' )
     move_directory_contents( src, dst )
-
-    clone_repositories_from_config( cfg )
 
 
 class MRGitUpstream:
@@ -601,7 +612,8 @@ def clone_repositories_from_config( cfg ):
 
     with change_directory( topdir ):
         for url,loc in cfg.getRemoteRepoList():
-            robust_clone( url, loc )
+            if not os.path.exists( loc+'/.git' ):
+                robust_clone( url, loc )
 
 
 def robust_clone( url, into_dir, verbose=2 ):

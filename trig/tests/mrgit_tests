@@ -15,6 +15,7 @@ from os.path import join as pjoin
 import time
 import unittest
 import glob
+import shutil
 
 
 import trigtestutils as trigutil
@@ -171,6 +172,8 @@ class cloning( trigutil.trigTestCase ):
         assert len( glob.glob( 'ness*' ) ) == 0
         assert len( glob.glob( 'code*' ) ) == 0
         assert len( glob.glob( 'cool*' ) ) == 0
+        git = clone_repo( genesis_url, 'precheck' )
+        assert mrlib.REPOMAP_BRANCH not in git.get_branches()
 
         mrlib.clone( [ genesis_url ] )
 
@@ -179,6 +182,9 @@ class cloning( trigutil.trigTestCase ):
         assert os.path.isdir( 'code/.mrgit' )
         assert os.path.isdir( 'code/.git' )
         assert os.path.isdir( 'code/ness/.git' )
+
+        git = GitRepo( 'code/.mrgit' )
+        assert mrlib.REPOMAP_BRANCH in git.get_branches()
 
     #   - use case:
     #       - have an mrgit clone with no top level git repo (because
@@ -683,6 +689,31 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         assert list( repos[0] ) == [ 'file:///one/repo.git', 'repo' ]
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
         assert cfg.getTopLevel() == abspath( 'topdir' )
+
+    def test_cloning_repos_from_config(self):
+        ""
+        cool_url, ness_url = make_coolness_repositories()
+
+        cfg = mrlib.Configuration()
+        cfg.setTopLevel( abspath( 'toplev' ) )
+
+        # magic: this block should be in mrlib somehow
+        upstream = mrlib.UpstreamURLs( [ cool_url, ness_url ] )
+        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillRepoMap( cfg.getRemoteMap(), None )
+        cfg.computeLocalRepoMap()
+
+        mrlib.clone_repositories_from_config( cfg )
+
+        GitRepo( 'toplev/cool' )
+        GitRepo( 'toplev/ness' )
+
+        shutil.rmtree( 'toplev/ness' )
+
+        mrlib.clone_repositories_from_config( cfg )
+
+        GitRepo( 'toplev/cool' )
+        GitRepo( 'toplev/ness' )
 
 
 class mrgit_init( trigutil.trigTestCase ):
