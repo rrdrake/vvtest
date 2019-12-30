@@ -131,7 +131,7 @@ def load_configuration():
     top = find_mrgit_top_level()
     cfg.setTopLevel( top )
     git = gititf.GitRepo( top+'/.mrgit' )
-    cfg.loadManifests( git )
+    read_mrgit_manifests_file( cfg.getManifests(), top )
     cfg.computeLocalRepoMap()
 
     return cfg
@@ -200,44 +200,50 @@ def make_absolute_url_path( url ):
 
 def clone_from_single_url( cfg, url, directory ):
     ""
-    tmpd = TempDirectory( directory )
+    tmptop = TempDirectory( directory )
 
     try:
         # prefer a .mrgit repo under the given url
-        git = robust_clone( url+'/.mrgit', tmpd.path(), verbose=1 )
+        git = temp_clone( url+'/.mrgit', tmptop.path() )
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
-        tmpd.removeFiles()
-        git = robust_clone( url, tmpd.path() )
+        git = temp_clone( url, tmptop.path() )
 
-    upstream = check_for_mrgit_repo( cfg, git )
+    upstream = check_for_mrgit_repo( git )
 
     if upstream:
 
         # we just cloned an mrgit or genesis repo
+
+        # make new clone the .mrgit directory
+        mrgit = tmptop.path()+'/.mrgit'
+        assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
+        os.rename( git.get_toplevel(), mrgit )
 
         # magic: can the repo be moved/renamed to .mrgit right here??
         #   - then the manifest can be loaded by the upstream
         #   - goal is move cfg construction into the upstreams, which can
         #     be reused for cfg construction of local mrgit case (as well as
         #     reducing the code in this bootstrapping region)
-        cfg.loadManifests( git )
+
+        read_mrgit_manifests_file( cfg.getManifests(), tmptop.path() )
         topdir = upstream.computeTopLevel( cfg, directory )
         cfg.computeLocalRepoMap()
-        tmpd.moveTo( topdir+'/.mrgit' )
+        tmptop.rename( topdir )
         upstream.fillRepoMap( cfg.getRemoteMap(), topdir )
         clone_repositories_from_config( cfg )
 
     else:
-        # repo is not an mrgit manifests
+        # repo is not an mrgit or genesis repo
         upstream = UpstreamURLs( [ url ] )
         upstream.fillManifests( cfg.getManifests() )
-        topdir = upstream.computeTopLevel( cfg, directory )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
-        cfg.computeLocalRepoMap()
+        topdir = upstream.computeTopLevel( cfg, directory )
         url,loc = cfg.getRemoteRepoList()[0]
-        tmpd.moveTo( pjoin( topdir, loc ) )
+        os.rename( git.get_toplevel(), pjoin( tmptop.path(), loc ) )
+        tmptop.rename( topdir )
+        cfg.computeLocalRepoMap()
         cfg.createMRGitRepo()
 
 
@@ -252,22 +258,29 @@ def clone_from_multiple_urls( cfg, urls, directory ):
     cfg.createMRGitRepo()
 
 
+
 def clone_from_google_repo_manifests( cfg, url, directory ):
     ""
-    tmpd = TempDirectory( directory )
+    tmptop = TempDirectory( directory )
 
-    git = robust_clone( url, tmpd.path() )
+    git = temp_clone( url, tmptop.path() )
+    tmpbname = basename( git.get_toplevel() )
 
-    gconv = GoogleConverter( tmpd.path() )
+    gconv = GoogleConverter( git.get_toplevel() )
     gconv.readManifestFiles()
     gconv.fillManifests( cfg.getManifests() )
 
     top = gconv.computeTopLevel( cfg, directory )
+    tmptop.rename( top )
 
     cfg.computeLocalRepoMap()
     gconv.fillRepoMap( cfg.getRemoteMap(), None )
     cfg.createMRGitRepo()
-    tmpd.moveTo( pjoin( top, '.mrgit', 'google_manifests' ) )
+
+    src = pjoin( top, tmpbname )
+    dst = pjoin( top, '.mrgit', 'google_manifests' )
+    move_directory_contents( src, dst )
+
     clone_repositories_from_config( cfg )
 
 
@@ -373,7 +386,7 @@ class UpstreamURLs:
             name = gititf.repo_name_from_url( url )
             mfest.addRepo( groupname, name, name )
 
-    def fillRepoMap(self, rmap, toplevel):
+    def fillRepoMap(self, rmap, toplevel):  # toplevel not needed here
         ""
         for url in self.urls:
             name = gititf.repo_name_from_url( url )
@@ -596,56 +609,40 @@ def robust_clone( url, into_dir, verbose=2 ):
     return git
 
 
+def temp_clone( url, chdir, verbose=1 ):
+    ""
+    subd = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( chdir ) )
+    try:
+        git = gititf.clone_repo( url, subd, verbose=verbose )
+    except Exception:
+        shutil.rmtree( subd )
+        raise
+
+    return git
+
+
 class TempDirectory:
 
-    # magic: I think I can get rid of the second level temp directory
-    #   - if 'directory' is given, create that and chdir to it immediately
-    #   - if not, there is no value in a two level temp
-
-    def __init__(self, subdir):
-        """
-        if 'subdir' is None, create tmpdir1/tmpdir2
-        else, create subdir/tmpdir2
-        """
-        self.subdir = subdir
-        self.tmpdir = self._create()
+    def __init__(self, directory):
+        ""
+        if directory and os.path.isdir( directory ):
+            self.isnew = False
+            self.tmpd = abspath( directory )
+        else:
+            self.isnew = True
+            self.tmpd = tempfile.mkdtemp( '', 'mrgit_tmpdir_', os.getcwd() )
 
     def path(self):
         ""
-        return self.tmpdir
+        return self.tmpd
 
-    def removeFiles(self):
+    def rename(self, todir):
         ""
-        remove_all_files_in_directory( self.tmpdir )
-
-    def moveTo(self, todir):
-        """
-        contents of temp dir are moved inside 'todir', and temp dir is removed
-        """
-        if os.path.exists( todir ):
-            move_directory_contents( self.tmpdir, todir )
-        else:
-            check_make_directory( dirname( todir ) )
-            os.rename( self.tmpdir, todir )
-
-        if not self.subdir:
-            shutil.rmtree( dirname( self.tmpdir ) )
-
-    def _create(self):
-        ""
-        check_make_directory( self.subdir )
-
-        if self.subdir:
-            tdir = abspath( self.subdir )
-            tmpdir = tempfile.mkdtemp( '', 'mrgit_tmpdir_', tdir )
-        else:
-            tmpdir1 = tempfile.mkdtemp( '', 'mrgit_tmpdir1_', os.getcwd() )
-            tmpdir  = tempfile.mkdtemp( '', 'mrgit_tmpdir2_', tmpdir1 )
-
-        return tmpdir
+        if self.isnew:
+            move_directory_contents( self.tmpd, todir )
 
 
-def check_for_mrgit_repo( cfg, git ):
+def check_for_mrgit_repo( git ):
     ""
     mfestfn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
     genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
@@ -714,10 +711,6 @@ class Configuration:
     def getManifests(self):
         ""
         return self.mfest
-
-    def loadManifests(self, git):
-        ""
-        read_mrgit_manifests_file( self.mfest, git )
 
     def computeLocalRepoMap(self):
         ""
@@ -971,8 +964,10 @@ def parse_attribute_line( line ):
     return attrs
 
 
-def read_mrgit_manifests_file( manifests, git ):
+def read_mrgit_manifests_file( manifests, toplevel ):
     ""
+    git = gititf.GitRepo( toplevel+'/.mrgit' )
+
     git.checkout_branch( 'master' )
 
     fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
