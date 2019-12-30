@@ -201,6 +201,7 @@ def make_absolute_url_path( url ):
 def clone_from_single_url( cfg, url, directory ):
     ""
     tmptop = TempDirectory( directory )
+    cfg.setTopLevel( tmptop.path() )
 
     try:
         # prefer a .mrgit repo under the given url
@@ -227,33 +228,37 @@ def clone_from_single_url( cfg, url, directory ):
         #     be reused for cfg construction of local mrgit case (as well as
         #     reducing the code in this bootstrapping region)
 
-        read_mrgit_manifests_file( cfg.getManifests(), tmptop.path() )
-        topdir = upstream.computeTopLevel( cfg, directory )
+        upstream.fillManifests( cfg.getManifests(), tmptop.path() )
+        upstream.fillRepoMap( cfg.getRemoteMap(), tmptop.path() )
         cfg.computeLocalRepoMap()
-        tmptop.rename( topdir )
-        upstream.fillRepoMap( cfg.getRemoteMap(), topdir )
+
         clone_repositories_from_config( cfg )
+
+        topdir = upstream.computeTopLevel( cfg, directory )
+        tmptop.rename( topdir )
 
     else:
         # repo is not an mrgit or genesis repo
         upstream = UpstreamURLs( [ url ] )
         upstream.fillManifests( cfg.getManifests() )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
-        topdir = upstream.computeTopLevel( cfg, directory )
-        url,loc = cfg.getRemoteRepoList()[0]
-        os.rename( git.get_toplevel(), pjoin( tmptop.path(), loc ) )
-        tmptop.rename( topdir )
         cfg.computeLocalRepoMap()
         cfg.createMRGitRepo()
+
+        url,loc = cfg.getRemoteRepoList()[0]
+        os.rename( git.get_toplevel(), pjoin( tmptop.path(), loc ) )
+
+        topdir = upstream.computeTopLevel( cfg, directory )
+        tmptop.rename( topdir )
 
 
 def clone_from_multiple_urls( cfg, urls, directory ):
     ""
     upstream = UpstreamURLs( urls )
     upstream.fillManifests( cfg.getManifests() )
-    upstream.computeTopLevel( cfg, directory )
     upstream.fillRepoMap( cfg.getRemoteMap(), None )
     cfg.computeLocalRepoMap()
+    upstream.computeTopLevel( cfg, directory )
     clone_repositories_from_config( cfg )
     cfg.createMRGitRepo()
 
@@ -295,6 +300,10 @@ class MRGitUpstream:
         ""
         return gititf.repo_name_from_url( dirname( self.url ) )
 
+    def fillManifests(self, mfest, toplevel):
+        ""
+        read_mrgit_manifests_file( mfest, toplevel )
+
     def computeTopLevel(self, cfg, directory):
         ""
         top = compute_path_for_toplevel( directory,
@@ -319,6 +328,10 @@ class GenesisUpstream:
     def remoteName(self):
         ""
         return gititf.repo_name_from_url( self.url )
+
+    def fillManifests(self, mfest, toplevel):
+        ""
+        read_mrgit_manifests_file( mfest, toplevel )
 
     def computeTopLevel(self, cfg, directory):
         ""
