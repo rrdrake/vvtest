@@ -49,20 +49,7 @@ def clone( argv ):
         urls, directory = parse_url_list( argL )
         assert len( urls ) > 0
 
-        cfg = Configuration()
-
-        if '-G' in optD:
-            if len(urls) != 1:
-                errorexit( 'must specify exactly one URL with the -G option' )
-            clone_from_google_repo_manifests( cfg, urls[0], directory )
-
-        elif len( urls ) == 1:
-            clone_from_single_url( cfg, urls[0], directory )
-
-        else:
-            clone_from_multiple_urls( cfg, urls, directory )
-
-        cfg.commitLocalRepoMap()
+        create_mrgit_repo( '-G' in optD, urls, directory )
 
 
 def init( argv ):
@@ -199,11 +186,32 @@ def make_absolute_url_path( url ):
     return absurl
 
 
-def clone_from_single_url( cfg, url, directory ):
+def create_mrgit_repo( dash_G, urls, directory ):
     ""
+    cfg = Configuration()
+
     tmptop = TempDirectory( directory )
     cfg.setTopLevel( tmptop.path() )
 
+    if dash_G:
+        if len(urls) != 1:
+            errorexit( 'must specify exactly one URL with the -G option' )
+        top = clone_from_google_repo_manifests( tmptop, cfg, urls[0], directory )
+
+    elif len( urls ) == 1:
+        top = clone_from_single_url( tmptop, cfg, urls[0], directory )
+
+    else:
+        top = clone_from_multiple_urls( tmptop, cfg, urls, directory )
+
+    cfg.setTopLevel( top )
+    tmptop.rename( top )
+
+    cfg.commitLocalRepoMap()
+
+
+def clone_from_single_url( tmptop, cfg, url, directory ):
+    ""
     try:
         # prefer a .mrgit repo under the given url
         git = temp_clone( url+'/.mrgit', tmptop.path() )
@@ -222,10 +230,7 @@ def clone_from_single_url( cfg, url, directory ):
         assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
         os.rename( git.get_toplevel(), mrgit )
 
-        top = construct_mrgit_repo( cfg, upstream, directory )
-
-        cfg.setTopLevel( top )
-        tmptop.rename( top )
+        top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
 
     else:
         # not an mrgit or genesis repo, just a generic repository
@@ -235,46 +240,37 @@ def clone_from_single_url( cfg, url, directory ):
 
         upstream = UpstreamURLs( [ url ] )
 
-        top = construct_mrgit_repo( cfg, upstream, directory )
+        top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
 
-        cfg.setTopLevel( top )
-        tmptop.rename( top )
+    return top
 
 
-def clone_from_multiple_urls( cfg, urls, directory ):
+def clone_from_multiple_urls( tmptop, cfg, urls, directory ):
     ""
-    tmptop = TempDirectory( directory )
-    cfg.setTopLevel( tmptop.path() )
-
     upstream = UpstreamURLs( urls )
 
-    top = construct_mrgit_repo( cfg, upstream, directory )
+    top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
 
-    cfg.setTopLevel( top )
-    tmptop.rename( top )
+    return top
 
 
-def clone_from_google_repo_manifests( cfg, url, directory ):
+def clone_from_google_repo_manifests( tmptop, cfg, url, directory ):
     ""
-    tmptop = TempDirectory( directory )
-    cfg.setTopLevel( tmptop.path() )
-
     git = temp_clone( url, tmptop.path() )
     tmpbname = basename( git.get_toplevel() )
 
     gconv = GoogleConverter( git.get_toplevel() )
 
-    top = construct_mrgit_repo( cfg, gconv, directory )
+    top = populate_config_and_make_mrgit_repo( cfg, gconv, directory )
 
-    cfg.setTopLevel( top )
-    tmptop.rename( top )
-
-    src = pjoin( top, tmpbname )
-    dst = pjoin( top, '.mrgit', 'google_manifests' )
+    src = pjoin( tmptop.path(), tmpbname )
+    dst = pjoin( tmptop.path(), '.mrgit', 'google_manifests' )
     move_directory_contents( src, dst )
 
+    return top
 
-def construct_mrgit_repo( cfg, upstream, directory ):
+
+def populate_config_and_make_mrgit_repo( cfg, upstream, directory ):
     ""
     top = cfg.getTopLevel()
 
@@ -295,7 +291,7 @@ class MRGitUpstream:
 
     def __init__(self, url):
         ""
-        # should always end in "/.mrgit", such as file:///some/path/.mrgit
+        assert url.endswith( os.path.sep+'.mrgit' )
         self.url = url
 
     def remoteName(self):
