@@ -466,7 +466,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv.readManifestFiles()
 
         cfg = mrlib.Configuration()
-        gconv.fillManifests( cfg.getManifests() )
+        gconv.fillManifests( cfg.getManifests(), None )
 
         mfest = cfg.getManifests()
 
@@ -497,7 +497,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv.readManifestFiles()
 
         cfg = mrlib.Configuration()
-        gconv.fillManifests( cfg.getManifests() )
+        gconv.fillManifests( cfg.getManifests(), None )
 
         mfest = cfg.getManifests()
 
@@ -626,7 +626,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         ""
         cfg = mrlib.Configuration()
         upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git' ] )
-        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillManifests( cfg.getManifests(), None )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
 
         repos = cfg.getRemoteRepoList()
@@ -638,7 +638,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg = mrlib.Configuration()
         upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git',
                                          'ssh:///and/two.git' ] )
-        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillManifests( cfg.getManifests(), None )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
         cfg.computeLocalRepoMap()
 
@@ -661,6 +661,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         ""
         cfg = self.create_config_with_two_urls()
         cfg.createMRGitRepo()
+        cfg.commitLocalRepoMap()
 
         git = clone_repo( 'topdir/.mrgit', 'checkrepo' )
         assert not os.path.isfile( 'checkrepo/'+mrlib.REPOMAP_FILENAME )
@@ -699,7 +700,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
 
         # magic: this block should be in mrlib somehow
         upstream = mrlib.UpstreamURLs( [ cool_url, ness_url ] )
-        upstream.fillManifests( cfg.getManifests() )
+        upstream.fillManifests( cfg.getManifests(), None )
         upstream.fillRepoMap( cfg.getRemoteMap(), None )
         cfg.computeLocalRepoMap()
 
