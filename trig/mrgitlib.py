@@ -190,62 +190,62 @@ def create_mrgit_repo( dash_G, urls, directory ):
     ""
     cfg = Configuration()
 
-    tmptop = TempDirectory( directory )
-    cfg.setTopLevel( tmptop.path() )
+    tmpdir = TempDirectory( directory )
+    wrkdir = tmpdir.path()
+    cfg.setTopLevel( wrkdir )
 
     if dash_G:
         if len(urls) != 1:
             errorexit( 'must specify exactly one URL with the -G option' )
-        top = clone_from_google_repo_manifests( tmptop, cfg, urls[0], directory )
+        top = clone_from_google_repo_manifests( wrkdir, cfg, urls[0], directory )
 
     elif len( urls ) == 1:
-        top = clone_from_single_url( tmptop, cfg, urls[0], directory )
+        top = clone_from_single_url( wrkdir, cfg, urls[0], directory )
 
     else:
-        top = clone_from_multiple_urls( tmptop, cfg, urls, directory )
+        top = clone_from_multiple_urls( wrkdir, cfg, urls, directory )
 
     cfg.setTopLevel( top )
-    tmptop.rename( top )
+    tmpdir.rename( top )
 
     cfg.commitLocalRepoMap()
 
 
-def clone_from_single_url( tmptop, cfg, url, directory ):
+def clone_from_single_url( wrkdir, cfg, url, directory ):
     ""
     try:
         # prefer a .mrgit repo under the given url
-        git = temp_clone( url+'/.mrgit', tmptop.path() )
+        git = temp_clone( url+'/.mrgit', wrkdir )
 
     except gititf.GitInterfaceError:
         # that failed, so just clone the given url
-        git = temp_clone( url, tmptop.path() )
+        git = temp_clone( url, wrkdir )
 
     upstream = check_for_mrgit_repo( git )
 
     if upstream:
         # we just cloned an mrgit or genesis repo
 
-        # make new clone the .mrgit directory
-        mrgit = tmptop.path()+'/.mrgit'
+        # move the clone so it becomes the .mrgit directory
+        mrgit = wrkdir+'/.mrgit'
         assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
         os.rename( git.get_toplevel(), mrgit )
-
-        top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
 
     else:
         # not an mrgit or genesis repo, just a generic repository
 
-        loc = pjoin( tmptop.path(), gititf.repo_name_from_url( url ) )
+        # move the clone to a directory with the name of the upstream URL
+        loc = pjoin( wrkdir, gititf.repo_name_from_url( url ) )
         move_directory_contents( git.get_toplevel(), loc )
 
         upstream = UpstreamURLs( [ url ] )
 
-        top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
+    top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
 
     return top
 
 
-def clone_from_multiple_urls( tmptop, cfg, urls, directory ):
+def clone_from_multiple_urls( wrkdir, cfg, urls, directory ):
     ""
     upstream = UpstreamURLs( urls )
 
@@ -254,18 +254,16 @@ def clone_from_multiple_urls( tmptop, cfg, urls, directory ):
     return top
 
 
-def clone_from_google_repo_manifests( tmptop, cfg, url, directory ):
+def clone_from_google_repo_manifests( wrkdir, cfg, url, directory ):
     ""
-    git = temp_clone( url, tmptop.path() )
-    tmpbname = basename( git.get_toplevel() )
+    git = temp_clone( url, wrkdir )
 
     gconv = GoogleConverter( git.get_toplevel() )
 
     top = populate_config_and_make_mrgit_repo( cfg, gconv, directory )
 
-    src = pjoin( tmptop.path(), tmpbname )
-    dst = pjoin( tmptop.path(), '.mrgit', 'google_manifests' )
-    move_directory_contents( src, dst )
+    dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
+    move_directory_contents( git.get_toplevel(), dst )
 
     return top
 
