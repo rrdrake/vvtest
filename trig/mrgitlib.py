@@ -118,7 +118,6 @@ def load_configuration():
 
     top = find_mrgit_top_level()
     cfg.setTopLevel( top )
-    git = gititf.GitRepo( top+'/.mrgit' )
     read_mrgit_manifests_file( cfg.getManifests(), top )
     cfg.computeLocalRepoMap()
 
@@ -240,7 +239,7 @@ def clone_from_single_url( wrkdir, cfg, url, directory ):
 
         upstream = UpstreamURLs( [ url ] )
 
-    top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
+    top = populate_config_and_mrgit_repo( cfg, upstream, directory )
 
     return top
 
@@ -249,7 +248,7 @@ def clone_from_multiple_urls( wrkdir, cfg, urls, directory ):
     ""
     upstream = UpstreamURLs( urls )
 
-    top = populate_config_and_make_mrgit_repo( cfg, upstream, directory )
+    top = populate_config_and_mrgit_repo( cfg, upstream, directory )
 
     return top
 
@@ -260,7 +259,7 @@ def clone_from_google_repo_manifests( wrkdir, cfg, url, directory ):
 
     gconv = GoogleConverter( git.get_toplevel() )
 
-    top = populate_config_and_make_mrgit_repo( cfg, gconv, directory )
+    top = populate_config_and_mrgit_repo( cfg, gconv, directory )
 
     dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
     move_directory_contents( git.get_toplevel(), dst )
@@ -268,7 +267,7 @@ def clone_from_google_repo_manifests( wrkdir, cfg, url, directory ):
     return top
 
 
-def populate_config_and_make_mrgit_repo( cfg, upstream, directory ):
+def populate_config_and_mrgit_repo( cfg, upstream, directory ):
     ""
     top = cfg.getTopLevel()
 
@@ -280,7 +279,9 @@ def populate_config_and_make_mrgit_repo( cfg, upstream, directory ):
 
     clone_repositories_from_config( cfg )
 
-    newtop = upstream.computeTopLevel( cfg, directory )
+    newtop = compute_top_level_directory( directory,
+                                          cfg.getManifests(),
+                                          upstream.remoteName() )
 
     return newtop
 
@@ -299,14 +300,6 @@ class MRGitUpstream:
     def fillManifests(self, mfest, toplevel):
         ""
         read_mrgit_manifests_file( mfest, toplevel )
-
-    def computeTopLevel(self, cfg, directory):
-        ""
-        top = compute_path_for_toplevel( directory,
-                                         cfg.getManifests(),
-                                         self.remoteName() )
-
-        return top
 
     def fillRepoMap(self, rmap, toplevel):
         ""
@@ -328,45 +321,10 @@ class GenesisUpstream:
         ""
         read_mrgit_manifests_file( mfest, toplevel )
 
-    def computeTopLevel(self, cfg, directory):
-        ""
-        top = compute_path_for_toplevel( directory,
-                                         cfg.getManifests(),
-                                         self.remoteName() )
-
-        return top
-
     def fillRepoMap(self, rmap, toplevel):
         ""
         git = gititf.GitRepo( toplevel+'/.mrgit' )
         read_genesis_map_file( rmap, git )
-
-
-def compute_path_for_toplevel( directory, mfest, remotename ):
-    ""
-    if directory:
-        top = normpath( abspath( directory ) )
-    else:
-        top = path_for_toplevel( mfest, remotename )
-
-    return top
-
-
-def path_for_toplevel( mfest, remotename ):
-    ""
-    grp = mfest.getDefaultGroup()
-    if grp == None:
-        # only from an empty mrgit init, or a clone of one
-        top = abspath( remotename )
-
-    elif grp.getName():
-        top = abspath( grp.getName() )
-
-    else:
-        # when cloning a repo which is a clone of a list of URLs
-        top = abspath( '.' )
-
-    return top
 
 
 class UpstreamURLs:
@@ -375,16 +333,9 @@ class UpstreamURLs:
         ""
         self.urls = url_list
 
-    def computeTopLevel(self, cfg, directory):
+    def remoteName(self):
         ""
-        if directory:
-            top = directory
-        else:
-            top = '.'
-
-        top = normpath( abspath( top ) )
-
-        return top
+        return None
 
     def fillManifests(self, mfest, toplevel):
         ""
@@ -406,12 +357,23 @@ class GoogleConverter:
         ""
         self.srcdir = manifests_directory
 
+    def remoteName(self):
+        ""
+        return None
+
     def fillManifests(self, mfest, toplevel):
         ""
         self.readManifestFiles()
 
         for gmr in [ self.default ] + self.manifests:
             self._create_group_from_manifest( gmr, mfest )
+
+    def fillRepoMap(self, rmap, toplevel):
+        ""
+        for gmr in [ self.default ] + self.manifests:
+            for reponame in gmr.getRepoNames():
+                url = self.getPrimaryURL( reponame )
+                rmap.setRepoLocation( reponame, url )
 
     def readManifestFiles(self):
         ""
@@ -441,24 +403,6 @@ class GoogleConverter:
             url = sortL[-1][1]
 
         return url
-
-    def fillRepoMap(self, rmap, toplevel):
-        ""
-        for gmr in [ self.default ] + self.manifests:
-            for reponame in gmr.getRepoNames():
-                url = self.getPrimaryURL( reponame )
-                rmap.setRepoLocation( reponame, url )
-
-    def computeTopLevel(self, cfg, directory):
-        ""
-        if directory:
-            top = normpath( abspath( directory ) )
-        else:
-            gname = self.default.getGroupName()
-            assert gname, 'default google manifest group name cannot be empty'
-            top = normpath( abspath( gname ) )
-
-        return top
 
     def _create_group_from_manifest(self, gmr, mfest):
         ""
@@ -587,6 +531,33 @@ class GoogleManifestReader:
                 return nd.attrib['remote'].strip()
 
 
+def compute_top_level_directory( directory, mfest, remotename ):
+    ""
+    if directory:
+        top = normpath( abspath( directory ) )
+    else:
+        top = path_for_toplevel( mfest, remotename )
+
+    return top
+
+
+def path_for_toplevel( mfest, remotename ):
+    ""
+    grp = mfest.getDefaultGroup()
+    if grp == None:
+        # only from an empty mrgit init, or a clone of one
+        top = abspath( remotename )
+
+    elif grp.getName():
+        top = abspath( grp.getName() )
+
+    else:
+        # when cloning a repo which is a clone of a list of URLs
+        top = abspath( '.' )
+
+    return top
+
+
 def clone_repositories_from_config( cfg ):
     ""
     topdir = cfg.getTopLevel()
@@ -712,6 +683,14 @@ class Configuration:
         self.remote = RepoMap()
         self.local = RepoMap()
 
+    def setTopLevel(self, directory):
+        ""
+        self.topdir = directory
+
+    def getTopLevel(self):
+        ""
+        return self.topdir
+
     def getRemoteMap(self):
         ""
         return self.remote
@@ -727,14 +706,6 @@ class Configuration:
         if grp != None:
             for spec in grp.getRepoList():
                 self.local.setRepoLocation( spec['repo'], path=spec['path'] )
-
-    def setTopLevel(self, directory):
-        ""
-        self.topdir = directory
-
-    def getTopLevel(self):
-        ""
-        return self.topdir
 
     def getLocalRepoPaths(self):
         ""
