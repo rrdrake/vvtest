@@ -36,7 +36,7 @@ def errorexit( *args ):
     raise MRGitExitError( err )
 
 
-def clone( argv ):
+def clone( argv, **kwargs ):
     ""
     optL,argL = getopt.getopt( argv, 'G', [] )
 
@@ -44,12 +44,11 @@ def clone( argv ):
     for n,v in optL:
         optD[n] = v
 
+    verb = kwargs.get( 'verbose', 1 )
+
     if len( argL ) > 0:
-
-        urls, directory = parse_url_list( argL )
-        assert len( urls ) > 0
-
-        create_mrgit_repo( '-G' in optD, urls, directory )
+        creator = CloneCreator( argL, '-G' in optD, verb )
+        creator.clone()
 
 
 def init( argv ):
@@ -185,86 +184,104 @@ def make_absolute_url_path( url ):
     return absurl
 
 
-def create_mrgit_repo( dash_G, urls, directory ):
-    ""
-    cfg = Configuration()
+class CloneCreator:
 
-    tmpdir = TempDirectory( directory )
-    wrkdir = tmpdir.path()
-    cfg.setTopLevel( wrkdir )
+    def __init__(self, args, is_google_manifest=False, verbose=1):
+        ""
+        self.isgoogle = is_google_manifest
+        self.verbose = verbose
 
-    if dash_G:
-        if len(urls) != 1:
-            errorexit( 'must specify exactly one URL with the -G option' )
-        top = clone_from_google_repo_manifests( wrkdir, cfg, urls[0], directory )
+        urls, directory = parse_url_list( args )
+        assert len( urls ) > 0
 
-    elif len( urls ) == 1:
-        top = clone_from_single_url( wrkdir, cfg, urls[0], directory )
+        self.urls = urls
+        self.todir = directory
 
-    else:
-        top = clone_from_multiple_urls( wrkdir, cfg, urls, directory )
+    def clone(self):
+        ""
+        cfg = Configuration()
 
-    cfg.setTopLevel( top )
-    tmpdir.rename( top )
+        tmpdir = TempDirectory( self.todir )
+        wrkdir = tmpdir.path()
+        cfg.setTopLevel( wrkdir )
 
-    cfg.commitLocalRepoMap()
+        if self.isgoogle:
+            if len(self.urls) != 1:
+                errorexit( 'must specify exactly one URL with the -G option' )
+            top = self.fromGoogleManifests( wrkdir, cfg )
 
+        elif len( self.urls ) == 1:
+            top = self.fromSingleURL( wrkdir, cfg )
 
-def clone_from_single_url( wrkdir, cfg, url, directory ):
-    ""
-    try:
-        # prefer a .mrgit repo under the given url
-        git = temp_clone( url+'/.mrgit', wrkdir )
+        else:
+            top = self.fromURLs( wrkdir, cfg )
 
-    except gititf.GitInterfaceError:
-        # that failed, so just clone the given url
-        git = temp_clone( url, wrkdir )
+        cfg.setTopLevel( top )
+        tmpdir.rename( top )
 
-    upstream = check_for_mrgit_repo( git )
+        cfg.commitLocalRepoMap()
 
-    if upstream:
-        # we just cloned an mrgit or genesis repo
+    def fromSingleURL(self, wrkdir, cfg):
+        ""
+        url = self.urls[0]
 
-        # move the clone so it becomes the .mrgit directory
-        mrgit = wrkdir+'/.mrgit'
-        assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
-        os.rename( git.get_toplevel(), mrgit )
+        try:
+            # prefer a .mrgit repo under the given url
+            git = temp_clone( url+'/.mrgit', wrkdir )
 
-    else:
-        # not an mrgit or genesis repo, just a generic repository
+        except gititf.GitInterfaceError:
+            git = None
 
-        # move the clone to a directory with the name of the upstream URL
-        loc = pjoin( wrkdir, gititf.repo_name_from_url( url ) )
-        move_directory_contents( git.get_toplevel(), loc )
+        if git == None:
+            # that failed, so just clone the given url
+            try:
+                git = temp_clone( url, wrkdir )
+            except gititf.GitInterfaceError:
+                errorexit( 'failed to clone', url )
 
-        upstream = UpstreamURLs( [ url ] )
+        upstream = check_for_mrgit_repo( git )
 
-    top = populate_config_and_mrgit_repo( cfg, upstream, directory )
+        if upstream:
+            # we just cloned an mrgit or genesis repo
 
-    return top
+            # move the clone so it becomes the .mrgit directory
+            mrgit = wrkdir+'/.mrgit'
+            assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
+            os.rename( git.get_toplevel(), mrgit )
 
+        else:
+            # not an mrgit or genesis repo, just a generic repository
 
-def clone_from_multiple_urls( wrkdir, cfg, urls, directory ):
-    ""
-    upstream = UpstreamURLs( urls )
+            # move the clone to a directory with the name of the upstream URL
+            loc = pjoin( wrkdir, gititf.repo_name_from_url( url ) )
+            move_directory_contents( git.get_toplevel(), loc )
 
-    top = populate_config_and_mrgit_repo( cfg, upstream, directory )
+            upstream = UpstreamURLs( [ url ] )
 
-    return top
+        top = populate_config_and_mrgit_repo( cfg, upstream, self.todir )
 
+        return top
 
-def clone_from_google_repo_manifests( wrkdir, cfg, url, directory ):
-    ""
-    git = temp_clone( url, wrkdir )
+    def fromURLs(self, wrkdir, cfg):
+        ""
+        upstream = UpstreamURLs( self.urls )
 
-    gconv = GoogleConverter( git.get_toplevel() )
+        top = populate_config_and_mrgit_repo( cfg, upstream, self.todir )
 
-    top = populate_config_and_mrgit_repo( cfg, gconv, directory )
+        return top
 
-    dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
-    move_directory_contents( git.get_toplevel(), dst )
+    def fromGoogleManifests(self, wrkdir, cfg):
+        ""
+        git = temp_clone( self.urls[0], wrkdir )
 
-    return top
+        gconv = GoogleConverter( git.get_toplevel() )
+
+        top = populate_config_and_mrgit_repo( cfg, gconv, self.todir )
+
+        dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
+        move_directory_contents( git.get_toplevel(), dst )
+
+        return top
 
 
 def populate_config_and_mrgit_repo( cfg, upstream, directory ):
@@ -676,7 +693,7 @@ class Configuration:
     def __init__(self):
         ""
         self.topdir = None
-        self.upstream = None  # magic: eventually contain the upstream specification
+        self.upstream = None  # will contain the upstream specification
         self.mfest = Manifests()
         self.remote = RepoMap()
         self.local = RepoMap()

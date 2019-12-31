@@ -96,7 +96,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        x,out = util.runcmd( mrgit_file+' clone '+cool_url+' '+ness_url )
+        x,out = util.runcmd( mrgit_file+' -v clone '+cool_url+' '+ness_url )
         assert x == 0
         self.assert_dual_clone( '.' )
 
@@ -697,10 +697,8 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg = mrlib.Configuration()
         cfg.setTopLevel( abspath( 'toplev' ) )
 
-        mrlib.clone_from_multiple_urls( 'toplev',
-                                        cfg,
-                                        [ cool_url, ness_url ],
-                                        'toplev' )
+        creator = mrlib.CloneCreator( [ cool_url, ness_url ] )
+        creator.fromURLs( 'toplev', cfg )
 
         GitRepo( 'toplev/cool' )
         GitRepo( 'toplev/ness' )

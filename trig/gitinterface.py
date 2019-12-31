@@ -809,9 +809,10 @@ def _is_local_repo( gitrun, directory, verbose ):
     if not os.path.isdir( directory ) and os.path.isdir( directory+'.git' ):
         directory += '.git'
 
+    verb = max( 0, verbose-1 )  # reduce verbosity for this check
     try:
         x,out = gitrun.run( 'rev-parse --is-bare-repository', chdir=directory,
-                            raise_on_error=False, capture=True, verbose=verbose )
+                            raise_on_error=False, capture=True, verbose=verb )
     except Exception:
         return False
 

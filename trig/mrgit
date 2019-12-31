@@ -56,18 +56,24 @@ mrgrap
 
 def main():
     ""
-    optL,argL = getopt.getopt( sys.argv[1:], 'h', ['help'] )
+    optL,argL = getopt.getopt( sys.argv[1:], 'hv', ['help'] )
 
     optD = {}
     for n,v in optL:
         if n == '-h' or n == '--help':
             print3( help_mrgit.strip() )
             return
-        optD[n] = v
+        if n == '-v':
+            cnt = int( optD.get( '-v', 0 ) )
+            optD['-v'] = cnt+1
+        else:
+            optD[n] = v
 
     if len(argL) == 0:
         print3( help_mrgit.strip() )
         mrgitlib.errorexit( 'no command given' )
+
+    verb = determine_verbosity( optD )
 
     cmd = argL[0]
 
@@ -75,7 +81,7 @@ def main():
         print3( help_mrgit.strip() )
 
     elif cmd == 'clone':
-        mrgitlib.clone( argL[1:] )
+        mrgitlib.clone( argL[1:], verbose=verb )
 
     elif cmd == 'pull':
         mrgitlib.pull( argL[1:] )
@@ -86,6 +92,11 @@ def main():
     else:
         mrgitlib.errorexit( 'unknown mrgit command:', cmd )
 
+
+def determine_verbosity( optD ):
+    ""
+    cnt = optD.get( '-v', 0 )
+    return 1+cnt
 
 ####################################################################
 
