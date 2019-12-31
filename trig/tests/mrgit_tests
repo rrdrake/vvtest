@@ -447,10 +447,9 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv = mrlib.GoogleConverter( '.' )
         gconv.readManifestFiles()
 
-        cfg = mrlib.Configuration()
-        gconv.fillRepoMap( cfg.getRemoteMap(), None )
+        rmap = mrlib.RepoMap()
+        gconv.fillRepoMap( rmap )
 
-        rmap = cfg.getRemoteMap()
         assert rmap.getRepoURL( 'service.git' ) == 'file:///special/path/service.git'
         assert rmap.getRepoURL( 'afrl.git' ) == 'file:///special/path/afrl.git'
         assert rmap.getRepoURL( 'bar.git' ) == 'file:///special/path/bar.git'
@@ -465,10 +464,8 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv = mrlib.GoogleConverter( '.' )
         gconv.readManifestFiles()
 
-        cfg = mrlib.Configuration()
-        gconv.fillManifests( cfg.getManifests(), None )
-
-        mfest = cfg.getManifests()
+        mfest = mrlib.Manifests()
+        gconv.fillManifests( mfest )
 
         rgrp = mfest.findGroup( 'default' )
         repoL = rgrp.getRepoNames()
@@ -488,7 +485,9 @@ class google_repo_manifests( trigutil.trigTestCase ):
         assert rgrp.getRepoPath( 'service.git' ) == '.'
 
     def test_a_group_is_skipped_if_one_of_the_urls_is_not_primary(self):
-        ""
+        """
+        see comment in getPrimaryURL() method about "primary URL"
+        """
         fs = defaults_xml.replace( 'CENTRALPATH', '/some/path/' )
         util.writefile( 'default.xml', fs )
         util.writefile( 'example.xml', example_xml )
@@ -496,10 +495,8 @@ class google_repo_manifests( trigutil.trigTestCase ):
         gconv = mrlib.GoogleConverter( '.' )
         gconv.readManifestFiles()
 
-        cfg = mrlib.Configuration()
-        gconv.fillManifests( cfg.getManifests(), None )
-
-        mfest = cfg.getManifests()
+        mfest = mrlib.Manifests()
+        gconv.fillManifests( mfest )
 
         assert mfest.findGroup( 'default' ) != None
         assert mfest.findGroup( 'example' ) == None
@@ -626,8 +623,9 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         ""
         cfg = mrlib.Configuration()
         upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git' ] )
-        upstream.fillManifests( cfg.getManifests(), None )
-        upstream.fillRepoMap( cfg.getRemoteMap(), None )
+        upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
+                                            cfg.getRemoteMap(),
+                                            None )
 
         repos = cfg.getRemoteRepoList()
         assert len( repos ) == 1
@@ -638,8 +636,9 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg = mrlib.Configuration()
         upstream = mrlib.UpstreamURLs( [ 'file:///one/repo.git',
                                          'ssh:///and/two.git' ] )
-        upstream.fillManifests( cfg.getManifests(), None )
-        upstream.fillRepoMap( cfg.getRemoteMap(), None )
+        upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
+                                            cfg.getRemoteMap(),
+                                            None )
         cfg.computeLocalRepoMap()
 
         top = mrlib.path_for_toplevel( cfg.getManifests(), 'foo' )
@@ -698,13 +697,10 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         cfg = mrlib.Configuration()
         cfg.setTopLevel( abspath( 'toplev' ) )
 
-        # magic: this block should be in mrlib somehow
-        upstream = mrlib.UpstreamURLs( [ cool_url, ness_url ] )
-        upstream.fillManifests( cfg.getManifests(), None )
-        upstream.fillRepoMap( cfg.getRemoteMap(), None )
-        cfg.computeLocalRepoMap()
-
-        mrlib.clone_repositories_from_config( cfg )
+        mrlib.clone_from_multiple_urls( 'toplev',
+                                        cfg,
+                                        [ cool_url, ness_url ],
+                                        'toplev' )
 
         GitRepo( 'toplev/cool' )
         GitRepo( 'toplev/ness' )

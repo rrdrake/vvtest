@@ -271,8 +271,9 @@ def populate_config_and_mrgit_repo( cfg, upstream, directory ):
     ""
     top = cfg.getTopLevel()
 
-    upstream.fillManifests( cfg.getManifests(), top )
-    upstream.fillRepoMap( cfg.getRemoteMap(), top )
+    upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
+                                        cfg.getRemoteMap(),
+                                        top )
 
     cfg.computeLocalRepoMap()
     cfg.createMRGitRepo()
@@ -297,12 +298,10 @@ class MRGitUpstream:
         ""
         return gititf.repo_name_from_url( dirname( self.url ) )
 
-    def fillManifests(self, mfest, toplevel):
+    def loadManifestsAndRemoteMap(self, mfest, rmap, toplevel):
         ""
         read_mrgit_manifests_file( mfest, toplevel )
 
-    def fillRepoMap(self, rmap, toplevel):
-        ""
         git = gititf.GitRepo( toplevel+'/.mrgit' )
         read_mrgit_repo_map_file( rmap, dirname( self.url ), git )
 
@@ -317,12 +316,10 @@ class GenesisUpstream:
         ""
         return gititf.repo_name_from_url( self.url )
 
-    def fillManifests(self, mfest, toplevel):
+    def loadManifestsAndRemoteMap(self, mfest, rmap, toplevel):
         ""
         read_mrgit_manifests_file( mfest, toplevel )
 
-    def fillRepoMap(self, rmap, toplevel):
-        ""
         git = gititf.GitRepo( toplevel+'/.mrgit' )
         read_genesis_map_file( rmap, git )
 
@@ -337,15 +334,13 @@ class UpstreamURLs:
         ""
         return None
 
-    def fillManifests(self, mfest, toplevel):
+    def loadManifestsAndRemoteMap(self, mfest, rmap, toplevel):
         ""
         groupname = ''
         for url in self.urls:
             name = gititf.repo_name_from_url( url )
             mfest.addRepo( groupname, name, name )
 
-    def fillRepoMap(self, rmap, toplevel):  # toplevel not needed here
-        ""
         for url in self.urls:
             name = gititf.repo_name_from_url( url )
             rmap.setRepoLocation( name, url=url )
@@ -361,19 +356,16 @@ class GoogleConverter:
         ""
         return None
 
-    def fillManifests(self, mfest, toplevel):
+    def loadManifestsAndRemoteMap(self, mfest, rmap, toplevel):
         ""
         self.readManifestFiles()
+        self.fillManifests( mfest )
+        self.fillRepoMap( rmap )
 
-        for gmr in [ self.default ] + self.manifests:
-            self._create_group_from_manifest( gmr, mfest )
-
-    def fillRepoMap(self, rmap, toplevel):
+    def fillManifests(self, mfest):
         ""
         for gmr in [ self.default ] + self.manifests:
-            for reponame in gmr.getRepoNames():
-                url = self.getPrimaryURL( reponame )
-                rmap.setRepoLocation( reponame, url )
+            self._create_group_from_manifest( gmr, mfest )
 
     def readManifestFiles(self):
         ""
@@ -386,6 +378,13 @@ class GoogleConverter:
             gmr = GoogleManifestReader( fn )
             gmr.createRepoNameToURLMap()
             self.manifests.append( gmr )
+
+    def fillRepoMap(self, rmap):
+        ""
+        for gmr in [ self.default ] + self.manifests:
+            for reponame in gmr.getRepoNames():
+                url = self.getPrimaryURL( reponame )
+                rmap.setRepoLocation( reponame, url )
 
     def getPrimaryURL(self, repo_name):
         """
@@ -436,9 +435,8 @@ class GoogleManifestReader:
 
     def __init__(self, filename):
         ""
-        # put this here instead of the top of this file because reading Google
-        # manifests is not core to mrgit, but if it was at the top and the
-        # import failed, then the application would crash
+        # put this here instead of the top of this file because reading
+        # Google manifests is not core to mrgit
         import xml.etree.ElementTree as ET
 
         self.name = os.path.splitext( basename( filename ) )[0]
@@ -531,6 +529,23 @@ class GoogleManifestReader:
                 return nd.attrib['remote'].strip()
 
 
+def check_for_mrgit_repo( git ):
+    ""
+    mfestfn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
+    genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
+
+    if os.path.isfile( mfestfn ):
+        if REPOMAP_BRANCH in git.get_branches() or \
+           REPOMAP_BRANCH in git.get_branches( remotes=True ):
+
+            return MRGitUpstream( git.get_remote_URL() )
+
+        elif os.path.isfile( genfn ):
+            return GenesisUpstream( git.get_remote_URL() )
+
+    return None
+
+
 def compute_top_level_directory( directory, mfest, remotename ):
     ""
     if directory:
@@ -619,23 +634,6 @@ class TempDirectory:
         ""
         if self.isnew:
             move_directory_contents( self.tmpd, todir )
-
-
-def check_for_mrgit_repo( git ):
-    ""
-    mfestfn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
-    genfn = pjoin( git.get_toplevel(), GENESIS_FILENAME )
-
-    if os.path.isfile( mfestfn ):
-        if REPOMAP_BRANCH in git.get_branches() or \
-           REPOMAP_BRANCH in git.get_branches( remotes=True ):
-
-            return MRGitUpstream( git.get_remote_URL() )
-
-        elif os.path.isfile( genfn ):
-            return GenesisUpstream( git.get_remote_URL() )
-
-    return None
 
 
 def remove_all_files_in_directory( path ):
