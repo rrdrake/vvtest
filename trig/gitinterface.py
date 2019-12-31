@@ -319,7 +319,7 @@ def clone_repo( url, directory=None, branch=None, bare=False, **options ):
     else:
         top = _full_clone( grun, url, directory, bare, verb )
 
-    options['verbose'] = verb
+    options['verbose'] = max( 0, verb-1 )
     return GitRepo( top, **options )
 
 

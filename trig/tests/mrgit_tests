@@ -53,7 +53,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        mrlib.clone( [ src_url ] )
+        mrlib.clone_cmd( [ src_url ] )
         self.assert_single_clone( '.' )
 
     def assert_single_clone(self, subdir):
@@ -66,7 +66,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        mrlib.clone( [ src_url, 'adir' ] )
+        mrlib.clone_cmd( [ src_url, 'adir' ] )
         self.assert_single_clone( 'adir' )
 
     def test_command_line_clone_a_single_repository(self):
@@ -81,7 +81,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, ness_url ] )
+        mrlib.clone_cmd( [ cool_url, ness_url ] )
         self.assert_dual_clone( '.' )
 
     def assert_dual_clone(self, subdir):
@@ -104,7 +104,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, ness_url, 'adir' ] )
+        mrlib.clone_cmd( [ cool_url, ness_url, 'adir' ] )
         self.assert_dual_clone( 'adir' )
 
     def test_command_line_clone_of_two_repos_into_a_directory(self):
@@ -119,8 +119,8 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
-        mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
+        mrlib.clone_cmd( [ cool_url, ness_url, 'clone1' ] )
+        mrlib.clone_cmd( [ 'clone1/.mrgit', 'clone2' ] )
 
         self.assert_dual_clone( 'clone2' )
 
@@ -128,8 +128,8 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, 'clone1' ] )
-        mrlib.clone( [ 'clone1/.mrgit', 'clone2' ] )
+        mrlib.clone_cmd( [ cool_url, 'clone1' ] )
+        mrlib.clone_cmd( [ 'clone1/.mrgit', 'clone2' ] )
 
         assert os.path.isdir( 'clone2/cool' )
         git = GitRepo( 'clone2/cool' )
@@ -139,9 +139,9 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
+        mrlib.clone_cmd( [ cool_url, ness_url, 'clone1' ] )
 
-        mrlib.clone( [ 'clone1', 'clone2' ] )
+        mrlib.clone_cmd( [ 'clone1', 'clone2' ] )
 
         assert os.path.isdir( 'clone2/cool' )
         git = GitRepo( 'clone2/cool' )
@@ -155,9 +155,9 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        mrlib.clone( [ cool_url, ness_url, 'clone1' ] )
+        mrlib.clone_cmd( [ cool_url, ness_url, 'clone1' ] )
 
-        mrlib.clone( [ 'file://'+abspath('clone1'), 'clone2' ] )
+        mrlib.clone_cmd( [ 'file://'+abspath('clone1'), 'clone2' ] )
 
         assert os.path.isdir( 'clone2/cool' )
         git = GitRepo( 'clone2/cool' )
@@ -175,7 +175,7 @@ class cloning( trigutil.trigTestCase ):
         git = clone_repo( genesis_url, 'precheck' )
         assert mrlib.REPOMAP_BRANCH not in git.get_branches()
 
-        mrlib.clone( [ genesis_url ] )
+        mrlib.clone_cmd( [ genesis_url ] )
 
         assert len( glob.glob( 'ness*' ) ) == 0
         assert len( glob.glob( 'cool*' ) ) == 0
@@ -327,6 +327,76 @@ class startup_logic( trigutil.trigTestCase ):
         assert into == None and len(urls) == 2
         assert urls[0] == abspath('path1')
         assert urls[1] == abspath('bdir/.mrgit')
+
+    def test_a_failed_clone_will_not_leave_around_temporary_files(self):
+        ""
+        x,out = util.runcmd( mrgit_file+' clone foobar', raise_on_error=False )
+
+        assert x != 0
+        assert len( os.listdir( '.' ) ) == 0
+
+        x,out = util.runcmd( mrgit_file+' clone file:///foo462/bar296/baz72',
+                             raise_on_error=False )
+
+        assert x != 0
+        assert len( os.listdir( '.' ) ) == 0
+
+        x,out = util.runcmd( mrgit_file + ' clone' + \
+                                 ' file:///foo462/bar296/baz72' + \
+                                 ' file:///foo462/bar296/buz83',
+                             raise_on_error=False )
+
+        assert x != 0
+        assert len( os.listdir( '.' ) ) == 0
+
+    def test_cloning_over_an_existing_clone_is_an_error(self):
+        ""
+        util.writefile( 'adir/afile.txt', "some contents" )
+        os.mkdir( 'wrk1' )
+        os.mkdir( 'wrk2' )
+        os.mkdir( 'wrk3' )
+
+        url1 = util.create_bare_repo_with_file_and_branch( 'example1' )
+        url2 = util.create_bare_repo_with_file_and_branch( 'example2' )
+
+        time.sleep(1)
+
+        x,out = util.runcmd( mrgit_file+' clone '+url1+' adir',
+                             raise_on_error=False )
+        assert 'Traceback' not in out
+        assert 'mrgit error' in out and 'exists and is not empty' in out
+
+        with util.change_directory( 'wrk1' ):
+            x,out = util.runcmd( mrgit_file+' clone '+url1 )
+            print3( out )
+            assert os.path.isdir( '.mrgit' ) and os.path.isdir( 'example1' )
+
+            x,out = util.runcmd( mrgit_file+' clone '+url1, raise_on_error=False )
+            assert 'Traceback' not in out
+            assert 'mrgit error' in out and 'mrgit exists' in out
+
+        with util.change_directory( 'wrk2' ):
+            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2 )
+            print3( out )
+            assert os.path.isdir( '.mrgit' )
+            assert os.path.isdir( 'example1' ) and os.path.isdir( 'example2' )
+
+            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2,
+                                 raise_on_error=False )
+            assert 'Traceback' not in out
+            assert 'mrgit error' in out and 'mrgit exists' in out
+            # the multi URL case can catch the error before cloning the URLs
+            assert len( util.greplines( 'clone *example', out ) ) == 0
+
+        with util.change_directory( 'wrk3' ):
+            clone_repo( url2, verbose=1 )
+
+            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2,
+                                 raise_on_error=False )
+            assert 'Traceback' not in out
+            assert 'mrgit error' in out and 'path already exists' in out
+            # the multi URL case can catch the error before cloning the URLs
+            assert len( util.greplines( 'clone *example', out ) ) == 0
 
 
 class manifests_handling( trigutil.trigTestCase ):
@@ -505,7 +575,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         ""
         man_url = create_google_repo_set()
 
-        mrlib.clone( [ '-G', man_url, 'clone1' ] )
+        mrlib.clone_cmd( [ '-G', man_url, 'clone1' ] )
 
         assert 'service' in util.readfile( 'clone1/file.txt' )
         assert 'navy' in util.readfile( 'clone1/navy/file.txt' )
@@ -515,7 +585,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
     def test_if_G_option_given_then_only_one_url_can_be_cloned(self):
         ""
         try:
-            mrlib.clone( ['-G', 'https:///foo', 'https:///bar'] )
+            mrlib.clone_cmd( ['-G', 'https:///foo', 'https:///bar'] )
         except mrlib.MRGitExitError as e:
             assert 'exactly one URL' in str(e)
         else:
@@ -690,26 +760,6 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
         assert cfg.getTopLevel() == abspath( 'topdir' )
 
-    def test_cloning_repos_from_config(self):
-        ""
-        cool_url, ness_url = make_coolness_repositories()
-
-        cfg = mrlib.Configuration()
-        cfg.setTopLevel( abspath( 'toplev' ) )
-
-        creator = mrlib.CloneCreator( [ cool_url, ness_url ] )
-        creator.fromURLs( 'toplev', cfg )
-
-        GitRepo( 'toplev/cool' )
-        GitRepo( 'toplev/ness' )
-
-        shutil.rmtree( 'toplev/ness' )
-
-        mrlib.clone_repositories_from_config( cfg )
-
-        GitRepo( 'toplev/cool' )
-        GitRepo( 'toplev/ness' )
-
 
 class mrgit_init( trigutil.trigTestCase ):
 
@@ -733,14 +783,14 @@ class updating( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        mrlib.clone( [ src_url ] )
+        mrlib.clone_cmd( [ src_url ] )
 
         util.push_file_to_repo( src_url, 'newfile.txt', 'anything\n' )
 
         assert not os.path.exists( 'cool/.git/FETCH_HEAD' )
 
         with util.change_directory( 'cool' ):
-            mrlib.fetch( [] )
+            mrlib.fetch_cmd( [] )
 
         x,out = util.runcmd( 'git branch -rv', chdir='cool' )
         assert x == 0
@@ -750,12 +800,12 @@ class updating( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        mrlib.clone( [ src_url ] )
+        mrlib.clone_cmd( [ src_url ] )
 
         util.push_file_to_repo( src_url, 'newfile.txt', 'anything\n' )
 
         with util.change_directory( 'cool' ):
-            mrlib.pull( [] )
+            mrlib.pull_cmd( [] )
 
         assert util.readfile( 'cool/newfile.txt' ).strip() == 'anything'
 
@@ -763,7 +813,7 @@ class updating( trigutil.trigTestCase ):
         ""
         man_url = create_google_repo_set()
 
-        mrlib.clone( [ '-G', man_url ] )
+        mrlib.clone_cmd( [ '-G', man_url ] )
 
         util.push_file_to_repo( abspath('central/navy.git'),
                                 'newfile.txt', "anything\n" )
@@ -777,7 +827,7 @@ class updating( trigutil.trigTestCase ):
         ""
         genesis_url, sub_url = create_example_genesis_repo()
 
-        mrlib.clone( [ genesis_url ] )
+        mrlib.clone_cmd( [ genesis_url ] )
 
         util.push_file_to_repo( sub_url, 'newfile.txt', "anything\n" )
 
@@ -793,13 +843,13 @@ class commit_and_push( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        mrlib.clone( [ src_url ] )
+        mrlib.clone_cmd( [ src_url ] )
 
         with util.change_directory( 'cool' ):
             util.writefile( 'newfile.txt', 'foo bar\n' )
-            mrlib.add( [ '.' ] )
-            mrlib.commit( ['-m','add new file'] )
-            mrlib.push( [] )
+            mrlib.add_cmd( [ '.' ] )
+            mrlib.commit_cmd( ['-m','add new file'] )
+            mrlib.push_cmd( [] )
 
         clone_repo( src_url, directory='check', verbose=3 )
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1

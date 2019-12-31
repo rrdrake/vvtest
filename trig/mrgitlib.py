@@ -36,7 +36,7 @@ def errorexit( *args ):
     raise MRGitExitError( err )
 
 
-def clone( argv, **kwargs ):
+def clone_cmd( argv, **kwargs ):
     ""
     optL,argL = getopt.getopt( argv, 'G', [] )
 
@@ -47,11 +47,11 @@ def clone( argv, **kwargs ):
     verb = kwargs.get( 'verbose', 1 )
 
     if len( argL ) > 0:
-        creator = CloneCreator( argL, '-G' in optD, verb )
-        creator.clone()
+        creator = CloneCreator( verb )
+        creator.clone( argL, '-G' in optD )
 
 
-def init( argv ):
+def init_cmd( argv ):
     ""
     cfg = Configuration()
     cfg.setTopLevel( os.getcwd() )
@@ -59,7 +59,7 @@ def init( argv ):
     cfg.commitLocalRepoMap()
 
 
-def fetch( argv ):
+def fetch_cmd( argv ):
     ""
     cfg = load_configuration()
 
@@ -69,7 +69,7 @@ def fetch( argv ):
         git.run( 'fetch', verbose=3 )
 
 
-def pull( argv ):
+def pull_cmd( argv ):
     ""
     cfg = load_configuration()
 
@@ -79,7 +79,7 @@ def pull( argv ):
         git.run( 'pull', verbose=3 )
 
 
-def add( argv ):
+def add_cmd( argv ):
     ""
     cfg = load_configuration()
 
@@ -90,7 +90,7 @@ def add( argv ):
         git.run( 'add', *args, verbose=3 )
 
 
-def commit( argv ):
+def commit_cmd( argv ):
     ""
     cfg = load_configuration()
 
@@ -101,7 +101,7 @@ def commit( argv ):
         git.run( 'commit', *args, verbose=3 )
 
 
-def push( argv ):
+def push_cmd( argv ):
     ""
     cfg = load_configuration()
 
@@ -186,48 +186,61 @@ def make_absolute_url_path( url ):
 
 class CloneCreator:
 
-    def __init__(self, args, is_google_manifest=False, verbose=1):
+    def __init__(self, verbose=1):
         ""
-        self.isgoogle = is_google_manifest
         self.verbose = verbose
 
-        urls, directory = parse_url_list( args )
+    def clone(self, url_list, is_google_manifest=False):
+        ""
+        urls, directory = parse_url_list( url_list )
         assert len( urls ) > 0
 
         self.urls = urls
-        self.todir = directory
+        self.dest = directory
 
-    def clone(self):
+        check_destination_directory( directory )
+
+        self.tmpdir = TempDirectory( self.dest )
+
+        top = self.cloneByUpstreamType( is_google_manifest )
+
+        self.tmpdir.rename( top )
+
+    def cloneByUpstreamType(self, is_google_manifest):
         ""
         cfg = Configuration()
+        cfg.setTopLevel( self.tmpdir.path() )
 
-        tmpdir = TempDirectory( self.todir )
-        wrkdir = tmpdir.path()
-        cfg.setTopLevel( wrkdir )
+        try:
+            if is_google_manifest:
+                if len(self.urls) != 1:
+                    errorexit( 'must specify exactly one URL with the -G option' )
+                top = self.fromGoogleManifests( cfg )
 
-        if self.isgoogle:
-            if len(self.urls) != 1:
-                errorexit( 'must specify exactly one URL with the -G option' )
-            top = self.fromGoogleManifests( wrkdir, cfg )
+            elif len( self.urls ) == 1:
+                top = self.fromSingleURL( cfg )
 
-        elif len( self.urls ) == 1:
-            top = self.fromSingleURL( wrkdir, cfg )
+            else:
+                top = self.fromURLs( cfg )
 
-        else:
-            top = self.fromURLs( wrkdir, cfg )
-
-        cfg.setTopLevel( top )
-        tmpdir.rename( top )
+        except MRGitExitError:
+            self.tmpdir.cleanup()
+            raise
 
         cfg.commitLocalRepoMap()
+        cfg.setTopLevel( top )
 
-    def fromSingleURL(self, wrkdir, cfg):
+        return top
+
+    def fromSingleURL(self, cfg):
         ""
         url = self.urls[0]
+        wrkdir = self.tmpdir.path()
 
         try:
             # prefer a .mrgit repo under the given url
-            git = temp_clone( url+'/.mrgit', wrkdir )
+            verb = max( 0, self.verbose - 1 )
+            git = temp_clone( url+'/.mrgit', wrkdir, verb )
 
         except gititf.GitInterfaceError:
             git = None
@@ -235,7 +248,7 @@ class CloneCreator:
         if git == None:
             # that failed, so just clone the given url
             try:
-                git = temp_clone( url, wrkdir )
+                git = temp_clone( url, wrkdir, self.verbose )
             except gititf.GitInterfaceError:
                 errorexit( 'failed to clone', url )
 
@@ -258,50 +271,78 @@ class CloneCreator:
 
             upstream = UpstreamURLs( [ url ] )
 
-        top = populate_config_and_mrgit_repo( cfg, upstream, self.todir )
+        top = self._populate_config_and_mrgit_repo( cfg, upstream )
 
         return top
 
-    def fromURLs(self, wrkdir, cfg):
+    def fromURLs(self, cfg):
         ""
         upstream = UpstreamURLs( self.urls )
 
-        top = populate_config_and_mrgit_repo( cfg, upstream, self.todir )
+        top = self._populate_config_and_mrgit_repo( cfg, upstream )
 
         return top
 
-    def fromGoogleManifests(self, wrkdir, cfg):
+    def fromGoogleManifests(self, cfg):
         ""
+        wrkdir = self.tmpdir.path()
+
         git = temp_clone( self.urls[0], wrkdir )
 
         gconv = GoogleConverter( git.get_toplevel() )
 
-        top = populate_config_and_mrgit_repo( cfg, gconv, self.todir )
+        top = self._populate_config_and_mrgit_repo( cfg, gconv )
 
         dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
         move_directory_contents( git.get_toplevel(), dst )
 
         return top
 
+    def _populate_config_and_mrgit_repo(self, cfg, upstream):
+        ""
+        top = cfg.getTopLevel()
 
-def populate_config_and_mrgit_repo( cfg, upstream, directory ):
+        upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
+                                            cfg.getRemoteMap(),
+                                            top )
+
+        cfg.computeLocalRepoMap()
+
+        newtop = compute_top_level_directory( self.dest,
+                                              cfg.getManifests(),
+                                              upstream.remoteName() )
+
+        if os.path.exists( newtop ) and not os.path.samefile( top, newtop ):
+            check_nonempty_destination_paths( newtop, cfg.getLocalRepoPaths() )
+
+        cfg.createMRGitRepo( self.verbose )
+
+        clone_repositories_from_config( cfg, self.verbose )
+
+        return newtop
+
+
+def check_destination_directory( directory ):
     ""
-    top = cfg.getTopLevel()
+    if directory and os.path.exists( directory ):
+        if os.path.isdir( directory ):
+            if len( os.listdir( directory ) ) > 0:
+                errorexit( 'destination path exists and is not empty:',
+                           repr(directory) )
+        else:
+            errorexit( 'destination path is not a directory:', repr(directory) )
 
-    upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
-                                        cfg.getRemoteMap(),
-                                        top )
 
-    cfg.computeLocalRepoMap()
-    cfg.createMRGitRepo()
+def check_nonempty_destination_paths( top, pathlist ):
+    ""
+    dst = top+'/.mrgit'
+    if os.path.islink(dst) or os.path.exists(dst):
+        errorexit( 'a previous mrgit exists in destination path:', repr(dst) )
 
-    clone_repositories_from_config( cfg )
-
-    newtop = compute_top_level_directory( directory,
-                                          cfg.getManifests(),
-                                          upstream.remoteName() )
-
-    return newtop
+    for path in pathlist:
+        dst = pjoin( top, path )
+        if os.path.islink(dst) or os.path.exists(dst):
+            errorexit( 'destination path already exists:', repr(dst) )
 
 
 class MRGitUpstream:
@@ -590,7 +631,7 @@ def path_for_toplevel( mfest, remotename ):
     return top
 
 
-def clone_repositories_from_config( cfg ):
+def clone_repositories_from_config( cfg, verbose=2 ):
     ""
     topdir = cfg.getTopLevel()
 
@@ -599,23 +640,32 @@ def clone_repositories_from_config( cfg ):
     with change_directory( topdir ):
         for url,loc in cfg.getRemoteRepoList():
             if not os.path.exists( loc+'/.git' ):
-                robust_clone( url, loc )
+                robust_clone( url, loc, verbose )
 
 
 def robust_clone( url, into_dir, verbose=2 ):
     ""
-    if os.path.exists( into_dir ):
+    tmp = None
 
-        assert '.git' not in os.listdir( into_dir )
+    try:
+        if os.path.exists( into_dir ):
 
-        tmp = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( into_dir ) )
-        gititf.clone_repo( url, tmp, verbose=verbose )
-        move_directory_contents( tmp, into_dir )
+            # magic: formalize this error condition (test it)
+            assert '.git' not in os.listdir( into_dir )
 
-        git = gititf.GitRepo( into_dir )
+            tmp = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( into_dir ) )
+            gititf.clone_repo( url, tmp, verbose=verbose )
+            move_directory_contents( tmp, into_dir )
 
-    else:
-        git = gititf.clone_repo( url, into_dir, verbose=verbose )
+            git = gititf.GitRepo( into_dir )
+
+        else:
+            git = gititf.clone_repo( url, into_dir, verbose=verbose )
+
+    except gititf.GitInterfaceError:
+        if tmp:
+            shutil.rmtree( tmp )
+        raise MRGitExitError( 'clone failed for '+url )
 
     return git
 
@@ -647,10 +697,23 @@ class TempDirectory:
         ""
         return self.tmpd
 
+    def newDirectory(self):
+        ""
+        return self.isnew
+
     def rename(self, todir):
         ""
         if self.isnew:
             move_directory_contents( self.tmpd, todir )
+
+    def cleanup(self):
+        ""
+        if self.isnew:
+            if os.path.exists( self.tmpd ):
+                try:
+                    shutil.rmtree( self.tmpd )
+                except Exception:
+                    pass
 
 
 def remove_all_files_in_directory( path ):
@@ -758,13 +821,16 @@ class Configuration:
         finally:
             git.checkout_branch( 'master' )
 
-    def createMRGitRepo(self):
+    def createMRGitRepo(self, verbose=2):
         ""
         repodir = pjoin( self.topdir, '.mrgit' )
 
+        # drop verbosity for internal operations
+        verb = max( 0, verbose-1 )
+
         if not gititf.is_a_local_repository( repodir ):
-            git = init_mrgit_repo( repodir )
-            commit_mrgit_manifests_file( self.mfest, git )
+            git = init_mrgit_repo( repodir, verb )
+            commit_mrgit_manifests_file( self.mfest, git, verb )
 
 
 class Manifests:
@@ -966,13 +1032,13 @@ def read_mrgit_manifests_file( manifests, toplevel ):
     manifests.readFromFile( fn )
 
 
-def init_mrgit_repo( repodir ):
+def init_mrgit_repo( repodir, verbose=2 ):
     ""
-    git = gititf.create_repo( repodir, verbose=3 )
+    git = gititf.create_repo( repodir, verbose=verbose )
 
     fn = pjoin( repodir, 'README.txt' )
     with open( fn, 'wt' ) as fp:
-        fp.write( 'This directory managed by the mrgit program.\n' )
+        fp.write( 'This directory managed by mrgit.\n' )
 
     git.add( 'README.txt' )
     git.commit( 'initialize mrgit' )
@@ -980,15 +1046,15 @@ def init_mrgit_repo( repodir ):
     return git
 
 
-def commit_mrgit_manifests_file( manifests, git ):
+def commit_mrgit_manifests_file( manifests, git, verbose=2 ):
     ""
     fn = pjoin( git.get_toplevel(), MANIFESTS_FILENAME )
 
-    git.checkout_branch( 'master' )
+    git.checkout_branch( 'master', verbose=verbose )
 
     manifests.writeToFile( fn )
-    git.add( MANIFESTS_FILENAME )
-    git.commit( 'set '+MANIFESTS_FILENAME )
+    git.add( MANIFESTS_FILENAME, verbose=verbose )
+    git.commit( 'set '+MANIFESTS_FILENAME, verbose=verbose )
 
 
 def read_mrgit_repo_map_file( repomap, baseurl, git ):
