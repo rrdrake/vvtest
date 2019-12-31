@@ -1311,6 +1311,7 @@ class misc_functions( trigutil.trigTestCase ):
 
         assert repository_url_match( 'sub:dir' )
         assert not repository_url_match( './sub:dir' )
+        assert repository_url_match( 'git-server:/git/proj' )
         assert repository_url_match( 'host.xx:path/to/repo.git' )
         assert repository_url_match( 'usrname@host.xx:/path/to/repo.git' )
 

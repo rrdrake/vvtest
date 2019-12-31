@@ -361,8 +361,8 @@ def update_repository_mirror( from_url, to_url, work_clone=None, **options ):
             shutil.rmtree( tmpdir )
 
 
-# match the form [user@]host.xz:path/to/repo.git/
-scp_like_url = re.compile( r'([a-zA-Z0-9_]+@)?[a-zA-Z0-9_]+([.][a-zA-Z0-9_]*)*:' )
+# match the form [user@]host.abc:path/to/repo.git/
+scp_like_url = re.compile( r'([a-zA-Z0-9_]+@)?[a-zA-Z0-9_-]+([.][a-zA-Z0-9_-]*)*:' )
 
 def repository_url_match( url ):
     ""
