@@ -582,6 +582,21 @@ class google_repo_manifests( trigutil.trigTestCase ):
         assert 'airforce' in util.readfile( 'clone1/airforce/file.txt' )
         assert 'afrl' in util.readfile( 'clone1/airforce/afrl/file.txt' )
 
+    def test_multi_url_clone_followed_by_a_google_clone(self):
+        ""
+        man_url = create_google_repo_set()
+        url1 = util.create_bare_repo_with_file_and_branch( 'example1' )
+        url2 = util.create_bare_repo_with_file_and_branch( 'example2' )
+
+        util.runcmd( mrgit_file+' clone '+url1+' '+url2 )
+
+        util.runcmd( mrgit_file+' clone -G '+man_url )
+
+        assert os.path.isdir( 'default/airforce' )
+        assert os.path.isdir( 'default/navy' )
+        assert os.path.isdir( 'default/.mrgit' )
+        assert os.path.isdir( 'default/.git' )
+
     def test_if_G_option_given_then_only_one_url_can_be_cloned(self):
         ""
         try:

@@ -647,10 +647,12 @@ def robust_clone( url, into_dir, verbose=2 ):
     ""
     tmp = None
 
+    if verbose > 0:
+        verbose = 3
+
     try:
         if os.path.exists( into_dir ):
 
-            # magic: formalize this error condition (test it)
             assert '.git' not in os.listdir( into_dir )
 
             tmp = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( into_dir ) )
@@ -672,6 +674,9 @@ def robust_clone( url, into_dir, verbose=2 ):
 
 def temp_clone( url, chdir, verbose=1 ):
     ""
+    if verbose > 0:
+        verbose = 3
+
     subd = tempfile.mkdtemp( '', 'mrgit_tempclone_', abspath( chdir ) )
     try:
         git = gititf.clone_repo( url, subd, verbose=verbose )
