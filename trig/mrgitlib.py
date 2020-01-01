@@ -262,8 +262,20 @@ class CloneCreator:
             assert not os.path.islink( mrgit ) and not os.path.exists( mrgit )
             os.rename( git.get_toplevel(), mrgit )
 
+            top = self._populate_config_and_mrgit_repo( cfg, upstream )
+
+        elif is_google_manfiests_repo( git.get_toplevel() ):
+            # we just cloned a Google manifests repo
+
+            gconv = GoogleConverter( git.get_toplevel() )
+
+            top = self._populate_config_and_mrgit_repo( cfg, gconv )
+
+            dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
+            move_directory_contents( git.get_toplevel(), dst )
+
         else:
-            # not an mrgit or genesis repo, just a generic repository
+            # not an mrgit, genesis or Google repo, just a generic repository
 
             # move the clone to a directory with the name of the upstream URL
             loc = pjoin( wrkdir, gititf.repo_name_from_url( url ) )
@@ -271,7 +283,7 @@ class CloneCreator:
 
             upstream = UpstreamURLs( [ url ] )
 
-        top = self._populate_config_and_mrgit_repo( cfg, upstream )
+            top = self._populate_config_and_mrgit_repo( cfg, upstream )
 
         return top
 
@@ -609,6 +621,25 @@ class GoogleManifestReader:
         for nd in self.xmlroot:
             if nd.tag == 'default':
                 return nd.attrib['remote'].strip()
+
+
+def is_google_manfiests_repo( path ):
+    ""
+    xml = pjoin( path, 'default.xml' )
+    if os.path.isfile( xml ):
+        try:
+            gmr = GoogleManifestReader( xml )
+            gmr.createRepoNameToURLMap()
+            projL = gmr.getProjectList()
+        except Exception:
+            pass
+        else:
+            if len( projL ) > 0:
+                name,url,sub = projL[0]
+                if name.strip() and url.strip():
+                    return True
+
+    return False
 
 
 def check_for_mrgit_repo( git ):

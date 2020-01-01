@@ -606,12 +606,29 @@ class google_repo_manifests( trigutil.trigTestCase ):
         ""
         man_url = create_google_repo_set()
 
-        mrlib.clone_cmd( [ '-G', man_url, 'clone1' ] )
+        mrlib.clone_cmd( [ man_url ] )
 
-        assert 'service' in util.readfile( 'clone1/file.txt' )
-        assert 'navy' in util.readfile( 'clone1/navy/file.txt' )
-        assert 'airforce' in util.readfile( 'clone1/airforce/file.txt' )
-        assert 'afrl' in util.readfile( 'clone1/airforce/afrl/file.txt' )
+        assert 'service' in util.readfile( 'code/file.txt' )
+        assert 'navy' in util.readfile( 'code/navy/file.txt' )
+        assert 'airforce' in util.readfile( 'code/airforce/file.txt' )
+        assert 'afrl' in util.readfile( 'code/airforce/afrl/file.txt' )
+
+    def test_clone_from_url_containing_default_xml_but_is_not_google_repo(self):
+        ""
+        url = util.create_bare_repo_with_file_and_branch( 'tricky' )
+        util.push_file_to_repo( url, 'default.xml', """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <foobar>
+              <another attr="origin"/>
+              <and further="more">i got nothing</and>
+            </foobar>
+            """.strip() )
+
+        mrlib.clone_cmd( [ url ] )
+
+        assert os.path.isdir( '.mrgit' )
+        assert os.path.isfile( 'tricky/default.xml' )
+        assert os.path.isdir( 'tricky/.git' )
 
     def test_multi_url_clone_followed_by_a_google_clone(self):
         ""

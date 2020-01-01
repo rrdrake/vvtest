@@ -16,41 +16,25 @@ NAME
     mrgit - Multi-Repository Git
 
 SYNOPSIS
-    mrgit help, mrgit -h, mrgit --help
-    mrgit clone
-    mrgit pull
+    Subcommands include help, clone, pull.
 
 DESCRIPTION
-    clone <repository> [<repository> ...] [<directory>]
-    clone -G <repository> [<directory>]
+    Blah blah.
 
-    A single <repository> can be a genesis URL, another mrgit clone URL, or
-    one or more Git repository URLs.
+mrgit [-v] clone <repository> [<repository> ...] [<directory>]
+mrgit [-v] clone -G <repository> [<directory>]
 
-    Use the -G option to clone from a Google Repo manifests URL.
+    When cloning a single repository URL, mrgit tries to determine if the
+    upstream is an mrgit repo, a Google manifests repo, a genesis repo, or
+    just a plain URL.  If you know the URL is a Google manifests repo but
+    mrgit is not recognizing it as such, use -G to force it.
 
     If more than one <repository> is given, an mrgit repository is created
-    and populated with those.
+    and populated with clones of the URLs.
 
-    pull
+mrgit [-v] pull
 
     Loop over each repository and issue "git pull".
-"""
-
-notes = """
-
-    mrgit [OPTIONS] clone [repo[,repo,...]] [directory]
-
-Upon clone, set/add to .git/info/exclude
-    - the .mrgit subdirectory
-    - sub-repositories
-
-multiple repository version control git manager utility tool
-tie combine coordinate 
-mrgit
-git wrapper for multiple repository managment
-grap = Git wRAPper
-mrgrap
 """
 
 
