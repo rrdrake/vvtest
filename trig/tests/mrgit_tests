@@ -525,6 +525,37 @@ class google_repo_manifests( trigutil.trigTestCase ):
         assert rmap.getRepoURL( 'bar.git' ) == 'file:///special/path/bar.git'
         assert rmap.getRepoURL( 'baz.git' ) == 'file:///server/path/baz.git'
 
+    def test_the_default_group_is_renaed_to_code(self):
+        ""
+        fs = defaults_xml.replace( 'CENTRALPATH', '/special/path/' )
+        util.writefile( 'default.xml', fs )
+        util.writefile( 'proj1.xml', proj1_xml )
+
+        gconv = mrlib.GoogleConverter( '.' )
+        gconv.readManifestFiles()
+
+        mfest = mrlib.Manifests()
+        gconv.fillManifests( mfest )
+
+        assert not mfest.findGroup( 'default' )
+        assert mfest.findGroup( 'code' )
+        assert mfest.findGroup( 'proj1' )
+
+    def test_the_default_group_is_NOT_renamed_to_code_if_a_code_xml_exists(self):
+        ""
+        fs = defaults_xml.replace( 'CENTRALPATH', '/special/path/' )
+        util.writefile( 'default.xml', fs )
+        util.writefile( 'code.xml', proj1_xml )
+
+        gconv = mrlib.GoogleConverter( '.' )
+        gconv.readManifestFiles()
+
+        mfest = mrlib.Manifests()
+        gconv.fillManifests( mfest )
+
+        assert mfest.findGroup( 'default' )
+        assert mfest.findGroup( 'code' )
+
     def test_creation_of_repo_groups(self):
         ""
         fs = defaults_xml.replace( 'CENTRALPATH', '/special/path/' )
@@ -537,7 +568,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         mfest = mrlib.Manifests()
         gconv.fillManifests( mfest )
 
-        rgrp = mfest.findGroup( 'default' )
+        rgrp = mfest.findGroup( 'code' )
         repoL = rgrp.getRepoNames()
         repoL.sort()
         assert repoL == [ 'afrl.git', 'airforce.git', 'navy.git', 'service.git' ]
@@ -568,7 +599,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         mfest = mrlib.Manifests()
         gconv.fillManifests( mfest )
 
-        assert mfest.findGroup( 'default' ) != None
+        assert mfest.findGroup( 'code' ) != None
         assert mfest.findGroup( 'example' ) == None
 
     def test_clone_from_a_google_repo_manifests(self):
@@ -592,10 +623,10 @@ class google_repo_manifests( trigutil.trigTestCase ):
 
         util.runcmd( mrgit_file+' clone -G '+man_url )
 
-        assert os.path.isdir( 'default/airforce' )
-        assert os.path.isdir( 'default/navy' )
-        assert os.path.isdir( 'default/.mrgit' )
-        assert os.path.isdir( 'default/.git' )
+        assert os.path.isdir( 'code/airforce' )
+        assert os.path.isdir( 'code/navy' )
+        assert os.path.isdir( 'code/.mrgit' )
+        assert os.path.isdir( 'code/.git' )
 
     def test_if_G_option_given_then_only_one_url_can_be_cloned(self):
         ""
@@ -833,10 +864,10 @@ class updating( trigutil.trigTestCase ):
         util.push_file_to_repo( abspath('central/navy.git'),
                                 'newfile.txt', "anything\n" )
 
-        x,out = util.runcmd( mrgit_file+' pull', chdir='default' )
+        x,out = util.runcmd( mrgit_file+' pull', chdir='code' )
         assert x == 0
 
-        assert util.readfile( 'default/navy/newfile.txt' ).strip() == 'anything'
+        assert util.readfile( 'code/navy/newfile.txt' ).strip() == 'anything'
 
     def test_pull_within_a_genesis_clone(self):
         ""

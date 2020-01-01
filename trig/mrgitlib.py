@@ -422,7 +422,10 @@ class GoogleConverter:
 
     def fillManifests(self, mfest):
         ""
-        for gmr in [ self.default ] + self.manifests:
+        grpname = self.getDefaultGroupName()
+        self._create_group_from_manifest( self.default, mfest, grpname )
+
+        for gmr in self.manifests:
             self._create_group_from_manifest( gmr, mfest )
 
     def readManifestFiles(self):
@@ -433,9 +436,10 @@ class GoogleConverter:
 
         self.manifests = []
         for fn in glob.glob( pjoin( self.srcdir, '*.xml' ) ):
-            gmr = GoogleManifestReader( fn )
-            gmr.createRepoNameToURLMap()
-            self.manifests.append( gmr )
+            if basename(fn) != 'default.xml':
+                gmr = GoogleManifestReader( fn )
+                gmr.createRepoNameToURLMap()
+                self.manifests.append( gmr )
 
     def fillRepoMap(self, rmap):
         ""
@@ -461,11 +465,31 @@ class GoogleConverter:
 
         return url
 
-    def _create_group_from_manifest(self, gmr, mfest):
+    def getDefaultGroupName(self):
+        ""
+        if 'code' not in self.getGroupNames():
+            return 'code'
+        else:
+            return None
+
+    def getGroupNames(self):
+        ""
+        names = []
+
+        for gmr in self.manifests:
+            if self._all_urls_are_primary( gmr ):
+                names.append( gmr.getGroupName() )
+
+        return names
+
+    def _create_group_from_manifest(self, gmr, mfest, force_groupname=None):
         ""
         if self._all_urls_are_primary( gmr ):
             for name,url,path in gmr.getProjectList():
-                groupname = gmr.getGroupName()
+                if force_groupname:
+                    groupname = force_groupname
+                else:
+                    groupname = gmr.getGroupName()
                 mfest.addRepo( groupname, name, path )
 
     def _all_urls_are_primary(self, gmr):
