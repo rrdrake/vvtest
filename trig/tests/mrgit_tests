@@ -630,6 +630,22 @@ class google_repo_manifests( trigutil.trigTestCase ):
         assert os.path.isfile( 'tricky/default.xml' )
         assert os.path.isdir( 'tricky/.git' )
 
+    def test_clone_a_google_repo_using_REPO_MANIFEST_URL_environ_variable(self):
+        ""
+        man_url = create_google_repo_set()
+
+        x,out = util.runcmd( mrgit_file+' clone', raise_on_error=False )
+        assert x != 0
+
+        with util.set_environ( REPO_MANIFEST_URL=man_url ):
+            x,out = util.runcmd( mrgit_file+' clone' )
+            assert x == 0
+
+        assert 'service' in util.readfile( 'code/file.txt' )
+        assert 'navy' in util.readfile( 'code/navy/file.txt' )
+        assert 'airforce' in util.readfile( 'code/airforce/file.txt' )
+        assert 'afrl' in util.readfile( 'code/airforce/afrl/file.txt' )
+
     def test_multi_url_clone_followed_by_a_google_clone(self):
         ""
         man_url = create_google_repo_set()

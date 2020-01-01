@@ -35,6 +35,9 @@ class trigTestCase( unittest.TestCase ):
         ""
         util.setup_test( cleanout )
 
+        if 'REPO_MANIFEST_URL' in os.environ:
+            del os.environ['REPO_MANIFEST_URL']
+
     def tearDown(self):
         ""
         pass

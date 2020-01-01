@@ -46,9 +46,23 @@ def clone_cmd( argv, **kwargs ):
 
     verb = kwargs.get( 'verbose', 1 )
 
-    if len( argL ) > 0:
-        creator = CloneCreator( verb )
-        creator.clone( argL, '-G' in optD )
+    augment_clone_command_line( optD, argL, os.environ )
+
+    if len( argL ) == 0:
+        errorexit( 'You must specify a repository to clone.' )
+
+    creator = CloneCreator( verb )
+    creator.clone( argL, '-G' in optD )
+
+
+def augment_clone_command_line( opts, arglist, environ ):
+    ""
+    if len( arglist ) == 0:
+        if 'REPO_MANIFEST_URL' in environ:
+            url = environ['REPO_MANIFEST_URL'].strip()
+            if url:
+                arglist.append( url )
+                opts['-G'] = ''
 
 
 def init_cmd( argv ):

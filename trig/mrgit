@@ -27,10 +27,13 @@ mrgit [-v] clone -G <repository> [<directory>]
     When cloning a single repository URL, mrgit tries to determine if the
     upstream is an mrgit repo, a Google manifests repo, a genesis repo, or
     just a plain URL.  If you know the URL is a Google manifests repo but
-    mrgit is not recognizing it as such, use -G to force it.
+    mrgit is not recognizing it as such, use -G to force it.  If no
+    repositories are given and the REPO_MANIFEST_URL variable is set, then
+    use that as the Google repo to clone.
 
     If more than one <repository> is given, an mrgit repository is created
-    and populated with clones of the URLs.
+    and populated with clones of each URL.  A single, plain URL is also
+    treated this way.
 
 mrgit [-v] pull
 
