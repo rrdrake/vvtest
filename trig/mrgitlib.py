@@ -1242,6 +1242,7 @@ class StatusWriter:
         ""
         self.verbose = verbose
         self.rows = []
+        self.files = {}
 
     def add(self, reponame, path, stats):
         ""
@@ -1252,7 +1253,21 @@ class StatusWriter:
                             path,
                             str( stats['branch'] ) ) )
 
+        chgL = self._collect_files( path, stats['changed'] )
+        unkL = self._collect_files( path, stats['untracked'] )
+
+        self.files[ reponame ] = [ chgL, unkL ]
+
     def write(self, fileobj):
+        ""
+        if self.verbose > 1:
+            self.writeFileList( fileobj )
+
+        self.writeSummaryTable( fileobj )
+
+        fileobj.flush()
+
+    def writeSummaryTable(self, fileobj):
         ""
         hdr = ( 'name', 'changed', 'untracked', 'commits', 'path', 'branch' )
 
@@ -1273,7 +1288,29 @@ class StatusWriter:
             fileobj.write( fmt % row + '\n' )
 
         fileobj.write( '\n' )
-        fileobj.flush()
+
+    def writeFileList(self, fileobj):
+        ""
+        for name,lists in self.files.items():
+            chgL,unkL = lists
+            if len(chgL) > 0 or len(unkL) > 0:
+                fileobj.write( 'Repository '+name+':\n' )
+                self._write_files( '  changed:', chgL, fileobj )
+                self._write_files( 'untracked:', unkL, fileobj )
+
+    def _write_files(self, listype, fnames, fileobj):
+        ""
+        for fn in fnames:
+            fileobj.write( '    '+listype+' '+fn+'\n' )
+
+    def _collect_files(self, path, filelist):
+        ""
+        fL = []
+        for fn in filelist:
+            fL.append( normpath( pjoin( path, fn ) ) )
+        fL.sort()
+
+        return fL
 
 
 def print3( *args ):

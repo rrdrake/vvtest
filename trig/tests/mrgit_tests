@@ -17,6 +17,10 @@ import unittest
 import glob
 import shutil
 
+try:
+    from StringIO import StringIO
+except Exception:
+    from io import StringIO
 
 import trigtestutils as trigutil
 import testutils as util
@@ -948,20 +952,63 @@ class commit_and_push( trigutil.trigTestCase ):
 
 class getting_status( trigutil.trigTestCase ):
 
+    def make_stats(self, changelist, untrackedlist):
+        ""
+        stats = { 'changed': changelist, 'untracked': untrackedlist,
+                  'commits': [], 'branch': 'master' }
+        return stats
+
+    def test_collecting_and_list_files(self):
+        ""
+        swr = mrlib.StatusWriter( verbose=1 )
+
+        statsA = self.make_stats( [ 'fileA.txt' ], [ 'unkA.txt' ] )
+        swr.add( 'repoA', '.', statsA )
+
+        statsB = self.make_stats( [ 'fileB.txt' ], [ 'unkB.txt' ] )
+        swr.add( 'repoB', 'sub', statsB )
+
+        sio = StringIO()
+        swr.writeFileList( sio )
+
+        val = sio.getvalue()
+        print3( val )
+        assert len( util.greplines( 'Repository *repoA', val ) ) == 1
+        assert len( util.greplines( 'Repository *repoB', val ) ) == 1
+        assert len( util.greplines( 'changed* fileA.txt', val ) ) == 1
+        assert len( util.greplines( 'untracked* unkA.txt', val ) ) == 1
+        assert len( util.greplines( 'changed* sub/fileB.txt', val ) ) == 1
+        assert len( util.greplines( 'untracked* sub/unkB.txt', val ) ) == 1
+
     def test_show_status_summary_of_two_repos(self):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
         mrlib.clone_cmd( [ cool_url, ness_url, 'sub' ] )
+        util.writefile( 'sub/cool/file.txt', 'some new contents' )
 
         x,out = util.runcmd( mrgit_file+' -vv status', chdir='sub' )
         print3( out )
+        assert x == 0
+        self.check_status_output( out )
+        assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
+
+        x,out = util.runcmd( mrgit_file+' -v status', chdir='sub' )
+        print3( out )
+        assert x == 0
+        self.check_status_output( out )
+        assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
 
         x,out = util.runcmd( mrgit_file+' status', chdir='sub' )
         print3( out )
         assert x == 0
+        self.check_status_output( out )
+        assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 0
+
+    def check_status_output(self, out):
+        ""
         assert len( util.greplines( 'changed*untracked*commits', out ) ) == 1
-        assert len( util.greplines( 'cool* 0 * 0 * 0 *cool master', out ) ) == 1
+        assert len( util.greplines( 'cool* 1 * 0 * 0 *cool master', out ) ) == 1
         assert len( util.greplines( 'ness* 0 * 0 * 0 *ness master', out ) ) == 1
 
 
