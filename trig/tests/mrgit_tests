@@ -839,6 +839,18 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         assert list( repos[1] ) == [ 'ssh:///and/two.git', 'two' ]
         assert cfg.getTopLevel() == abspath( 'topdir' )
 
+    def test_that_the_dot_mrgit_directory_is_ignored_by_git(self):
+        ""
+        genesis_url, sub_url = create_example_genesis_repo()
+
+        mrlib.clone_cmd( [ genesis_url ] )
+
+        assert os.path.isdir( 'code/.mrgit' )
+        git = GitRepo( 'code' )
+        stats = git.status()
+        for fn in stats['untracked']:
+            assert '.mrgit' not in fn
+
 
 class mrgit_init( trigutil.trigTestCase ):
 

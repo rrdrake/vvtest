@@ -244,6 +244,9 @@ class CloneCreator:
             raise
 
         cfg.commitLocalRepoMap()
+
+        set_to_ignore_mrgit_directory( cfg )
+
         cfg.setTopLevel( top )
 
         return top
@@ -1184,6 +1187,38 @@ def checkout_repo_map_branch( git ):
         git.checkout_branch( REPOMAP_BRANCH )
     else:
         git.create_branch( REPOMAP_BRANCH )
+
+
+def set_to_ignore_mrgit_directory( cfg ):
+    ""
+    for name,path in cfg.getLocalRepoPaths():
+        if path == '.':
+            fn = pjoin( cfg.getTopLevel(), '.git', 'info', 'exclude' )
+            check_add_mrgit_exclude_line( fn )
+
+
+def check_add_mrgit_exclude_line( filename ):
+    ""
+    excl = '/.mrgit'
+
+    addit = True
+
+    if os.path.exists( filename ):
+        addit = not file_has_line( filename, excl )
+
+    if addit:
+        with open( filename, 'at' ) as fp:
+            fp.write( excl+'\n' )
+
+
+def file_has_line( filename, line ):
+    ""
+    with open( filename, 'rt' ) as fp:
+        for line in fp:
+            if line.strip() == line:
+                return True
+
+    return False
 
 
 def get_repo_status( name, path, verbose ):
