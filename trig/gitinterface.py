@@ -63,6 +63,27 @@ class GitRepo:
         ""
         self.run( 'commit -m', pipes.quote(message), verbose=verbose )
 
+    def status(self, verbose=0):
+        ""
+        stats = {
+            'commits': [],
+            'changed': [],
+            'untracked': [],
+            'stash': [],
+        }
+
+        br = _current_branch_string( self.grun, verbose )
+        if br == None:
+            stats['branch'] = '<no branch found>'
+        else:
+            stats['branch'] = br
+
+        _get_commits_ahead( self.grun, stats['commits'], verbose )
+        _fill_path_statuses( self.grun, stats, verbose )
+        _fill_stash_list( self.grun, stats['stash'], verbose )
+
+        return stats
+
     def push(self, all_branches=False, all_tags=False,
                    repository=None, verbose=0):
         """
@@ -109,15 +130,13 @@ class GitRepo:
         """
         The current branch name, or None if in a detached HEAD state.
         """
-        x,out = self.run( 'branch', capture=True, verbose=verbose )
-
-        for line in out.splitlines():
-            if line.startswith( '* (' ):
-                return None  # detatched
-            elif line.startswith( '* ' ):
-                return line[2:].strip()
-
-        raise GitInterfaceError( 'no branches found in '+str(self.top) )
+        br = _current_branch_string( self.grun, verbose )
+        if br == None:
+            raise GitInterfaceError( 'no branch found in '+str(self.top) )
+        elif br.startswith( '(' ):
+            return None
+        else:
+            return br
 
     def get_branches(self, remotes=False, verbose=0):
         ""
@@ -245,6 +264,22 @@ class GitRepo:
         tagL.sort()
 
         return tagL
+
+    def checkout_tag(self, tagname, verbose=0):
+        ""
+        tagL = self.get_tags( verbose )
+        if tagname not in tagL:
+            raise GitInterfaceError( 'tag name does not exist: '+repr(tagname) )
+
+        self.run( 'checkout', tagname, verbose=verbose )
+
+    def create_tag(self, tagname, commit_message, verbose=0):
+        ""
+        if tagname in self.get_tags( verbose=verbose ):
+            raise GitInterfaceError( 'tag already exists: '+repr(tagname) )
+
+        self.run( 'tag -m', pipes.quote( commit_message ), tagname,
+                  verbose=verbose )
 
     def is_bare(self, verbose=0):
         ""
@@ -700,6 +735,98 @@ def _fetch_then_checkout_branch( gitrun, branchname, verbose ):
                             'fetch plus checkout failed: '+branchname )
 
 
+def _current_branch_string( gitrun, verbose ):
+    ""
+    x,out = gitrun.run( 'branch --no-color', capture=True, verbose=verbose )
+
+    val = None
+
+    for line in out.splitlines():
+        if line.startswith( '* (' ):
+            # detatched
+            val = line[2:].strip()
+            if _rebase_in_progress( gitrun, verbose ):
+                val = '(rebase in progress, e.g. merge conflict)'
+            break
+        elif line.startswith( '* ' ):
+            val = line[2:].strip()
+            break
+
+    return val
+
+
+def _rebase_in_progress( gitrun, verbose ):
+    ""
+    x,out = gitrun.run( 'status', capture=True, verbose=verbose )
+
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith( '# You are currently rebasing' ) or \
+           line.startswith( 'You are currently rebasing' ):
+            return True
+
+    return False
+
+
+def _get_commits_ahead( gitrun, commitlist, verbose ):
+    ""
+    x,out = gitrun.run( 'status', capture=True, verbose=verbose )
+
+    num = None
+
+    for line in out.splitlines():
+        line = line.strip()
+        if line.startswith( '# Your branch is ahead of' ) or \
+           line.startswith( 'Your branch is ahead of' ):
+            lineL = line.split()
+            if lineL[-1].startswith('commit'):
+                try:
+                    num = int( lineL[-2] )
+                except Exception:
+                    num = None
+                else:
+                    break
+
+    if num > 0:
+        x,out = gitrun.run( 'log -n', str(num), '--format="format:%H %s"',
+                            capture=True, verbose=verbose )
+
+        for line in out.splitlines():
+            lineL = line.strip().split()
+            if len( lineL ) > 0:
+                commitlist.append( ( lineL[0], ' '.join( lineL[1:] ) ) )
+
+
+def _fill_path_statuses( gitrun, statD, verbose ):
+    ""
+    x,out = gitrun.run( 'status --porcelain', capture=True, verbose=verbose )
+
+    chg = statD['changed']
+    unk = statD['untracked']
+
+    for line in out.splitlines():
+        lineL = line.strip().split()
+        if len( lineL ) > 1:
+            fmt,fn = lineL[0],lineL[1]
+            if fmt == '??':
+                unk.append( fn )
+            else:
+                chg.append( fn )
+
+    chg.sort()
+    unk.sort()
+
+
+def _fill_stash_list( gitrun, stashlist, verbose ):
+    ""
+    x,out = gitrun.run( 'stash list', capture=True, verbose=verbose )
+
+    for line in out.splitlines():
+        lineL = line.strip().split(':',1)
+        if len( lineL ) == 2:
+            stashlist.append( ( lineL[0], lineL[1] ) )
+
+
 class change_directory:
 
     def __init__(self, directory):
@@ -937,12 +1064,12 @@ def runcmd( cmd, chdir=None,
 
 def flush_stdout_err( out, err ):
     ""
-    if out:
-        sys.stdout.write( '\n'+out )
-        sys.stdout.flush()
-    if err:
-        sys.stderr.write( '\n'+err )
-        sys.stderr.flush()
+    for fp,val in [ (sys.stdout,out), (sys.stderr,err) ]:
+        if val:
+            fp.write( '\n'+val )
+            if not val.endswith( os.linesep ):
+                fp.write( os.linesep )
+            fp.flush()
 
 
 if sys.version_info[0] < 3:

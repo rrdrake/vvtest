@@ -16,6 +16,8 @@ import time
 import shutil
 import glob
 import filecmp
+import string
+import random
 import unittest
 
 import trigtestutils as trigutil
@@ -994,6 +996,59 @@ class branches( trigutil.trigTestCase ):
         self.assertRaises( GitInterfaceError, git.delete_remote_branch, 'foobar' )
 
 
+class tagging( trigutil.trigTestCase ):
+
+    def test_checking_out_a_tag(self):
+        ""
+        bare = util.create_bare_repo_with_file_and_branch( 'example' )
+        util.push_file_to_repo( bare, 'newfile.txt', 'add new file' )
+        util.push_tag_to_repo( bare, 'newtag' )
+        util.push_file_to_repo( bare, 'newfile.txt', 'change new file' )
+
+        clone_repo( bare, 'chk' )
+        git = GitRepo( 'chk' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'change new file'
+
+        git.checkout_tag( 'newtag' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'add new file'
+
+        git.checkout_branch( 'master' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'change new file'
+
+        self.assertRaises( GitInterfaceError,
+                           git.checkout_tag, 'tag_that_does_not_exist' )
+
+    def test_creating_a_tag(self):
+        ""
+        bare = util.create_bare_repo_with_file_and_branch( 'example' )
+        util.push_file_to_repo( bare, 'newfile.txt', 'add new file' )
+
+        git = clone_repo( bare, 'ex' )
+
+        git.create_tag( 'newtag', 'create new tag' )
+
+        util.writefile( 'ex/newfile.txt', 'change new file' )
+        git.add( 'ex/newfile.txt' )
+        git.commit( 'make a commit' )
+
+        git.checkout_tag( 'newtag' )
+        assert util.readfile( 'ex/newfile.txt' ).strip() == 'add new file'
+
+        git.checkout_branch( 'master' )
+        git.push()
+        git.push( all_tags=True )
+
+        git2 = clone_repo( bare, 'chk' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'change new file'
+
+        git2.checkout_tag( 'newtag' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'add new file'
+
+        git2.checkout_branch( 'master' )
+        assert util.readfile( 'chk/newfile.txt' ).strip() == 'change new file'
+        self.assertRaises( GitInterfaceError, git.create_tag, 'newtag', 'mesg' )
+
+
 class pulling( trigutil.trigTestCase ):
 
     def setUp(self):
@@ -1401,6 +1456,150 @@ class misc_functions( trigutil.trigTestCase ):
             assert not is_subdir( '.', normpath( abspath('../dir1') ) )
             assert is_subdir( '.', pjoin( '..', 'dir1', '..', 'dir2' ) )
             assert is_subdir( os.getcwd(), pjoin( '..', 'dir1', '..', 'dir2' ) )
+
+
+class status_tests( trigutil.trigTestCase ):
+
+    def make_repo_and_clone(self):
+        ""
+        url = util.create_bare_repo_with_file_and_branch( 'example', tag='atag' )
+        util.push_file_to_repo( url, 'file.txt', 'new file content' )
+        clone_repo( url )
+        git = GitRepo( 'example' )
+
+        return git, url
+
+    def test_entries_in_an_empty_status(self):
+        ""
+        git,bare = self.make_repo_and_clone()
+
+        status = git.status()
+
+        assert len( status['commits'] ) == 0
+        assert len( status['changed'] ) == 0
+        assert len( status['untracked'] ) == 0
+        assert len( status['stash'] ) == 0
+        assert status['branch'] == 'master'
+
+    def test_branch_states(self):
+        ""
+        git,bare = self.make_repo_and_clone()
+
+        status = git.status( verbose=3 )
+        assert status['branch'] == 'master'
+
+        git.checkout_branch( 'topic' )
+        status = git.status( verbose=3 )
+        assert status['branch'] == 'topic'
+
+        util.checkout_to_previous_sha1( 'example' )
+        status = git.status( verbose=3 )
+        assert status['branch'].startswith( '(' )
+
+        git.checkout_branch( 'master' )
+        git.checkout_tag( 'atag' )
+        status = git.status( verbose=3 )
+        print3( status['branch'] )
+        assert status['branch'].startswith( '(' )
+
+    def test_branch_state_during_conflict_resolution(self):
+        ""
+        git,bare= self.make_repo_and_clone()
+
+        util.push_file_to_repo( bare, 'file.txt', 'should conflict' )
+
+        util.writefile( 'example/file.txt', 'make sure it does' )
+        git.add( 'example/file.txt' )
+        git.commit( 'conflict message\n\nthen message\nbody\n' )
+
+        x,out = git.run( 'pull', verbose=3, raise_on_error=False )
+        assert x != 0
+
+        status = git.status()
+        assert 'rebase in progress' in status['branch']
+        assert status['changed'] == [ 'file.txt' ]
+
+    def test_commit_list(self):
+        ""
+        git,bare = self.make_repo_and_clone()
+
+        util.writefile( 'example/file.txt', 'a content string' )
+        git.add( 'example/file.txt' )
+        git.commit( 'a message\n\nthen message\nbody\n' )
+
+        util.writefile( 'example/file.txt', 'next content' )
+        git.add( 'example/file.txt' )
+        git.commit( 'next msg\n\nand smore\n' )
+
+        status = git.status( verbose=3 )
+        cmtL = status['commits']
+        assert len( cmtL ) == 2
+        sha1,msg = cmtL[0]
+        assert sha1
+        assert 'next msg' in msg and 'and smore' not in msg
+        sha1,msg = cmtL[1]
+        assert sha1
+        assert 'a message' in msg and 'then message' not in msg
+
+    def test_changed_and_untracked_files(self):
+        ""
+        git,bare = self.make_repo_and_clone()
+
+        for i in range(10):
+            fn = 'example/file'+str(i)+'.txt'
+            util.writefile( fn, random_file_content(i) )
+            git.add( fn )
+            git.commit( 'cmt msg '+str(i) )
+            git.push
+
+        git.run( 'rm file2.txt' )
+        git.run( 'mv file4.txt file_moved.txt' )
+        shutil.copy( 'example/file6.txt', 'example/file_copied.txt' )
+        util.writefile( 'example/file7.txt', 'complete overwrite' )
+        util.writefile( 'example/file_new.txt', 'a new file' )
+        os.remove( 'example/file9.txt' )
+
+        status = git.status()
+
+        assert status['changed'] == [ 'file2.txt', 'file4.txt',
+                                      'file7.txt', 'file9.txt' ]
+        assert status['untracked'] == [ 'file_copied.txt', 'file_new.txt' ]
+
+    def test_the_stash_list(self):
+        ""
+        git,bare = self.make_repo_and_clone()
+
+        util.writefile( 'example/file.txt', 'complete overwrite' )
+        mj,mn,mc = git_version()
+        if mj < 2 or ( mj == 2 and mn < 13 ):
+            git.run( 'stash save "stash message"', verbose=3 )
+        else:
+            git.run( 'stash push -m "stash message"', verbose=3 )
+
+        util.writefile( 'example/file.txt', 'another overwrite' )
+        git.run( 'stash', verbose=3 )
+
+        status = git.status()
+
+        stashL = status['stash']
+        assert len( stashL ) == 2
+        ref,msg = stashL[0]
+        assert ref.startswith( 'stash@' ) and 'WIP' in msg
+        ref,msg = stashL[1]
+        assert ref.startswith( 'stash@' ) and 'stash message' in msg
+
+
+def random_file_content( idx ):
+    ""
+    cs = ''
+
+    letters = string.ascii_letters + string.digits
+    for i in range(idx+1):
+        for j in range(100):
+            cs += random.choice( letters )
+        cs += '\n'
+
+    return cs
 
 
 def call_expect_GitInterfaceError_capture_output( func, *args, **kwargs ):
