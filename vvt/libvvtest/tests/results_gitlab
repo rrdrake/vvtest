@@ -31,7 +31,7 @@ from libvvtest.gitlabwriter import make_submit_info
 from libvvtest.TestSpecCreator import TestCreator
 from libvvtest.teststatus import TestStatus, DIFF_EXIT_STATUS
 from libvvtest.testcase import TestCase
-from gitinterface import GitRepo
+from gitinterface import clone_repo, get_remote_branches
 
 
 class gitlab_output_format_tests( vtu.vvtestTestCase ):
@@ -466,10 +466,10 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
                     'myname':'my value' }
         wr._dispatch_submission( None, runinfo )
 
-        git = GitRepo( url, 'checkrepo' )
+        git = clone_repo( url, 'checkrepo' )
         branch = get_results_branch( git )
         assert branch == 'results_2019_06'
-        git.checkoutBranch( branch )
+        git.checkout_branch( branch )
         rdir = util.globfile( 'checkrepo/*' )
         assert basename( rdir ) == '2019_06_06_06'
 
@@ -587,10 +587,10 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=5, npass=2, diff=2, fail=1 )
         time.sleep(1)
 
-        git = GitRepo( url, 'checkrepo' )
+        git = clone_repo( url, 'checkrepo' )
         branch = get_results_branch( git )
         assert branch == 'results_2019_06'
-        git.checkoutBranch( branch )
+        git.checkout_branch( branch )
         rdir = util.globfile( 'checkrepo/*' )
         assert 'dbg' in rdir and 'digit' in rdir
         assert basename(rdir).startswith( '2019_06_06' )
@@ -637,7 +637,7 @@ def get_results_branch( git ):
     ""
     brL = []
 
-    for br in git.listRemoteBranches():
+    for br in get_remote_branches( git.get_remote_URL() ):
         if br.startswith( 'results_' ):
             brL.append( br )
 
