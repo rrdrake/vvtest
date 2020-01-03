@@ -262,7 +262,7 @@ def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):
             if verbose < 1:
                 print3( 'RUN: '+dstr+cmd )
             print3( out )
-            raise Exception( 'runcmd failed: '+repr(dstr) )
+            raise Exception( 'runcmd failed: '+repr(dstr+cmd) )
         elif verbose >= 1:
             print3( out )
     elif verbose >= 2:

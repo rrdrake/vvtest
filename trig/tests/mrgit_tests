@@ -934,6 +934,25 @@ class commit_and_push( trigutil.trigTestCase ):
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1
 
 
+class getting_status( trigutil.trigTestCase ):
+
+    def test_show_status_summary_of_two_repos(self):
+        ""
+        cool_url, ness_url = make_coolness_repositories()
+
+        mrlib.clone_cmd( [ cool_url, ness_url, 'sub' ] )
+
+        x,out = util.runcmd( mrgit_file+' -vv status', chdir='sub' )
+        print3( out )
+
+        x,out = util.runcmd( mrgit_file+' status', chdir='sub' )
+        print3( out )
+        assert x == 0
+        assert len( util.greplines( 'changed*untracked*commits', out ) ) == 1
+        assert len( util.greplines( 'cool* 0 * 0 * 0 *cool master', out ) ) == 1
+        assert len( util.greplines( 'ness* 0 * 0 * 0 *ness master', out ) ) == 1
+
+
 #######################################################################
 
 util.run_test_cases( sys.argv, sys.modules[__name__] )

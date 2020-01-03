@@ -16,7 +16,7 @@ NAME
     mrgit - Multi-Repository Git
 
 SYNOPSIS
-    Subcommands include help, clone, pull.
+    Subcommands include help, clone, pull, status.
 
 DESCRIPTION
     Blah blah.
@@ -38,6 +38,10 @@ mrgit [-v] clone -G <repository> [<directory>]
 mrgit [-v] pull
 
     Loop over each repository and issue "git pull".
+
+mrgit [-v] status
+
+    Show a status summary of each repository.
 """
 
 
@@ -76,6 +80,9 @@ def main():
     elif cmd == 'init':
         mrgitlib.init_cmd( argL[1:] )
 
+    elif cmd == 'status':
+        mrgitlib.status_cmd( argL[1:], verbose=verb )
+
     else:
         mrgitlib.errorexit( 'unknown mrgit command:', cmd )
 
@@ -84,6 +91,7 @@ def determine_verbosity( optD ):
     ""
     cnt = optD.get( '-v', 0 )
     return 1+cnt
+
 
 ####################################################################
 

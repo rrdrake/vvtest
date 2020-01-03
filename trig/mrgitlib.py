@@ -78,7 +78,7 @@ def fetch_cmd( argv ):
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
-    for path in cfg.getLocalRepoPaths():
+    for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'fetch', verbose=3 )
 
@@ -88,7 +88,7 @@ def pull_cmd( argv ):
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
-    for path in cfg.getLocalRepoPaths():
+    for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'pull', verbose=3 )
 
@@ -98,7 +98,7 @@ def add_cmd( argv ):
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
-    for path in cfg.getLocalRepoPaths():
+    for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'add', *args, verbose=3 )
@@ -109,7 +109,7 @@ def commit_cmd( argv ):
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
-    for path in cfg.getLocalRepoPaths():
+    for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
         git.run( 'commit', *args, verbose=3 )
@@ -120,9 +120,23 @@ def push_cmd( argv ):
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
-    for path in cfg.getLocalRepoPaths():
+    for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         git.run( 'push', verbose=3 )
+
+
+def status_cmd( argv, **kwargs ):
+    ""
+    cfg = load_configuration()
+
+    verb = kwargs.get( 'verbose', 0 )
+
+    top = cfg.getTopLevel()
+    stats = StatusWriter( verb )
+    for name,path in cfg.getLocalRepoPaths():
+        statD = get_repo_status( name, pjoin( top, path ), verb )
+        stats.add( name, path, statD )
+    stats.write( sys.stdout )
 
 
 def load_configuration():
@@ -217,6 +231,8 @@ class CloneCreator:
         self.tmpdir = TempDirectory( self.dest )
 
         top = self.cloneByUpstreamType( is_google_manifest )
+
+        print3( 'mrgit toplevel is', repr(top) )
 
         self.tmpdir.rename( top )
 
@@ -365,7 +381,7 @@ def check_nonempty_destination_paths( top, pathlist ):
     if os.path.islink(dst) or os.path.exists(dst):
         errorexit( 'a previous mrgit exists in destination path:', repr(dst) )
 
-    for path in pathlist:
+    for name,path in pathlist:
         dst = pjoin( top, path )
         if os.path.islink(dst) or os.path.exists(dst):
             errorexit( 'destination path already exists:', repr(dst) )
@@ -866,7 +882,7 @@ class Configuration:
         grp = self.mfest.getDefaultGroup()
         if grp != None:
             for spec in grp.getRepoList():
-                paths.append( spec['path'] )
+                paths.append( ( spec['repo'], spec['path'] ) )
 
         return paths
 
@@ -1182,6 +1198,60 @@ def checkout_repo_map_branch( git ):
         git.checkout_branch( REPOMAP_BRANCH )
     else:
         git.create_branch( REPOMAP_BRANCH )
+
+
+def get_repo_status( name, path, verbose ):
+    ""
+    git = gititf.GitRepo( path )
+
+    if verbose > 0:
+        if verbose >= 3:
+            print3()
+        print3( 'Getting status of', repr(name), '...' )
+
+    gitverb = ( 0 if verbose < 3 else 3 )
+    statD = git.status( verbose=gitverb )
+
+    return statD
+
+
+class StatusWriter:
+
+    def __init__(self, verbose=0):
+        ""
+        self.verbose = verbose
+        self.rows = []
+
+    def add(self, reponame, path, stats):
+        ""
+        self.rows.append( ( reponame,
+                            str( len( stats['changed'] ) ),
+                            str( len( stats['untracked'] ) ),
+                            str( len( stats['commits'] ) ),
+                            path,
+                            str( stats['branch'] ) ) )
+
+    def write(self, fileobj):
+        ""
+        hdr = ( 'name', 'changed', 'untracked', 'commits', 'path', 'branch' )
+
+        szL = [ len(hdr[i]) for i in range(len(hdr)) ]
+        for row in self.rows:
+            for i in range( len(row) ):
+                szL[i] = max( szL[i], len(str(row[i])) )
+
+        fmt = '%%-%ds | %%%ds %%%ds %%%ds | %%-%ds %%-%ds' % tuple(szL)
+        hs = fmt % hdr
+
+        hz = '-'*(szL[0]+1) + '+' + \
+             '-'*(szL[1]+1) + '-'*(szL[2]+1) + '-'*(szL[3]+2) + '+' + \
+             '-'*(szL[4]+1) + '-'*(szL[5]+1)
+
+        fileobj.write( '\n' + hs + '\n' + hz+'\n' )
+        for row in self.rows:
+            fileobj.write( fmt % row + '\n' )
+
+        fileobj.flush()
 
 
 def print3( *args ):
