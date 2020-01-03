@@ -869,7 +869,7 @@ class updating( trigutil.trigTestCase ):
         assert not os.path.exists( 'cool/.git/FETCH_HEAD' )
 
         with util.change_directory( 'cool' ):
-            mrlib.fetch_cmd( [] )
+            util.runcmd( mrgit_file+' fetch', verbose=3 )
 
         x,out = util.runcmd( 'git branch -rv', chdir='cool' )
         assert x == 0
@@ -927,8 +927,8 @@ class commit_and_push( trigutil.trigTestCase ):
         with util.change_directory( 'cool' ):
             util.writefile( 'newfile.txt', 'foo bar\n' )
             mrlib.add_cmd( [ '.' ] )
-            mrlib.commit_cmd( ['-m','add new file'] )
-            mrlib.push_cmd( [] )
+            util.runcmd( mrgit_file+' commit -m "add new file"', verbose=3 )
+            util.runcmd( mrgit_file+' push', verbose=3 )
 
         clone_repo( src_url, directory='check', verbose=3 )
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1

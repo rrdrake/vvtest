@@ -36,6 +36,14 @@ def errorexit( *args ):
     raise MRGitExitError( err )
 
 
+def init_cmd( argv ):
+    ""
+    cfg = Configuration()
+    cfg.setTopLevel( os.getcwd() )
+    cfg.createMRGitRepo()
+    cfg.commitLocalRepoMap()
+
+
 def clone_cmd( argv, **kwargs ):
     ""
     optL,argL = getopt.getopt( argv, 'G', [] )
@@ -65,24 +73,6 @@ def augment_clone_command_line( opts, arglist, environ ):
                 opts['-G'] = ''
 
 
-def init_cmd( argv ):
-    ""
-    cfg = Configuration()
-    cfg.setTopLevel( os.getcwd() )
-    cfg.createMRGitRepo()
-    cfg.commitLocalRepoMap()
-
-
-def fetch_cmd( argv ):
-    ""
-    cfg = load_configuration()
-
-    top = cfg.getTopLevel()
-    for name,path in cfg.getLocalRepoPaths():
-        git = gititf.GitRepo( pjoin( top, path ) )
-        git.run( 'fetch', verbose=3 )
-
-
 def pull_cmd( argv ):
     ""
     cfg = load_configuration()
@@ -104,27 +94,6 @@ def add_cmd( argv ):
         git.run( 'add', *args, verbose=3 )
 
 
-def commit_cmd( argv ):
-    ""
-    cfg = load_configuration()
-
-    top = cfg.getTopLevel()
-    for name,path in cfg.getLocalRepoPaths():
-        git = gititf.GitRepo( pjoin( top, path ) )
-        args = [ pipes.quote(arg) for arg in argv ]
-        git.run( 'commit', *args, verbose=3 )
-
-
-def push_cmd( argv ):
-    ""
-    cfg = load_configuration()
-
-    top = cfg.getTopLevel()
-    for name,path in cfg.getLocalRepoPaths():
-        git = gititf.GitRepo( pjoin( top, path ) )
-        git.run( 'push', verbose=3 )
-
-
 def status_cmd( argv, **kwargs ):
     ""
     cfg = load_configuration()
@@ -137,6 +106,23 @@ def status_cmd( argv, **kwargs ):
         statD = get_repo_status( name, pjoin( top, path ), verb )
         stats.add( name, path, statD )
     stats.write( sys.stdout )
+
+
+def run_cmd( argv, **kwargs ):
+    ""
+    cfg = load_configuration()
+
+    verb = kwargs.get( 'verbose', 0 )
+
+    top = cfg.getTopLevel()
+    for name,path in cfg.getLocalRepoPaths():
+        git = gititf.GitRepo( pjoin( top, path ) )
+        if verb > 0:
+            print3( '\nRepository', repr(name), 'in path', repr(path), '...' )
+        cmd = ' '.join( [ pipes.quote(arg) for arg in argv ] )
+        x,out = git.run( cmd, verbose=verb, raise_on_error=False )
+        if x != 0 and verb < 3:
+            print3( out )
 
 
 def load_configuration():
@@ -1251,6 +1237,7 @@ class StatusWriter:
         for row in self.rows:
             fileobj.write( fmt % row + '\n' )
 
+        fileobj.write( '\n' )
         fileobj.flush()
 
 

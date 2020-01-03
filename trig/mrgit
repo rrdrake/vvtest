@@ -80,11 +80,14 @@ def main():
     elif cmd == 'init':
         mrgitlib.init_cmd( argL[1:] )
 
+    elif cmd == 'add':
+        mrgitlib.add_cmd( argL[1:] )
+
     elif cmd == 'status':
         mrgitlib.status_cmd( argL[1:], verbose=verb )
 
     else:
-        mrgitlib.errorexit( 'unknown mrgit command:', cmd )
+        mrgitlib.run_cmd( argL, verbose=verb )
 
 
 def determine_verbosity( optD ):

@@ -787,7 +787,7 @@ def _get_commits_ahead( gitrun, commitlist, verbose ):
                 else:
                     break
 
-    if num > 0:
+    if num:
         x,out = gitrun.run( 'log -n', str(num), '--format="format:%H %s"',
                             capture=True, verbose=verbose )
 
@@ -1051,8 +1051,11 @@ def runcmd( cmd, chdir=None,
             err = _STRING_(serr)
 
     if x != 0:
-        if collect and verbose >= 2:
-            flush_stdout_err( out, err )
+        if collect:
+            if verbose >= 2:
+                flush_stdout_err( out, err )
+            else:
+                out += err
         if raise_on_error:
             raise GitInterfaceError( 'Command failed: '+cmd )
 
