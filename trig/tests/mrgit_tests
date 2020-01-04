@@ -949,6 +949,22 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
                                                      raise_on_error=False )
             assert x != 0 and 'mrgit error' in out
 
+    def test_adding_verbose_option_after_the_git_command(self):
+        ""
+        src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
+
+        mrlib.clone_cmd( [ '-v', src_url ] )
+
+        with util.change_directory( 'cool' ):
+            util.runcmd( mrgit_file+' pull -v', verbose=3 )
+            util.runcmd( mrgit_file+' pull -vv', verbose=3 )
+            util.runcmd( mrgit_file+' add -v .', verbose=3 )
+            util.runcmd( mrgit_file+' add -vv .', verbose=3 )
+            util.runcmd( mrgit_file+' status -v', verbose=3 )
+            util.runcmd( mrgit_file+' status -vv', verbose=3 )
+            util.runcmd( mrgit_file+' fetch -v', verbose=3 )
+            util.runcmd( mrgit_file+' fetch -vv', verbose=3 )
+
 
 class mrgit_init( trigutil.trigTestCase ):
 
@@ -1088,6 +1104,12 @@ class getting_status( trigutil.trigTestCase ):
         assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
 
         x,out = util.runcmd( mrgit_file+' -v status', chdir='sub' )
+        print3( out )
+        assert x == 0
+        self.check_status_output( out )
+        assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
+
+        x,out = util.runcmd( mrgit_file+' status -v', chdir='sub' )
         print3( out )
         assert x == 0
         self.check_status_output( out )

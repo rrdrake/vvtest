@@ -36,7 +36,7 @@ def errorexit( *args ):
     raise MRGitExitError( err )
 
 
-def init_cmd( argv ):
+def init_cmd( argv, **kwargs ):
     ""
     cfg = Configuration()
     cfg.setTopLevel( os.getcwd() )
@@ -46,13 +46,17 @@ def init_cmd( argv ):
 
 def clone_cmd( argv, **kwargs ):
     ""
-    optL,argL = getopt.getopt( argv, 'G', [] )
+    optL,argL = getopt.getopt( argv, 'Gv', [] )
 
     optD = {}
     for n,v in optL:
-        optD[n] = v
+        if n == '-v':
+            cnt = optD.get( '-v', 0 )
+            optD[n] = cnt+1
+        else:
+            optD[n] = v
 
-    verb = kwargs.get( 'verbose', 1 )
+    verb = optD.get( '-v', kwargs.get( 'verbose', 0 ) ) + 1
 
     augment_clone_command_line( optD, argL, os.environ )
 
@@ -73,32 +77,55 @@ def augment_clone_command_line( opts, arglist, environ ):
                 opts['-G'] = ''
 
 
-def pull_cmd( argv ):
+def get_verbosity( argv, kwargs, default ):
     ""
+    verb = 0
+
+    if '-v' in argv:
+        verb = argv.count( '-v' )
+        verb += 2*argv.count( '-vv' )
+    elif '-vv' in argv:
+        verb = 2*argv.count( '-vv' )
+
+    if not verb:
+        verb = kwargs.get( 'verbose', default )
+
+    # reserve the value zero for "quiet" (not implemented yet)
+    verb += 1
+
+    return verb
+
+
+def pull_cmd( argv, **kwargs ):
+    ""
+    verb = get_verbosity( argv, kwargs, 2 )
+
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
     for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
-        git.run( 'pull', verbose=3 )
+        git.run( 'pull', verbose=verb )
 
 
-def add_cmd( argv ):
+def add_cmd( argv, **kwargs ):
     ""
+    verb = get_verbosity( argv, kwargs, 2 )
+
     cfg = load_configuration()
 
     top = cfg.getTopLevel()
     for name,path in cfg.getLocalRepoPaths():
         git = gititf.GitRepo( pjoin( top, path ) )
         args = [ pipes.quote(arg) for arg in argv ]
-        git.run( 'add', *args, verbose=3 )
+        git.run( 'add', *args, verbose=verb )
 
 
 def status_cmd( argv, **kwargs ):
     ""
-    cfg = load_configuration()
+    verb = get_verbosity( argv, kwargs, 0 )
 
-    verb = kwargs.get( 'verbose', 0 )
+    cfg = load_configuration()
 
     top = cfg.getTopLevel()
     stats = StatusWriter( verb )
@@ -110,9 +137,9 @@ def status_cmd( argv, **kwargs ):
 
 def run_cmd( argv, **kwargs ):
     ""
-    cfg = load_configuration()
+    verb = get_verbosity( argv, kwargs, 0 )
 
-    verb = kwargs.get( 'verbose', 0 )
+    cfg = load_configuration()
 
     top = cfg.getTopLevel()
     for name,path in cfg.getLocalRepoPaths():
