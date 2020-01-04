@@ -16,6 +16,7 @@ import time
 import unittest
 import glob
 import shutil
+import tarfile
 
 try:
     from StringIO import StringIO
@@ -674,6 +675,21 @@ class google_repo_manifests( trigutil.trigTestCase ):
         else:
             raise Exception( 'expected an MRGitExitError exception' )
 
+    def test_using_mrgit_to_get_status_from_a_google_repo_checkout(self):
+        ""
+        repocmd = setup_for_google_repo()
+
+        checkout_by_actually_using_google_repo( repocmd, 'chkout' )
+
+        x,out = util.runcmd( mrgit_file+' -v status', chdir='chkout/airforce',
+                                                      verbose=3 )
+
+        assert len( util.greplines( 'changed*untracked*commits', out ) ) == 1
+        assert len( util.greplines( 'service.git* 0 * 0 * 0 *.', out ) ) == 1
+        assert len( util.greplines( 'navy.git* 0 * 0 * 0 *navy', out ) ) == 1
+        assert len( util.greplines( 'airforce.git* 0 * 0 * 0 *airforce', out ) ) == 1
+        assert len( util.greplines( 'afrl.git* 0 * 0 * 0 *airforce/afrl', out ) ) == 1
+
 
 def make_coolness_repositories():
     ""
@@ -695,7 +711,78 @@ def create_google_repo_set():
             file in """+repo+""" repository
             """ )
 
+    util.push_file_to_repo( 'file://'+abspath('central/service.git'),
+                            '.gitignore', """
+        .repo
+        airforce
+        navy
+        """ )
+
+    util.push_file_to_repo( 'file://'+abspath('central/airforce.git'),
+                            '.gitignore', """
+        afrl
+        """ )
+
     return man_url
+
+
+def setup_for_google_repo( bindir='testingbin' ):
+    """
+    the repo source repository was created by
+      - git clone sierra-git:/git/git-repo
+      - cd git-repo
+      - rm -rf .git
+      - git init
+      - git add .
+      - git commit -m "top skim commit"
+      - cd ..
+      - git clone --bare file://`pwd`/git-repo git-repo.git
+      - tar zcvf bare-git-repo.tgz git-repo.git
+    """
+    os.mkdir( bindir )
+
+    shutil.copy( trigutil.testsrcdir+'/repo', bindir+'/repo' )
+
+    print3( 'cd '+abspath(bindir)+' &&',
+            'tar zxvf '+trigutil.testsrcdir+'/bare-git-repo.tgz' )
+    with util.change_directory( bindir ):
+        tf = tarfile.open( trigutil.testsrcdir+'/bare-git-repo.tgz', 'r:gz' )
+        tf.extractall()
+
+    os.environ['REPO_URL'] = 'file://'+abspath( bindir+'/git-repo.git' )
+    print3( 'REPO_URL =', os.environ['REPO_URL'] )
+
+    os.environ['PATH'] = abspath(bindir) + ':' + os.environ['PATH']
+
+    # the repo script needs python 2 (at least this one does)
+    if sys.version_info[0] < 3:
+        repocmd = sys.executable
+    elif os.path.exists( '/usr/bin/python2' ):
+        repocmd = '/usr/bin/python2'
+    else:
+        repocmd = 'python2'
+
+    repocmd += ' ' + abspath(bindir)+'/repo'
+
+    print3()
+
+    return repocmd
+
+
+def checkout_by_actually_using_google_repo( repocmd, directory ):
+    ""
+    os.mkdir( directory )
+
+    create_google_repo_set()
+
+    os.environ['REPO_MANIFEST_URL'] = 'file://'+abspath('central/manifests.git')
+    print3( 'REPO_MANIFEST_URL =', os.environ['REPO_MANIFEST_URL'], '\n' )
+
+    with util.change_directory( directory ):
+        util.runcmd( repocmd+' init -b master', verbose=3 )
+        util.runcmd( repocmd+' sync', verbose=3 )
+        util.runcmd( repocmd+' start --all master', verbose=3 )
+        util.runcmd( repocmd+' status', verbose=3 )
 
 
 defaults_xml = """\
@@ -854,6 +941,13 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         stats = git.status()
         for fn in stats['untracked']:
             assert '.mrgit' not in fn
+
+    def test_error_message_when_no_mrgit_repo_found(self):
+        ""
+        for cmd in ['status','fetch','pull','add','push','commit']:
+            x,out = util.runcmd( mrgit_file+' '+cmd, chdir='/usr',
+                                                     raise_on_error=False )
+            assert x != 0 and 'mrgit error' in out
 
 
 class mrgit_init( trigutil.trigTestCase ):

@@ -129,25 +129,39 @@ def load_configuration():
     ""
     cfg = Configuration()
 
-    top = find_mrgit_top_level()
-    cfg.setTopLevel( top )
-    read_mrgit_manifests_file( cfg.getManifests(), top )
-    cfg.computeLocalRepoMap()
+    top = find_top_level( '.mrgit' )
+    if top:
+        cfg.setTopLevel( top )
+        read_mrgit_manifests_file( cfg.getManifests(), top )
+        cfg.computeLocalRepoMap()
+
+    else:
+        top = find_top_level( '.repo' )
+        if top:
+            cfg.setTopLevel( top )
+            gconv = GoogleConverter( top+'/.repo/manifests' )
+            gconv.loadManifestsAndRemoteMap( cfg.getManifests(),
+                                             cfg.getRemoteMap(),
+                                             top )
+        else:
+            errorexit( 'Not an mrgit repository (or any parent directory)' )
+
 
     return cfg
 
 
-def find_mrgit_top_level():
+def find_top_level( repodir ):
     ""
     top = None
+    stopat = os.environ.get( 'MRGIT_PARENT_SEARCH_BARRIER', '/' )
 
     d1 = os.getcwd()
     while True:
-        if os.path.isdir( pjoin( d1, '.mrgit' ) ):
+        if os.path.isdir( pjoin( d1, repodir ) ):
             top = d1
             break
         d2 = dirname( d1 )
-        if not d2 or d1 == d2:
+        if not d2 or d1 == d2 or os.path.samefile( d1, stopat ):
             break
         d1 = d2
 

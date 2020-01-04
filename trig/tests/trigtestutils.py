@@ -38,6 +38,8 @@ class trigTestCase( unittest.TestCase ):
         if 'REPO_MANIFEST_URL' in os.environ:
             del os.environ['REPO_MANIFEST_URL']
 
+        os.environ['MRGIT_PARENT_SEARCH_BARRIER'] = os.getcwd()
+
     def tearDown(self):
         ""
         pass
