@@ -1486,7 +1486,7 @@ class StatusWriter:
         for name,lists in self.files.items():
             chgL,unkL = lists
             if len(chgL) > 0 or len(unkL) > 0:
-                fileobj.write( 'Repository '+name+':\n' )
+                fileobj.write( '\nRepository '+name+':\n' )
                 self._write_files( '  changed:', chgL, fileobj )
                 self._write_files( 'untracked:', unkL, fileobj )
 
