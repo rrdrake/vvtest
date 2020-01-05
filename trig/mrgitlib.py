@@ -41,7 +41,7 @@ def init_cmd( argv, **kwargs ):
     cfg = Configuration()
     cfg.setTopLevel( os.getcwd() )
     cfg.setManifestName( '' )
-    cfg.createMRGitRepo()
+    make_mrgit_repo( cfg )
     cfg.commitLocalRepoMap()
 
 
@@ -161,7 +161,7 @@ def load_configuration():
     if top:
         cfg.setTopLevel( top )
         read_mrgit_manifests_file( cfg.getManifests(), top )
-        read_mrgit_config_file( cfg )
+        read_mrgit_config_file( top+'/.mrgit', cfg )
 
     else:
         top = find_top_level( '.repo' )
@@ -330,9 +330,9 @@ class CloneCreator:
         elif is_google_manfiests_repo( git.get_toplevel() ):
             # we just cloned a Google manifests repo
 
-            gconv = GoogleConverter( git.get_toplevel() )
+            upstream = GoogleConverter( git.get_toplevel() )
 
-            top = self._populate_config_and_mrgit_repo( cfg, gconv )
+            top = self._populate_config_and_mrgit_repo( cfg, upstream )
 
             dst = pjoin( wrkdir, '.mrgit', 'google_manifests' )
             move_directory_contents( git.get_toplevel(), dst )
@@ -383,6 +383,8 @@ class CloneCreator:
         ""
         top = cfg.getTopLevel()
 
+        cfg.setUpstreamType( upstream.getType() )
+
         upstream.loadManifestsAndRemoteMap( cfg.getManifests(),
                                             cfg.getRemoteMap(),
                                             top )
@@ -397,7 +399,7 @@ class CloneCreator:
 
         clone_repositories_from_config( cfg, self.verbose )
 
-        cfg.createMRGitRepo( self.verbose )
+        make_mrgit_repo( cfg, self.verbose )
 
         return newtop
 
@@ -432,6 +434,10 @@ class MRGitUpstream:
         assert url.endswith( os.path.sep+'.mrgit' )
         self.url = url
 
+    def getType(self):
+        ""
+        return 'mrgit'
+
     def remoteName(self):
         ""
         return gititf.repo_name_from_url( dirname( self.url ) )
@@ -450,6 +456,10 @@ class GenesisUpstream:
         ""
         self.url = url
 
+    def getType(self):
+        ""
+        return 'genesis'
+
     def remoteName(self):
         ""
         return gititf.repo_name_from_url( self.url )
@@ -467,6 +477,10 @@ class UpstreamURLs:
     def __init__(self, url_list):
         ""
         self.urls = url_list
+
+    def getType(self):
+        ""
+        return 'urls'
 
     def remoteName(self):
         ""
@@ -489,6 +503,10 @@ class GoogleConverter:
     def __init__(self, manifests_directory):
         ""
         self.srcdir = manifests_directory
+
+    def getType(self):
+        ""
+        return 'googlerepo'
 
     def remoteName(self):
         ""
@@ -770,7 +788,7 @@ def compute_top_level_directory( directory, cfg, remotename ):
 
 def path_for_toplevel( cfg, remotename ):
     ""
-    grp = cfg.getManifests().findGroup( cfg.getManifestGroupName() )
+    grp = cfg.getManifests().findGroup( cfg.getManifestName() )
 
     if grp == None:
         # only from an empty mrgit init, or a clone of one
@@ -916,7 +934,7 @@ class Configuration:
     def __init__(self):
         ""
         self.topdir = None
-        self.upstream = None  # will contain the upstream specification
+        self.upstream = None
         self.grpname = None
 
         self.mfest = Manifests()
@@ -927,11 +945,19 @@ class Configuration:
         ""
         self.topdir = directory
 
+    def setUpstreamType(self, upstream):
+        ""
+        self.upstream = upstream
+
+    def getUpstreamType(self):
+        ""
+        return self.upstream
+
     def setManifestName(self, groupname):
         ""
         self.grpname = groupname
 
-    def getManifestGroupName(self):
+    def getManifestName(self):
         ""
         return self.grpname
 
@@ -972,16 +998,6 @@ class Configuration:
 
         return repolist
 
-    def inactivateRepo(self, reponame):
-        ""
-        grp = self.mfest.findGroup( self.grpname )
-        spec = grp.findRepo( reponame )
-        path = spec['path']
-
-        magic.setRepoLocation( reponame, path=path )
-
-        return path
-
     def commitLocalRepoMap(self):
         ""
         local = RepoMap()
@@ -1007,21 +1023,21 @@ class Configuration:
         finally:
             git.checkout_branch( 'master' )
 
-    def createMRGitRepo(self, verbose=2):
-        ""
-        # magic: save the upstream in the config file
 
-        repodir = pjoin( self.topdir, '.mrgit' )
+def make_mrgit_repo( cfg, verbose=2):
+    ""
+    # drop verbosity for internal operations
+    verb = max( 0, verbose-1 )
 
-        # drop verbosity for internal operations
-        verb = max( 0, verbose-1 )
+    repodir = pjoin( cfg.getTopLevel(), '.mrgit' )
+    mfests = cfg.getManifests()
 
-        if not gititf.is_a_local_repository( repodir ):
-            git = init_mrgit_repo( repodir, verb )
-            commit_mrgit_manifests_file( self.mfest, git, verb )
-            commit_mrgit_gitignore_file( git, verb )
+    if not gititf.is_a_local_repository( repodir ):
+        git = init_mrgit_repo( repodir, verb )
+        commit_mrgit_manifests_file( mfests, git, verb )
+        commit_mrgit_gitignore_file( git, verb )
 
-        write_mrgit_config_file( repodir, self.grpname )
+    write_mrgit_config_file( repodir, cfg )
 
 
 class Manifests:
@@ -1353,6 +1369,7 @@ def get_repo_status( name, path, verbose ):
 def commit_mrgit_gitignore_file( git, verbose ):
     ""
     with change_directory( git.get_toplevel() ):
+
         with open( '.gitignore', 'wt' ) as fp:
             fp.write( '/config\n' )
 
@@ -1360,21 +1377,55 @@ def commit_mrgit_gitignore_file( git, verbose ):
         git.commit( 'set .gitignore', verbose=verbose )
 
 
-def write_mrgit_config_file( destdir, groupname ):
+def write_mrgit_config_file( destdir, cfg ):
     ""
-    with open( destdir+'/config', 'wt' ) as fp:
-        fp.write( 'group='+groupname+'\n' )
+    fn = pjoin( destdir, 'config' )
+
+    grpname = cfg.getManifestName()
+
+    with open( fn, 'wt' ) as fp:
+        fp.write( '[core]\n' )
+        fp.write( '    group = '+grpname+'\n' )
+
+        up = cfg.getUpstreamType()
+        if up:
+            fp.write( '    upstream = '+up+'\n' )
 
 
-def read_mrgit_config_file( cfg ):
+def read_mrgit_config_file( fromdir, cfg ):
     ""
-    fn = pjoin( cfg.getTopLevel(), '.mrgit/config' )
+    fn = pjoin( fromdir, 'config' )
+
     with open( fn, 'rt' ) as fp:
+        section = None
         for line in fp:
             line = line.strip()
-            if line.startswith( 'group=' ):
-                gname = line.split( 'group=', 1 )[1].strip()
-                cfg.setManifestName( gname )
+            if not line or line.startswith( '#' ):
+                pass
+            elif line.startswith( '[' ):
+                section = _parse_config_section_name( line )
+            elif section:
+                _parse_config_section_line( section, line, cfg )
+
+
+def _parse_config_section_line( section, line, cfg ):
+    ""
+    attrs = parse_attribute_line( line )
+
+    if section[0] == 'core':
+        if 'group' in attrs:
+            cfg.setManifestName( attrs['group'] )
+        if 'upstream' in attrs:
+            cfg.setUpstreamType( attrs['upstream'] )
+
+
+def _parse_config_section_name( line ):
+    ""
+    val = line.strip('[').split(']',1)[0].strip()
+    valL = re.split( r'\s*', val, 1 )
+    if len(valL) == 1:
+        valL.append( '' )
+    return valL
 
 
 class StatusWriter:

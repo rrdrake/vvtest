@@ -501,7 +501,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
     def test_create_initial_mrgit_repository(self):
         ""
         cfg = self.create_config_with_two_urls()
-        cfg.createMRGitRepo()
+        mrlib.make_mrgit_repo( cfg )
         cfg.commitLocalRepoMap()
 
         git = clone_repo( 'topdir/.mrgit', 'checkrepo' )
@@ -523,7 +523,7 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
     def test_load_config_from_mrgit_checkout(self):
         ""
         cfg = self.create_config_with_two_urls()
-        cfg.createMRGitRepo()
+        mrlib.make_mrgit_repo( cfg )
 
         rmap = mrlib.RepoMap()
         git = create_repo( '.mrgit' )
@@ -547,14 +547,43 @@ class mrgit_configuration_tests( trigutil.trigTestCase ):
         for fn in stats['untracked']:
             assert '.mrgit' not in fn
 
-    def test_local_repo_map_contains_all_groups(self):
+    def test_read_write_config_file_manifest_group_name(self):
         ""
-        cfg = mrlib.Configuration()
-        mfest = cfg.getManifests()
-        mfest.addRepo( 'grp1', 'foo', 'bar' )
-        mfest.addRepo( 'grp2', 'mars', 'pluto' )
+        os.mkdir( 'dir1' )
+        os.mkdir( 'dir2' )
+        time.sleep(1)
 
-        # magic: in progress
+        cfg = mrlib.Configuration()
+        cfg.setManifestName( 'goodstuff' )
+        mrlib.write_mrgit_config_file( 'dir1', cfg )
+
+        cfg2 = mrlib.Configuration()
+        mrlib.read_mrgit_config_file( 'dir1', cfg2 )
+        assert cfg2.getManifestName() == 'goodstuff'
+
+        cfg = mrlib.Configuration()
+        cfg.setManifestName( '' )
+        mrlib.write_mrgit_config_file( 'dir2', cfg )
+
+        cfg2 = mrlib.Configuration()
+        mrlib.read_mrgit_config_file( 'dir2', cfg2 )
+        assert cfg2.getManifestName() == ''
+
+    def test_read_write_config_file_upstream_type(self):
+        ""
+        os.mkdir( 'dir1' )
+        os.mkdir( 'dir2' )
+        time.sleep(1)
+
+        cfg = mrlib.Configuration()
+        cfg.setManifestName( 'goodstuff' )
+        cfg.setUpstreamType( 'foobar' )
+        mrlib.write_mrgit_config_file( 'dir1', cfg )
+
+        cfg2 = mrlib.Configuration()
+        mrlib.read_mrgit_config_file( 'dir1', cfg2 )
+        assert cfg2.getUpstreamType() == 'foobar'
+        assert cfg2.getManifestName() == 'goodstuff'
 
 
 class google_repo_manifests( trigutil.trigTestCase ):
