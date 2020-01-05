@@ -40,13 +40,14 @@ def init_cmd( argv, **kwargs ):
     ""
     cfg = Configuration()
     cfg.setTopLevel( os.getcwd() )
+    cfg.setManifestName( '' )
     cfg.createMRGitRepo()
     cfg.commitLocalRepoMap()
 
 
 def clone_cmd( argv, **kwargs ):
     ""
-    optL,argL = getopt.getopt( argv, 'Gv', [] )
+    optL,argL = getopt.getopt( argv, 'Gvm:', [] )
 
     optD = {}
     for n,v in optL:
@@ -63,7 +64,7 @@ def clone_cmd( argv, **kwargs ):
     if len( argL ) == 0:
         errorexit( 'You must specify a repository to clone.' )
 
-    creator = CloneCreator( verb )
+    creator = CloneCreator( optD.get( '-m', None ), verbose=verb )
     creator.clone( argL, '-G' in optD )
 
 
@@ -160,7 +161,7 @@ def load_configuration():
     if top:
         cfg.setTopLevel( top )
         read_mrgit_manifests_file( cfg.getManifests(), top )
-        cfg.computeLocalRepoMap()
+        read_mrgit_config_file( cfg )
 
     else:
         top = find_top_level( '.repo' )
@@ -170,9 +171,10 @@ def load_configuration():
             gconv.loadManifestsAndRemoteMap( cfg.getManifests(),
                                              cfg.getRemoteMap(),
                                              top )
-        else:
-            errorexit( 'Not an mrgit repository (or any parent directory)' )
+            set_google_repo_manifest( cfg, top+'/.repo' )
 
+        else:
+            errorexit( 'Not an mrgit repository (nor any parent directory)' )
 
     return cfg
 
@@ -241,8 +243,9 @@ def make_absolute_url_path( url ):
 
 class CloneCreator:
 
-    def __init__(self, verbose=1):
+    def __init__(self, groupname=None, verbose=1):
         ""
+        self.grpname = groupname
         self.verbose = verbose
 
     def clone(self, url_list, is_google_manifest=False):
@@ -337,6 +340,9 @@ class CloneCreator:
         else:
             # not an mrgit, genesis or Google repo, just a generic repository
 
+            if self.grpname != None:
+                errorexit( 'cannot specify repo group for a list of URLs' )
+
             # move the clone to a directory with the name of the upstream URL
             loc = pjoin( wrkdir, gititf.repo_name_from_url( url ) )
             move_directory_contents( git.get_toplevel(), loc )
@@ -349,6 +355,9 @@ class CloneCreator:
 
     def fromURLs(self, cfg):
         ""
+        if self.grpname != None:
+            errorexit( 'cannot specify repo group for a list of URLs' )
+
         upstream = UpstreamURLs( self.urls )
 
         top = self._populate_config_and_mrgit_repo( cfg, upstream )
@@ -378,18 +387,17 @@ class CloneCreator:
                                             cfg.getRemoteMap(),
                                             top )
 
-        cfg.computeLocalRepoMap()
+        set_config_manifest_name( cfg, self.grpname )
 
-        newtop = compute_top_level_directory( self.dest,
-                                              cfg.getManifests(),
+        newtop = compute_top_level_directory( self.dest, cfg,
                                               upstream.remoteName() )
 
         if os.path.exists( newtop ) and not os.path.samefile( top, newtop ):
             check_nonempty_destination_paths( newtop, cfg.getLocalRepoPaths() )
 
-        cfg.createMRGitRepo( self.verbose )
-
         clone_repositories_from_config( cfg, self.verbose )
+
+        cfg.createMRGitRepo( self.verbose )
 
         return newtop
 
@@ -683,6 +691,21 @@ class GoogleManifestReader:
                 return nd.attrib['remote'].strip()
 
 
+def set_google_repo_manifest( cfg, repodir ):
+    ""
+    lf = pjoin( repodir, 'manifest.xml' )
+    fn = basename( os.readlink( lf ) )
+
+    if fn == 'default.xml':
+        grpname = cfg.getManifests().getDefaultGroup().getName()
+    else:
+        grpname = os.path.splitext( fn )[0]
+
+    assert cfg.getManifests().findGroup( grpname ) != None
+
+    cfg.setManifestName( grpname )
+
+
 def is_google_manfiests_repo( path ):
     ""
     xml = pjoin( path, 'default.xml' )
@@ -719,19 +742,36 @@ def check_for_mrgit_repo( git ):
     return None
 
 
-def compute_top_level_directory( directory, mfest, remotename ):
+def set_config_manifest_name( cfg, groupname ):
+    ""
+    if groupname == None:
+        grp = cfg.getManifests().getDefaultGroup()
+        if grp != None:
+            groupname = grp.getName()
+        else:
+            groupname = ''
+    else:
+        grp = cfg.getManifests().findGroup( groupname )
+        if grp == None:
+            errorexit( 'manifest group name not found:', repr(groupname) )
+
+    cfg.setManifestName( groupname )
+
+
+def compute_top_level_directory( directory, cfg, remotename ):
     ""
     if directory:
         top = normpath( abspath( directory ) )
     else:
-        top = path_for_toplevel( mfest, remotename )
+        top = path_for_toplevel( cfg, remotename )
 
     return top
 
 
-def path_for_toplevel( mfest, remotename ):
+def path_for_toplevel( cfg, remotename ):
     ""
-    grp = mfest.getDefaultGroup()
+    grp = cfg.getManifests().findGroup( cfg.getManifestGroupName() )
+
     if grp == None:
         # only from an empty mrgit init, or a clone of one
         top = abspath( remotename )
@@ -753,7 +793,7 @@ def clone_repositories_from_config( cfg, verbose=2 ):
     check_make_directory( topdir )
 
     with change_directory( topdir ):
-        for url,loc in cfg.getRemoteRepoList():
+        for url,loc in cfg.getActiveRepoList():
             if not os.path.exists( loc+'/.git' ):
                 robust_clone( url, loc, verbose )
 
@@ -877,50 +917,52 @@ class Configuration:
         ""
         self.topdir = None
         self.upstream = None  # will contain the upstream specification
+        self.grpname = None
+
         self.mfest = Manifests()
         self.remote = RepoMap()
-        self.local = RepoMap()
+        self.inactive = set()
 
     def setTopLevel(self, directory):
         ""
         self.topdir = directory
 
+    def setManifestName(self, groupname):
+        ""
+        self.grpname = groupname
+
+    def getManifestGroupName(self):
+        ""
+        return self.grpname
+
     def getTopLevel(self):
         ""
         return self.topdir
-
-    def getRemoteMap(self):
-        ""
-        return self.remote
 
     def getManifests(self):
         ""
         return self.mfest
 
-    def computeLocalRepoMap(self):
+    def getRemoteMap(self):
         ""
-        grp = self.mfest.getDefaultGroup()
-
-        if grp != None:
-            for spec in grp.getRepoList():
-                self.local.setRepoLocation( spec['repo'], path=spec['path'] )
+        return self.remote
 
     def getLocalRepoPaths(self):
         ""
         paths = []
 
-        grp = self.mfest.getDefaultGroup()
+        grp = self.mfest.findGroup( self.grpname )
         if grp != None:
             for spec in grp.getRepoList():
                 paths.append( ( spec['repo'], spec['path'] ) )
 
         return paths
 
-    def getRemoteRepoList(self):
+    def getActiveRepoList(self):
         ""
         repolist = []
 
-        grp = self.mfest.getDefaultGroup()
+        grp = self.mfest.findGroup( self.grpname )
 
         if grp != None:
             for spec in grp.getRepoList():
@@ -930,19 +972,45 @@ class Configuration:
 
         return repolist
 
+    def inactivateRepo(self, reponame):
+        ""
+        grp = self.mfest.findGroup( self.grpname )
+        spec = grp.findRepo( reponame )
+        path = spec['path']
+
+        magic.setRepoLocation( reponame, path=path )
+
+        return path
+
     def commitLocalRepoMap(self):
         ""
+        local = RepoMap()
+
+        # magic: need to add all repos to 'local' that are currently cloned
+        #        - includes the repos in the current group name
+        #        - must also include inactive repos
+        if self.grpname == None:
+            grp = None
+        else:
+            grp = self.mfest.findGroup( self.grpname )
+
+        if grp != None:
+            for spec in grp.getRepoList():
+                local.setRepoLocation( spec['repo'], path=spec['path'] )
+
         mrgit = pjoin( self.topdir, '.mrgit' )
         git = gititf.GitRepo( mrgit )
         checkout_repo_map_branch( git )
 
         try:
-            write_mrgit_repo_map_file( self.local, git )
+            write_mrgit_repo_map_file( local, git )
         finally:
             git.checkout_branch( 'master' )
 
     def createMRGitRepo(self, verbose=2):
         ""
+        # magic: save the upstream in the config file
+
         repodir = pjoin( self.topdir, '.mrgit' )
 
         # drop verbosity for internal operations
@@ -951,6 +1019,9 @@ class Configuration:
         if not gititf.is_a_local_repository( repodir ):
             git = init_mrgit_repo( repodir, verb )
             commit_mrgit_manifests_file( self.mfest, git, verb )
+            commit_mrgit_gitignore_file( git, verb )
+
+        write_mrgit_config_file( repodir, self.grpname )
 
 
 class Manifests:
@@ -975,6 +1046,8 @@ class Manifests:
 
     def findGroup(self, groupname):
         ""
+        assert groupname != None
+
         grp = None
 
         for igrp in self.groups:
@@ -1275,6 +1348,33 @@ def get_repo_status( name, path, verbose ):
     statD = git.status( verbose=gitverb )
 
     return statD
+
+
+def commit_mrgit_gitignore_file( git, verbose ):
+    ""
+    with change_directory( git.get_toplevel() ):
+        with open( '.gitignore', 'wt' ) as fp:
+            fp.write( '/config\n' )
+
+        git.add( '.gitignore', verbose=verbose )
+        git.commit( 'set .gitignore', verbose=verbose )
+
+
+def write_mrgit_config_file( destdir, groupname ):
+    ""
+    with open( destdir+'/config', 'wt' ) as fp:
+        fp.write( 'group='+groupname+'\n' )
+
+
+def read_mrgit_config_file( cfg ):
+    ""
+    fn = pjoin( cfg.getTopLevel(), '.mrgit/config' )
+    with open( fn, 'rt' ) as fp:
+        for line in fp:
+            line = line.strip()
+            if line.startswith( 'group=' ):
+                gname = line.split( 'group=', 1 )[1].strip()
+                cfg.setManifestName( gname )
 
 
 class StatusWriter:
