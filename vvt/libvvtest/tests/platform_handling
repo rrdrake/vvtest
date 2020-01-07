@@ -247,6 +247,19 @@ class resource_pooling( vtu.vvtestTestCase ):
         L3 = pool.get(5)
         assert_no_overlap( L2, L3 )
 
+    def test_get_then_put_all_resources_back(self):
+        ""
+        pool = vvplatform.ResourcePool( 2 )
+
+        L1 = pool.get( 1 )
+        L2 = pool.get( 1 )
+        assert not pool.available( 1 )
+        pool.put( L2 )
+        pool.put( L1 )
+        assert pool.available( 1 )
+        assert pool.available( 2 )
+        assert not pool.available( 3 )
+
     def test_oversubscribing_the_pool(self):
         ""
         pool = vvplatform.ResourcePool( 10 )

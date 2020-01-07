@@ -300,7 +300,7 @@ class ResourcePool:
         for i in items:
             if i not in pset:
                 pset.add( i )
-        self.pool.extend( pset )
+                self.pool.append( i )
         self.pool.sort()
 
     def _get_num_available(self):
