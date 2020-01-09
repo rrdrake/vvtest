@@ -24,6 +24,7 @@ import testutils as util
 import libvvtest.printinfo as printinfo
 from libvvtest.TestExec import TestExec
 import libvvtest.batchutils as batchutils
+import libvvtest.batching as batching
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
 
@@ -136,13 +137,16 @@ def make_fake_Batcher( tlist ):
     a smell here is how the construction does not go through the Batcher
     interface (it pokes into and manipulates the data members)
     """
+    jobmon = batching.BatchJobMonitor( 5, 5, 'clean' )
+
     batch = batchutils.Batcher( None, None,
                                 None, tlist, None, None,
                                 None, None,
-                                None, None )
+                                None, None,
+                                None, jobmon )
 
     batchid = 0
-    bjob = batchutils.BatchJob( batchid, None, None, None, tlist )
+    bjob = batching.BatchJob( batchid, None, None, None, tlist )
 
     batch.jobmon.addJob( bjob )
 

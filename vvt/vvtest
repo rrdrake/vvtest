@@ -971,6 +971,7 @@ def batchTestList( opts, optD, rtdata,
     The 'tlist' is a TestList class instance.
     """
     import libvvtest.batchutils as batchutils
+    import libvvtest.batching as batching
 
     assert opts.qsub_id == None
 
@@ -984,11 +985,19 @@ def batchTestList( opts, optD, rtdata,
                                                rtdata.getVvtestPath(),
                                                rtdata.getRuntimeConfig() )
 
+    namer = batching.BatchFileNamer( test_dir, testlist_name )
+
+    read_interval, read_timeout = determine_job_read_intervals()
+    clean_exit_marker = "queue job finished cleanly"
+    jobmon = batching.BatchJobMonitor( read_interval, read_timeout,
+                                            clean_exit_marker )
+
     batch = batchutils.Batcher( vvtestcmd, testlist_name,
                                 plat, tlist, xlist, perms,
                                 test_dir, qsublimit,
                                 opts.batch_length,
-                                opts.max_timeout )
+                                opts.max_timeout,
+                                namer, jobmon )
 
     plat.display()
 
@@ -996,6 +1005,18 @@ def batchTestList( opts, optD, rtdata,
 
     execute.run_batch( batch, tlist, xlist, perms, results_writer,
                        test_dir, qsublimit )
+
+
+def determine_job_read_intervals():
+    """
+    allow these values to be set by environment variable, mainly for
+    unit testing; if setting these is needed more regularly then a
+    command line option should be added
+    """
+    read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
+    read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
+
+    return read_interval, read_timeout
 
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
@@ -1043,8 +1064,8 @@ def restartTests( opts, optD, rtdata ):
         apply_filters = True
     else:
         # batch jobs have --qsub-id set and land here
-        import libvvtest.batchutils as batchutils
-        namer = batchutils.BatchFileNamer( test_dir, testlist_name )
+        import libvvtest.batching as batching
+        namer = batching.BatchFileNamer( test_dir, testlist_name )
         tfile = namer.getBasePath( batchid )
         apply_filters = False
 
