@@ -126,7 +126,7 @@ class config_tests( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '--config config', batch=True )
             vrun.assertCounts( total=2, npass=2 )
 
-            assert extract_maxprocs( vrun.out ) == 2
+            assert extract_maxprocs( vrun.out ) == None
 
             assert vrun.getTestIds() == [ 'atest.np=1', 'btest.np=2' ]
 
@@ -501,11 +501,12 @@ def check_get_compiler_and_platform( vrun ):
 
 def extract_maxprocs( vvtest_output ):
     ""
-    L1 = util.greplines( 'max procs', vvtest_output )
-    assert len(L1) == 1
+    maxprocs = None
 
-    smax = L1[0].split( 'max procs', 1 )[1].strip().lstrip('=').strip()
-    maxprocs = int( smax )
+    L1 = util.greplines( 'max procs', vvtest_output )
+    if len(L1) > 0:
+      smax = L1[0].split( 'max procs', 1 )[1].strip().lstrip('=').strip()
+      maxprocs = int( smax )
 
     return maxprocs
 

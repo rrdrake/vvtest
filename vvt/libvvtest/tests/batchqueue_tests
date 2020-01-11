@@ -17,8 +17,22 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.vvplatform import BatchQueueInterface
 
-class the_tests( vtu.vvtestTestCase ):
+
+class misc_tests( vtu.vvtestTestCase ):
+
+    def test_the_runcmd_function_which_lives_in_its_own_file(self):
+        ""
+        from libvvtest.runcmd import runcmd
+
+        x,out = runcmd( [ 'uname', '-a' ] )
+
+        assert x == 0
+        assert os.uname()[1] in out.strip()
+
+
+class queue_interface_types( vtu.vvtestTestCase ):
 
     def test_procbatch_smoke_test(self):
         ""
@@ -134,14 +148,13 @@ class the_tests( vtu.vvtestTestCase ):
         assert stateD[ '123456.ladmin1' ] == 'pending'
         assert stateD[ '7345.ladmin1' ] == ''
 
-    def test_the_runcmd_function_which_lives_in_its_own_file(self):
+    def test_queue_type_construction(self):
         ""
-        from libvvtest.runcmd import runcmd
-
-        x,out = runcmd( [ 'uname', '-a' ] )
-
-        assert x == 0
-        assert os.uname()[1] in out.strip()
+        for qtype in ['procbatch','craypbs','pbs','slurm','moab']:
+            bq = BatchQueueInterface()
+            assert not bq.isBatched()
+            bq.setQueueType( qtype, 12 )
+            assert bq.isBatched()
 
 
 #############################################################

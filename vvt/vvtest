@@ -334,7 +334,7 @@ def construct_platform_instance( vvtestdir, opts, optD ):
 
     plat = vvplatform.create_Platform_instance(
                 vvtestdir,
-                opts.plat,
+                opts.plat, opts.batch,
                 optD['platopt_dict'],  # --platopt
                 opts.dash_e,
                 opts.dash_n,
@@ -975,6 +975,8 @@ def batchTestList( opts, optD, rtdata,
 
     assert opts.qsub_id == None
 
+    batchitf = plat.initializeBatchSystem()
+
     tlist.setResultsSuffix()
 
     qsublimit = opts.batch_limit
@@ -990,16 +992,16 @@ def batchTestList( opts, optD, rtdata,
     read_interval, read_timeout = determine_job_read_intervals()
     clean_exit_marker = "queue job finished cleanly"
     jobmon = batching.BatchJobMonitor( read_interval, read_timeout,
-                                            clean_exit_marker )
+                                       clean_exit_marker )
 
-    batch = batchutils.Batcher( vvtestcmd, testlist_name,
-                                plat, tlist, xlist, perms,
-                                test_dir, qsublimit,
+    batch = batchutils.Batcher( vvtestcmd,
+                                tlist, xlist, perms,
+                                qsublimit,
                                 opts.batch_length,
                                 opts.max_timeout,
-                                namer, jobmon )
+                                namer, jobmon, batchitf )
 
-    plat.display()
+    plat.display( isbatched=True )
 
     batch.writeQsubScripts()
 

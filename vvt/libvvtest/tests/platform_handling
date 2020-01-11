@@ -119,19 +119,19 @@ class constructing_platform( vtu.vvtestTestCase ):
         savepath = adjust_sys_path_for_unit_testing()
         try:
             plat = vvplatform.Platform( '/fake', {} )
-            plug = vvplatform.initialize_platform( plat )
+            vvplatform.initialize_platform( plat )
         finally:
             sys.path[:] = savepath
-        assert plug == None and plat.getattr( 'foo', None ) == None
+        assert plat.getattr( 'foo', None ) == None
 
         savepath = adjust_sys_path_for_unit_testing()
         try:
             plat = vvplatform.Platform( '/fake', {} )
             sys.path.insert( 0, adir )
-            plug = vvplatform.initialize_platform( plat )
+            vvplatform.initialize_platform( plat )
         finally:
             sys.path[:] = savepath
-        assert plug != None and plat.getattr( 'foo', None ) == 'bar'
+        assert plat.getattr( 'foo', None ) == 'bar'
 
     def test_setting_platform_options(self):
         ""
@@ -174,12 +174,12 @@ class constructing_platform( vtu.vvtestTestCase ):
         ""
         plat = vvplatform.create_Platform_instance(
                     os.getcwd(),
-                    None, None, None, None, None, None, None, None )
+                    None, None, None, None, None, None, None, None, None )
 
         optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
         plat = vvplatform.create_Platform_instance(
                     os.getcwd(),
-                    'XBox',
+                    'XBox', True,
                     optD,
                     True,
                     10, 20,

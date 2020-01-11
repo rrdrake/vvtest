@@ -17,23 +17,23 @@ from . import batching
 
 class Batcher:
 
-    def __init__(self, vvtestcmd, testlist_name,
-                       plat, tlist, xlist, perms,
-                       test_dir, qsublimit,
+    def __init__(self, vvtestcmd,
+                       tlist, xlist, perms,
+                       qsublimit,
                        batch_length, max_timeout,
-                       namer, jobmon):
+                       namer, jobmon, batchitf):
         ""
-        self.plat = plat
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
         self.jobmon = jobmon
+        self.batchitf = batchitf
 
         self.results = ResultsHandler( tlist, xlist )
 
         suffix = tlist.getResultsSuffix()
-        self.maker = JobMaker( suffix, self.namer, plat,
+        self.maker = JobMaker( suffix, self.namer, batchitf,
                                vvtestcmd, jobmon.getCleanExitMarker() )
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
@@ -142,7 +142,7 @@ class Batcher:
         ""
         jL = [ bjob.getJobID() for _,bjob in self.jobmon.getStarted() ]
         if len(jL) > 0:
-            self.plat.Qcancel( jL )
+            self.batchitf.cancelJobs( jL )
 
     #####################################################################
 
@@ -151,7 +151,7 @@ class Batcher:
         bid = bjob.getBatchID()
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
-        jobid = self.plat.Qsubmit( tdir, bjob.getOutputFile(), pin )
+        jobid = self.batchitf.submitJob( tdir, bjob.getOutputFile(), pin )
         self.jobmon.markJobStarted( bjob, jobid )
 
     def _check_get_stopped_jobs(self):
@@ -161,7 +161,7 @@ class Batcher:
         startlist = list( self.jobmon.getStarted() )
         if len(startlist) > 0:
             jobidL = [ bjob.getJobID() for _,bjob in startlist ]
-            statusD = self.plat.Qquery( jobidL )
+            statusD = self.batchitf.queryJobs( jobidL )
             tnow = time.time()
             for bid,bjob in startlist:
                 check_set_outfile_permissions( bjob, self.perms )
@@ -374,12 +374,12 @@ def apply_queue_timeout_bump_factor( qtime ):
 
 class JobMaker:
 
-    def __init__(self, suffix, filenamer, platform,
+    def __init__(self, suffix, filenamer, batchitf,
                        basevvtestcmd, clean_exit_marker):
         ""
         self.suffix = suffix
         self.namer = filenamer
-        self.plat = platform
+        self.batchitf = batchitf
         self.vvtestcmd = basevvtestcmd
         self.clean_exit_marker = clean_exit_marker
 
@@ -406,21 +406,8 @@ class JobMaker:
         bidstr = str( bjob.getBatchID() )
         maxnp = bjob.getMaxNP()
 
-        fn = self.namer.getBatchScriptName( bidstr )
-        fp = open( fn, "w" )
-
         tdir = self.namer.getRootDir()
         pout = self.namer.getBatchOutputName( bjob.getBatchID() )
-
-        hdr = self.plat.getQsubScriptHeader( maxnp, qtime, tdir, pout )
-        fp.writelines( [ hdr + '\n\n',
-                         'cd ' + tdir + ' || exit 1\n',
-                         'echo "job start time = `date`"\n' + \
-                         'echo "job time limit = ' + str(qtime) + '"\n' ] )
-
-        # set the environment variables from the platform into the script
-        for k,v in self.plat.getEnvironment().items():
-            fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
 
         cmd = self.vvtestcmd + ' --qsub-id=' + bidstr
 
@@ -430,12 +417,11 @@ class JobMaker:
             else:           cmd += ' -T ' + str(qtime-120)
 
         cmd += ' || exit 1'
-        fp.writelines( [ cmd+'\n\n' ] )
 
-        # echo a marker to determine when a clean batch job exit has occurred
-        fp.writelines( [ 'echo "'+self.clean_exit_marker+'"\n' ] )
+        fn = self.namer.getBatchScriptName( bidstr )
 
-        fp.close()
+        self.batchitf.writeJobScript( maxnp, qtime, tdir, pout,
+                                      fn, cmd, self.clean_exit_marker )
 
 
 class ResultsHandler:

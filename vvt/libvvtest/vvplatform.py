@@ -23,12 +23,11 @@ class Platform:
         self.platname = None
         self.cplrname = None
 
-        self.plugin = None
-
         self.envD = {}
         self.attrs = {}
 
-        self.batch = None
+        self.batchspec = None
+        self.batchitf = BatchQueueInterface()
 
     # ----------------------------------------------------------------
 
@@ -38,9 +37,10 @@ class Platform:
     def getMaxProcs(self): return self.maxprocs
     def getNumProcs(self): return self.nprocs
 
-    def display(self):
+    def display(self, isbatched=False):
+        ""
         s = "Platform " + self.platname
-        if self.batch == None:
+        if not isbatched:
             if self.nprocs > 0:
                 s += ", num procs = " + str(self.nprocs)
             s += ", max procs = " + str(self.maxprocs)
@@ -80,93 +80,29 @@ class Platform:
             return self.attrs[name]
 
     def setBatchSystem(self, batch, ppn, **kwargs ):
-        """
-        Set the batch system for this platform.  If 'batch' is a string, it
-        must be one of the known batch systems, such as
-
-              craypbs   : for Cray machines running PBS (or PBS-like)
-              moab      : for Cray machines running Moab (may work in general)
-              pbs       : standard PBS system
-              slurm     : standard SLURM system
-
-        It can also be a python object which implements the batch functions.
-        """
+        ""
         assert ppn and ppn > 0
 
-        if type(batch) == type(''):
-            if batch == 'craypbs':
-                from . import craypbs
-                self.batch = craypbs.BatchCrayPBS( ppn, **kwargs )
-            elif batch == 'pbs':
-                from . import pbs
-                self.batch = pbs.BatchPBS( ppn, **kwargs )
-            elif batch == 'slurm':
-                from . import slurm
-                self.batch = slurm.BatchSLURM( ppn, **kwargs )
-            elif batch == 'moab':
-                from . import moab
-                self.batch = moab.BatchMOAB( ppn, **kwargs )
-            else:
-                raise Exception( "Unknown batch system name: "+str(batch) )
-        else:
-            self.batch = batch
+        self.batchspec = ( batch, ppn, kwargs )
 
-    def getQsubScriptHeader(self, np, queue_time, workdir, qout_file):
-        """
-        """
-        if not self.batch:
-            # construct a default processor batch system
-            from . import procbatch
-            self.batch = procbatch.ProcessBatch( 1 )
+    def initializeBatchSystem(self):
+        ""
+        if self.batchspec:
+            qtype,ppn,kwargs = self.batchspec
+            self.batchitf.setQueueType( qtype, ppn, **kwargs )
 
-        qt = self.attrs.get( 'walltime', queue_time )
+        for n,v in self.envD.items():
+            self.batchitf.setEnviron( n, v )
 
-        hdr = '#!/bin/csh -f\n' + \
-              self.batch.header( np, qt, workdir, qout_file, self.attrs ) + '\n'
+        for n,v in self.attrs.items():
+            self.batchitf.setAttr( n, v )
 
-        if qout_file:
-            hdr += 'touch '+qout_file + ' || exit 1\n'
-
-        # add in the shim if specified for this platform
-        s = self.attrs.get( 'batchshim', None )
-        if s:
-            hdr += '\n'+s
-        hdr += '\n'
-
-        return hdr
+        return self.batchitf
 
     def getDefaultQsubLimit(self):
         ""
         n = self.attrs.get( 'maxsubs', 5 )
         return n
-
-    def Qsubmit(self, workdir, outfile, scriptname):
-        ""
-        q = self.attrs.get( 'queue', None )
-        acnt = self.attrs.get( 'account', None )
-        cmd, out, jobid, err = \
-                self.batch.submit( scriptname, workdir, outfile, q, acnt )
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
-        else:
-            print3( "Job script", scriptname, "submitted with id", jobid )
-        
-        return jobid
-
-    def Qquery(self, jobidL):
-        ""
-        cmd, out, err, jobD = self.batch.query( jobidL )
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
-        
-        return jobD
-
-    def Qcancel(self, jobidL):
-        ""
-        if hasattr( self.batch, 'cancel' ):
-            print3( '\nCancelling jobs:', jobidL )
-            for jid in jobidL:
-                self.batch.cancel( jid )
 
     def initProcs(self, set_num, set_max):
         """
@@ -188,10 +124,10 @@ class Platform:
         if set_max == None:
             mx = self.attrs.get( 'maxprocs', None )
             if mx == None:
-                if self.batch == None:
-                    mx = probe_max_processors()
-                else:
+                if self.batchspec != None:
                     mx = 2**31 - 1  # by default, no limit for batch systems
+                else:
+                    mx = probe_max_processors()
             self.maxprocs = mx if mx != None else 1
         else:
             self.maxprocs = set_max
@@ -310,7 +246,7 @@ class ResourcePool:
         return n
 
 
-def create_Platform_instance( vvtestdir, platname, platopts, usenv,
+def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
                               numprocs, maxprocs,
                               onopts, offopts,
                               qsubid ):
@@ -329,7 +265,7 @@ def create_Platform_instance( vvtestdir, platname, platopts, usenv,
     if offopts:          optdict['-O']        = offopts
     if qsubid != None:   optdict['--qsub-id'] = qsubid
 
-    return construct_Platform( vvtestdir, optdict )
+    return construct_Platform( vvtestdir, optdict, isbatched=isbatched )
 
 
 def construct_Platform( vvtestdir, optdict, **kwargs ):
@@ -354,10 +290,14 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
 
     set_platform_options( plat, optdict.get( '--platopt', {} ) )
 
-    plug = initialize_platform( plat )
-    plat.plugin = plug
+    if kwargs.get( 'isbatched', False ):
+        # this may get overridden by platform_plugin.py
+        plat.setBatchSystem( 'procbatch', 1 )
 
-    plat.initProcs( optdict.get( '-n', None ), optdict.get( '-N', None ) )
+    initialize_platform( plat )
+
+    plat.initProcs( optdict.get( '-n', None ),
+                    optdict.get( '-N', None ) )
 
     return plat
 
@@ -405,8 +345,6 @@ def initialize_platform( plat ):
 
     if plug != None and hasattr( plug, 'initialize' ):
         plug.initialize( plat )
-
-    return plug
 
 
 def import_idplatform():
@@ -516,6 +454,123 @@ def probe_max_processors():
             mx = None
 
     return mx
+
+
+class BatchQueueInterface:
+
+    def __init__(self):
+        ""
+        self.batch = None
+        self.envD = {}
+        self.attrs = {}
+
+    def isBatched(self):
+        ""
+        return self.batch != None
+
+    def setAttr(self, name, value):
+        ""
+        self.attrs[name] = value
+
+    def setEnviron(self, name, value):
+        ""
+        self.envD[name] = value
+
+    def setQueueType(self, qtype, ppn, **kwargs):
+        """
+        Set the batch system.  If 'batch' is a string, it must be one of the
+        known batch systems, such as
+
+              craypbs   : for Cray machines running PBS (or PBS-like)
+              moab      : for Cray machines running Moab (may work in general)
+              pbs       : standard PBS system
+              slurm     : standard SLURM system
+
+        It can also be a python object which implements the batch functions.
+        """
+        if type(qtype) == type(''):
+            if qtype == 'procbatch':
+                from . import procbatch
+                self.batch = procbatch.ProcessBatch( ppn )
+            elif qtype == 'craypbs':
+                from . import craypbs
+                self.batch = craypbs.BatchCrayPBS( ppn, **kwargs )
+            elif qtype == 'pbs':
+                from . import pbs
+                self.batch = pbs.BatchPBS( ppn, **kwargs )
+            elif qtype == 'slurm':
+                from . import slurm
+                self.batch = slurm.BatchSLURM( ppn, **kwargs )
+            elif qtype == 'moab':
+                from . import moab
+                self.batch = moab.BatchMOAB( ppn, **kwargs )
+            else:
+                raise Exception( "Unknown batch system name: "+str(qtype) )
+        else:
+            self.batch = qtype
+
+        return self.batch
+
+    def writeJobScript(self, np, queue_time, workdir, qout_file,
+                             filename, command, clean_exit_marker):
+        ""
+        qt = self.attrs.get( 'walltime', queue_time )
+
+        hdr = '#!/bin/csh -f\n' + \
+              self.batch.header( np, qt, workdir, qout_file, self.attrs ) + '\n'
+
+        if qout_file:
+            hdr += 'touch '+qout_file + ' || exit 1\n'
+
+        # add in the shim if specified for this platform
+        s = self.attrs.get( 'batchshim', None )
+        if s:
+            hdr += '\n'+s
+        hdr += '\n'
+
+        with open( filename, 'wt' ) as fp:
+
+            fp.writelines( [ hdr + '\n\n',
+                             'cd ' + workdir + ' || exit 1\n',
+                             'echo "job start time = `date`"\n' + \
+                             'echo "job time limit = ' + str(queue_time) + '"\n' ] )
+
+            # set the environment variables from the platform into the script
+            for k,v in self.envD.items():
+                fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
+
+            fp.writelines( [ command+'\n\n' ] )
+
+            # echo a marker to determine when a clean batch job exit has occurred
+            fp.writelines( [ 'echo "'+clean_exit_marker+'"\n' ] )
+
+    def submitJob(self, workdir, outfile, scriptname):
+        ""
+        q = self.attrs.get( 'queue', None )
+        acnt = self.attrs.get( 'account', None )
+        cmd, out, jobid, err = \
+                self.batch.submit( scriptname, workdir, outfile, q, acnt )
+        if err:
+            print3( cmd + os.linesep + out + os.linesep + err )
+        else:
+            print3( "Job script", scriptname, "submitted with id", jobid )
+
+        return jobid
+
+    def queryJobs(self, jobidL):
+        ""
+        cmd, out, err, jobD = self.batch.query( jobidL )
+        if err:
+            print3( cmd + os.linesep + out + os.linesep + err )
+
+        return jobD
+
+    def cancelJobs(self, jobidL):
+        ""
+        if hasattr( self.batch, 'cancel' ):
+            print3( '\nCancelling jobs:', jobidL )
+            for jid in jobidL:
+                self.batch.cancel( jid )
 
 
 ##########################################################################

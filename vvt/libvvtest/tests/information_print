@@ -139,11 +139,11 @@ def make_fake_Batcher( tlist ):
     """
     jobmon = batching.BatchJobMonitor( 5, 5, 'clean' )
 
-    batch = batchutils.Batcher( None, None,
-                                None, tlist, None, None,
+    batch = batchutils.Batcher( None,
+                                tlist, None, None,
+                                None,
                                 None, None,
-                                None, None,
-                                None, jobmon )
+                                None, jobmon, None )
 
     batchid = 0
     bjob = batching.BatchJob( batchid, None, None, None, tlist )
