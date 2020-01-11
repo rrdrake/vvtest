@@ -975,7 +975,8 @@ def batchTestList( opts, optD, rtdata,
 
     assert opts.qsub_id == None
 
-    batchitf = plat.initializeBatchSystem()
+    batchitf = batching.BatchQueueInterface()
+    plat.initializeBatchSystem( batchitf )
 
     tlist.setResultsSuffix()
 
