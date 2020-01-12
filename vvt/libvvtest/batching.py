@@ -11,26 +11,26 @@ import time
 
 class BatchJob:
 
-    def __init__(self, batchid, maxnp, fout, resultsfile, tlist):
-        ""
-        self.batchid = batchid
-        self.maxnp = maxnp
-        self.outfile = fout
-        self.resultsfile = resultsfile
-        self.tlist = tlist  # a TestList object
+    batchid_counter = 0
 
+    def __init__(self):
+        ""
+        self.batchid = BatchJob.batchid_counter
+        BatchJob.batchid_counter += 1
+
+        self.outfile = None
+        self.outfile_seen = False
+        self.maxnp = None
         self.jobid = None
         self.tstart = None
-        self.outfile_seen = False
         self.tstop = None
         self.tcheck = None
         self.result = None
 
+        self.attrs = {}
+
     def getBatchID(self): return self.batchid
     def getMaxNP(self): return self.maxnp
-
-    def getTestList(self): return self.tlist
-    def getTests(self): return self.tlist.getTests()
 
     def getJobID(self): return self.jobid
 
@@ -40,9 +40,26 @@ class BatchJob:
 
     def getResult(self): return self.result
 
-    def getOutputFile(self): return self.outfile
+    def getOutputFilename(self): return self.outfile
     def outfileSeen(self): return self.outfile_seen
-    def getResultsFile(self): return self.resultsfile
+
+    def setAttr(self, name, value):
+        ""
+        self.attrs[name] = value
+
+    def getAttr(self, name, *default):
+        ""
+        if len(default) > 0:
+            return self.attrs.get( name, default[0] )
+        return self.attrs[name]
+
+    def setOutputFilename(self, filename):
+        ""
+        self.outfile = filename
+
+    def setMaxNP(self, maxnp):
+        ""
+        self.maxnp = maxnp
 
     def setJobID(self, jobid):
         ""
@@ -206,10 +223,17 @@ class BatchJobHandler:
         self.qstop  = {}  # no longer in the queue
         self.qdone  = {}  # final results have been read
 
-    def addJob(self, batchjob ):
+    def createJob(self):
         ""
-        bid = batchjob.getBatchID()
-        self.qtodo[ bid ] = batchjob
+        bjob = BatchJob()
+
+        pout = self.namer.getBatchOutputName( bjob.getBatchID() )
+        bjob.setOutputFilename( pout )
+
+        bid = bjob.getBatchID()
+        self.qtodo[ bid ] = bjob
+
+        return bjob
 
     def writeJobScript(self, batchjob, qtime, cmd):
         ""
@@ -223,7 +247,7 @@ class BatchJobHandler:
 
     def startJob(self, batchjob, workdir, scriptname):
         ""
-        outfile = batchjob.getOutputFile()
+        outfile = batchjob.getOutputFilename()
         jobid = self.batchitf.submitJob( workdir, outfile, scriptname )
         self.markJobStarted( batchjob, jobid )
 

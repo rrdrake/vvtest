@@ -9,6 +9,7 @@
 import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
+import os
 import re
 import time
 import signal
@@ -133,11 +134,9 @@ def make_fake_TestExecList():
 def make_fake_Batcher( tlist ):
     """
     construct and return a Batcher object
-
-    a smell here is how the construction does not go through the Batcher
-    interface (it pokes into and manipulates the data members)
     """
-    jobhandler = batching.BatchJobHandler( 5, 5, 'clean', None )
+    namer = batching.BatchFileNamer( os.getcwd() )
+    jobhandler = batching.BatchJobHandler( 5, 5, 'clean', namer )
 
     batch = batchutils.Batcher( None,
                                 tlist, None, None,
@@ -145,10 +144,8 @@ def make_fake_Batcher( tlist ):
                                 None, None,
                                 None, jobhandler )
 
-    batchid = 0
-    bjob = batching.BatchJob( batchid, None, None, None, tlist )
-
-    jobhandler.addJob( bjob )
+    bjob = jobhandler.createJob()
+    bjob.setAttr( 'testlist', tlist )
 
     jid = 42
     jobhandler.markJobStarted( bjob, jid )

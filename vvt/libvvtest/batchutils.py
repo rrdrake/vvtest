@@ -43,8 +43,9 @@ class Batcher:
         self.grouper.construct()
         self._remove_batch_directories()
 
-        for bid,qL in enumerate( self.grouper.getGroups() ):
-            self._create_job_and_write_script( bid, qL )
+        for qL in self.grouper.getGroups():
+            bjob = self.jobhandler.createJob()
+            self._construct_job_and_write_script( bjob, qL )
 
     def getNumNotRun(self):
         ""
@@ -140,37 +141,6 @@ class Batcher:
         ""
         self.jobhandler.cancelStartedJobs()
 
-    def createJob(self, batchid, testL):
-        ""
-        testlistfname = self.namer.getBasePath( batchid )
-        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
-
-        maxnp = compute_max_np( tlist )
-
-        pout = self.namer.getBatchOutputName( batchid )
-        tout = self.namer.getBasePath( batchid ) + '.' + self.suffix
-
-        bjob = batching.BatchJob( batchid, maxnp, pout, tout, tlist )
-
-        return bjob
-
-    def writeJob(self, bjob, qtime):
-        ""
-        tl = bjob.getTestList()
-
-        tl.stringFileWrite( extended=True )
-
-        cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
-
-        if len( tl.getTestMap() ) == 1:
-            # force a timeout for batches with only one test
-            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
-            else:           cmd += ' -T ' + str(qtime-120)
-
-        cmd += ' || exit 1'
-
-        self.jobhandler.writeJobScript( bjob, qtime, cmd )
-
     #####################################################################
 
     def _start_job(self, bjob):
@@ -217,8 +187,8 @@ class Batcher:
 
     def _check_for_clean_finish(self, bjob):
         ""
-        ofile = bjob.getOutputFile()
-        rfile = bjob.getResultsFile()
+        ofile = bjob.getOutputFilename()
+        rfile = bjob.getAttr('resultsfilename')
 
         finished = False
         if self.jobhandler.scanBatchOutput( ofile ):
@@ -230,10 +200,10 @@ class Batcher:
         ""
         tL = []
 
-        if not os.path.exists( bjob.getOutputFile() ):
+        if not os.path.exists( bjob.getOutputFilename() ):
             mark = 'notrun'
 
-        elif os.path.exists( bjob.getResultsFile() ):
+        elif os.path.exists( bjob.getAttr('resultsfilename') ):
             mark = 'notdone'
             tL.extend( self.results.readJobResults( bjob ) )
 
@@ -250,20 +220,48 @@ class Batcher:
             print3( 'rm -rf '+d )
             pathutil.fault_tolerant_remove( d )
 
-    def _create_job_and_write_script(self, batchid, testL):
+    def _construct_job_and_write_script(self, bjob, testL):
         ""
-        bjob = self.createJob( batchid, testL )
+        self._construct_job( bjob, testL )
 
-        self.jobhandler.addJob( bjob )
+        qtime = self.grouper.computeQueueTime( bjob.getAttr('testlist') )
+        self._write_job( bjob, qtime )
 
-        qtime = self.grouper.computeQueueTime( bjob.getTestList() )
-        self.writeJob( bjob, qtime )
-
-        incl = self.namer.getBasePath( batchid, relative=True )
+        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
         self.qsub_testfilenames.append( incl )
 
-        d = self.namer.getSubdir( batchid )
+        d = self.namer.getSubdir( bjob.getBatchID() )
         self.perms.recurse( d )
+
+    def _construct_job(self, bjob, testL):
+        ""
+        testlistfname = self.namer.getBasePath( bjob.getBatchID() )
+        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
+
+        maxnp = compute_max_np( tlist )
+
+        bjob.setMaxNP( maxnp )
+        bjob.setAttr( 'testlist', tlist )
+
+        rfile = self.namer.getBasePath( bjob.getBatchID() )+'.'+self.suffix
+        bjob.setAttr( 'resultsfilename', rfile )
+
+    def _write_job(self, bjob, qtime):
+        ""
+        tl = bjob.getAttr('testlist')
+
+        tl.stringFileWrite( extended=True )
+
+        cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
+
+        if len( tl.getTestMap() ) == 1:
+            # force a timeout for batches with only one test
+            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
+            else:           cmd += ' -T ' + str(qtime-120)
+
+        cmd += ' || exit 1'
+
+        self.jobhandler.writeJobScript( bjob, qtime, cmd )
 
 
 class BatchTestGrouper:
@@ -401,14 +399,15 @@ class ResultsHandler:
         ""
         tL = []
 
-        self.tlist.readTestResults( bjob.getResultsFile() )
+        rfile = bjob.getAttr('resultsfilename')
+        self.tlist.readTestResults( rfile )
 
-        tlr = testlistio.TestListReader( bjob.getResultsFile() )
+        tlr = testlistio.TestListReader( rfile )
         tlr.read()
         jobtests = tlr.getTests()
 
         # only add tests to the stopped list that are done
-        for tcase in bjob.getTests():
+        for tcase in bjob.getAttr('testlist').getTests():
 
             tid = tcase.getSpec().getID()
 
@@ -425,7 +424,7 @@ class ResultsHandler:
 
         tcase1 = self.getBlockingDependency( bjob )
         assert tcase1 != None  # otherwise the job should have run
-        for tcase0 in bjob.getTests():
+        for tcase0 in bjob.getAttr('testlist').getTests():
             depL.append( (tcase0,tcase1) )
 
         return depL
@@ -436,7 +435,7 @@ class ResultsHandler:
         ran but did not pass or diff, then that dependency test is returned.
         Otherwise None is returned.
         """
-        for tcase in bjob.getTests():
+        for tcase in bjob.getAttr('testlist').getTests():
             deptx = tcase.getBlockingDependency()
             if deptx != None:
                 return deptx
@@ -445,7 +444,7 @@ class ResultsHandler:
 
 def check_set_outfile_permissions( bjob, perms ):
     ""
-    ofile = bjob.getOutputFile()
+    ofile = bjob.getOutputFilename()
     if not bjob.outfileSeen() and os.path.exists( ofile ):
         perms.set( ofile )
         bjob.setOutfileSeen()
