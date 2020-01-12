@@ -79,7 +79,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
 
     finally:
         tlist.writeFinished()
-        batch.cancelStartedJobs()
+        batch.cancelJobs()
 
     tlist.inlineIncludeFiles()
 

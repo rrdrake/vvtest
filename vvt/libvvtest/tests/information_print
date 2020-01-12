@@ -137,21 +137,21 @@ def make_fake_Batcher( tlist ):
     a smell here is how the construction does not go through the Batcher
     interface (it pokes into and manipulates the data members)
     """
-    jobmon = batching.BatchJobMonitor( 5, 5, 'clean' )
+    jobhandler = batching.BatchJobHandler( 5, 5, 'clean', None )
 
     batch = batchutils.Batcher( None,
                                 tlist, None, None,
                                 None,
                                 None, None,
-                                None, jobmon, None )
+                                None, jobhandler )
 
     batchid = 0
     bjob = batching.BatchJob( batchid, None, None, None, tlist )
 
-    batch.jobmon.addJob( bjob )
+    jobhandler.addJob( bjob )
 
     jid = 42
-    batch.jobmon.markJobStarted( bjob, jid )
+    jobhandler.markJobStarted( bjob, jid )
 
     return batch
 

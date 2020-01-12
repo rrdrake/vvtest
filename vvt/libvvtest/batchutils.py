@@ -21,20 +21,18 @@ class Batcher:
                        tlist, xlist, perms,
                        qsublimit,
                        batch_length, max_timeout,
-                       namer, jobmon, batchitf):
+                       namer, jobhandler):
         ""
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
-        self.jobmon = jobmon
-        self.batchitf = batchitf
+        self.jobhandler = jobhandler
 
         self.results = ResultsHandler( tlist, xlist )
 
-        suffix = tlist.getResultsSuffix()
-        self.maker = JobMaker( suffix, self.namer, batchitf,
-                               vvtestcmd, jobmon.getCleanExitMarker() )
+        self.suffix = tlist.getResultsSuffix()
+        self.vvtestcmd = vvtestcmd
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
 
@@ -50,43 +48,43 @@ class Batcher:
 
     def getNumNotRun(self):
         ""
-        return self.jobmon.numToDo()
+        return self.jobhandler.numToDo()
 
     def getNumStarted(self):
         """
         Number of batch jobs currently running (those that have been started
         and still appear to be in the batch queue).
         """
-        return self.jobmon.numStarted()
+        return self.jobhandler.numStarted()
 
     def numInFlight(self):
         """
         Returns the number of batch jobs are still running or stopped but
         whose results have not been read yet.
         """
-        return self.jobmon.numInFlight()
+        return self.jobhandler.numInFlight()
 
     def numPastQueue(self):
         ""
-        return self.jobmon.numPastQueue()
+        return self.jobhandler.numPastQueue()
 
     def getNumDone(self):
         """
         Number of batch jobs that ran and completed.
         """
-        return self.jobmon.numDone()
+        return self.jobhandler.numDone()
 
     def getStarted(self):
         ""
-        return self.jobmon.getStarted()
+        return self.jobhandler.getStarted()
 
     def checkstart(self):
         """
         Launches a new batch job if possible.  If it does, the batch id is
         returned.
         """
-        if self.jobmon.numStarted() < self.maxjobs:
-            for bid,bjob in self.jobmon.getNotStarted():
+        if self.jobhandler.numStarted() < self.maxjobs:
+            for bid,bjob in self.jobhandler.getNotStarted():
                 if self.results.getBlockingDependency( bjob ) == None:
                     self._start_job( bjob )
                     return bid
@@ -122,15 +120,15 @@ class Batcher:
               pair (a test, failed dependency test)
         """
         # should not be here if there are jobs currently running
-        assert self.jobmon.numInFlight() == 0
+        assert self.jobhandler.numInFlight() == 0
 
-        jobL = self.jobmon.markNotStartedJobsAsDone()
+        jobL = self.jobhandler.markNotStartedJobsAsDone()
 
         notrunL = []
         for bjob in jobL:
             notrunL.extend( self.results.getFailedDependencies( bjob ) )
 
-        notrun,notdone = self.jobmon.getUnfinishedJobIDs()
+        notrun,notdone = self.jobhandler.getUnfinishedJobIDs()
 
         return notrun, notdone, notrunL
 
@@ -138,11 +136,40 @@ class Batcher:
         ""
         return self.qsub_testfilenames
 
-    def cancelStartedJobs(self):
+    def cancelJobs(self):
         ""
-        jL = [ bjob.getJobID() for _,bjob in self.jobmon.getStarted() ]
-        if len(jL) > 0:
-            self.batchitf.cancelJobs( jL )
+        self.jobhandler.cancelStartedJobs()
+
+    def createJob(self, batchid, testL):
+        ""
+        testlistfname = self.namer.getBasePath( batchid )
+        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
+
+        maxnp = compute_max_np( tlist )
+
+        pout = self.namer.getBatchOutputName( batchid )
+        tout = self.namer.getBasePath( batchid ) + '.' + self.suffix
+
+        bjob = batching.BatchJob( batchid, maxnp, pout, tout, tlist )
+
+        return bjob
+
+    def writeJob(self, bjob, qtime):
+        ""
+        tl = bjob.getTestList()
+
+        tl.stringFileWrite( extended=True )
+
+        cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
+
+        if len( tl.getTestMap() ) == 1:
+            # force a timeout for batches with only one test
+            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
+            else:           cmd += ' -T ' + str(qtime-120)
+
+        cmd += ' || exit 1'
+
+        self.jobhandler.writeJobScript( bjob, qtime, cmd )
 
     #####################################################################
 
@@ -151,32 +178,23 @@ class Batcher:
         bid = bjob.getBatchID()
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
-        jobid = self.batchitf.submitJob( tdir, bjob.getOutputFile(), pin )
-        self.jobmon.markJobStarted( bjob, jobid )
+        self.jobhandler.startJob( bjob, tdir, pin )
 
     def _check_get_stopped_jobs(self):
         ""
-        qdoneL = []
+        for _,bjob in self.jobhandler.getStarted():
+            check_set_outfile_permissions( bjob, self.perms )
 
-        startlist = list( self.jobmon.getStarted() )
-        if len(startlist) > 0:
-            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
-            statusD = self.batchitf.queryJobs( jobidL )
-            tnow = time.time()
-            for bid,bjob in startlist:
-                check_set_outfile_permissions( bjob, self.perms )
-                status = statusD[ bjob.getJobID() ]
-                if self.jobmon.checkJobStopped( bjob, status, tnow ):
-                    qdoneL.append( bid )
+        done_jobids = self.jobhandler.transitionStartedToStopped()
 
-        return qdoneL
+        return done_jobids
 
     def _check_get_finished_tests(self):
         ""
         tnow = time.time()
         tdoneL = []
-        for bid,bjob in list( self.jobmon.getStopped() ):
-            if self.jobmon.timeToCheckIfFinished( bjob, tnow ):
+        for bid,bjob in list( self.jobhandler.getStopped() ):
+            if self.jobhandler.timeToCheckIfFinished( bjob, tnow ):
                 tL = self._check_job_finish( bjob, tnow )
                 tdoneL.extend( tL )
 
@@ -188,9 +206,9 @@ class Batcher:
 
         if self._check_for_clean_finish( bjob ):
             tdoneL = self.results.readJobResults( bjob )
-            self.jobmon.markJobDone( bjob, 'clean' )
+            self.jobhandler.markJobDone( bjob, 'clean' )
 
-        elif not self.jobmon.extendFinishCheck( bjob, current_time ):
+        elif not self.jobhandler.extendFinishCheck( bjob, current_time ):
             # too many attempts to read; assume the queue job
             # failed somehow, but force a read anyway
             tdoneL = self._finish_job( bjob )
@@ -203,7 +221,7 @@ class Batcher:
         rfile = bjob.getResultsFile()
 
         finished = False
-        if self.jobmon.scanBatchOutput( ofile ):
+        if self.jobhandler.scanBatchOutput( ofile ):
             finished = testlistio.file_is_marked_finished( rfile )
 
         return finished
@@ -222,7 +240,7 @@ class Batcher:
         else:
             mark = 'fail'
 
-        self.jobmon.markJobDone( bjob, mark )
+        self.jobhandler.markJobDone( bjob, mark )
 
         return tL
 
@@ -234,12 +252,12 @@ class Batcher:
 
     def _create_job_and_write_script(self, batchid, testL):
         ""
-        bjob = self.maker.createJob( batchid, testL )
+        bjob = self.createJob( batchid, testL )
 
-        self.jobmon.addJob( bjob )
+        self.jobhandler.addJob( bjob )
 
         qtime = self.grouper.computeQueueTime( bjob.getTestList() )
-        self.maker.writeJob( bjob, qtime )
+        self.writeJob( bjob, qtime )
 
         incl = self.namer.getBasePath( batchid, relative=True )
         self.qsub_testfilenames.append( incl )
@@ -370,58 +388,6 @@ def apply_queue_timeout_bump_factor( qtime ):
         qtime += min( 15*60, 10*60 + int( float(30*60-10*60) * 0.3 ) )
 
     return qtime
-
-
-class JobMaker:
-
-    def __init__(self, suffix, filenamer, batchitf,
-                       basevvtestcmd, clean_exit_marker):
-        ""
-        self.suffix = suffix
-        self.namer = filenamer
-        self.batchitf = batchitf
-        self.vvtestcmd = basevvtestcmd
-        self.clean_exit_marker = clean_exit_marker
-
-    def createJob(self, batchid, testL):
-        ""
-        testlistfname = self.namer.getBasePath( batchid )
-        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
-
-        maxnp = compute_max_np( tlist )
-
-        pout = self.namer.getBatchOutputName( batchid )
-        tout = self.namer.getBasePath( batchid ) + '.' + self.suffix
-
-        bjob = batching.BatchJob( batchid, maxnp, pout, tout, tlist )
-
-        return bjob
-
-    def writeJob(self, bjob, qtime):
-        ""
-        tl = bjob.getTestList()
-
-        tl.stringFileWrite( extended=True )
-
-        bidstr = str( bjob.getBatchID() )
-        maxnp = bjob.getMaxNP()
-
-        tdir = self.namer.getRootDir()
-        pout = self.namer.getBatchOutputName( bjob.getBatchID() )
-
-        cmd = self.vvtestcmd + ' --qsub-id=' + bidstr
-
-        if len( tl.getTestMap() ) == 1:
-            # force a timeout for batches with only one test
-            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
-            else:           cmd += ' -T ' + str(qtime-120)
-
-        cmd += ' || exit 1'
-
-        fn = self.namer.getBatchScriptName( bidstr )
-
-        self.batchitf.writeJobScript( maxnp, qtime, tdir, pout,
-                                      fn, cmd, self.clean_exit_marker )
 
 
 class ResultsHandler:

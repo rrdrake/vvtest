@@ -77,9 +77,15 @@ class BatchQueueInterface:
         self.envD = {}
         self.attrs = {}
 
+        self.clean_exit_marker = "queue job finished cleanly"
+
     def isBatched(self):
         ""
         return self.batch != None
+
+    def getCleanExitMarker(self):
+        ""
+        return self.clean_exit_marker
 
     def setAttr(self, name, value):
         ""
@@ -125,7 +131,7 @@ class BatchQueueInterface:
         return self.batch
 
     def writeJobScript(self, np, queue_time, workdir, qout_file,
-                             filename, command, clean_exit_marker):
+                             filename, command):
         ""
         qt = self.attrs.get( 'walltime', queue_time )
 
@@ -155,7 +161,7 @@ class BatchQueueInterface:
             fp.writelines( [ command+'\n\n' ] )
 
             # echo a marker to determine when a clean batch job exit has occurred
-            fp.writelines( [ 'echo "'+clean_exit_marker+'"\n' ] )
+            fp.writelines( [ 'echo "'+self.clean_exit_marker+'"\n' ] )
 
     def submitJob(self, workdir, outfile, scriptname):
         ""
@@ -186,27 +192,40 @@ class BatchQueueInterface:
                 self.batch.cancel( jid )
 
 
-class BatchJobMonitor:
+class BatchJobHandler:
 
-    def __init__(self, read_interval, read_timeout, clean_exit_marker):
+    def __init__(self, read_interval, read_timeout, batchitf, namer):
         ""
         self.read_interval = read_interval
         self.read_timeout = read_timeout
-        self.clean_exit_marker = clean_exit_marker
+        self.batchitf = batchitf
+        self.namer = namer
 
         self.qtodo  = {}  # to be submitted
         self.qstart = {}  # submitted
         self.qstop  = {}  # no longer in the queue
         self.qdone  = {}  # final results have been read
 
-    def getCleanExitMarker(self):
-        ""
-        return self.clean_exit_marker
-
     def addJob(self, batchjob ):
         ""
         bid = batchjob.getBatchID()
         self.qtodo[ bid ] = batchjob
+
+    def writeJobScript(self, batchjob, qtime, cmd):
+        ""
+        tdir = self.namer.getRootDir()
+        pout = self.namer.getBatchOutputName( batchjob.getBatchID() )
+
+        fn = self.namer.getBatchScriptName( str( batchjob.getBatchID() ) )
+
+        maxnp = batchjob.getMaxNP()
+        self.batchitf.writeJobScript( maxnp, qtime, tdir, pout, fn, cmd )
+
+    def startJob(self, batchjob, workdir, scriptname):
+        ""
+        outfile = batchjob.getOutputFile()
+        jobid = self.batchitf.submitJob( workdir, outfile, scriptname )
+        self.markJobStarted( batchjob, jobid )
 
     def numToDo(self):
         ""
@@ -269,7 +288,24 @@ class BatchJobMonitor:
         self.qdone[ bid ] = bjob
         bjob.setResult( result )
 
-    def checkJobStopped(self, bjob, queue_status, current_time):
+    def transitionStartedToStopped(self):
+        ""
+        doneL = []
+
+        startlist = list( self.getStarted() )
+
+        if len(startlist) > 0:
+            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
+            statusD = self.batchitf.queryJobs( jobidL )
+            tnow = time.time()
+            for bid,bjob in startlist:
+                status = statusD[ bjob.getJobID() ]
+                if self._check_stopped_job( bjob, status, tnow ):
+                    doneL.append( bid )
+
+        return doneL
+
+    def _check_stopped_job(self, bjob, queue_status, current_time):
         """
         If job 'queue_status' is empty (meaning the job is not in the queue),
         then return True if enough time has elapsed since the job started or
@@ -323,7 +359,7 @@ class BatchJobMonitor:
             except Exception:
                 pass
             else:
-                if self.clean_exit_marker in buf:
+                if self.batchitf.getCleanExitMarker() in buf:
                     clean = True
             try:
                 fp.close()
@@ -351,6 +387,12 @@ class BatchJobMonitor:
             elif bjob.getResult() == 'notdone': notdone.append( str(bid) )
 
         return notrun, notdone
+
+    def cancelStartedJobs(self):
+        ""
+        jL = [ bjob.getJobID() for _,bjob in self.getStarted() ]
+        if len(jL) > 0:
+            self.batchitf.cancelJobs( jL )
 
     def _pop_job(self, batchid):
         ""

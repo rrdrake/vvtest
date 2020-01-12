@@ -991,16 +991,15 @@ def batchTestList( opts, optD, rtdata,
     namer = batching.BatchFileNamer( test_dir, testlist_name )
 
     read_interval, read_timeout = determine_job_read_intervals()
-    clean_exit_marker = "queue job finished cleanly"
-    jobmon = batching.BatchJobMonitor( read_interval, read_timeout,
-                                       clean_exit_marker )
+    jobhandler = batching.BatchJobHandler( read_interval, read_timeout,
+                                           batchitf, namer )
 
     batch = batchutils.Batcher( vvtestcmd,
                                 tlist, xlist, perms,
                                 qsublimit,
                                 opts.batch_length,
                                 opts.max_timeout,
-                                namer, jobmon, batchitf )
+                                namer, jobhandler )
 
     plat.display( isbatched=True )
 
