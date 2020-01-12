@@ -19,11 +19,11 @@ class BatchJob:
         BatchJob.batchid_counter += 1
 
         self.outfile = None
-        self.outfile_seen = False
         self.maxnp = None
         self.jobid = None
         self.wrkdir = None
         self.tstart = None
+        self.tseen = None
         self.tstop = None
         self.tcheck = None
         self.result = None
@@ -44,7 +44,7 @@ class BatchJob:
     def getResult(self): return self.result
 
     def getOutputFilename(self): return self.outfile
-    def outfileSeen(self): return self.outfile_seen
+    def outfileSeen(self): return self.tseen != None
 
     def setAttr(self, name, value):
         ""
@@ -76,9 +76,9 @@ class BatchJob:
         ""
         self.tstart = tstart
 
-    def setOutfileSeen(self):
+    def setOutfileSeen(self, tseen):
         ""
-        self.outfile_seen = True
+        self.tseen = tseen
 
     def setCheckTime(self, tcheck):
         ""

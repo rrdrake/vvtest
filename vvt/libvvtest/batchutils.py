@@ -152,8 +152,9 @@ class Batcher:
 
     def _check_get_stopped_jobs(self):
         ""
+        tm = time.time()
         for _,bjob in self.jobhandler.getStarted():
-            check_set_outfile_permissions( bjob, self.perms )
+            check_set_outfile_permissions( bjob, self.perms, tm )
 
         done_jobids = self.jobhandler.transitionStartedToStopped()
 
@@ -442,12 +443,12 @@ class ResultsHandler:
         return None
 
 
-def check_set_outfile_permissions( bjob, perms ):
+def check_set_outfile_permissions( bjob, perms, curtime ):
     ""
     ofile = bjob.getOutputFilename()
     if not bjob.outfileSeen() and os.path.exists( ofile ):
         perms.set( ofile )
-        bjob.setOutfileSeen()
+        bjob.setOutfileSeen( curtime )
 
 
 def print3( *args ):
