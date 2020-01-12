@@ -22,6 +22,7 @@ class BatchJob:
         self.outfile_seen = False
         self.maxnp = None
         self.jobid = None
+        self.wrkdir = None
         self.tstart = None
         self.tstop = None
         self.tcheck = None
@@ -33,6 +34,8 @@ class BatchJob:
     def getMaxNP(self): return self.maxnp
 
     def getJobID(self): return self.jobid
+
+    def getWorkDir(self): return self.wrkdir
 
     def getStartTime(self): return self.tstart
     def getCheckTime(self): return self.tcheck
@@ -56,6 +59,10 @@ class BatchJob:
     def setOutputFilename(self, filename):
         ""
         self.outfile = filename
+
+    def setWorkDir(self, dirpath):
+        ""
+        self.wrkdir = dirpath
 
     def setMaxNP(self, maxnp):
         ""
@@ -230,6 +237,8 @@ class BatchJobHandler:
         pout = self.namer.getBatchOutputName( bjob.getBatchID() )
         bjob.setOutputFilename( pout )
 
+        bjob.setWorkDir( self.namer.getRootDir() )
+
         bid = bjob.getBatchID()
         self.qtodo[ bid ] = bjob
 
@@ -237,13 +246,13 @@ class BatchJobHandler:
 
     def writeJobScript(self, batchjob, qtime, cmd):
         ""
-        tdir = self.namer.getRootDir()
-        pout = self.namer.getBatchOutputName( batchjob.getBatchID() )
+        wrkdir = batchjob.getWorkDir()
+        pout = batchjob.getOutputFilename()
 
         fn = self.namer.getBatchScriptName( str( batchjob.getBatchID() ) )
 
         maxnp = batchjob.getMaxNP()
-        self.batchitf.writeJobScript( maxnp, qtime, tdir, pout, fn, cmd )
+        self.batchitf.writeJobScript( maxnp, qtime, wrkdir, pout, fn, cmd )
 
     def startJob(self, batchjob, workdir, scriptname):
         ""

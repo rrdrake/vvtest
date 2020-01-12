@@ -133,7 +133,7 @@ def make_fake_TestExecList():
 
 def make_fake_Batcher( tlist ):
     """
-    construct and return a Batcher object
+    construct and return a Batcher object with one started job
     """
     namer = batching.BatchFileNamer( os.getcwd() )
     jobhandler = batching.BatchJobHandler( 5, 5, 'clean', namer )
