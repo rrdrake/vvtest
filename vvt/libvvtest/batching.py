@@ -278,19 +278,19 @@ class BatchJobHandler:
 
     def getNotStarted(self):
         ""
-        return self.qtodo.items()
+        return self.qtodo.values()
 
     def getStarted(self):
         ""
-        return self.qstart.items()
+        return self.qstart.values()
 
     def getStopped(self):
         ""
-        return self.qstop.items()
+        return self.qstop.values()
 
     def getDone(self):
         ""
-        return self.qdone.items()
+        return self.qdone.values()
 
     def markJobStarted(self, bjob, jobid):
         ""
@@ -328,13 +328,13 @@ class BatchJobHandler:
         startlist = list( self.getStarted() )
 
         if len(startlist) > 0:
-            jobidL = [ bjob.getJobID() for _,bjob in startlist ]
+            jobidL = [ bjob.getJobID() for bjob in startlist ]
             statusD = self.batchitf.queryJobs( jobidL )
             tnow = time.time()
-            for bid,bjob in startlist:
+            for bjob in startlist:
                 status = statusD[ bjob.getJobID() ]
                 if self._check_stopped_job( bjob, status, tnow ):
-                    doneL.append( bid )
+                    doneL.append( bjob.getBatchID() )
 
         return doneL
 
@@ -405,7 +405,7 @@ class BatchJobHandler:
         ""
         jobs = []
 
-        for bid,bjob in list( self.getNotStarted() ):
+        for bjob in list( self.getNotStarted() ):
             self.markJobDone( bjob, 'notrun' )
             jobs.append( bjob )
 
@@ -415,15 +415,18 @@ class BatchJobHandler:
         ""
         notrun = []
         notdone = []
-        for bid,bjob in self.getDone():
-            if bjob.getResult() == 'notrun': notrun.append( str(bid) )
-            elif bjob.getResult() == 'notdone': notdone.append( str(bid) )
+        for bjob in self.getDone():
+            bid = str( bjob.getBatchID() )
+            if bjob.getResult() == 'notrun':
+                notrun.append( bid )
+            elif bjob.getResult() == 'notdone':
+                notdone.append( bid )
 
         return notrun, notdone
 
     def cancelStartedJobs(self):
         ""
-        jL = [ bjob.getJobID() for _,bjob in self.getStarted() ]
+        jL = [ bjob.getJobID() for bjob in self.getStarted() ]
         if len(jL) > 0:
             self.batchitf.cancelJobs( jL )
 

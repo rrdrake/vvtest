@@ -57,8 +57,9 @@ class TestInformationPrinter:
         ""
         self.println( '  *', self.batcher.getNumStarted(),
                       'batch job(s) in flight:' )
-        for qid, batch_job in self.batcher.getStarted():
-            duration = now - batch_job.tstart
+        for batch_job in self.batcher.getStarted():
+            qid = batch_job.getBatchID()
+            duration = now - batch_job.getStartTime()
             duration = datetime.timedelta( seconds=int(duration) )
             self.println( '    * qbat.{0}'.format(qid),
                           '({0} since submitting)'.format(duration) )

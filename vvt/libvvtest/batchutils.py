@@ -85,10 +85,10 @@ class Batcher:
         returned.
         """
         if self.jobhandler.numStarted() < self.maxjobs:
-            for bid,bjob in self.jobhandler.getNotStarted():
+            for bjob in self.jobhandler.getNotStarted():
                 if self.results.getBlockingDependency( bjob ) == None:
                     self._start_job( bjob )
-                    return bid
+                    return bjob.getBatchID()
         return None
 
     def checkdone(self):
@@ -153,7 +153,7 @@ class Batcher:
     def _check_get_stopped_jobs(self):
         ""
         tm = time.time()
-        for _,bjob in self.jobhandler.getStarted():
+        for bjob in self.jobhandler.getStarted():
             check_set_outfile_permissions( bjob, self.perms, tm )
 
         done_jobids = self.jobhandler.transitionStartedToStopped()
@@ -164,7 +164,7 @@ class Batcher:
         ""
         tnow = time.time()
         tdoneL = []
-        for bid,bjob in list( self.jobhandler.getStopped() ):
+        for bjob in list( self.jobhandler.getStopped() ):
             if self.jobhandler.timeToCheckIfFinished( bjob, tnow ):
                 tL = self._check_job_finish( bjob, tnow )
                 tdoneL.extend( tL )
