@@ -56,18 +56,18 @@ class Batcher:
         Number of batch jobs currently running (those that have been started
         and still appear to be in the batch queue).
         """
-        return self.jobhandler.numStarted()
+        return self.jobhandler.numSubmitted()
 
-    def numInFlight(self):
+    def numInProgress(self):
         """
         Returns the number of batch jobs are still running or stopped but
         whose results have not been read yet.
         """
-        return self.jobhandler.numInFlight()
+        return self.jobhandler.numSubmitted() + self.jobhandler.numStopped()
 
     def numPastQueue(self):
         ""
-        return self.jobhandler.numPastQueue()
+        return self.jobhandler.numStopped() + self.jobhandler.numDone()
 
     def getNumDone(self):
         """
@@ -84,7 +84,7 @@ class Batcher:
         Launches a new batch job if possible.  If it does, the batch id is
         returned.
         """
-        if self.jobhandler.numStarted() < self.maxjobs:
+        if self.jobhandler.numSubmitted() < self.maxjobs:
             for bjob in self.jobhandler.getNotStarted():
                 if self.results.getBlockingDependency( bjob ) == None:
                     self._start_job( bjob )
@@ -121,7 +121,7 @@ class Batcher:
               pair (a test, failed dependency test)
         """
         # should not be here if there are jobs currently running
-        assert self.jobhandler.numInFlight() == 0
+        assert self.numInProgress() == 0
 
         jobL = self.jobhandler.markNotStartedJobsAsDone()
 

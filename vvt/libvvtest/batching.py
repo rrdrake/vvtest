@@ -225,10 +225,10 @@ class BatchJobHandler:
         self.batchitf = batchitf
         self.namer = namer
 
-        self.qtodo  = {}  # to be submitted
-        self.qstart = {}  # submitted
-        self.qstop  = {}  # no longer in the queue
-        self.qdone  = {}  # final results have been read
+        self.todo  = {}
+        self.submitted = {}
+        self.stopped  = {}  # not in queue or shown as completed by the queue
+        self.done  = {}  # job results have been processed
 
     def createJob(self):
         ""
@@ -240,7 +240,7 @@ class BatchJobHandler:
         bjob.setWorkDir( self.namer.getRootDir() )
 
         bid = bjob.getBatchID()
-        self.qtodo[ bid ] = bjob
+        self.todo[ bid ] = bjob
 
         return bjob
 
@@ -262,35 +262,32 @@ class BatchJobHandler:
 
     def numToDo(self):
         ""
-        return len( self.qtodo )
+        return len( self.todo )
 
-    def numStarted(self):
-        return len( self.qstart )
+    def numSubmitted(self):
+        return len( self.submitted )
+
+    def numStopped(self):
+        return len( self.stopped )
 
     def numDone(self):
-        return len( self.qdone )
-
-    def numInFlight(self):
-        return len( self.qstart ) + len( self.qstop )
-
-    def numPastQueue(self):
-        return len( self.qstop ) + len( self.qdone )
+        return len( self.done )
 
     def getNotStarted(self):
         ""
-        return self.qtodo.values()
+        return self.todo.values()
 
     def getStarted(self):
         ""
-        return self.qstart.values()
+        return self.submitted.values()
 
     def getStopped(self):
         ""
-        return self.qstop.values()
+        return self.stopped.values()
 
     def getDone(self):
         ""
-        return self.qdone.values()
+        return self.done.values()
 
     def markJobStarted(self, bjob, jobid):
         ""
@@ -298,7 +295,7 @@ class BatchJobHandler:
         bid = bjob.getBatchID()
 
         self._pop_job( bid )
-        self.qstart[ bid ] = bjob
+        self.submitted[ bid ] = bjob
 
         bjob.setJobID( jobid )
         bjob.setStartTime( tm )
@@ -309,7 +306,7 @@ class BatchJobHandler:
         bid = bjob.getBatchID()
 
         self._pop_job( bid )
-        self.qstop[ bid ] = bjob
+        self.stopped[ bid ] = bjob
 
         bjob.setStopTime( tm )
         bjob.setCheckTime( tm + self.read_interval )
@@ -318,7 +315,7 @@ class BatchJobHandler:
         ""
         bid = bjob.getBatchID()
         self._pop_job( bid )
-        self.qdone[ bid ] = bjob
+        self.done[ bid ] = bjob
         bjob.setResult( result )
 
     def transitionStartedToStopped(self):
@@ -432,7 +429,7 @@ class BatchJobHandler:
 
     def _pop_job(self, batchid):
         ""
-        for qD in [ self.qtodo, self.qstart, self.qstop, self.qdone ]:
+        for qD in [ self.todo, self.submitted, self.stopped, self.done ]:
             if batchid in qD:
                 return qD.pop( batchid )
         raise Exception( 'job id not found: '+str(batchid) )

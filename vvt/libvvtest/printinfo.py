@@ -55,7 +55,7 @@ class TestInformationPrinter:
 
     def writeBatchListInfo(self, now):
         ""
-        self.println( '  *', self.batcher.getNumStarted(),
+        self.println( '  *', self.batcher.numInProgress(),
                       'batch job(s) in flight:' )
         for batch_job in self.batcher.getStarted():
             qid = batch_job.getBatchID()

@@ -42,7 +42,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
             if qid != None:
                 # nothing to print here because the qsubmit prints
                 pass
-            elif batch.numInFlight() == 0:
+            elif batch.numInProgress() == 0:
                 break
             else:
                 sleep_with_info_check( info, qsleep )
@@ -56,14 +56,14 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
                 ts = XstatusString( tcase, test_dir, cwd )
                 print3( "Finished:", ts )
 
-            uthook.check( batch.numInFlight(), batch.numPastQueue() )
+            uthook.check( batch.numInProgress(), batch.numPastQueue() )
 
             results_writer.midrun( tlist )
 
             if len(doneL) > 0:
                 jpct = 100 * float(batch.getNumDone()) / float(numjobs)
                 jdiv = 'jobs '+str(batch.getNumDone())+'/'+str(numjobs)
-                jflt = '(in flight '+str(batch.getNumStarted())+')'
+                jflt = '(in flight '+str(batch.numInProgress())+')'
                 ndone = xlist.numDone()
                 ntot = tlist.numActive()
                 tpct = 100 * float(ndone) / float(ntot)
