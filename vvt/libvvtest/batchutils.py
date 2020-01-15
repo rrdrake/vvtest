@@ -40,12 +40,12 @@ class Batcher:
 
     def writeQsubScripts(self):
         ""
-        self.grouper.construct()
         self._remove_batch_directories()
 
+        self.grouper.construct()
         for qL in self.grouper.getGroups():
             bjob = self.jobhandler.createJob()
-            self._construct_job_and_write_script( bjob, qL )
+            self._construct_job( bjob, qL )
 
     def getNumNotRun(self):
         ""
@@ -145,6 +145,8 @@ class Batcher:
 
     def _start_job(self, bjob):
         ""
+        self._write_job( bjob )
+
         bid = bjob.getBatchID()
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
@@ -221,19 +223,6 @@ class Batcher:
             print3( 'rm -rf '+d )
             pathutil.fault_tolerant_remove( d )
 
-    def _construct_job_and_write_script(self, bjob, testL):
-        ""
-        self._construct_job( bjob, testL )
-
-        qtime = self.grouper.computeQueueTime( bjob.getAttr('testlist') )
-        self._write_job( bjob, qtime )
-
-        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
-        self.qsub_testfilenames.append( incl )
-
-        d = self.namer.getSubdir( bjob.getBatchID() )
-        self.perms.recurse( d )
-
     def _construct_job(self, bjob, testL):
         ""
         testlistfname = self.namer.getBasePath( bjob.getBatchID() )
@@ -247,8 +236,13 @@ class Batcher:
         rfile = self.namer.getBasePath( bjob.getBatchID() )+'.'+self.suffix
         bjob.setAttr( 'resultsfilename', rfile )
 
-    def _write_job(self, bjob, qtime):
+        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
+        self.qsub_testfilenames.append( incl )
+
+    def _write_job(self, bjob):
         ""
+        qtime = self.grouper.computeQueueTime( bjob.getAttr('testlist') )
+
         tl = bjob.getAttr('testlist')
 
         tl.stringFileWrite( extended=True )
@@ -263,6 +257,9 @@ class Batcher:
         cmd += ' || exit 1'
 
         self.jobhandler.writeJobScript( bjob, qtime, cmd )
+
+        d = self.namer.getSubdir( bjob.getBatchID() )
+        self.perms.recurse( d )
 
 
 class BatchTestGrouper:
