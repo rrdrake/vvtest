@@ -184,7 +184,7 @@ class Batcher:
         elif not self.jobhandler.extendFinishCheck( bjob, current_time ):
             # too many attempts to read; assume the queue job
             # failed somehow, but force a read anyway
-            tdoneL = self._finish_job( bjob )
+            tdoneL = self._force_finish_job( bjob )
 
         return tdoneL
 
@@ -199,7 +199,7 @@ class Batcher:
 
         return finished
 
-    def _finish_job(self, bjob):
+    def _force_finish_job(self, bjob):
         ""
         tL = []
 

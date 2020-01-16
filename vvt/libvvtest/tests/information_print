@@ -120,7 +120,7 @@ def make_fake_TestExecList():
         tlist.addTest( ts )
         ts.getSpec().setConstructionCompleted()
 
-    xlist = TestExecList( None, tlist, None )
+    xlist = TestExecList( tlist, None )
 
     xlist._createTestExecList( None )
 

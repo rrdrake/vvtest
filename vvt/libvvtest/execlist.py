@@ -12,13 +12,12 @@ from . import depend
 
 class TestExecList:
 
-    def __init__(self, usrplugin, tlist, runner):
+    def __init__(self, tlist, runner):
         ""
-        self.plugin = usrplugin
         self.tlist = tlist
         self.runner = runner
 
-        self.xtlist = {}  # np -> list of TestCase objects
+        self.backlog = {}  # np -> list of TestCase objects
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
@@ -35,7 +34,7 @@ class TestExecList:
 
     def _createTestExecList(self, perms):
         ""
-        self.xtlist = {}
+        self.backlog = {}
 
         for tcase in self.tlist.getTests():
 
@@ -48,10 +47,10 @@ class TestExecList:
                 tcase.setExec( TestExec() )
 
                 np = int( tspec.getParameters().get('np', 0) )
-                if np in self.xtlist:
-                    self.xtlist[np].append( tcase )
+                if np in self.backlog:
+                    self.backlog[np].append( tcase )
                 else:
-                    self.xtlist[np] = [ tcase ]
+                    self.backlog[np] = [ tcase ]
 
     def _connect_execute_dependencies(self):
         ""
@@ -75,7 +74,7 @@ class TestExecList:
         of the testing sequence, which can add significantly to the total wall
         time.
         """
-        for np,tcaseL in self.xtlist.items():
+        for np,tcaseL in self.backlog.items():
             sortL = []
             for tcase in tcaseL:
                 tm = tcase.getStat().getRuntime( None )
@@ -91,7 +90,7 @@ class TestExecList:
         Returns a list of integers; each integer is the number of processors
         needed by one or more tests in the TestExec list.
         """
-        return self.xtlist.keys()
+        return self.backlog.keys()
 
     def getTestExecList(self, numprocs=None):
         """
@@ -102,10 +101,10 @@ class TestExecList:
         xL = []
 
         if numprocs == None:
-            for tcaseL in self.xtlist.values():
+            for tcaseL in self.backlog.values():
                 xL.extend( tcaseL )
         else:
-            xL.extend( self.xtlist.get(numprocs,[]) )
+            xL.extend( self.backlog.get(numprocs,[]) )
 
         return xL
 
@@ -115,12 +114,12 @@ class TestExecList:
         test can run.  In this case, one of the following is true
 
             1. there are not enough free processors to run another test
-            2. the only tests left are parent tests that cannot be run
-               because one or more of their children did not pass or diff
+            2. the only tests left have a dependency with a bad result (like
+               a fail) preventing the test from running
 
         In the latter case, numRunning() will be zero.
         """
-        npL = list( self.xtlist.keys() )
+        npL = list( self.backlog.keys() )
         npL.sort()
         npL.reverse()
 
@@ -154,10 +153,10 @@ class TestExecList:
         All remaining tests are removed from the run list and returned.
         """
         tL = []
-        for np,tcaseL in list( self.xtlist.items() ):
+        for np,tcaseL in list( self.backlog.items() ):
             tL.extend( tcaseL )
             del tcaseL[:]
-            self.xtlist.pop( np )
+            self.backlog.pop( np )
         return tL
 
     def getRunning(self):
@@ -189,7 +188,7 @@ class TestExecList:
         ""
         for np in npL:
             if platform == None or platform.queryProcs(np):
-                tcaseL = self.xtlist[np]
+                tcaseL = self.backlog[np]
                 N = len(tcaseL)
                 i = 0
                 while i < N:
@@ -202,7 +201,7 @@ class TestExecList:
 
     def _pop_test_exec(self, np, i):
         ""
-        tcaseL = self.xtlist[np]
+        tcaseL = self.backlog[np]
         del tcaseL[i]
         if len(tcaseL) == 0:
-            self.xtlist.pop( np )
+            self.backlog.pop( np )

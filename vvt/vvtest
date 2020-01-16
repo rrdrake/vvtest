@@ -532,7 +532,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-    xlist = TestExecList( plugin, tlist, runner )
+    xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
     print3( "\nTest directory:", testsubdir )
@@ -951,7 +951,7 @@ def run_test_exec_list( opts, optD, rtdata,
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-    xlist = TestExecList( plugin, tlist, runner )
+    xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
     if not opts.batch:
@@ -1141,7 +1141,7 @@ def baselineTests( opts, optD, rtdata ):
         perms = rtdata.getPermissionsObject()
         runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-        xlist = TestExecList( plugin, tlist, runner )
+        xlist = TestExecList( tlist, runner )
         xlist.createTestExecs( perms )
 
         execute.run_baseline( xlist, plat )
