@@ -18,6 +18,7 @@ class TestExecList:
         self.runner = runner
 
         self.backlog = {}  # np -> list of TestCase objects
+        self.waiting = {}  # TestSpec ID -> TestCase object
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
@@ -129,13 +130,20 @@ class TestExecList:
             # search for tests that need more processors than platform has
             tcase = self._pop_next_test( npL )
 
-        if tcase != None:
-            self.started[ tcase.getSpec().getID() ] = tcase
-
         return tcase
+
+    def consumeBacklog(self):
+        ""
+        for np,tcaseL in list( self.backlog.items() ):
+            while len( tcaseL ) > 0:
+                tcase = tcaseL[0]
+                self._pop_test_exec( np, 0 )
+                yield tcase
 
     def startTest(self, tcase, platform, baseline=0):
         ""
+        self.moveToStarted( tcase )
+
         tspec = tcase.getSpec()
         texec = tcase.getExec()
 
@@ -148,9 +156,16 @@ class TestExecList:
 
         tcase.getStat().markStarted( texec.getStartTime() )
 
+    def moveToStarted(self, tcase):
+        ""
+        tid = tcase.getSpec().getID()
+
+        self.waiting.pop( tid )
+        self.started[ tid ] = tcase
+
     def popRemaining(self):
         """
-        All remaining tests are removed from the run list and returned.
+        All remaining tests are removed from the backlog and returned.
         """
         tL = []
         for np,tcaseL in list( self.backlog.items() ):
@@ -202,6 +217,11 @@ class TestExecList:
     def _pop_test_exec(self, np, i):
         ""
         tcaseL = self.backlog[np]
+        tcase = tcaseL[i]
+
         del tcaseL[i]
+
+        self.waiting[ tcase.getSpec().getID() ] = tcase
+
         if len(tcaseL) == 0:
             self.backlog.pop( np )

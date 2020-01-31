@@ -125,8 +125,8 @@ def make_fake_TestExecList():
     xlist._createTestExecList( None )
 
     # mark the tests as running
-    xt1 = xlist.popNext( None )
-    xt2 = xlist.popNext( None )
+    for tcase in xlist.consumeBacklog():
+        xlist.moveToStarted( tcase )
 
     return xlist, tlist
 

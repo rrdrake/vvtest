@@ -193,7 +193,8 @@ def exec_path( testspec, test_dir ):
 def run_baseline( xlist, plat ):
     ""
     failures = False
-    for tcase in xlist.getTestExecList():
+
+    for tcase in xlist.consumeBacklog():
 
         tspec = tcase.getSpec()
         texec = tcase.getExec()
