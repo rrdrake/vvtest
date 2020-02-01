@@ -286,7 +286,7 @@ class BatchJobHandler:
         ""
         return self.stopped.values()
 
-    def getNotDone(self):
+    def getNotDone(self):  # magic: still need this?
         ""
         for bjob in self.submitted.values():
             yield bjob
@@ -307,7 +307,10 @@ class BatchJobHandler:
 
         bjob.setJobID( jobid )
         bjob.setStartTime( tm )
-        bjob.setCheckTime( tm )  # magic: may want to make this tm+2
+
+        # delay the first job check a little
+        chktime = tm + max( 1, int( self.check_interval * 0.1 ) )
+        bjob.setCheckTime( chktime )
 
     def markJobStopped(self, bjob):
         ""
@@ -340,7 +343,7 @@ class BatchJobHandler:
             for bjob in startlist:
                 status = statusD[ bjob.getJobID() ]
                 if self._check_stopped_job( bjob, status, tnow ):
-                    doneL.append( bjob.getBatchID() )
+                    doneL.append( bjob )
 
         return doneL
 
@@ -360,16 +363,17 @@ class BatchJobHandler:
 
         return started
 
-    def timeToCheckIfFinished(self, bjob, current_time):
+    def isTimeToCheck(self, bjob, current_time):
         ""
         return current_time > bjob.getCheckTime() + self.check_interval
 
-    def extendFinishCheck(self, bjob, current_time):
+    def resetCheckTime(self, bjob, current_time):
         """
         Resets the finish check time to the current time.  Returns
         False if the number of extensions has been exceeded.
         """
-        if current_time < bjob.getStopTime()+self.check_timeout:
+        tstop = bjob.getStopTime()
+        if not tstop or current_time < tstop+self.check_timeout:
             bjob.setCheckTime( current_time )
             return True
         else:

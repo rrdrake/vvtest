@@ -32,26 +32,42 @@ class job_handling( vtu.vvtestTestCase ):
         bjob = BatchJob()
         bjob.setCheckTime( tm )
 
-        assert not jh.timeToCheckIfFinished( bjob, tm )
-        assert not jh.timeToCheckIfFinished( bjob, tm+1 )
-        assert jh.timeToCheckIfFinished( bjob, tm+3 )
+        assert not jh.isTimeToCheck( bjob, tm )
+        assert not jh.isTimeToCheck( bjob, tm+1 )
+        assert jh.isTimeToCheck( bjob, tm+3 )
 
         stop_time = tm+check_interval
         bjob.setStopTime( stop_time )
         bjob.setCheckTime( stop_time )
 
-        assert not jh.timeToCheckIfFinished( bjob, tm+check_interval )
-        assert not jh.timeToCheckIfFinished( bjob, tm+check_interval+1 )
-        assert jh.timeToCheckIfFinished( bjob, tm+check_interval+3 )
+        assert not jh.isTimeToCheck( bjob, tm+check_interval )
+        assert not jh.isTimeToCheck( bjob, tm+check_interval+1 )
+        assert jh.isTimeToCheck( bjob, tm+check_interval+3 )
 
-        ok = jh.extendFinishCheck( bjob, tm+2*check_interval )
+        ok = jh.resetCheckTime( bjob, tm+2*check_interval )
         assert ok
-        assert not jh.timeToCheckIfFinished( bjob, tm+2*check_interval )
-        assert not jh.timeToCheckIfFinished( bjob, tm+2*check_interval+1 )
-        assert jh.timeToCheckIfFinished( bjob, tm+2*check_interval+3 )
+        assert not jh.isTimeToCheck( bjob, tm+2*check_interval )
+        assert not jh.isTimeToCheck( bjob, tm+2*check_interval+1 )
+        assert jh.isTimeToCheck( bjob, tm+2*check_interval+3 )
 
-        ok = jh.extendFinishCheck( bjob, stop_time+check_timeout+1 )
+        ok = jh.resetCheckTime( bjob, stop_time+check_timeout+1 )
         assert not ok
+
+    def test_job_check_time_reset_limit_only_applies_after_job_is_stopped(self):
+        ""
+        check_interval = 2
+        check_timeout = 5
+        jh = BatchJobHandler( check_interval, check_timeout, None, None )
+
+        tm = time.time()
+        bjob = BatchJob()
+        bjob.setCheckTime( tm )
+
+        ok = jh.resetCheckTime( bjob, tm+check_interval+1 )
+        assert ok
+
+        ok = jh.resetCheckTime( bjob, tm+check_interval+1+check_timeout )
+        assert ok
 
 
 ############################################################################

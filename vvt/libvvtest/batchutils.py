@@ -155,24 +155,31 @@ class Batcher:
     def _check_get_stopped_jobs(self):
         ""
         tm = time.time()
+
         for bjob in self.jobhandler.getStarted():
             # magic: also use check time to look for outfile
             check_set_outfile_permissions( bjob, self.perms, tm )
 
-        done_jobids = self.jobhandler.transitionStartedToStopped()
+        stop_jobs = self.jobhandler.transitionStartedToStopped()
 
-        return done_jobids
+        for bjob in stop_jobs:
+            self.results.readJobResults( bjob )
+            self.jobhandler.resetCheckTime( bjob, tm )
+
+        return [ bjob.getBatchID() for bjob in stop_jobs ]
 
     def _check_get_finished_tests(self):
         ""
         tnow = time.time()
         tdoneL = []
 
-        for bjob in self.jobhandler.getNotDone():
-            pass  # magic: WIP
+        for bjob in self.jobhandler.getStarted():
+            if self.jobhandler.isTimeToCheck( bjob, tnow ):
+                self.results.readJobResults( bjob )
+                self.jobhandler.resetCheckTime( bjob, tnow )
 
         for bjob in list( self.jobhandler.getStopped() ):
-            if self.jobhandler.timeToCheckIfFinished( bjob, tnow ):
+            if self.jobhandler.isTimeToCheck( bjob, tnow ):
                 tL = self._check_job_finish( bjob, tnow )
                 tdoneL.extend( tL )
 
@@ -186,7 +193,7 @@ class Batcher:
             tdoneL = self.results.readJobResults( bjob )
             self.jobhandler.markJobDone( bjob, 'clean' )
 
-        elif not self.jobhandler.extendFinishCheck( bjob, current_time ):
+        elif not self.jobhandler.resetCheckTime( bjob, current_time ):
             # too many attempts to read; assume the queue job
             # failed somehow, but force a read anyway
             tdoneL = self._force_job_finish( bjob )
@@ -400,19 +407,22 @@ class ResultsHandler:
 
     def readJobResults(self, bjob):
         ""
+        tL = []
+
         rfile = bjob.getAttr('resultsfilename')
 
-        tlr = testlistio.TestListReader( rfile )
-        tlr.read()
-        jobtests = tlr.getTests()
+        if os.path.isfile( rfile ):
 
-        for file_tcase in jobtests.values():
-            self.xlist.checkStateChange( file_tcase )
+            tlr = testlistio.TestListReader( rfile )
+            tlr.read()
+            jobtests = tlr.getTests()
 
-        tL = []
-        for tcase in bjob.getAttr('testlist').getTests():
-            if tcase.getStat().isDone():
-                tL.append( tcase )
+            for file_tcase in jobtests.values():
+                self.xlist.checkStateChange( file_tcase )
+
+            for tcase in bjob.getAttr('testlist').getTests():
+                if tcase.getStat().isDone():
+                    tL.append( tcase )
 
         return tL
 
