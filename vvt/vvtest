@@ -990,8 +990,8 @@ def batchTestList( opts, optD, rtdata,
 
     namer = batching.BatchFileNamer( test_dir, testlist_name )
 
-    read_interval, read_timeout = determine_job_read_intervals()
-    jobhandler = batching.BatchJobHandler( read_interval, read_timeout,
+    check_interval, check_timeout = determine_job_check_intervals()
+    jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
                                            batchitf, namer )
 
     batch = batchutils.Batcher( vvtestcmd,
@@ -1009,16 +1009,16 @@ def batchTestList( opts, optD, rtdata,
                        test_dir, qsublimit )
 
 
-def determine_job_read_intervals():
+def determine_job_check_intervals():
     """
     allow these values to be set by environment variable, mainly for
     unit testing; if setting these is needed more regularly then a
     command line option should be added
     """
-    read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
-    read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
+    check_interval = int( os.environ.get( 'VVTEST_BATCH_CHECK_INTERVAL', 30 ) )
+    check_timeout = int( os.environ.get( 'VVTEST_BATCH_CHECK_TIMEOUT', 5*60 ) )
 
-    return read_interval, read_timeout
+    return check_interval, check_timeout
 
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):

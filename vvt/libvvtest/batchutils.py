@@ -156,6 +156,7 @@ class Batcher:
         ""
         tm = time.time()
         for bjob in self.jobhandler.getStarted():
+            # magic: also use check time to look for outfile
             check_set_outfile_permissions( bjob, self.perms, tm )
 
         done_jobids = self.jobhandler.transitionStartedToStopped()
@@ -166,6 +167,10 @@ class Batcher:
         ""
         tnow = time.time()
         tdoneL = []
+
+        for bjob in self.jobhandler.getNotDone():
+            pass  # magic: WIP
+
         for bjob in list( self.jobhandler.getStopped() ):
             if self.jobhandler.timeToCheckIfFinished( bjob, tnow ):
                 tL = self._check_job_finish( bjob, tnow )
@@ -184,7 +189,7 @@ class Batcher:
         elif not self.jobhandler.extendFinishCheck( bjob, current_time ):
             # too many attempts to read; assume the queue job
             # failed somehow, but force a read anyway
-            tdoneL = self._force_finish_job( bjob )
+            tdoneL = self._force_job_finish( bjob )
 
         return tdoneL
 
@@ -199,7 +204,7 @@ class Batcher:
 
         return finished
 
-    def _force_finish_job(self, bjob):
+    def _force_job_finish(self, bjob):
         ""
         tL = []
 

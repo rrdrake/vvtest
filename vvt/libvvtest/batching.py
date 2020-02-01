@@ -22,6 +22,7 @@ class BatchJob:
         self.maxnp = None
         self.jobid = None
         self.wrkdir = None
+
         self.tstart = None
         self.tseen = None
         self.tstop = None
@@ -218,10 +219,10 @@ class BatchQueueInterface:
 
 class BatchJobHandler:
 
-    def __init__(self, read_interval, read_timeout, batchitf, namer):
+    def __init__(self, check_interval, check_timeout, batchitf, namer):
         ""
-        self.read_interval = read_interval
-        self.read_timeout = read_timeout
+        self.check_interval = check_interval
+        self.check_timeout = check_timeout
         self.batchitf = batchitf
         self.namer = namer
 
@@ -285,6 +286,13 @@ class BatchJobHandler:
         ""
         return self.stopped.values()
 
+    def getNotDone(self):
+        ""
+        for bjob in self.submitted.values():
+            yield bjob
+        for bjob in self.stopped.values():
+            yield bjob
+
     def getDone(self):
         ""
         return self.done.values()
@@ -299,6 +307,7 @@ class BatchJobHandler:
 
         bjob.setJobID( jobid )
         bjob.setStartTime( tm )
+        bjob.setCheckTime( tm )  # magic: may want to make this tm+2
 
     def markJobStopped(self, bjob):
         ""
@@ -309,7 +318,7 @@ class BatchJobHandler:
         self.stopped[ bid ] = bjob
 
         bjob.setStopTime( tm )
-        bjob.setCheckTime( tm + self.read_interval )
+        bjob.setCheckTime( tm )
 
     def markJobDone(self, bjob, result):
         ""
@@ -353,19 +362,18 @@ class BatchJobHandler:
 
     def timeToCheckIfFinished(self, bjob, current_time):
         ""
-        return bjob.getCheckTime() < current_time
+        return current_time > bjob.getCheckTime() + self.check_interval
 
     def extendFinishCheck(self, bjob, current_time):
         """
-        Resets the finish check time to a time into the future.  Returns
+        Resets the finish check time to the current time.  Returns
         False if the number of extensions has been exceeded.
         """
-        if current_time < bjob.getStopTime()+self.read_timeout:
-            # set the time for the next read attempt
-            bjob.setCheckTime( current_time + self.read_interval )
+        if current_time < bjob.getStopTime()+self.check_timeout:
+            bjob.setCheckTime( current_time )
+            return True
+        else:
             return False
-
-        return True
 
     def scanBatchOutput(self, outfile):
         """

@@ -1,0 +1,59 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+import time
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+from libvvtest.batching import BatchJobHandler
+from libvvtest.batching import BatchJob
+
+
+class job_handling( vtu.vvtestTestCase ):
+
+    def test_job_check_timing_mechanism(self):
+        ""
+        check_interval = 2
+        check_timeout = 5
+        jh = BatchJobHandler( check_interval, check_timeout, None, None )
+
+        tm = time.time()
+        bjob = BatchJob()
+        bjob.setCheckTime( tm )
+
+        assert not jh.timeToCheckIfFinished( bjob, tm )
+        assert not jh.timeToCheckIfFinished( bjob, tm+1 )
+        assert jh.timeToCheckIfFinished( bjob, tm+3 )
+
+        stop_time = tm+check_interval
+        bjob.setStopTime( stop_time )
+        bjob.setCheckTime( stop_time )
+
+        assert not jh.timeToCheckIfFinished( bjob, tm+check_interval )
+        assert not jh.timeToCheckIfFinished( bjob, tm+check_interval+1 )
+        assert jh.timeToCheckIfFinished( bjob, tm+check_interval+3 )
+
+        ok = jh.extendFinishCheck( bjob, tm+2*check_interval )
+        assert ok
+        assert not jh.timeToCheckIfFinished( bjob, tm+2*check_interval )
+        assert not jh.timeToCheckIfFinished( bjob, tm+2*check_interval+1 )
+        assert jh.timeToCheckIfFinished( bjob, tm+2*check_interval+3 )
+
+        ok = jh.extendFinishCheck( bjob, stop_time+check_timeout+1 )
+        assert not ok
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
