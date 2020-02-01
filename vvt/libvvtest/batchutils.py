@@ -284,7 +284,7 @@ class BatchTestGrouper:
         ""
         qL = []
 
-        for np in self.xlist.getTestExecProcList():
+        for np in list( self.xlist.getTestExecProcList() ):
             qL.extend( self._process_groups( np ) )
 
         qL.sort()
@@ -319,7 +319,7 @@ class BatchTestGrouper:
         qL = []
 
         xL = []
-        for tcase in self.xlist.getTestExecList(np):
+        for tcase in self.xlist.getTestExecList( np, consume=True ):
             xdir = tcase.getSpec().getDisplayString()
             xL.append( (tcase.getSpec().getAttr('timeout'),xdir,tcase) )
         xL.sort()
@@ -395,24 +395,19 @@ class ResultsHandler:
 
     def readJobResults(self, bjob):
         ""
-        tL = []
-
         rfile = bjob.getAttr('resultsfilename')
-        self.tlist.readTestResults( rfile )
 
         tlr = testlistio.TestListReader( rfile )
         tlr.read()
         jobtests = tlr.getTests()
 
-        # only add tests to the stopped list that are done
+        for file_tcase in jobtests.values():
+            self.xlist.checkStateChange( file_tcase )
+
+        tL = []
         for tcase in bjob.getAttr('testlist').getTests():
-
-            tid = tcase.getSpec().getID()
-
-            job_tcase = jobtests.get( tid, None )
-            if job_tcase and job_tcase.getStat().isDone():
+            if tcase.getStat().isDone():
                 tL.append( tcase )
-                self.xlist.testDone( tcase )
 
         return tL
 

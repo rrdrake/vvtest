@@ -8,6 +8,7 @@ import os, sys
 
 from .TestExec import TestExec
 from . import depend
+from .teststatus import copy_test_results
 
 
 class TestExecList:
@@ -93,19 +94,26 @@ class TestExecList:
         """
         return self.backlog.keys()
 
-    def getTestExecList(self, numprocs=None):
+    def getTestExecList(self, numprocs=None, consume=False):
         """
         If 'numprocs' is None, all TestExec objects are returned.  If 'numprocs'
         is not None, a list of TestExec objects is returned each of which need
         that number of processors to run.
+
+        If 'consume' is True, the tests are moved from backlog to waiting.
         """
         xL = []
 
-        if numprocs == None:
-            for tcaseL in self.backlog.values():
+        for np,tcaseL in list( self.backlog.items() ):
+            if numprocs == None:
                 xL.extend( tcaseL )
-        else:
-            xL.extend( self.backlog.get(numprocs,[]) )
+                if consume:
+                    self._consume_tests( np )
+            elif numprocs == np:
+                xL.extend( tcaseL )
+                if consume:
+                    self._consume_tests( np )
+                break
 
         return xL
 
@@ -198,6 +206,35 @@ class TestExecList:
         Return the number of tests are currently running.
         """
         return len(self.started)
+
+    def checkStateChange(self, tmp_tcase):
+        ""
+        tid = tmp_tcase.getSpec().getID()
+
+        tcase = None
+
+        if tid in self.waiting:
+            if tmp_tcase.getStat().isNotDone():
+                tcase = self.waiting.pop( tid )
+                self.started[ tid ] = tcase
+            elif tmp_tcase.getStat().isDone():
+                tcase = self.waiting.pop( tid )
+                self.stopped[ tid ] = tcase
+
+        elif tid in self.started:
+            if tmp_tcase.getStat().isDone():
+                tcase = self.started.pop( tid )
+                self.stopped[ tid ] = tcase
+
+        if tcase:
+            copy_test_results( tcase, tmp_tcase )
+            self.tlist.appendTestResult( tcase )
+
+    def _consume_tests(self, np):
+        ""
+        tcaseL = self.backlog[np]
+        while len( tcaseL ) > 0:
+            self._pop_test_exec( np, 0 )
 
     def _pop_next_test(self, npL, platform=None):
         ""
