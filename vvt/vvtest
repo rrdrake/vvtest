@@ -748,7 +748,6 @@ def runTests( opts, optD, rtdata, dirs ):
     perms.set( abspath( tfile ) )
 
     tlist.readTestResults( preserve_skips=True )
-    tlist.ensureInlinedTestResultIncludes()
 
     tlist.determineActiveTests()
 
@@ -1075,7 +1074,6 @@ def restartTests( opts, optD, rtdata ):
 
     tlist.readTestList()
     tlist.readTestResults()
-    tlist.ensureInlinedTestResultIncludes()
 
     check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
 
@@ -1124,7 +1122,6 @@ def baselineTests( opts, optD, rtdata ):
 
     tlist.readTestList()
     tlist.readTestResults()
-    tlist.ensureInlinedTestResultIncludes()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default

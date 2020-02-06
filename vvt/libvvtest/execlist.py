@@ -230,6 +230,8 @@ class TestExecList:
             copy_test_results( tcase, tmp_tcase )
             self.tlist.appendTestResult( tcase )
 
+        return tcase
+
     def _consume_tests(self, np):
         ""
         tcaseL = self.backlog[np]

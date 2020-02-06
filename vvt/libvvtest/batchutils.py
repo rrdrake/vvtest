@@ -8,6 +8,7 @@ import sys
 import os
 import time
 import glob
+import itertools
 
 from . import TestList
 from . import testlistio
@@ -35,8 +36,6 @@ class Batcher:
         self.vvtestcmd = vvtestcmd
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
-
-        self.qsub_testfilenames = []
 
     def writeQsubScripts(self):
         ""
@@ -104,8 +103,10 @@ class Batcher:
         Returns a list of job ids that were removed from the batch queue,
         and a list of tests that were successfully read in.
         """
-        qdoneL = self._check_get_stopped_jobs()
-        tdoneL = self._check_get_finished_tests()
+        tdoneL = []
+        qdoneL = []
+        self._check_get_stopped_jobs( qdoneL, tdoneL )
+        self._check_get_finished_tests( tdoneL )
 
         return qdoneL, tdoneL
 
@@ -133,13 +134,10 @@ class Batcher:
 
         return notrun, notdone, notrunL
 
-    def getIncludeFiles(self):
-        ""
-        return self.qsub_testfilenames
-
-    def cancelJobs(self):
+    def shutdown(self):
         ""
         self.jobhandler.cancelStartedJobs()
+        self.results.finalize()
 
     #####################################################################
 
@@ -148,11 +146,15 @@ class Batcher:
         self._write_job( bjob )
 
         bid = bjob.getBatchID()
+
+        incl = self.namer.getBasePath( bid, relative=True )
+        self.results.addResultsInclude( incl )
+
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
         self.jobhandler.startJob( bjob, tdir, pin )
 
-    def _check_get_stopped_jobs(self):
+    def _check_get_stopped_jobs(self, qdoneL, tdoneL):
         ""
         tm = time.time()
 
@@ -163,42 +165,37 @@ class Batcher:
         stop_jobs = self.jobhandler.transitionStartedToStopped()
 
         for bjob in stop_jobs:
-            self.results.readJobResults( bjob )
+            self.results.readJobResults( bjob, tdoneL )
             self.jobhandler.resetCheckTime( bjob, tm )
 
-        return [ bjob.getBatchID() for bjob in stop_jobs ]
+        for bjob in stop_jobs:
+            qdoneL.append( bjob.getBatchID() )
 
-    def _check_get_finished_tests(self):
+    def _check_get_finished_tests(self, tdoneL):
         ""
         tnow = time.time()
-        tdoneL = []
 
         for bjob in self.jobhandler.getStarted():
             if self.jobhandler.isTimeToCheck( bjob, tnow ):
-                self.results.readJobResults( bjob )
+                self.results.readJobResults( bjob, tdoneL )
                 self.jobhandler.resetCheckTime( bjob, tnow )
 
         for bjob in list( self.jobhandler.getStopped() ):
             if self.jobhandler.isTimeToCheck( bjob, tnow ):
-                tL = self._check_job_finish( bjob, tnow )
-                tdoneL.extend( tL )
+                self._check_job_finish( bjob, tdoneL, tnow )
 
-        return tdoneL
-
-    def _check_job_finish(self, bjob, current_time):
+    def _check_job_finish(self, bjob, tdoneL, current_time):
         ""
-        tdoneL = []
-
         if self._check_for_clean_finish( bjob ):
-            tdoneL = self.results.readJobResults( bjob )
+            self.results.readJobResults( bjob, tdoneL )
+            incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
+            self.results.completeResultsInclude( incl )
             self.jobhandler.markJobDone( bjob, 'clean' )
 
         elif not self.jobhandler.resetCheckTime( bjob, current_time ):
             # too many attempts to read; assume the queue job
             # failed somehow, but force a read anyway
-            tdoneL = self._force_job_finish( bjob )
-
-        return tdoneL
+            self._force_job_finish( bjob, tdoneL )
 
     def _check_for_clean_finish(self, bjob):
         ""
@@ -211,23 +208,22 @@ class Batcher:
 
         return finished
 
-    def _force_job_finish(self, bjob):
+    def _force_job_finish(self, bjob, tdoneL):
         ""
-        tL = []
-
         if not os.path.exists( bjob.getOutputFilename() ):
             mark = 'notrun'
 
         elif os.path.exists( bjob.getAttr('resultsfilename') ):
             mark = 'notdone'
-            tL.extend( self.results.readJobResults( bjob ) )
+            self.results.readJobResults( bjob, tdoneL )
 
         else:
             mark = 'fail'
 
-        self.jobhandler.markJobDone( bjob, mark )
+        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
+        self.results.completeResultsInclude( incl )
 
-        return tL
+        self.jobhandler.markJobDone( bjob, mark )
 
     def _remove_batch_directories(self):
         ""
@@ -247,9 +243,6 @@ class Batcher:
 
         rfile = self.namer.getBasePath( bjob.getBatchID() )+'.'+self.suffix
         bjob.setAttr( 'resultsfilename', rfile )
-
-        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
-        self.qsub_testfilenames.append( incl )
 
     def _write_job(self, bjob):
         ""
@@ -405,10 +398,16 @@ class ResultsHandler:
         self.tlist = tlist
         self.xlist = xlist
 
-    def readJobResults(self, bjob):
+    def addResultsInclude(self, pathname):
         ""
-        tL = []
+        self.tlist.addIncludeFile( pathname )
 
+    def completeResultsInclude(self, pathname):
+        ""
+        self.tlist.completeIncludeFile( pathname )
+
+    def readJobResults(self, bjob, donetests):
+        ""
         rfile = bjob.getAttr('resultsfilename')
 
         if os.path.isfile( rfile ):
@@ -418,13 +417,9 @@ class ResultsHandler:
             jobtests = tlr.getTests()
 
             for file_tcase in jobtests.values():
-                self.xlist.checkStateChange( file_tcase )
-
-            for tcase in bjob.getAttr('testlist').getTests():
-                if tcase.getStat().isDone():
-                    tL.append( tcase )
-
-        return tL
+                tcase = self.xlist.checkStateChange( file_tcase )
+                if tcase and tcase.getStat().isDone():
+                    donetests.append( tcase )
 
     def getFailedDependencies(self, bjob):
         ""
@@ -448,6 +443,10 @@ class ResultsHandler:
             if deptx != None:
                 return deptx
         return None
+
+    def finalize(self):
+        ""
+        self.tlist.writeFinished()
 
 
 def check_set_outfile_permissions( bjob, perms, curtime ):

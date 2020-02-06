@@ -102,6 +102,12 @@ class TestList:
         inclf = testlist_path + '.' + self.rundate
         self.results_file.addIncludeFile( inclf )
 
+    def completeIncludeFile(self, testlist_path):
+        ""
+        assert self.rundate, 'suffix must have already been set'
+        inclf = testlist_path + '.' + self.rundate
+        self.results_file.includeFileCompleted( inclf )
+
     def appendTestResult(self, tcase):
         """
         Appends the results file with the name and attributes of the given
@@ -170,18 +176,6 @@ class TestList:
                     if not preserve_skips:
                         t.getSpec().attrs.pop( 'skip', None )
 
-    def ensureInlinedTestResultIncludes(self):
-        ""
-        fL = self.getResultsFilenames()
-        if len(fL) > 0:
-            # only the most recent is checked
-            testlistio.inline_include_files( fL[-1] )
-
-    def inlineIncludeFiles(self):
-        ""
-        rfile = self.filename + '.' + self.rundate
-        testlistio.inline_include_files( rfile )
-
     def getDateStamp(self, default=None):
         """
         Return the start date from the last test results file read using the
@@ -211,7 +205,7 @@ class TestList:
 
     def getTestMap(self):
         """
-        Returns a map of xdir to TestCase containing all tests.
+        Returns all tests as a map from test ID to TestCase.
         """
         return self.tcasemap
 

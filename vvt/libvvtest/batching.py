@@ -286,13 +286,6 @@ class BatchJobHandler:
         ""
         return self.stopped.values()
 
-    def getNotDone(self):  # magic: still need this?
-        ""
-        for bjob in self.submitted.values():
-            yield bjob
-        for bjob in self.stopped.values():
-            yield bjob
-
     def getDone(self):
         ""
         return self.done.values()
@@ -309,7 +302,7 @@ class BatchJobHandler:
         bjob.setStartTime( tm )
 
         # delay the first job check a little
-        chktime = tm + max( 1, int( self.check_interval * 0.1 ) )
+        chktime = tm + max( 1, int( self.check_interval * 0.1 + 0.5 ) )
         bjob.setCheckTime( chktime )
 
     def markJobStopped(self, bjob):

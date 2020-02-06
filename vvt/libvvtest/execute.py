@@ -30,8 +30,6 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
     uthook = utesthooks.construct_unit_testing_hook( 'batch' )
 
     rfile = tlist.initializeResultsFile()
-    for inclf in batch.getIncludeFiles():
-        tlist.addIncludeFile( inclf )
 
     info = TestInformationPrinter( sys.stdout, tlist, batch )
 
@@ -78,10 +76,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
         NS, NF, nrL = batch.flush()
 
     finally:
-        tlist.writeFinished()
-        batch.cancelJobs()
-
-    tlist.inlineIncludeFiles()
+        batch.shutdown()
 
     perms.set( os.path.abspath( rfile ) )
 

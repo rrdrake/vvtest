@@ -416,7 +416,7 @@ class script_utils_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-o dbg' )
         vrun.assertCounts( total=6, npass=6 )
 
-        assert vrun.countGrepLogs( 'analyze', '*=*' ) == 0
+        assert vrun.countGrepLogs( 'analyze ', '*=*' ) == 0
 
         assert vrun.countGrepLogs( 'analyze param expr true', 'pytest' ) == 1
         assert vrun.countGrepLogs( 'analyze plat expr true', 'pytest' ) == 1

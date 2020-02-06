@@ -7,14 +7,13 @@
 import os, sys
 import time
 import stat
-import tempfile
 import shutil
 
 from . import TestSpec
 from .paramset import ParameterSet
 from .testcase import TestCase
 
-version = 33
+version = 34
 
 
 class TestListWriter:
@@ -29,39 +28,32 @@ class TestListWriter:
 
         remove_attrs_with_None_for_a_value( file_attrs )
 
-        fp = open( self.filename, 'w' )
-        try:
+        with open( self.filename, 'w' ) as fp:
             fp.write( '#VVT: Version = '+str(version)+'\n' )
             fp.write( '#VVT: Start = '+datestamp+'\n' )
             fp.write( '#VVT: Attrs = '+repr( file_attrs )+'\n\n' )
-        finally:
-            fp.close()
 
-    def addIncludeFile(self, filename):
+    def addIncludeFile(self, include_filename):
         ""
-        fp = open( self.filename, 'a' )
-        try:
-            fp.write( '#VVT: Include = '+filename+'\n' )
-        finally:
-            fp.close()
+        with open( self.filename, 'a' ) as fp:
+            fp.write( '#VVT: Include = '+include_filename+'\n' )
+
+    def includeFileCompleted(self, include_filename):
+        ""
+        with open( self.filename, 'a' ) as fp:
+            fp.write( '#VVT: Completed = '+include_filename+'\n' )
 
     def append(self, tcase, extended=False):
         ""
-        fp = open( self.filename, 'a' )
-        try:
+        with open( self.filename, 'a' ) as fp:
             fp.write( test_to_string( tcase, extended ) + '\n' )
-        finally:
-            fp.close()
 
     def finish(self):
         ""
         datestamp = repr( [ time.ctime(), time.time() ] )
 
-        fp = open( self.filename, 'a' )
-        try:
+        with open( self.filename, 'a' ) as fp:
             fp.write( '\n#VVT: Finish = '+datestamp+'\n' )
-        finally:
-            fp.close()
 
 
 class TestListReader:
@@ -69,10 +61,13 @@ class TestListReader:
     def __init__(self, filename):
         ""
         self.filename = filename
+
         self.vers = None
         self.start = None
         self.attrs = {}
         self.finish = None
+
+        self.incl = set()
         self.tests = {}
 
     def read(self):
@@ -86,7 +81,10 @@ class TestListReader:
                 elif key == 'Attrs':
                     self.attrs = eval( val )
                 elif key == 'Include':
-                    self._read_include_file( val )
+                    self.incl.add( val )
+                elif key == 'Completed':
+                    if val in self.incl:
+                        self.incl.remove( val )
                 elif key == 'Finish':
                     self.finish = eval( val )[1]
                 else:
@@ -96,8 +94,11 @@ class TestListReader:
             except Exception:
                 pass
 
-        assert self.vers == 32 or self.vers == 33, \
+        assert self.vers in [32, 33, 34], \
             'corrupt test list file or older format: '+str(self.filename)
+
+        for incl_file in self.incl:
+            self._read_include_file( incl_file )
 
     def getFileVersion(self):
         ""
@@ -140,8 +141,8 @@ class TestListReader:
 
     def _iterate_file_lines(self):
         ""
-        fp = open( self.filename, 'r' )
-        try:
+        with open( self.filename, 'r' ) as fp:
+
             for line in fp:
 
                 line = line.strip()
@@ -156,9 +157,6 @@ class TestListReader:
 
                 except Exception:
                     pass
-
-        finally:
-            fp.close()
 
     def _read_include_file(self, fname):
         ""
@@ -185,105 +183,6 @@ def file_is_marked_finished( filename ):
         pass
 
     return finished
-
-
-def inline_include_files( filename ):
-    """
-    For each "include" line in the given test list file, the include statement
-    is replaced with the test specifications from the included file.  If the
-    file contains no include lines, the file is not touched.
-    """
-    fdir = os.path.dirname( filename )
-
-    tmpfp = TempFile( '.vvtest' )
-    try:
-        numincl = 0
-
-        fp = open( filename, 'r' )
-        for line in fp:
-            if line.startswith( '#VVT: ' ):
-                numincl += process_inline_vvt_directive( tmpfp, fdir, line )
-            else:
-                tmpfp.write( line )
-
-        if numincl > 0:
-            tmpfp.copyto( filename )
-
-    finally:
-        tmpfp.remove()
-
-
-def process_inline_vvt_directive( tmpfp, fdir, line ):
-    ""
-    numincl = 0
-
-    kvL = line[5:].split( '=', 1 )
-    if len(kvL) == 1:
-        tmpfp.write( line )
-    else:
-        n,v = kvL
-        if n.strip() == 'Include':
-            numincl = 1
-            try:
-                insert_include_file( tmpfp, fdir, v.strip() )
-            except Exception:
-                pass
-        else:
-            tmpfp.write( line )
-
-    return numincl
-
-
-def insert_include_file( tmpfp, fdir, inclfname ):
-    ""
-    if not os.path.isabs( inclfname ):
-        inclfname = os.path.join( fdir, inclfname )
-
-    if os.path.exists( inclfname ):
-        fp = open( inclfname, 'r' )
-        try:
-            for incline in fp:
-                sline = incline.strip()
-                if sline and not sline.startswith( '#VVT: ' ):
-                    tmpfp.write( incline )
-        finally:
-            fp.close()
-
-
-class TempFile:
-
-    def __init__(self, suffix):
-        ""
-        fd, self.fname = tempfile.mkstemp( suffix=suffix )
-        self.fp = os.fdopen( fd, 'w' )
-
-    def getFilename(self):
-        ""
-        return self.fname
-
-    def write(self, buf):
-        ""
-        self.fp.write( buf )
-
-    def copyto(self, filename):
-        ""
-        self.fp.close()
-        self.fp = None
-
-        if os.path.exists( filename ):
-            fmode = stat.S_IMODE( os.stat(filename)[stat.ST_MODE] )
-            shutil.copyfile( self.fname, filename )
-            os.chmod( filename, fmode )
-        else:
-            shutil.copyfile( self.fname, filename )
-
-    def remove(self):
-        ""
-        try:
-            if self.fp != None:
-                self.fp.close()
-        finally:
-            os.remove( self.fname )
 
 
 def remove_attrs_with_None_for_a_value( attrdict ):
@@ -376,8 +275,3 @@ def check_load_extended_info( tcase, testdict ):
     if depL:
         for pat,xdir in depL:
             tcase.addDepDirectory( pat, xdir )
-
-
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
