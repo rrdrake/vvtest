@@ -91,8 +91,7 @@ class MainEntry:
         elif self.opts.dash_b:
 
             if self.opts.dash_R or self.opts.dash_w:
-                print3( "*** error: cannot use -R or -w with -b (baseline)" )
-                sys.exit(1)
+                raise FatalError( 'cannot use -R or -w with -b (baseline)' )
 
             baselineTests( self.opts, self.optD, self.rtdata )
 
@@ -134,12 +133,10 @@ class MainEntry:
         readCommandInfo( self.opts, self.optD, rtconfig, self.cache_file )
 
         if self.cache_file and self.optD['param_dict']:
-            print3( "*** error: cannot use -S in a TestResults directory" )
-            sys.exit(1)
+            raise FatalError( 'cannot use -S in a TestResults directory' )
 
         if self.cache_file and self.opts.dash_g:
-            print3( "*** error: cannot use -g in a TestResults directory" )
-            sys.exit(1)
+            raise FatalError( 'cannot use -g in a TestResults directory' )
 
         # this is scheduled for deprecation
         if self.opts.check:
@@ -639,10 +636,8 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
     if cache_file != None:
 
         if optD['onopts'] or optD['offopts'] or opts.dash_g:
-            sys.stderr.write('*** error: ' + \
-                'the -g, -o, and -O options are not allowed ' + \
-                'in a TestResults directory\n')
-            sys.exit(1);
+            raise FatalError( 'the -g, -o, and -O options are not allowed '
+                              'in a TestResults directory')
 
         fp = open( cache_file, "r" )
         write_version = 0
@@ -773,22 +768,17 @@ def runTests( opts, optD, rtdata, dirs ):
 
 def check_for_currently_running_vvtest( resultsfiles, optforce ):
     ""
-    if not optforce:
+    if not optforce and len(resultsfiles) > 0:
 
-        msg = '*** error: tests are currently running in another process\n' + \
-              '    (or a previous run was killed); use --force to run anyway'
+        import libvvtest.testlistio as testlistio
 
-        if len(resultsfiles) > 0:
+        rfile = resultsfiles[-1]
 
-            import libvvtest.testlistio as testlistio
-
-            rfile = resultsfiles[-1]
-
-            tlr = testlistio.TestListReader( rfile )
-            fin = tlr.scanForFinishDate()
-            if fin == None:
-                print3( msg )
-                sys.exit(1)
+        tlr = testlistio.TestListReader( rfile )
+        fin = tlr.scanForFinishDate()
+        if fin == None:
+            raise FatalError( 'tests are currently running in another process\n'
+                    '    (or a previous run was killed); use --force to run anyway' )
 
 
 def get_output_verbosity_integer( dash_v ):
