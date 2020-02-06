@@ -147,16 +147,21 @@ class TestList:
         will have its skip setting removed from the test.
         """
         if resultsfilename == None:
-            self._read_file_list( self.getResultsFilenames(), preserve_skips )
+            fL = glob_results_files( self.filename )
+            self._read_file_list( fL, preserve_skips )
         else:
             self._read_file_list( [ resultsfilename ], preserve_skips )
 
-    def getResultsFilenames(self):
+    def resultsFileIsMarkedFinished(self):
         ""
-        assert self.filename
-        fileL = glob.glob( self.filename+'.*' )
-        fileL.sort()
-        return fileL
+        finished = True
+
+        rfileL = glob_results_files( self.filename )
+        if len(rfileL) > 0:
+           if not testlistio.file_is_marked_finished( rfileL[-1] ):
+                finished = False
+
+        return finished
 
     def _read_file_list(self, files, preserve_skips):
         ""
@@ -424,6 +429,14 @@ def refresh_active_tests( tcase_map, creator ):
         if not tcase.getStat().skipTest():
             if not tspec.constructionCompleted():
                 creator.reparse( tspec )
+
+
+def glob_results_files( basename ):
+    ""
+    assert basename
+    fileL = glob.glob( basename+'.*' )
+    fileL.sort()
+    return fileL
 
 
 ###########################################################################

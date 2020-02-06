@@ -716,7 +716,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     tlist = make_TestList( rtdata, tfile )
 
-    check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
+    check_for_currently_running_vvtest( tlist, opts.force )
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
@@ -766,19 +766,11 @@ def runTests( opts, optD, rtdata, dirs ):
     return tlist.encodeIntegerWarning()
 
 
-def check_for_currently_running_vvtest( resultsfiles, optforce ):
+def check_for_currently_running_vvtest( tlist, optforce ):
     ""
-    if not optforce and len(resultsfiles) > 0:
-
-        import libvvtest.testlistio as testlistio
-
-        rfile = resultsfiles[-1]
-
-        tlr = testlistio.TestListReader( rfile )
-        fin = tlr.scanForFinishDate()
-        if fin == None:
-            raise FatalError( 'tests are currently running in another process\n'
-                    '    (or a previous run was killed); use --force to run anyway' )
+    if not optforce and not tlist.resultsFileIsMarkedFinished():
+        raise FatalError( 'tests are currently running in another process\n'
+            '    (or a previous run was killed); use --force to run anyway' )
 
 
 def get_output_verbosity_integer( dash_v ):
@@ -1065,7 +1057,7 @@ def restartTests( opts, optD, rtdata ):
     tlist.readTestList()
     tlist.readTestResults()
 
-    check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
+    check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
         timehandler = rtdata.getTestTimeHandler()
