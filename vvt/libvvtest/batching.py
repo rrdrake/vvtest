@@ -451,9 +451,9 @@ class BatchFileNamer:
         ""
         return self.rootdir
 
-    def getBasePath(self, batchid, relative=False):
+    def getBasePath(self, batchid):
         ""
-        return self.getPath( self.basename, batchid, relative )
+        return self.getPath( self.basename, batchid )
 
     def getBatchScriptName(self, batchid):
         ""
@@ -463,27 +463,23 @@ class BatchFileNamer:
         ""
         return self.getPath( 'qbat-out', batchid )
 
-    def getPath(self, basename, batchid, relative=False):
+    def getPath(self, basename, batchid):
         """
         Given a base file name and a batch id, this function returns the
         file name in the batchset subdirectory and with the id appended.
-        If 'relative' is true, then the path is relative to the TestResults
-        directory.
         """
-        subd = self.getSubdir( batchid, relative )
+        subd = self.getSubdir( batchid )
         if basename == None:
             basename = 'batch'
         fn = os.path.join( subd, basename+'.'+str(batchid) )
         return fn
 
-    def getSubdir(self, batchid, relative=False):
+    def getSubdir(self, batchid):
         """
         Given a queue/batch id, this function returns the corresponding
         subdirectory name.  The 'batchid' argument can be a string or integer.
         """
         d = 'batchset' + str( int( float(batchid)/50 + 0.5 ) )
-        if relative:
-            return d
         return os.path.join( self.rootdir, d )
 
     def globBatchDirectories(self):

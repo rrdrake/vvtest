@@ -147,8 +147,7 @@ class Batcher:
 
         bid = bjob.getBatchID()
 
-        incl = self.namer.getBasePath( bid, relative=True )
-        self.results.addResultsInclude( incl )
+        self.results.addResultsInclude( bjob )
 
         pin = self.namer.getBatchScriptName( bid )
         tdir = self.namer.getRootDir()
@@ -188,8 +187,7 @@ class Batcher:
         ""
         if self._check_for_clean_finish( bjob ):
             self.results.readJobResults( bjob, tdoneL )
-            incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
-            self.results.completeResultsInclude( incl )
+            self.results.completeResultsInclude( bjob )
             self.jobhandler.markJobDone( bjob, 'clean' )
 
         elif not self.jobhandler.resetCheckTime( bjob, current_time ):
@@ -200,7 +198,7 @@ class Batcher:
     def _check_for_clean_finish(self, bjob):
         ""
         ofile = bjob.getOutputFilename()
-        rfile = bjob.getAttr('resultsfilename')
+        rfile = bjob.getAttr('testlist').getResultsFilename()
 
         finished = False
         if self.jobhandler.scanBatchOutput( ofile ):
@@ -213,15 +211,14 @@ class Batcher:
         if not os.path.exists( bjob.getOutputFilename() ):
             mark = 'notrun'
 
-        elif os.path.exists( bjob.getAttr('resultsfilename') ):
+        elif os.path.exists( bjob.getAttr('testlist').getResultsFilename() ):
             mark = 'notdone'
             self.results.readJobResults( bjob, tdoneL )
 
         else:
             mark = 'fail'
 
-        incl = self.namer.getBasePath( bjob.getBatchID(), relative=True )
-        self.results.completeResultsInclude( incl )
+        self.results.completeResultsInclude( bjob )
 
         self.jobhandler.markJobDone( bjob, mark )
 
@@ -240,9 +237,6 @@ class Batcher:
 
         bjob.setMaxNP( maxnp )
         bjob.setAttr( 'testlist', tlist )
-
-        rfile = self.namer.getBasePath( bjob.getBatchID() )+'.'+self.suffix
-        bjob.setAttr( 'resultsfilename', rfile )
 
     def _write_job(self, bjob):
         ""
@@ -398,17 +392,19 @@ class ResultsHandler:
         self.tlist = tlist
         self.xlist = xlist
 
-    def addResultsInclude(self, pathname):
+    def addResultsInclude(self, bjob):
         ""
-        self.tlist.addIncludeFile( pathname )
+        fname = get_relative_results_filename( self.tlist, bjob )
+        self.tlist.addIncludeFile( fname )
 
-    def completeResultsInclude(self, pathname):
+    def completeResultsInclude(self, bjob):
         ""
-        self.tlist.completeIncludeFile( pathname )
+        fname = get_relative_results_filename( self.tlist, bjob )
+        self.tlist.completeIncludeFile( fname )
 
     def readJobResults(self, bjob, donetests):
         ""
-        rfile = bjob.getAttr('resultsfilename')
+        rfile = bjob.getAttr('testlist').getResultsFilename()
 
         if os.path.isfile( rfile ):
 
@@ -447,6 +443,15 @@ class ResultsHandler:
     def finalize(self):
         ""
         self.tlist.writeFinished()
+
+
+def get_relative_results_filename( tlist_from, to_bjob ):
+    ""
+    fromdir = os.path.dirname( tlist_from.getResultsFilename() )
+
+    tofile = to_bjob.getAttr('testlist').getResultsFilename()
+
+    return pathutil.compute_relative_path( fromdir, tofile )
 
 
 def check_set_outfile_permissions( bjob, perms, curtime ):

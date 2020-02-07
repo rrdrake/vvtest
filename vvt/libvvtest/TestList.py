@@ -56,7 +56,11 @@ class TestList:
 
         return self.rundate
 
-    def getResultsSuffix(self):
+    def getResultsFilename(self):
+        ""
+        return self.filename+'.'+self.rundate
+
+    def getResultsSuffix(self):  # magic: can this be removed?
         ""
         return self.rundate
 
