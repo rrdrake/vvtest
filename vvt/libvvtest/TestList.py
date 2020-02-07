@@ -72,8 +72,6 @@ class TestList:
         """
         assert self.filename
 
-        check_make_directory_containing_file( self.filename )
-
         tlw = testlistio.TestListWriter( self.filename )
 
         if extended:
@@ -85,6 +83,8 @@ class TestList:
             tlw.append( tcase, extended=extended )
 
         tlw.finish()
+
+        return self.filename
 
     def initializeResultsFile(self):
         ""
@@ -407,14 +407,6 @@ def tests_are_related_by_staging( tspec1, tspec2 ):
         return True
 
     return False
-
-
-def check_make_directory_containing_file( filename ):
-    ""
-    d,b = os.path.split( filename )
-    if d and d != '.':
-        if not os.path.exists(d):
-            os.mkdir( d )
 
 
 def count_active( tcase_map ):

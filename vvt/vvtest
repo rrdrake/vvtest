@@ -1049,7 +1049,7 @@ def restartTests( opts, optD, rtdata ):
         # batch jobs have --qsub-id set and land here
         import libvvtest.batching as batching
         namer = batching.BatchFileNamer( test_dir, testlist_name )
-        tfile = namer.getBasePath( batchid )
+        tfile = namer.getTestListFilename( batchid )
         apply_filters = False
 
     tlist = make_TestList( rtdata, tfile )

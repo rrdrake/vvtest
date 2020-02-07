@@ -255,6 +255,8 @@ class BatchJobHandler:
         maxnp = batchjob.getMaxNP()
         self.batchitf.writeJobScript( maxnp, qtime, wrkdir, pout, fn, cmd )
 
+        return fn
+
     def startJob(self, batchjob, workdir, scriptname):
         ""
         outfile = batchjob.getOutputFilename()
@@ -451,7 +453,7 @@ class BatchFileNamer:
         ""
         return self.rootdir
 
-    def getBasePath(self, batchid):
+    def getTestListFilename(self, batchid):
         ""
         return self.getPath( self.basename, batchid )
 

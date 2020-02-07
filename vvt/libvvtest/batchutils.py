@@ -230,7 +230,7 @@ class Batcher:
 
     def _construct_job(self, bjob, testL):
         ""
-        testlistfname = self.namer.getBasePath( bjob.getBatchID() )
+        testlistfname = self.namer.getTestListFilename( bjob.getBatchID() )
         tlist = make_batch_TestList( testlistfname, self.suffix, testL )
 
         maxnp = compute_max_np( tlist )
@@ -240,14 +240,16 @@ class Batcher:
 
     def _write_job(self, bjob):
         ""
-        qtime = self.grouper.computeQueueTime( bjob.getAttr('testlist') )
-
         tl = bjob.getAttr('testlist')
 
-        tl.stringFileWrite( extended=True )
+        bdir = self.namer.getSubdir( bjob.getBatchID() )
+        check_make_directory( bdir, self.perms )
+
+        tname = tl.stringFileWrite( extended=True )
 
         cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
 
+        qtime = self.grouper.computeQueueTime( tl )
         if len( tl.getTestMap() ) == 1:
             # force a timeout for batches with only one test
             if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
@@ -255,10 +257,10 @@ class Batcher:
 
         cmd += ' || exit 1'
 
-        self.jobhandler.writeJobScript( bjob, qtime, cmd )
+        bname = self.jobhandler.writeJobScript( bjob, qtime, cmd )
 
-        d = self.namer.getSubdir( bjob.getBatchID() )
-        self.perms.recurse( d )
+        self.perms.set( bname )
+        self.perms.set( tname )
 
 
 class BatchTestGrouper:
@@ -452,6 +454,14 @@ def get_relative_results_filename( tlist_from, to_bjob ):
     tofile = to_bjob.getAttr('testlist').getResultsFilename()
 
     return pathutil.compute_relative_path( fromdir, tofile )
+
+
+def check_make_directory( dirname, perms ):
+    ""
+    if dirname and dirname != '.':
+        if not os.path.exists( dirname ):
+            os.mkdir( dirname )
+            perms.set( dirname )
 
 
 def check_set_outfile_permissions( bjob, perms, curtime ):
