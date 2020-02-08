@@ -263,10 +263,6 @@ class BatchJobHandler:
         jobid = self.batchitf.submitJob( workdir, outfile, scriptname )
         self.markJobStarted( batchjob, jobid )
 
-    def numToDo(self):
-        ""
-        return len( self.todo )
-
     def numSubmitted(self):
         return len( self.submitted )
 
@@ -280,7 +276,7 @@ class BatchJobHandler:
         ""
         return self.todo.values()
 
-    def getStarted(self):
+    def getSubmitted(self):
         ""
         return self.submitted.values()
 
@@ -329,7 +325,7 @@ class BatchJobHandler:
         ""
         doneL = []
 
-        startlist = list( self.getStarted() )
+        startlist = list( self.getSubmitted() )
 
         if len(startlist) > 0:
             jobidL = [ bjob.getJobID() for bjob in startlist ]
@@ -430,7 +426,7 @@ class BatchJobHandler:
 
     def cancelStartedJobs(self):
         ""
-        jL = [ bjob.getJobID() for bjob in self.getStarted() ]
+        jL = [ bjob.getJobID() for bjob in self.getSubmitted() ]
         if len(jL) > 0:
             self.batchitf.cancelJobs( jL )
 

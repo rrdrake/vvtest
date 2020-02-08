@@ -16,10 +16,7 @@ from .outpututils import XstatusString, pretty_time
 def run_batch( batch, tlist, xlist, perms, results_writer,
                test_dir, qsublimit ):
     ""
-    numjobs = batch.getNumNotRun()
-
-    print3( 'Total number of batch jobs: ' + str(batch.getNumNotRun()) + \
-            ', maximum concurrent jobs: ' + str(qsublimit) )
+    print3( 'Maximum concurrent batch jobs:', qsublimit )
 
     starttime = time.time()
     print3( "Start time:", time.ctime() )
@@ -59,18 +56,10 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
             results_writer.midrun( tlist )
 
             if len(doneL) > 0:
-                jpct = 100 * float(batch.getNumDone()) / float(numjobs)
-                jdiv = 'jobs '+str(batch.getNumDone())+'/'+str(numjobs)
-                jflt = '(in flight '+str(batch.numInProgress())+')'
-                ndone = xlist.numDone()
-                ntot = tlist.numActive()
-                tpct = 100 * float(ndone) / float(ntot)
-                tdiv = 'tests '+str(ndone)+'/'+str(ntot)
-                dt = pretty_time( time.time() - starttime )
-                print3( "Progress: " + \
-                        jdiv+" = %%%.1f"%jpct + ' '+jflt+', ' + \
-                        tdiv+" = %%%.1f"%tpct + ', ' + \
-                        'time = '+dt )
+                sL = [ get_batch_info( batch ),
+                       get_test_info( tlist, xlist ),
+                       'time = '+pretty_time( time.time() - starttime ) ]
+                print3( "Progress:", ', '.join( sL )  )
 
         # any remaining tests cannot be run; flush then print warnings
         NS, NF, nrL = batch.flush()
@@ -94,6 +83,24 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
         xdir1 = tcase1.getSpec().getDisplayString()
         print3( '*** Warning: test "'+xdir0+'"',
                 'notrun due to dependency "' + xdir1 + '"' )
+
+
+def get_batch_info( batch ):
+    ""
+    ndone = batch.getNumDone()
+    nrun = batch.numInProgress()
+
+    return 'jobs running='+str(nrun)+' completed='+str(ndone)
+
+
+def get_test_info( tlist, xlist ):
+    ""
+    ndone = xlist.numDone()
+    ntot = tlist.numActive()
+    tpct = 100 * float(ndone) / float(ntot)
+    tdiv = 'tests '+str(ndone)+'/'+str(ntot)
+
+    return tdiv+" = %%%.1f"%tpct
 
 
 def sleep_with_info_check( info, qsleep ):

@@ -46,21 +46,17 @@ class Batcher:
             bjob = self.jobhandler.createJob()
             self._construct_job( bjob, qL )
 
-    def getNumNotRun(self):
-        ""
-        return self.jobhandler.numToDo()
-
     def getNumStarted(self):
         """
-        Number of batch jobs currently running (those that have been started
-        and still appear to be in the batch queue).
+        Number of batch jobs currently in progress (those that have been
+        submitted and still appear to be in the queue).
         """
         return self.jobhandler.numSubmitted()
 
     def numInProgress(self):
         """
-        Returns the number of batch jobs are still running or stopped but
-        whose results have not been read yet.
+        Returns the number of batch jobs are still in the queue or stopped but
+        whose results have not yet been read.
         """
         return self.jobhandler.numSubmitted() + self.jobhandler.numStopped()
 
@@ -74,9 +70,9 @@ class Batcher:
         """
         return self.jobhandler.numDone()
 
-    def getStarted(self):
+    def getSubmittedJobs(self):
         ""
-        return self.jobhandler.getStarted()
+        return self.jobhandler.getSubmitted()
 
     def checkstart(self):
         """
@@ -157,7 +153,7 @@ class Batcher:
         ""
         tm = time.time()
 
-        for bjob in self.jobhandler.getStarted():
+        for bjob in self.jobhandler.getSubmitted():
             # magic: also use check time to look for outfile
             check_set_outfile_permissions( bjob, self.perms, tm )
 
@@ -174,7 +170,7 @@ class Batcher:
         ""
         tnow = time.time()
 
-        for bjob in self.jobhandler.getStarted():
+        for bjob in self.jobhandler.getSubmitted():
             if self.jobhandler.isTimeToCheck( bjob, tnow ):
                 self.results.readJobResults( bjob, tdoneL )
                 self.jobhandler.resetCheckTime( bjob, tnow )

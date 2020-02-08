@@ -57,7 +57,7 @@ class TestInformationPrinter:
         ""
         self.println( '  *', self.batcher.numInProgress(),
                       'batch job(s) in flight:' )
-        for batch_job in self.batcher.getStarted():
+        for batch_job in self.batcher.getSubmittedJobs():
             qid = batch_job.getBatchID()
             duration = now - batch_job.getStartTime()
             duration = datetime.timedelta( seconds=int(duration) )
