@@ -153,20 +153,16 @@ class TestList:
                 if xdir not in self.tcasemap:
                     self.tcasemap[ xdir ] = tcase
 
-    def readTestResults(self, resultsfilename=None, preserve_skips=False):
+    def readTestResults(self, preserve_skips=False):
         """
-        If 'resultsfilename' is not None, only read that one file.  Otherwise,
-        glob for results filenames and read them all in time stamp increasing
-        order.
+        Glob for results filenames and read them all in increasing order
+        by rundate.
 
         If 'preserve_skips' is False, each test read in from a results file
         will have its skip setting removed from the test.
         """
-        if resultsfilename == None:
-            fL = glob_results_files( self.filename )
-            self._read_file_list( fL, preserve_skips )
-        else:
-            self._read_file_list( [ resultsfilename ], preserve_skips )
+        fL = glob_results_files( self.filename )
+        self._read_file_list( fL, preserve_skips )
 
     def resultsFileIsMarkedFinished(self):
         ""

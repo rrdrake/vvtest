@@ -138,6 +138,17 @@ class Batcher:
 
     #####################################################################
 
+    def _construct_job(self, bjob, testL):
+        ""
+        batchid = bjob.getBatchID()
+        bdir = self.namer.getBatchDir( batchid )
+        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL )
+
+        maxnp = compute_max_np( tlist )
+
+        bjob.setMaxNP( maxnp )
+        bjob.setAttr( 'testlist', tlist )
+
     def _start_job(self, bjob):
         ""
         self._write_job( bjob )
@@ -244,17 +255,6 @@ class Batcher:
         for d in self.namer.globBatchDirectories():
             print3( 'rm -rf '+d )
             pathutil.fault_tolerant_remove( d )
-
-    def _construct_job(self, bjob, testL):
-        ""
-        batchid = bjob.getBatchID()
-        bdir = self.namer.getBatchDir( batchid )
-        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL )
-
-        maxnp = compute_max_np( tlist )
-
-        bjob.setMaxNP( maxnp )
-        bjob.setAttr( 'testlist', tlist )
 
 
 class BatchTestGrouper:

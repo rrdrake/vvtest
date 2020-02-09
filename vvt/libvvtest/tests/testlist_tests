@@ -356,7 +356,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tl = TestList.TestList()
-        tl.readTestResults( rfile )
+        tl.readTestResults()
 
         tm = tl.getDateStamp()
         assert tm != None and time.time() - tm < 10
