@@ -18,10 +18,12 @@ class BatchJob:
         self.batchid = BatchJob.batchid_counter
         BatchJob.batchid_counter += 1
 
+        self.jobscript = None
         self.outfile = None
         self.maxnp = None
         self.jobid = None
         self.wrkdir = None
+
         self.tstart = None
         self.tseen = None
         self.tstop = None
@@ -33,6 +35,11 @@ class BatchJob:
     def getBatchID(self): return self.batchid
     def getMaxNP(self): return self.maxnp
 
+    def getJobScriptName(self): return self.jobscript
+
+    def getOutputFilename(self): return self.outfile
+    def outfileSeen(self): return self.tseen != None
+
     def getJobID(self): return self.jobid
 
     def getWorkDir(self): return self.wrkdir
@@ -43,9 +50,6 @@ class BatchJob:
 
     def getResult(self): return self.result
 
-    def getOutputFilename(self): return self.outfile
-    def outfileSeen(self): return self.tseen != None
-
     def setAttr(self, name, value):
         ""
         self.attrs[name] = value
@@ -55,6 +59,10 @@ class BatchJob:
         if len(default) > 0:
             return self.attrs.get( name, default[0] )
         return self.attrs[name]
+
+    def setJobScriptName(self, scriptname):
+        ""
+        self.jobscript = scriptname
 
     def setOutputFilename(self, filename):
         ""
@@ -218,29 +226,32 @@ class BatchQueueInterface:
 
 class BatchJobHandler:
 
-    def __init__(self, read_interval, read_timeout, batchitf, namer):
+    def __init__(self, check_interval, check_timeout, batchitf, namer):
         ""
-        self.read_interval = read_interval
-        self.read_timeout = read_timeout
+        self.check_interval = check_interval
+        self.check_timeout = check_timeout
         self.batchitf = batchitf
         self.namer = namer
 
-        self.qtodo  = {}  # to be submitted
-        self.qstart = {}  # submitted
-        self.qstop  = {}  # no longer in the queue
-        self.qdone  = {}  # final results have been read
+        self.todo  = {}
+        self.submitted = {}
+        self.stopped  = {}  # not in queue or shown as completed by the queue
+        self.done  = {}  # job results have been processed
 
     def createJob(self):
         ""
         bjob = BatchJob()
 
-        pout = self.namer.getBatchOutputName( bjob.getBatchID() )
+        fn = self.namer.getScriptPath( bjob.getBatchID() )
+        bjob.setJobScriptName( fn )
+
+        pout = self.namer.getOutputPath( bjob.getBatchID() )
         bjob.setOutputFilename( pout )
 
         bjob.setWorkDir( self.namer.getRootDir() )
 
         bid = bjob.getBatchID()
-        self.qtodo[ bid ] = bjob
+        self.todo[ bid ] = bjob
 
         return bjob
 
@@ -249,48 +260,46 @@ class BatchJobHandler:
         wrkdir = batchjob.getWorkDir()
         pout = batchjob.getOutputFilename()
 
-        fn = self.namer.getBatchScriptName( str( batchjob.getBatchID() ) )
+        fn = batchjob.getJobScriptName()
 
         maxnp = batchjob.getMaxNP()
         self.batchitf.writeJobScript( maxnp, qtime, wrkdir, pout, fn, cmd )
 
-    def startJob(self, batchjob, workdir, scriptname):
+        return fn
+
+    def startJob(self, batchjob):
         ""
+        workdir = self.namer.getRootDir()
+        scriptname = self.namer.getScriptPath( batchjob.getBatchID() )
+
         outfile = batchjob.getOutputFilename()
         jobid = self.batchitf.submitJob( workdir, outfile, scriptname )
         self.markJobStarted( batchjob, jobid )
 
-    def numToDo(self):
-        ""
-        return len( self.qtodo )
+    def numSubmitted(self):
+        return len( self.submitted )
 
-    def numStarted(self):
-        return len( self.qstart )
+    def numStopped(self):
+        return len( self.stopped )
 
     def numDone(self):
-        return len( self.qdone )
-
-    def numInFlight(self):
-        return len( self.qstart ) + len( self.qstop )
-
-    def numPastQueue(self):
-        return len( self.qstop ) + len( self.qdone )
+        return len( self.done )
 
     def getNotStarted(self):
         ""
-        return self.qtodo.values()
+        return self.todo.values()
 
-    def getStarted(self):
+    def getSubmitted(self):
         ""
-        return self.qstart.values()
+        return self.submitted.values()
 
     def getStopped(self):
         ""
-        return self.qstop.values()
+        return self.stopped.values()
 
     def getDone(self):
         ""
-        return self.qdone.values()
+        return self.done.values()
 
     def markJobStarted(self, bjob, jobid):
         ""
@@ -298,10 +307,14 @@ class BatchJobHandler:
         bid = bjob.getBatchID()
 
         self._pop_job( bid )
-        self.qstart[ bid ] = bjob
+        self.submitted[ bid ] = bjob
 
         bjob.setJobID( jobid )
         bjob.setStartTime( tm )
+
+        # delay the first job check a little
+        chktime = tm + max( 1, int( self.check_interval * 0.1 + 0.5 ) )
+        bjob.setCheckTime( chktime )
 
     def markJobStopped(self, bjob):
         ""
@@ -309,23 +322,23 @@ class BatchJobHandler:
         bid = bjob.getBatchID()
 
         self._pop_job( bid )
-        self.qstop[ bid ] = bjob
+        self.stopped[ bid ] = bjob
 
         bjob.setStopTime( tm )
-        bjob.setCheckTime( tm + self.read_interval )
+        bjob.setCheckTime( tm )
 
     def markJobDone(self, bjob, result):
         ""
         bid = bjob.getBatchID()
         self._pop_job( bid )
-        self.qdone[ bid ] = bjob
+        self.done[ bid ] = bjob
         bjob.setResult( result )
 
     def transitionStartedToStopped(self):
         ""
         doneL = []
 
-        startlist = list( self.getStarted() )
+        startlist = list( self.getSubmitted() )
 
         if len(startlist) > 0:
             jobidL = [ bjob.getJobID() for bjob in startlist ]
@@ -334,7 +347,7 @@ class BatchJobHandler:
             for bjob in startlist:
                 status = statusD[ bjob.getJobID() ]
                 if self._check_stopped_job( bjob, status, tnow ):
-                    doneL.append( bjob.getBatchID() )
+                    doneL.append( bjob )
 
         return doneL
 
@@ -354,21 +367,21 @@ class BatchJobHandler:
 
         return started
 
-    def timeToCheckIfFinished(self, bjob, current_time):
+    def isTimeToCheck(self, bjob, current_time):
         ""
-        return bjob.getCheckTime() < current_time
+        return current_time > bjob.getCheckTime() + self.check_interval
 
-    def extendFinishCheck(self, bjob, current_time):
+    def resetCheckTime(self, bjob, current_time):
         """
-        Resets the finish check time to a time into the future.  Returns
+        Resets the finish check time to the current time.  Returns
         False if the number of extensions has been exceeded.
         """
-        if current_time < bjob.getStopTime()+self.read_timeout:
-            # set the time for the next read attempt
-            bjob.setCheckTime( current_time + self.read_interval )
+        tstop = bjob.getStopTime()
+        if not tstop or current_time < tstop+self.check_timeout:
+            bjob.setCheckTime( current_time )
+            return True
+        else:
             return False
-
-        return True
 
     def scanBatchOutput(self, outfile):
         """
@@ -426,13 +439,13 @@ class BatchJobHandler:
 
     def cancelStartedJobs(self):
         ""
-        jL = [ bjob.getJobID() for bjob in self.getStarted() ]
+        jL = [ bjob.getJobID() for bjob in self.getSubmitted() ]
         if len(jL) > 0:
             self.batchitf.cancelJobs( jL )
 
     def _pop_job(self, batchid):
         ""
-        for qD in [ self.qtodo, self.qstart, self.qstop, self.qdone ]:
+        for qD in [ self.todo, self.submitted, self.stopped, self.done ]:
             if batchid in qD:
                 return qD.pop( batchid )
         raise Exception( 'job id not found: '+str(batchid) )
@@ -440,48 +453,37 @@ class BatchJobHandler:
 
 class BatchFileNamer:
 
-    def __init__(self, rootdir, basename=None):
+    def __init__(self, rootdir):
         ""
         self.rootdir = rootdir
-        self.basename = basename
 
     def getRootDir(self):
         ""
         return self.rootdir
 
-    def getBasePath(self, batchid, relative=False):
+    def getScriptPath(self, batchid):
         ""
-        return self.getPath( self.basename, batchid, relative )
+        return self.getFilePath( 'qbat', batchid )
 
-    def getBatchScriptName(self, batchid):
+    def getOutputPath(self, batchid):
         ""
-        return self.getPath( 'qbat', batchid )
+        return self.getFilePath( 'qbat-out', batchid )
 
-    def getBatchOutputName(self, batchid):
-        ""
-        return self.getPath( 'qbat-out', batchid )
-
-    def getPath(self, basename, batchid, relative=False):
+    def getFilePath(self, basename, batchid):
         """
         Given a base file name and a batch id, this function returns the
         file name in the batchset subdirectory and with the id appended.
-        If 'relative' is true, then the path is relative to the TestResults
-        directory.
         """
-        subd = self.getSubdir( batchid, relative )
-        if basename == None:
-            basename = 'batch'
+        subd = self.getBatchDir( batchid )
         fn = os.path.join( subd, basename+'.'+str(batchid) )
         return fn
 
-    def getSubdir(self, batchid, relative=False):
+    def getBatchDir(self, batchid):
         """
         Given a queue/batch id, this function returns the corresponding
         subdirectory name.  The 'batchid' argument can be a string or integer.
         """
         d = 'batchset' + str( int( float(batchid)/50 + 0.5 ) )
-        if relative:
-            return d
         return os.path.join( self.rootdir, d )
 
     def globBatchDirectories(self):

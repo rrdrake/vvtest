@@ -7,6 +7,8 @@
 import os, sys
 import time
 import glob
+from os.path import abspath, normpath
+from os.path import join as pjoin
 
 from .errors import TestSpecError
 from .testcase import TestCase
@@ -17,20 +19,26 @@ from .teststatus import copy_test_results
 
 class TestList:
     """
-    Stores a set of TestCase objects.  Has utilities to read/write to a text
-    file and to read from a test specification file.
+    Stores a set of TestCase objects and has utilities to read and write them
+    to a file.
     """
 
-    def __init__(self, filename,
+    base_filename = 'testlist'
+
+    def __init__(self, directory=None,
+                       identifier=None,
                        runtime_config=None,
                        testcreator=None,
                        testfilter=None):
         ""
-        if filename:
-            self.filename = os.path.normpath( filename )
-        else:
-            # use case: scanning tests, but never reading or writing
-            self.filename = None
+        if not directory:
+            directory = os.getcwd()
+
+        fn = pjoin( directory, TestList.base_filename )
+        self.filename = normpath( abspath( fn ) )
+
+        if identifier != None:
+            self.filename += '.'+str(identifier)
 
         self.rundate = None
         self.results_file = None
@@ -47,6 +55,10 @@ class TestList:
         self.creator = testcreator
         self.testfilter = testfilter
 
+    def getFilename(self):
+        ""
+        return self.filename
+
     def setResultsSuffix(self, suffix=None):
         ""
         if suffix:
@@ -55,6 +67,10 @@ class TestList:
             self.rundate = time.strftime( "%Y-%m-%d_%H:%M:%S" )
 
         return self.rundate
+
+    def getResultsFilename(self):
+        ""
+        return self.filename+'.'+self.rundate
 
     def getResultsSuffix(self):
         ""
@@ -68,8 +84,6 @@ class TestList:
         """
         assert self.filename
 
-        check_make_directory_containing_file( self.filename )
-
         tlw = testlistio.TestListWriter( self.filename )
 
         if extended:
@@ -81,6 +95,8 @@ class TestList:
             tlw.append( tcase, extended=extended )
 
         tlw.finish()
+
+        return self.filename
 
     def initializeResultsFile(self):
         ""
@@ -101,6 +117,12 @@ class TestList:
         assert self.rundate, 'suffix must have already been set'
         inclf = testlist_path + '.' + self.rundate
         self.results_file.addIncludeFile( inclf )
+
+    def completeIncludeFile(self, testlist_path):
+        ""
+        assert self.rundate, 'suffix must have already been set'
+        inclf = testlist_path + '.' + self.rundate
+        self.results_file.includeFileCompleted( inclf )
 
     def appendTestResult(self, tcase):
         """
@@ -131,26 +153,27 @@ class TestList:
                 if xdir not in self.tcasemap:
                     self.tcasemap[ xdir ] = tcase
 
-    def readTestResults(self, resultsfilename=None, preserve_skips=False):
+    def readTestResults(self, preserve_skips=False):
         """
-        If 'resultsfilename' is not None, only read that one file.  Otherwise,
-        glob for results filenames and read them all in time stamp increasing
-        order.
+        Glob for results filenames and read them all in increasing order
+        by rundate.
 
         If 'preserve_skips' is False, each test read in from a results file
         will have its skip setting removed from the test.
         """
-        if resultsfilename == None:
-            self._read_file_list( self.getResultsFilenames(), preserve_skips )
-        else:
-            self._read_file_list( [ resultsfilename ], preserve_skips )
+        fL = glob_results_files( self.filename )
+        self._read_file_list( fL, preserve_skips )
 
-    def getResultsFilenames(self):
+    def resultsFileIsMarkedFinished(self):
         ""
-        assert self.filename
-        fileL = glob.glob( self.filename+'.*' )
-        fileL.sort()
-        return fileL
+        finished = True
+
+        rfileL = glob_results_files( self.filename )
+        if len(rfileL) > 0:
+           if not testlistio.file_is_marked_finished( rfileL[-1] ):
+                finished = False
+
+        return finished
 
     def _read_file_list(self, files, preserve_skips):
         ""
@@ -169,18 +192,6 @@ class TestList:
                     copy_test_results( t, tcase )
                     if not preserve_skips:
                         t.getSpec().attrs.pop( 'skip', None )
-
-    def ensureInlinedTestResultIncludes(self):
-        ""
-        fL = self.getResultsFilenames()
-        if len(fL) > 0:
-            # only the most recent is checked
-            testlistio.inline_include_files( fL[-1] )
-
-    def inlineIncludeFiles(self):
-        ""
-        rfile = self.filename + '.' + self.rundate
-        testlistio.inline_include_files( rfile )
 
     def getDateStamp(self, default=None):
         """
@@ -211,7 +222,7 @@ class TestList:
 
     def getTestMap(self):
         """
-        Returns a map of xdir to TestCase containing all tests.
+        Returns all tests as a map from test ID to TestCase.
         """
         return self.tcasemap
 
@@ -406,14 +417,6 @@ def tests_are_related_by_staging( tspec1, tspec2 ):
     return False
 
 
-def check_make_directory_containing_file( filename ):
-    ""
-    d,b = os.path.split( filename )
-    if d and d != '.':
-        if not os.path.exists(d):
-            os.mkdir( d )
-
-
 def count_active( tcase_map ):
     ""
     cnt = 0
@@ -430,6 +433,14 @@ def refresh_active_tests( tcase_map, creator ):
         if not tcase.getStat().skipTest():
             if not tspec.constructionCompleted():
                 creator.reparse( tspec )
+
+
+def glob_results_files( basename ):
+    ""
+    assert basename
+    fileL = glob.glob( basename+'.*' )
+    fileL.sort()
+    return fileL
 
 
 ###########################################################################

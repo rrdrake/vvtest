@@ -16,10 +16,7 @@ from .outpututils import XstatusString, pretty_time
 def run_batch( batch, tlist, xlist, perms, results_writer,
                test_dir, qsublimit ):
     ""
-    numjobs = batch.getNumNotRun()
-
-    print3( 'Total number of batch jobs: ' + str(batch.getNumNotRun()) + \
-            ', maximum concurrent jobs: ' + str(qsublimit) )
+    print3( 'Maximum concurrent batch jobs:', qsublimit )
 
     starttime = time.time()
     print3( "Start time:", time.ctime() )
@@ -30,8 +27,6 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
     uthook = utesthooks.construct_unit_testing_hook( 'batch' )
 
     rfile = tlist.initializeResultsFile()
-    for inclf in batch.getIncludeFiles():
-        tlist.addIncludeFile( inclf )
 
     info = TestInformationPrinter( sys.stdout, tlist, batch )
 
@@ -42,7 +37,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
             if qid != None:
                 # nothing to print here because the qsubmit prints
                 pass
-            elif batch.numInFlight() == 0:
+            elif batch.numInProgress() == 0:
                 break
             else:
                 sleep_with_info_check( info, qsleep )
@@ -56,32 +51,21 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
                 ts = XstatusString( tcase, test_dir, cwd )
                 print3( "Finished:", ts )
 
-            uthook.check( batch.numInFlight(), batch.numPastQueue() )
+            uthook.check( batch.numInProgress(), batch.numPastQueue() )
 
             results_writer.midrun( tlist )
 
             if len(doneL) > 0:
-                jpct = 100 * float(batch.getNumDone()) / float(numjobs)
-                jdiv = 'jobs '+str(batch.getNumDone())+'/'+str(numjobs)
-                jflt = '(in flight '+str(batch.getNumStarted())+')'
-                ndone = xlist.numDone()
-                ntot = tlist.numActive()
-                tpct = 100 * float(ndone) / float(ntot)
-                tdiv = 'tests '+str(ndone)+'/'+str(ntot)
-                dt = pretty_time( time.time() - starttime )
-                print3( "Progress: " + \
-                        jdiv+" = %%%.1f"%jpct + ' '+jflt+', ' + \
-                        tdiv+" = %%%.1f"%tpct + ', ' + \
-                        'time = '+dt )
+                sL = [ get_batch_info( batch ),
+                       get_test_info( tlist, xlist ),
+                       'time = '+pretty_time( time.time() - starttime ) ]
+                print3( "Progress:", ', '.join( sL )  )
 
         # any remaining tests cannot be run; flush then print warnings
         NS, NF, nrL = batch.flush()
 
     finally:
-        tlist.writeFinished()
-        batch.cancelJobs()
-
-    tlist.inlineIncludeFiles()
+        batch.shutdown()
 
     perms.set( os.path.abspath( rfile ) )
 
@@ -99,6 +83,24 @@ def run_batch( batch, tlist, xlist, perms, results_writer,
         xdir1 = tcase1.getSpec().getDisplayString()
         print3( '*** Warning: test "'+xdir0+'"',
                 'notrun due to dependency "' + xdir1 + '"' )
+
+
+def get_batch_info( batch ):
+    ""
+    ndone = batch.getNumDone()
+    nrun = batch.numInProgress()
+
+    return 'jobs running='+str(nrun)+' completed='+str(ndone)
+
+
+def get_test_info( tlist, xlist ):
+    ""
+    ndone = xlist.numDone()
+    ntot = tlist.numActive()
+    tpct = 100 * float(ndone) / float(ntot)
+    tdiv = 'tests '+str(ndone)+'/'+str(ntot)
+
+    return tdiv+" = %%%.1f"%tpct
 
 
 def sleep_with_info_check( info, qsleep ):
@@ -193,7 +195,8 @@ def exec_path( testspec, test_dir ):
 def run_baseline( xlist, plat ):
     ""
     failures = False
-    for tcase in xlist.getTestExecList():
+
+    for tcase in xlist.consumeBacklog():
 
         tspec = tcase.getSpec()
         texec = tcase.getExec()

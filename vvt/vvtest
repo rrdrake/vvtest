@@ -27,8 +27,6 @@ version = '1.2'
 
 search_fnmatch = ['*.inp','*.apr','*.i']
 
-testlist_name = 'testlist'
-
 USER_PLUGIN_MODULE_NAME = 'vvtest_user_plugin'
 
 
@@ -91,8 +89,7 @@ class MainEntry:
         elif self.opts.dash_b:
 
             if self.opts.dash_R or self.opts.dash_w:
-                print3( "*** error: cannot use -R or -w with -b (baseline)" )
-                sys.exit(1)
+                raise FatalError( 'cannot use -R or -w with -b (baseline)' )
 
             baselineTests( self.opts, self.optD, self.rtdata )
 
@@ -134,12 +131,10 @@ class MainEntry:
         readCommandInfo( self.opts, self.optD, rtconfig, self.cache_file )
 
         if self.cache_file and self.optD['param_dict']:
-            print3( "*** error: cannot use -S in a TestResults directory" )
-            sys.exit(1)
+            raise FatalError( 'cannot use -S in a TestResults directory' )
 
         if self.cache_file and self.opts.dash_g:
-            print3( "*** error: cannot use -g in a TestResults directory" )
-            sys.exit(1)
+            raise FatalError( 'cannot use -g in a TestResults directory' )
 
         # this is scheduled for deprecation
         if self.opts.check:
@@ -405,7 +400,7 @@ class InformationMode:
         ""
         test_dir = self.rtdata.getTestResultsDir()
 
-        tlist = self.createTestList()
+        tlist = make_TestList( self.rtdata )
 
         if self.rtdata.isRestartMode():
             tlist.readTestList()
@@ -428,16 +423,6 @@ class InformationMode:
                                     remove_skips=True )
 
         return tlist
-
-    def createTestList(self):
-        ""
-        test_dir = self.rtdata.getTestResultsDir()
-
-        tfile = pjoin( test_dir, testlist_name )
-        if not os.path.exists( tfile ):
-            tfile = None
-
-        return make_TestList( self.rtdata, tfile )
 
     def printKeywordUnion(self, tlist):
         ""
@@ -471,15 +456,42 @@ class InformationMode:
             print3( d )
 
 
-def make_TestList( rtdata, filename ):
+def make_TestList( rtdata, batchid=None ):
     ""
     import libvvtest.TestList as TestList
 
     rtconfig = rtdata.getRuntimeConfig()
     creator = rtdata.getTestCreator()
     testfilter = rtdata.getTestFilter()
+    test_dir = rtdata.getTestResultsDir()
 
-    return TestList.TestList( filename, rtconfig, creator, testfilter )
+    if batchid == None:
+        tdir = test_dir
+    else:
+        namer = create_batch_namer( test_dir )
+        tdir = namer.getBatchDir( batchid )
+
+    tlist = TestList.TestList( tdir, batchid, rtconfig, creator, testfilter )
+
+    return tlist
+
+
+def symlink_batch_files_in_tests( test_dir, tlist, batchid ):
+    ""
+    namer = create_batch_namer( test_dir )
+
+    qbat = namer.getScriptPath( batchid )
+    qout = namer.getOutputPath( batchid )
+
+    for tcase in tlist.getTests():
+        tcase.getSpec().addLinkFile( qbat )
+        tcase.getSpec().addLinkFile( qout )
+
+
+def create_batch_namer( test_dir ):
+    ""
+    import libvvtest.batching as batching
+    return batching.BatchFileNamer( test_dir )
 
 
 ##############################################################################
@@ -510,9 +522,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
 
-    tfile = pjoin( test_dir, testlist_name )
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata )
 
     scan_test_source_directories( tlist, dirs,
                                   opts.scan_type, optD['param_dict'] )
@@ -528,11 +538,11 @@ def generateTestList( opts, optD, dirs, rtdata ):
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
     tlist.stringFileWrite()
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-    xlist = TestExecList( plugin, tlist, runner )
+    xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
     print3( "\nTest directory:", testsubdir )
@@ -546,7 +556,7 @@ def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
     """
     import libvvtest.extract as extract
 
-    tlist = make_TestList( rtdata, None )
+    tlist = make_TestList( rtdata )
 
     scan_test_source_directories( tlist, dirs, scan_type, param_dict )
 
@@ -639,10 +649,8 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
     if cache_file != None:
 
         if optD['onopts'] or optD['offopts'] or opts.dash_g:
-            sys.stderr.write('*** error: ' + \
-                'the -g, -o, and -O options are not allowed ' + \
-                'in a TestResults directory\n')
-            sys.exit(1);
+            raise FatalError( 'the -g, -o, and -O options are not allowed '
+                              'in a TestResults directory')
 
         fp = open( cache_file, "r" )
         write_version = 0
@@ -717,11 +725,9 @@ def runTests( opts, optD, rtdata, dirs ):
 
     call_user_prologue( rtdata )
 
-    tfile = pjoin( test_dir, testlist_name )
+    tlist = make_TestList( rtdata )
 
-    tlist = make_TestList( rtdata, tfile )
-
-    check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
+    check_for_currently_running_vvtest( tlist, opts.force )
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
@@ -745,10 +751,9 @@ def runTests( opts, optD, rtdata, dirs ):
     # apply filters and save the test list in the TestResults directory
     tlist.applyPermanentFilters()
     tlist.stringFileWrite()
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     tlist.readTestResults( preserve_skips=True )
-    tlist.ensureInlinedTestResultIncludes()
 
     tlist.determineActiveTests()
 
@@ -772,24 +777,11 @@ def runTests( opts, optD, rtdata, dirs ):
     return tlist.encodeIntegerWarning()
 
 
-def check_for_currently_running_vvtest( resultsfiles, optforce ):
+def check_for_currently_running_vvtest( tlist, optforce ):
     ""
-    if not optforce:
-
-        msg = '*** error: tests are currently running in another process\n' + \
-              '    (or a previous run was killed); use --force to run anyway'
-
-        if len(resultsfiles) > 0:
-
-            import libvvtest.testlistio as testlistio
-
-            rfile = resultsfiles[-1]
-
-            tlr = testlistio.TestListReader( rfile )
-            fin = tlr.scanForFinishDate()
-            if fin == None:
-                print3( msg )
-                sys.exit(1)
+    if not optforce and not tlist.resultsFileIsMarkedFinished():
+        raise FatalError( 'tests are currently running in another process\n'
+            '    (or a previous run was killed); use --force to run anyway' )
 
 
 def get_output_verbosity_integer( dash_v ):
@@ -951,7 +943,7 @@ def run_test_exec_list( opts, optD, rtdata,
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-    xlist = TestExecList( plugin, tlist, runner )
+    xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
     if not opts.batch:
@@ -988,10 +980,10 @@ def batchTestList( opts, optD, rtdata,
                                                rtdata.getVvtestPath(),
                                                rtdata.getRuntimeConfig() )
 
-    namer = batching.BatchFileNamer( test_dir, testlist_name )
+    namer = batching.BatchFileNamer( test_dir )
 
-    read_interval, read_timeout = determine_job_read_intervals()
-    jobhandler = batching.BatchJobHandler( read_interval, read_timeout,
+    check_interval, check_timeout = determine_job_check_intervals()
+    jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
                                            batchitf, namer )
 
     batch = batchutils.Batcher( vvtestcmd,
@@ -1009,16 +1001,16 @@ def batchTestList( opts, optD, rtdata,
                        test_dir, qsublimit )
 
 
-def determine_job_read_intervals():
+def determine_job_check_intervals():
     """
     allow these values to be set by environment variable, mainly for
     unit testing; if setting these is needed more regularly then a
     command line option should be added
     """
-    read_interval = int( os.environ.get( 'VVTEST_BATCH_READ_INTERVAL', 30 ) )
-    read_timeout = int( os.environ.get( 'VVTEST_BATCH_READ_TIMEOUT', 5*60 ) )
+    check_interval = int( os.environ.get( 'VVTEST_BATCH_CHECK_INTERVAL', 30 ) )
+    check_timeout = int( os.environ.get( 'VVTEST_BATCH_CHECK_TIMEOUT', 5*60 ) )
 
-    return read_interval, read_timeout
+    return check_interval, check_timeout
 
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
@@ -1051,6 +1043,7 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
 
 def restartTests( opts, optD, rtdata ):
     ""
+    batchid = opts.qsub_id
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
@@ -1060,38 +1053,27 @@ def restartTests( opts, optD, rtdata ):
 
     call_user_prologue( rtdata )
 
-    batchid = opts.qsub_id
-    if batchid == None:
-        tfile = pjoin( test_dir, testlist_name )
-        apply_filters = True
-    else:
-        # batch jobs have --qsub-id set and land here
-        import libvvtest.batching as batching
-        namer = batching.BatchFileNamer( test_dir, testlist_name )
-        tfile = namer.getBasePath( batchid )
-        apply_filters = False
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata, batchid )
 
     tlist.readTestList()
     tlist.readTestResults()
-    tlist.ensureInlinedTestResultIncludes()
 
-    check_for_currently_running_vvtest( tlist.getResultsFilenames(), opts.force )
+    check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
         timehandler = rtdata.getTestTimeHandler()
         timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
     else:
-        symlink_batch_files_in_tests( tlist, namer, batchid )
+        symlink_batch_files_in_tests( test_dir, tlist, batchid )
 
     reld = rtdata.getFilterPath()
 
-    tlist.determineActiveTests( filter_dir=reld, apply_filters=apply_filters )
+    tlist.determineActiveTests( filter_dir=reld,
+                                apply_filters=( batchid == None ) )
 
     perms = rtdata.getPermissionsObject()
 
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     results_writer = rtdata.getResultsWriter()
 
@@ -1118,13 +1100,10 @@ def baselineTests( opts, optD, rtdata ):
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
 
-    tfile = pjoin( test_dir, testlist_name )
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata )
 
     tlist.readTestList()
     tlist.readTestResults()
-    tlist.ensureInlinedTestResultIncludes()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default
@@ -1141,20 +1120,10 @@ def baselineTests( opts, optD, rtdata ):
         perms = rtdata.getPermissionsObject()
         runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
-        xlist = TestExecList( plugin, tlist, runner )
+        xlist = TestExecList( tlist, runner )
         xlist.createTestExecs( perms )
 
         execute.run_baseline( xlist, plat )
-
-
-def symlink_batch_files_in_tests( tlist, namer, batchid ):
-    ""
-    qbat = namer.getBatchScriptName( batchid )
-    qout = namer.getBatchOutputName( batchid )
-
-    for tcase in tlist.getTests():
-        tcase.getSpec().addLinkFile( qbat )
-        tcase.getSpec().addLinkFile( qout )
 
 
 ###########################################################################

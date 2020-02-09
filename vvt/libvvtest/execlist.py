@@ -8,17 +8,18 @@ import os, sys
 
 from .TestExec import TestExec
 from . import depend
+from .teststatus import copy_test_results
 
 
 class TestExecList:
 
-    def __init__(self, usrplugin, tlist, runner):
+    def __init__(self, tlist, runner):
         ""
-        self.plugin = usrplugin
         self.tlist = tlist
         self.runner = runner
 
-        self.xtlist = {}  # np -> list of TestCase objects
+        self.backlog = {}  # np -> list of TestCase objects
+        self.waiting = {}  # TestSpec ID -> TestCase object
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
@@ -35,7 +36,7 @@ class TestExecList:
 
     def _createTestExecList(self, perms):
         ""
-        self.xtlist = {}
+        self.backlog = {}
 
         for tcase in self.tlist.getTests():
 
@@ -48,10 +49,10 @@ class TestExecList:
                 tcase.setExec( TestExec() )
 
                 np = int( tspec.getParameters().get('np', 0) )
-                if np in self.xtlist:
-                    self.xtlist[np].append( tcase )
+                if np in self.backlog:
+                    self.backlog[np].append( tcase )
                 else:
-                    self.xtlist[np] = [ tcase ]
+                    self.backlog[np] = [ tcase ]
 
     def _connect_execute_dependencies(self):
         ""
@@ -75,7 +76,7 @@ class TestExecList:
         of the testing sequence, which can add significantly to the total wall
         time.
         """
-        for np,tcaseL in self.xtlist.items():
+        for np,tcaseL in self.backlog.items():
             sortL = []
             for tcase in tcaseL:
                 tm = tcase.getStat().getRuntime( None )
@@ -91,21 +92,28 @@ class TestExecList:
         Returns a list of integers; each integer is the number of processors
         needed by one or more tests in the TestExec list.
         """
-        return self.xtlist.keys()
+        return self.backlog.keys()
 
-    def getTestExecList(self, numprocs=None):
+    def getTestExecList(self, numprocs=None, consume=False):
         """
         If 'numprocs' is None, all TestExec objects are returned.  If 'numprocs'
         is not None, a list of TestExec objects is returned each of which need
         that number of processors to run.
+
+        If 'consume' is True, the tests are moved from backlog to waiting.
         """
         xL = []
 
-        if numprocs == None:
-            for tcaseL in self.xtlist.values():
+        for np,tcaseL in list( self.backlog.items() ):
+            if numprocs == None:
                 xL.extend( tcaseL )
-        else:
-            xL.extend( self.xtlist.get(numprocs,[]) )
+                if consume:
+                    self._consume_tests( np )
+            elif numprocs == np:
+                xL.extend( tcaseL )
+                if consume:
+                    self._consume_tests( np )
+                break
 
         return xL
 
@@ -115,12 +123,12 @@ class TestExecList:
         test can run.  In this case, one of the following is true
 
             1. there are not enough free processors to run another test
-            2. the only tests left are parent tests that cannot be run
-               because one or more of their children did not pass or diff
+            2. the only tests left have a dependency with a bad result (like
+               a fail) preventing the test from running
 
         In the latter case, numRunning() will be zero.
         """
-        npL = list( self.xtlist.keys() )
+        npL = list( self.backlog.keys() )
         npL.sort()
         npL.reverse()
 
@@ -130,13 +138,20 @@ class TestExecList:
             # search for tests that need more processors than platform has
             tcase = self._pop_next_test( npL )
 
-        if tcase != None:
-            self.started[ tcase.getSpec().getID() ] = tcase
-
         return tcase
+
+    def consumeBacklog(self):
+        ""
+        for np,tcaseL in list( self.backlog.items() ):
+            while len( tcaseL ) > 0:
+                tcase = tcaseL[0]
+                self._pop_test_exec( np, 0 )
+                yield tcase
 
     def startTest(self, tcase, platform, baseline=0):
         ""
+        self.moveToStarted( tcase )
+
         tspec = tcase.getSpec()
         texec = tcase.getExec()
 
@@ -149,15 +164,22 @@ class TestExecList:
 
         tcase.getStat().markStarted( texec.getStartTime() )
 
+    def moveToStarted(self, tcase):
+        ""
+        tid = tcase.getSpec().getID()
+
+        self.waiting.pop( tid )
+        self.started[ tid ] = tcase
+
     def popRemaining(self):
         """
-        All remaining tests are removed from the run list and returned.
+        All remaining tests are removed from the backlog and returned.
         """
         tL = []
-        for np,tcaseL in list( self.xtlist.items() ):
+        for np,tcaseL in list( self.backlog.items() ):
             tL.extend( tcaseL )
             del tcaseL[:]
-            self.xtlist.pop( np )
+            self.backlog.pop( np )
         return tL
 
     def getRunning(self):
@@ -185,11 +207,42 @@ class TestExecList:
         """
         return len(self.started)
 
+    def checkStateChange(self, tmp_tcase):
+        ""
+        tid = tmp_tcase.getSpec().getID()
+
+        tcase = None
+
+        if tid in self.waiting:
+            if tmp_tcase.getStat().isNotDone():
+                tcase = self.waiting.pop( tid )
+                self.started[ tid ] = tcase
+            elif tmp_tcase.getStat().isDone():
+                tcase = self.waiting.pop( tid )
+                self.stopped[ tid ] = tcase
+
+        elif tid in self.started:
+            if tmp_tcase.getStat().isDone():
+                tcase = self.started.pop( tid )
+                self.stopped[ tid ] = tcase
+
+        if tcase:
+            copy_test_results( tcase, tmp_tcase )
+            self.tlist.appendTestResult( tcase )
+
+        return tcase
+
+    def _consume_tests(self, np):
+        ""
+        tcaseL = self.backlog[np]
+        while len( tcaseL ) > 0:
+            self._pop_test_exec( np, 0 )
+
     def _pop_next_test(self, npL, platform=None):
         ""
         for np in npL:
             if platform == None or platform.queryProcs(np):
-                tcaseL = self.xtlist[np]
+                tcaseL = self.backlog[np]
                 N = len(tcaseL)
                 i = 0
                 while i < N:
@@ -202,7 +255,12 @@ class TestExecList:
 
     def _pop_test_exec(self, np, i):
         ""
-        tcaseL = self.xtlist[np]
+        tcaseL = self.backlog[np]
+        tcase = tcaseL[i]
+
         del tcaseL[i]
+
+        self.waiting[ tcase.getSpec().getID() ] = tcase
+
         if len(tcaseL) == 0:
-            self.xtlist.pop( np )
+            self.backlog.pop( np )
