@@ -18,6 +18,7 @@ class BatchJob:
         self.batchid = BatchJob.batchid_counter
         BatchJob.batchid_counter += 1
 
+        self.jobscript = None
         self.outfile = None
         self.maxnp = None
         self.jobid = None
@@ -34,6 +35,11 @@ class BatchJob:
     def getBatchID(self): return self.batchid
     def getMaxNP(self): return self.maxnp
 
+    def getJobScriptName(self): return self.jobscript
+
+    def getOutputFilename(self): return self.outfile
+    def outfileSeen(self): return self.tseen != None
+
     def getJobID(self): return self.jobid
 
     def getWorkDir(self): return self.wrkdir
@@ -44,9 +50,6 @@ class BatchJob:
 
     def getResult(self): return self.result
 
-    def getOutputFilename(self): return self.outfile
-    def outfileSeen(self): return self.tseen != None
-
     def setAttr(self, name, value):
         ""
         self.attrs[name] = value
@@ -56,6 +59,10 @@ class BatchJob:
         if len(default) > 0:
             return self.attrs.get( name, default[0] )
         return self.attrs[name]
+
+    def setJobScriptName(self, scriptname):
+        ""
+        self.jobscript = scriptname
 
     def setOutputFilename(self, filename):
         ""
@@ -235,7 +242,10 @@ class BatchJobHandler:
         ""
         bjob = BatchJob()
 
-        pout = self.namer.getBatchOutputName( bjob.getBatchID() )
+        fn = self.namer.getScriptPath( bjob.getBatchID() )
+        bjob.setJobScriptName( fn )
+
+        pout = self.namer.getOutputPath( bjob.getBatchID() )
         bjob.setOutputFilename( pout )
 
         bjob.setWorkDir( self.namer.getRootDir() )
@@ -250,15 +260,18 @@ class BatchJobHandler:
         wrkdir = batchjob.getWorkDir()
         pout = batchjob.getOutputFilename()
 
-        fn = self.namer.getBatchScriptName( str( batchjob.getBatchID() ) )
+        fn = batchjob.getJobScriptName()
 
         maxnp = batchjob.getMaxNP()
         self.batchitf.writeJobScript( maxnp, qtime, wrkdir, pout, fn, cmd )
 
         return fn
 
-    def startJob(self, batchjob, workdir, scriptname):
+    def startJob(self, batchjob):
         ""
+        workdir = self.namer.getRootDir()
+        scriptname = self.namer.getScriptPath( batchjob.getBatchID() )
+
         outfile = batchjob.getOutputFilename()
         jobid = self.batchitf.submitJob( workdir, outfile, scriptname )
         self.markJobStarted( batchjob, jobid )
@@ -440,39 +453,32 @@ class BatchJobHandler:
 
 class BatchFileNamer:
 
-    def __init__(self, rootdir, basename=None):
+    def __init__(self, rootdir):
         ""
         self.rootdir = rootdir
-        self.basename = basename
 
     def getRootDir(self):
         ""
         return self.rootdir
 
-    def getTestListFilename(self, batchid):
+    def getScriptPath(self, batchid):
         ""
-        return self.getPath( self.basename, batchid )
+        return self.getFilePath( 'qbat', batchid )
 
-    def getBatchScriptName(self, batchid):
+    def getOutputPath(self, batchid):
         ""
-        return self.getPath( 'qbat', batchid )
+        return self.getFilePath( 'qbat-out', batchid )
 
-    def getBatchOutputName(self, batchid):
-        ""
-        return self.getPath( 'qbat-out', batchid )
-
-    def getPath(self, basename, batchid):
+    def getFilePath(self, basename, batchid):
         """
         Given a base file name and a batch id, this function returns the
         file name in the batchset subdirectory and with the id appended.
         """
-        subd = self.getSubdir( batchid )
-        if basename == None:
-            basename = 'batch'
+        subd = self.getBatchDir( batchid )
         fn = os.path.join( subd, basename+'.'+str(batchid) )
         return fn
 
-    def getSubdir(self, batchid):
+    def getBatchDir(self, batchid):
         """
         Given a queue/batch id, this function returns the corresponding
         subdirectory name.  The 'batchid' argument can be a string or integer.

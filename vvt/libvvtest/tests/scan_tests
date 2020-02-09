@@ -127,7 +127,7 @@ def construct_TestList_and_TestFileScanner( spectype=None ):
     ""
     rtconfig = RuntimeConfig()
     creator = TestCreator( 'atari', [] )
-    tlist = TestList.TestList( None, rtconfig, creator )
+    tlist = TestList.TestList( runtime_config=rtconfig, testcreator=creator )
 
     scan = TestFileScanner( tlist, spectype=spectype )
 

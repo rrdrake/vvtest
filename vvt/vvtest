@@ -27,8 +27,6 @@ version = '1.2'
 
 search_fnmatch = ['*.inp','*.apr','*.i']
 
-testlist_name = 'testlist'
-
 USER_PLUGIN_MODULE_NAME = 'vvtest_user_plugin'
 
 
@@ -402,7 +400,7 @@ class InformationMode:
         ""
         test_dir = self.rtdata.getTestResultsDir()
 
-        tlist = self.createTestList()
+        tlist = make_TestList( self.rtdata )
 
         if self.rtdata.isRestartMode():
             tlist.readTestList()
@@ -425,16 +423,6 @@ class InformationMode:
                                     remove_skips=True )
 
         return tlist
-
-    def createTestList(self):
-        ""
-        test_dir = self.rtdata.getTestResultsDir()
-
-        tfile = pjoin( test_dir, testlist_name )
-        if not os.path.exists( tfile ):
-            tfile = None
-
-        return make_TestList( self.rtdata, tfile )
 
     def printKeywordUnion(self, tlist):
         ""
@@ -468,15 +456,42 @@ class InformationMode:
             print3( d )
 
 
-def make_TestList( rtdata, filename ):
+def make_TestList( rtdata, batchid=None ):
     ""
     import libvvtest.TestList as TestList
 
     rtconfig = rtdata.getRuntimeConfig()
     creator = rtdata.getTestCreator()
     testfilter = rtdata.getTestFilter()
+    test_dir = rtdata.getTestResultsDir()
 
-    return TestList.TestList( filename, rtconfig, creator, testfilter )
+    if batchid == None:
+        tdir = test_dir
+    else:
+        namer = create_batch_namer( test_dir )
+        tdir = namer.getBatchDir( batchid )
+
+    tlist = TestList.TestList( tdir, batchid, rtconfig, creator, testfilter )
+
+    return tlist
+
+
+def symlink_batch_files_in_tests( test_dir, tlist, batchid ):
+    ""
+    namer = create_batch_namer( test_dir )
+
+    qbat = namer.getScriptPath( batchid )
+    qout = namer.getOutputPath( batchid )
+
+    for tcase in tlist.getTests():
+        tcase.getSpec().addLinkFile( qbat )
+        tcase.getSpec().addLinkFile( qout )
+
+
+def create_batch_namer( test_dir ):
+    ""
+    import libvvtest.batching as batching
+    return batching.BatchFileNamer( test_dir )
 
 
 ##############################################################################
@@ -507,9 +522,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
 
-    tfile = pjoin( test_dir, testlist_name )
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata )
 
     scan_test_source_directories( tlist, dirs,
                                   opts.scan_type, optD['param_dict'] )
@@ -525,7 +538,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
     tlist.stringFileWrite()
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
@@ -543,7 +556,7 @@ def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
     """
     import libvvtest.extract as extract
 
-    tlist = make_TestList( rtdata, None )
+    tlist = make_TestList( rtdata )
 
     scan_test_source_directories( tlist, dirs, scan_type, param_dict )
 
@@ -712,9 +725,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     call_user_prologue( rtdata )
 
-    tfile = pjoin( test_dir, testlist_name )
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata )
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
@@ -740,7 +751,7 @@ def runTests( opts, optD, rtdata, dirs ):
     # apply filters and save the test list in the TestResults directory
     tlist.applyPermanentFilters()
     tlist.stringFileWrite()
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     tlist.readTestResults( preserve_skips=True )
 
@@ -969,7 +980,7 @@ def batchTestList( opts, optD, rtdata,
                                                rtdata.getVvtestPath(),
                                                rtdata.getRuntimeConfig() )
 
-    namer = batching.BatchFileNamer( test_dir, testlist_name )
+    namer = batching.BatchFileNamer( test_dir )
 
     check_interval, check_timeout = determine_job_check_intervals()
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
@@ -1032,6 +1043,7 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
 
 def restartTests( opts, optD, rtdata ):
     ""
+    batchid = opts.qsub_id
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
@@ -1041,18 +1053,7 @@ def restartTests( opts, optD, rtdata ):
 
     call_user_prologue( rtdata )
 
-    batchid = opts.qsub_id
-    if batchid == None:
-        tfile = pjoin( test_dir, testlist_name )
-        apply_filters = True
-    else:
-        # batch jobs have --qsub-id set and land here
-        import libvvtest.batching as batching
-        namer = batching.BatchFileNamer( test_dir, testlist_name )
-        tfile = namer.getTestListFilename( batchid )
-        apply_filters = False
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata, batchid )
 
     tlist.readTestList()
     tlist.readTestResults()
@@ -1063,15 +1064,16 @@ def restartTests( opts, optD, rtdata ):
         timehandler = rtdata.getTestTimeHandler()
         timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
     else:
-        symlink_batch_files_in_tests( tlist, namer, batchid )
+        symlink_batch_files_in_tests( test_dir, tlist, batchid )
 
     reld = rtdata.getFilterPath()
 
-    tlist.determineActiveTests( filter_dir=reld, apply_filters=apply_filters )
+    tlist.determineActiveTests( filter_dir=reld,
+                                apply_filters=( batchid == None ) )
 
     perms = rtdata.getPermissionsObject()
 
-    perms.set( abspath( tfile ) )
+    perms.set( tlist.getFilename() )
 
     results_writer = rtdata.getResultsWriter()
 
@@ -1098,9 +1100,7 @@ def baselineTests( opts, optD, rtdata ):
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
 
-    tfile = pjoin( test_dir, testlist_name )
-
-    tlist = make_TestList( rtdata, tfile )
+    tlist = make_TestList( rtdata )
 
     tlist.readTestList()
     tlist.readTestResults()
@@ -1124,16 +1124,6 @@ def baselineTests( opts, optD, rtdata ):
         xlist.createTestExecs( perms )
 
         execute.run_baseline( xlist, plat )
-
-
-def symlink_batch_files_in_tests( tlist, namer, batchid ):
-    ""
-    qbat = namer.getBatchScriptName( batchid )
-    qout = namer.getBatchOutputName( batchid )
-
-    for tcase in tlist.getTests():
-        tcase.getSpec().addLinkFile( qbat )
-        tcase.getSpec().addLinkFile( qout )
 
 
 ###########################################################################

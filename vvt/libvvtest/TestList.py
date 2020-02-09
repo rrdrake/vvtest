@@ -7,6 +7,8 @@
 import os, sys
 import time
 import glob
+from os.path import abspath, normpath
+from os.path import join as pjoin
 
 from .errors import TestSpecError
 from .testcase import TestCase
@@ -17,20 +19,26 @@ from .teststatus import copy_test_results
 
 class TestList:
     """
-    Stores a set of TestCase objects.  Has utilities to read/write to a text
-    file and to read from a test specification file.
+    Stores a set of TestCase objects and has utilities to read and write them
+    to a file.
     """
 
-    def __init__(self, filename,
+    base_filename = 'testlist'
+
+    def __init__(self, directory=None,
+                       identifier=None,
                        runtime_config=None,
                        testcreator=None,
                        testfilter=None):
         ""
-        if filename:
-            self.filename = os.path.normpath( filename )
-        else:
-            # use case: scanning tests, but never reading or writing
-            self.filename = None
+        if not directory:
+            directory = os.getcwd()
+
+        fn = pjoin( directory, TestList.base_filename )
+        self.filename = normpath( abspath( fn ) )
+
+        if identifier != None:
+            self.filename += '.'+str(identifier)
 
         self.rundate = None
         self.results_file = None
@@ -47,6 +55,10 @@ class TestList:
         self.creator = testcreator
         self.testfilter = testfilter
 
+    def getFilename(self):
+        ""
+        return self.filename
+
     def setResultsSuffix(self, suffix=None):
         ""
         if suffix:
@@ -60,7 +72,7 @@ class TestList:
         ""
         return self.filename+'.'+self.rundate
 
-    def getResultsSuffix(self):  # magic: can this be removed?
+    def getResultsSuffix(self):
         ""
         return self.rundate
 

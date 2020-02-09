@@ -9,6 +9,7 @@ import os
 import time
 import glob
 import itertools
+from os.path import dirname
 
 from . import TestList
 from . import testlistio
@@ -141,13 +142,33 @@ class Batcher:
         ""
         self._write_job( bjob )
 
-        bid = bjob.getBatchID()
-
         self.results.addResultsInclude( bjob )
 
-        pin = self.namer.getBatchScriptName( bid )
-        tdir = self.namer.getRootDir()
-        self.jobhandler.startJob( bjob, tdir, pin )
+        self.jobhandler.startJob( bjob )
+
+    def _write_job(self, bjob):
+        ""
+        tl = bjob.getAttr('testlist')
+
+        bdir = dirname( bjob.getJobScriptName() )
+        check_make_directory( bdir, self.perms )
+
+        tname = tl.stringFileWrite( extended=True )
+
+        cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
+
+        qtime = self.grouper.computeQueueTime( tl )
+        if len( tl.getTestMap() ) == 1:
+            # force a timeout for batches with only one test
+            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
+            else:           cmd += ' -T ' + str(qtime-120)
+
+        cmd += ' || exit 1'
+
+        bname = self.jobhandler.writeJobScript( bjob, qtime, cmd )
+
+        self.perms.set( bname )
+        self.perms.set( tname )
 
     def _check_get_stopped_jobs(self, qdoneL, tdoneL):
         ""
@@ -226,37 +247,14 @@ class Batcher:
 
     def _construct_job(self, bjob, testL):
         ""
-        testlistfname = self.namer.getTestListFilename( bjob.getBatchID() )
-        tlist = make_batch_TestList( testlistfname, self.suffix, testL )
+        batchid = bjob.getBatchID()
+        bdir = self.namer.getBatchDir( batchid )
+        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL )
 
         maxnp = compute_max_np( tlist )
 
         bjob.setMaxNP( maxnp )
         bjob.setAttr( 'testlist', tlist )
-
-    def _write_job(self, bjob):
-        ""
-        tl = bjob.getAttr('testlist')
-
-        bdir = self.namer.getSubdir( bjob.getBatchID() )
-        check_make_directory( bdir, self.perms )
-
-        tname = tl.stringFileWrite( extended=True )
-
-        cmd = self.vvtestcmd + ' --qsub-id='+str( bjob.getBatchID() )
-
-        qtime = self.grouper.computeQueueTime( tl )
-        if len( tl.getTestMap() ) == 1:
-            # force a timeout for batches with only one test
-            if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
-            else:           cmd += ' -T ' + str(qtime-120)
-
-        cmd += ' || exit 1'
-
-        bname = self.jobhandler.writeJobScript( bjob, qtime, cmd )
-
-        self.perms.set( bname )
-        self.perms.set( tname )
 
 
 class BatchTestGrouper:
@@ -342,10 +340,12 @@ class BatchTestGrouper:
         return qL
 
 
-def make_batch_TestList( filename, suffix, qlist ):
+def make_batch_TestList( batchdir, batchid, suffix, qlist ):
     ""
-    tl = TestList.TestList( filename )
+    tl = TestList.TestList( batchdir, batchid )
+
     tl.setResultsSuffix( suffix )
+
     for tcase in qlist:
         tl.addTest( tcase )
 
