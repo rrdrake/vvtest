@@ -155,6 +155,9 @@ class BatchQueueInterface:
             elif qtype == 'moab':
                 from . import moab
                 self.batch = moab.BatchMOAB( ppn, **kwargs )
+            elif qtype == 'lsf':
+                from . import lsf
+                self.batch = lsf.BatchLSF( ppn, **kwargs )
             else:
                 raise Exception( "Unknown batch system name: "+str(qtype) )
         else:

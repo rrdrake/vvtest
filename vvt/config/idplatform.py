@@ -20,11 +20,15 @@ def platform( opts ):
         return opts['--plat']
 
     pbshost = os.environ.get('PBS_O_HOST','')
+    lsfhost = os.environ.get('LSB_SUB_HOST','')
     cluster = os.environ.get('SNLCLUSTER','')
 
     if debug:
         print3( 'idplatform.platform: uname =', osname, nodename, osrelease, machine )
         print3( 'idplatform.platform: pbshost, cluster', pbshost, cluster )
+
+    if base_match( [nodename,lsfhost], ['vortex'] ):
+        return 'ATS2'
 
     if base_match( [nodename,pbshost],
                    ['ci-fe','ci-login','ci-vizlogin','mzlogin'] ) or \

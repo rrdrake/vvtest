@@ -105,6 +105,37 @@ class queue_interface_types( vtu.vvtestTestCase ):
         obj.cancel( 123456 )
         assert int( slurm_cmds[-1][-1] ) == 123456
 
+    def test_lsf_smoke_test(self):
+        ""
+        from libvvtest.lsf import BatchLSF
+
+        obj = BatchLSF( 44 )
+        obj.setRunCommand( mock_lsf_run_command )
+
+        hdr = obj.header( 8, 123, os.getcwd(), abspath('out.txt') , {} )
+        assert 'BSUB' in hdr
+
+        cmd,out,jobid,err = obj.submit( 'batchscript',
+                                        'work_directory',
+                                        'out_filename' )
+        assert jobid == 68628
+
+        cmd,out,err,stateD = obj.query( [ 68628, 68728, 38594 ] )
+        assert len( stateD ) == 3
+        assert stateD[ 68628 ] == 'pending'
+        assert stateD[ 68728 ] == 'running'
+        assert stateD[ 38594 ] == ''
+
+    def test_lsf_cancel_function(self):
+        ""
+        from libvvtest.lsf import BatchLSF
+
+        obj = BatchLSF( 44 )
+        obj.setRunCommand( mock_lsf_run_command )
+
+        obj.cancel( 123456 )
+        assert int( lsf_cmds[-1][-1] ) == 123456
+
     def test_craypbs_smoke_test(self):
         ""
         from libvvtest.craypbs import BatchCrayPBS
@@ -178,6 +209,27 @@ def mock_slurm_run_command( cmdL, changedir=None ):
 """
 
     if cmdL[0] == 'scancel':
+        return 0, ''
+
+    raise Exception( 'mock failure' )
+
+
+lsf_cmds = []
+
+def mock_lsf_run_command( cmdL, changedir=None ):
+    ""
+    lsf_cmds.append( cmdL )
+
+    if cmdL[0] == 'bsub':
+        return 0, 'Job <68628> is submitted to default queue <normal>.'
+
+    if cmdL[0] == 'bjobs':
+        return 0, """
+68628   PEND
+68728   RUN
+"""
+
+    if cmdL[0] == 'bkill':
         return 0, ''
 
     raise Exception( 'mock failure' )

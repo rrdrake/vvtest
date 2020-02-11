@@ -38,3 +38,6 @@ def initialize( plat ):
 
     elif platname == "Godzilla":
         plat.setBatchSystem( "slurm", 20 )
+
+    elif platname == 'ATS2':
+        plat.setBatchSystem( "lsf", 44 )
