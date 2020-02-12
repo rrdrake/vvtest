@@ -27,7 +27,7 @@ def platform( opts ):
         print3( 'idplatform.platform: uname =', osname, nodename, osrelease, machine )
         print3( 'idplatform.platform: pbshost, cluster', pbshost, cluster )
 
-    if base_match( [nodename,lsfhost], ['vortex'] ):
+    if base_match( [nodename,lsfhost], ['vortex','rzansel','sierra'] ):
         return 'ATS2'
 
     if base_match( [nodename,pbshost],
