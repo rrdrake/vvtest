@@ -28,6 +28,7 @@ import libvvtest.testrunner as testrunner
 
 import libvvtest.TestSpecCreator as TSC
 import libvvtest.parsevvt as parsevvt
+import libvvtest.parseutil as parseutil
 
 
 class staged_parameters( vtu.vvtestTestCase ):
@@ -154,11 +155,11 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         assert oracle.numStages() == 3
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         assert oracle.numStages() == 2
 
     def test_staging_oracle_can_determine_the_stage_index_of_a_test(self):
@@ -176,7 +177,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         assert len( testL ) == 3
         for ts in testL:
             if ts.getParameterValue( 'np' ) == '2':
@@ -187,7 +188,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 assert oracle.getStageIndex( ts ) == 2
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         assert len( testL ) == 2
         for ts in testL:
             if ts.getParameterValue( 'np' ) == '1':
@@ -196,7 +197,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 assert oracle.getStageIndex( ts ) == 1
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         assert len( testL ) == 4
         num_idx_0 = num_idx_1 = 0
         for ts in testL:
@@ -224,7 +225,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -238,7 +239,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -250,7 +251,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        oracle = TSC.StagingOracle( pset.getStagedGroup() )
+        oracle = parseutil.StagingOracle( pset.getStagedGroup() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -277,7 +278,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -306,7 +307,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -328,7 +329,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -376,7 +377,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for tspec in testL:
             depL = tspec.getDependencies()
@@ -395,7 +396,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for tspec in testL:
             depL = tspec.getDependencies()
@@ -428,7 +429,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        TSC.mark_staged_tests( pset, testL )
+        parseutil.mark_staged_tests( pset, testL )
 
         for ts in testL:
             sid = tio.test_to_string( TestCase( ts, None ) )

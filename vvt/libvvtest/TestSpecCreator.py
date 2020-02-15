@@ -6,7 +6,6 @@
 
 import os, sys
 
-from . import xmlwrapper
 from . import TestSpec
 from . import FilterExpressions
 
@@ -17,6 +16,7 @@ from .parseutil import create_dependency_result_expression
 
 from . import parsexml
 from . import parsevvt
+from . import parseutil
 
 
 class TestCreator:
@@ -123,7 +123,7 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
 
     if ext == '.xml':
 
-        filedoc = read_xml_file( fname )
+        filedoc = parsexml.read_xml_file( fname )
 
         nameL = parsexml.parse_test_names( filedoc )
         if nameL == None:
@@ -131,8 +131,8 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
 
         tL = []
         for tname in nameL:
-            L = createXmlTest( tname, filedoc, rootpath, relpath,
-                               force_params, evaluator )
+            L = create_xml_test( tname, filedoc, rootpath, relpath,
+                                 force_params, evaluator )
             tL.extend( L )
 
     elif ext == '.vvt':
@@ -141,8 +141,8 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
         nameL = parsevvt.parse_test_names( vspecs )
         tL = []
         for tname in nameL:
-            L = createScriptTest( tname, vspecs, rootpath, relpath,
-                                  force_params, evaluator )
+            L = create_script_test( tname, vspecs, rootpath, relpath,
+                                    force_params, evaluator )
             tL.extend( L )
 
     else:
@@ -154,19 +154,7 @@ def create_testlist( evaluator, rootpath, relpath, force_params ):
     return tL
 
 
-def read_xml_file( filename ):
-    ""
-    docreader = xmlwrapper.XmlDocReader()
-
-    try:
-        filedoc = docreader.readDoc( filename )
-    except xmlwrapper.XmlError:
-        raise TestSpecError( str( sys.exc_info()[1] ) )
-
-    return filedoc
-
-
-def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
+def create_xml_test( tname, filedoc, rootpath, relpath, force_params, evaluator ):
     ""
     pset = parsexml.parse_parameterize( filedoc, tname, evaluator, force_params )
     numparams = len( pset.getParameters() )
@@ -207,16 +195,16 @@ def createXmlTest( tname, filedoc, rootpath, relpath, force_params, evaluator ):
     return testL
 
 
-def createScriptTest( tname, vspecs, rootpath, relpath,
-                      force_params, evaluator ):
+def create_script_test( tname, vspecs, rootpath, relpath,
+                        force_params, evaluator ):
     ""
     pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, force_params )
 
     testL = generate_test_objects( tname, rootpath, relpath, pset )
 
-    mark_staged_tests( pset, testL )
+    parseutil.mark_staged_tests( pset, testL )
 
-    check_add_analyze_test( pset, testL, vspecs, evaluator )
+    parsevvt.check_add_analyze_test( pset, testL, vspecs, evaluator )
 
     for t in testL:
         parsevvt.parse_keywords( t, vspecs, tname )
@@ -251,116 +239,6 @@ def generate_test_objects( tname, rootpath, relpath, pset ):
     return testL
 
 
-def mark_staged_tests( pset, testL ):
-    """
-    1. each test must be told which parameter names form the staged set
-    2. the first and last tests in a staged set must be marked as such
-    3. each staged test "depends on" the previous staged test
-    """
-    if pset.getStagedGroup():
-
-        oracle = StagingOracle( pset.getStagedGroup() )
-
-        for tspec in testL:
-
-            set_stage_params( tspec, oracle )
-
-            prev = oracle.findPreviousStageDisplayID( tspec )
-            if prev:
-                add_staged_dependency( tspec, prev )
-
-
-def set_stage_params( tspec, oracle ):
-    ""
-    idx = oracle.getStageIndex( tspec )
-    is_first = ( idx == 0 )
-    is_last = ( idx == oracle.numStages() - 1 )
-
-    names = oracle.getStagedParameterNames()
-
-    tspec.setStagedParameters( is_first, is_last, *names )
-
-
-def add_staged_dependency( from_tspec, to_display_string ):
-    ""
-    wx = create_dependency_result_expression( None )
-    from_tspec.addDependency( to_display_string, wx )
-
-
-class StagingOracle:
-
-    def __init__(self, stage_group):
-        ""
-        self.param_nameL = stage_group[0]
-        self.param_valueL = stage_group[1]
-
-        self.stage_values = [ vals[0] for vals in self.param_valueL ]
-
-    def getStagedParameterNames(self):
-        ""
-        return self.param_nameL
-
-    def numStages(self):
-        ""
-        return len( self.param_valueL )
-
-    def getStageIndex(self, tspec):
-        ""
-        stage_name = self.param_nameL[0]
-        stage_val = tspec.getParameterValue( stage_name )
-        idx = self.stage_values.index( stage_val )
-        return idx
-
-    def findPreviousStageDisplayID(self, tspec):
-        ""
-        idx = self.getStageIndex( tspec )
-        if idx > 0:
-
-            paramD = tspec.getParameters()
-            self._overwrite_with_stage_params( paramD, idx-1 )
-
-            idgen = TestSpec.IDGenerator( tspec.getName(),
-                                          tspec.getFilepath(),
-                                          paramD,
-                                          self.param_nameL )
-            displ = idgen.computeDisplayString()
-
-            return displ
-
-        return None
-
-    def _overwrite_with_stage_params(self, paramD, stage_idx):
-        ""
-        for i,pname in enumerate( self.param_nameL ):
-            pval = self.param_valueL[ stage_idx ][i]
-            paramD[ pname ] = pval
-
-
-def check_add_analyze_test( pset, testL, vspecs, evaluator ):
-    ""
-    if len(testL) > 0:
-
-        t = testL[0]
-
-        analyze_spec = parsevvt.parse_analyze( t, vspecs, evaluator )
-
-        if analyze_spec:
-
-            numparams = len( pset.getParameters() )
-            if numparams == 0:
-                raise TestSpecError( 'an analyze requires at least one ' + \
-                                     'parameter to be defined' )
-
-            # create an analyze test
-            parent = t.makeParent()
-            parent.setParameterSet( pset )
-            testL.append( parent )
-
-            parent.setAnalyzeScript( analyze_spec )
-            if not analyze_spec.startswith('-'):
-                parent.addLinkFile( analyze_spec )
-
-
 def reparse_test_object( evaluator, testobj ):
     """
     Given a TestSpec object, this function opens the original test file,
@@ -371,7 +249,7 @@ def reparse_test_object( evaluator, testobj ):
 
     if ext == '.xml':
 
-        filedoc = read_xml_file( fname )
+        filedoc = parsexml.read_xml_file( fname )
 
         # run through the test name logic to check XML validity
         nameL = parsexml.parse_test_names(filedoc)
@@ -407,7 +285,7 @@ def reparse_test_object( evaluator, testobj ):
         testobj.setParameterTypes( type_map )
 
         if pset.getStagedGroup():
-            mark_staged_tests( pset, [ testobj ] )
+            parseutil.mark_staged_tests( pset, [ testobj ] )
 
         if testobj.isAnalyze():
             testobj.getParameterSet().setParameterTypeMap( type_map )

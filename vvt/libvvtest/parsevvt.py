@@ -351,6 +351,31 @@ def parse_analyze( t, vspecs, evaluator ):
     return specval
 
 
+def check_add_analyze_test( pset, testL, vspecs, evaluator ):
+    ""
+    if len(testL) > 0:
+
+        t = testL[0]
+
+        analyze_spec = parse_analyze( t, vspecs, evaluator )
+
+        if analyze_spec:
+
+            numparams = len( pset.getParameters() )
+            if numparams == 0:
+                raise TestSpecError( 'an analyze requires at least one ' + \
+                                     'parameter to be defined' )
+
+            # create an analyze test
+            parent = t.makeParent()
+            parent.setParameterSet( pset )
+            testL.append( parent )
+
+            parent.setAnalyzeScript( analyze_spec )
+            if not analyze_spec.startswith('-'):
+                parent.addLinkFile( analyze_spec )
+
+
 def parse_working_files( t, vspecs, evaluator ):
     """
         #VVT: copy : file1 file2

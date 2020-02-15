@@ -7,12 +7,27 @@
 import os, sys
 
 from .errors import TestSpecError
+from . import xmlwrapper
 from . import FilterExpressions
+
 from .paramset import ParameterSet
+
 from .parseutil import variable_expansion
 from .parseutil import evauate_testname_expr
 from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
+
+
+def read_xml_file( filename ):
+    ""
+    docreader = xmlwrapper.XmlDocReader()
+
+    try:
+        filedoc = docreader.readDoc( filename )
+    except xmlwrapper.XmlError:
+        raise TestSpecError( str( sys.exc_info()[1] ) )
+
+    return filedoc
 
 
 def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
