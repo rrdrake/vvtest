@@ -30,6 +30,16 @@ def read_xml_file( filename ):
     return filedoc
 
 
+def parse_xml_test( testobj, filedoc, evaluator ):
+    ""
+    parse_include_platform ( testobj, filedoc )
+    parse_keywords         ( testobj, filedoc )
+    parse_working_files    ( testobj, filedoc, evaluator )
+    parse_timeouts         ( testobj, filedoc, evaluator )
+    parse_execute_list     ( testobj, filedoc, evaluator )
+    parse_baseline         ( testobj, filedoc, evaluator )
+
+
 def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
     """
     Checks the attribute name for a filtering attributes.  Returns a pair of
@@ -488,7 +498,7 @@ def parse_include_platform( testobj, xmldoc ):
                 testobj.addEnableOptionExpression( wx )
 
 
-def parse_keywords( tspec, filedoc, tname ):
+def parse_keywords( tspec, filedoc ):
     """
     Parse the test keywords for the test XML file.
 
@@ -499,6 +509,7 @@ def parse_keywords( tspec, filedoc, tname ):
     in <parameterize> blocks.
     """
     keys = []
+    tname = tspec.getName()
 
     for nd in filedoc.matchNodes(['keywords$']):
         if testname_ok( nd, tname ):

@@ -21,6 +21,17 @@ from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
 
 
+def parse_vvt_test( testobj, vspecs, evaluator ):
+    ""
+    parse_enable        ( testobj, vspecs )
+    parse_keywords      ( testobj, vspecs )
+    parse_working_files ( testobj, vspecs, evaluator )
+    parse_timeouts      ( testobj, vspecs, evaluator )
+    parse_baseline      ( testobj, vspecs, evaluator )
+    parse_dependencies  ( testobj, vspecs, evaluator )
+    parse_preload_label ( testobj, vspecs, evaluator )
+
+
 def parse_test_names( vspecs ):
     """
     Determine the test name and check for validity.
@@ -87,7 +98,7 @@ def check_test_name_attributes( attrD, lineno ):
                 ' '.join( checkD.keys() ) + ', line ' + str(lineno) )
 
 
-def parse_keywords( tspec, vspecs, tname ):
+def parse_keywords( tspec, vspecs ):
     """
     Parse the test keywords for the test script file.
     
@@ -98,6 +109,7 @@ def parse_keywords( tspec, vspecs, tname ):
     TODO: what other implicit keywords ??
     """
     keys = []
+    tname = tspec.getName()
 
     for spec in vspecs.getSpecList( 'keywords' ):
 

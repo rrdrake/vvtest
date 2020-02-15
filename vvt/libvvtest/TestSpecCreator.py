@@ -35,10 +35,10 @@ class TestCreator:
         
         Returns a list of TestSpec objects, including a "parent" test if needed.
         """
-        tests = create_testlist( self.evaluator,
-                                 rootpath,
-                                 relpath,
-                                 force_params )
+        tests = create_test_list( self.evaluator,
+                                  rootpath,
+                                  relpath,
+                                  force_params )
 
         return tests
 
@@ -90,7 +90,7 @@ class ExpressionEvaluator:
         return word_expr.evaluate( self.option_list.count )
 
 
-def create_testlist( evaluator, rootpath, relpath, force_params ):
+def create_test_list( evaluator, rootpath, relpath, force_params ):
     """
     Can use a (nested) rtest element to cause another test to be defined.
         
@@ -159,8 +159,6 @@ def create_xml_test( tname, filedoc, rootpath, relpath, force_params, evaluator 
     pset = parsexml.parse_parameterize( filedoc, tname, evaluator, force_params )
     numparams = len( pset.getParameters() )
 
-    # create the test instances
-
     testL = generate_test_objects( tname, rootpath, relpath, pset )
 
     if len(testL) > 0:
@@ -183,14 +181,8 @@ def create_xml_test( tname, filedoc, rootpath, relpath, force_params, evaluator 
             parent.setAnalyzeScript( analyze_spec )
 
     # parse and set the rest of the XML file for each test
-    
     for t in testL:
-        parsexml.parse_keywords( t, filedoc, tname )
-        parsexml.parse_include_platform( t, filedoc )
-        parsexml.parse_timeouts( t, filedoc, evaluator )
-        parsexml.parse_execute_list( t, filedoc, evaluator )
-        parsexml.parse_working_files( t, filedoc, evaluator )
-        parsexml.parse_baseline( t, filedoc, evaluator )
+        parsexml.parse_xml_test( t, filedoc, evaluator )
 
     return testL
 
@@ -207,13 +199,7 @@ def create_script_test( tname, vspecs, rootpath, relpath,
     parsevvt.check_add_analyze_test( pset, testL, vspecs, evaluator )
 
     for t in testL:
-        parsevvt.parse_keywords( t, vspecs, tname )
-        parsevvt.parse_enable( t, vspecs )
-        parsevvt.parse_working_files( t, vspecs, evaluator )
-        parsevvt.parse_timeouts( t, vspecs, evaluator )
-        parsevvt.parse_baseline( t, vspecs, evaluator )
-        parsevvt.parse_dependencies( t, vspecs, evaluator )
-        parsevvt.parse_preload_label( t, vspecs, evaluator )
+        parsevvt.parse_vvt_test( t, vspecs, evaluator )
 
     return testL
 
@@ -254,19 +240,11 @@ def reparse_test_object( evaluator, testobj ):
         # run through the test name logic to check XML validity
         nameL = parsexml.parse_test_names(filedoc)
 
-        tname = testobj.getName()
-
-        parsexml.parse_include_platform( testobj, filedoc )
-
         if testobj.isAnalyze():
             analyze_spec = parsexml.parse_analyze( testobj, filedoc, evaluator )
             testobj.setAnalyzeScript( analyze_spec )
 
-        parsexml.parse_keywords( testobj, filedoc, tname )
-        parsexml.parse_working_files( testobj, filedoc, evaluator )
-        parsexml.parse_timeouts( testobj, filedoc, evaluator )
-        parsexml.parse_execute_list( testobj, filedoc, evaluator )
-        parsexml.parse_baseline( testobj, filedoc, evaluator )
+        parsexml.parse_xml_test( testobj, filedoc, evaluator )
 
     elif ext == '.vvt':
 
@@ -276,8 +254,6 @@ def reparse_test_object( evaluator, testobj ):
         nameL = parsevvt.parse_test_names( vspecs )
 
         tname = testobj.getName()
-
-        parsevvt.parse_enable( testobj, vspecs )
 
         pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, None )
 
@@ -295,12 +271,7 @@ def reparse_test_object( evaluator, testobj ):
             if not analyze_spec.startswith('-'):
                 testobj.addLinkFile( analyze_spec )
 
-        parsevvt.parse_keywords( testobj, vspecs, tname )
-        parsevvt.parse_working_files( testobj, vspecs, evaluator )
-        parsevvt.parse_timeouts( testobj, vspecs, evaluator )
-        parsevvt.parse_baseline( testobj, vspecs, evaluator )
-        parsevvt.parse_dependencies( testobj, vspecs, evaluator )
-        parsevvt.parse_preload_label( testobj, vspecs, evaluator )
+        parsevvt.parse_vvt_test( testobj, vspecs, evaluator )
 
     else:
         raise Exception( "invalid file extension: "+ext )
