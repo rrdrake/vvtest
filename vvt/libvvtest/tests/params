@@ -18,7 +18,7 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.ScriptReader import ScriptReader
-import libvvtest.TestSpecCreator as TSC
+import libvvtest.testcreator as testcreator
 import libvvtest.parsexml as parsexml
 import libvvtest.parsevvt as parsevvt
 
@@ -358,39 +358,39 @@ class parameter_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'err1.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err1', evaluator, None )
 
         vspecs = ScriptReader( 'err2.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err2', evaluator, None )
 
         vspecs = ScriptReader( 'err3.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err3', evaluator, None )
 
         vspecs = ScriptReader( 'err4.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err4', evaluator, None )
 
         vspecs = ScriptReader( 'err4b.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err4b', evaluator, None )
 
         vspecs = ScriptReader( 'err5.vvt' )
         parsevvt.parse_parameterize( vspecs, 'err5', evaluator, {'np':'3'} )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err5', evaluator, {'dt':'0.2'} )
 
         vspecs = ScriptReader( 'err6.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err6', evaluator, None )
 
         vspecs = ScriptReader( 'err7.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err7', evaluator, None )
 
     def test_for_duplicate_parameters_in_xml_form(self):
@@ -412,17 +412,17 @@ class parameter_tests( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
 
         xdoc = parsexml.read_xml_file( 'err1.xml' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsexml.parse_parameterize, xdoc, 'err1', evaluator, None )
 
         xdoc = parsexml.read_xml_file( 'ok1.xml' )
         parsexml.parse_parameterize( xdoc, 'ok1', evaluator, None )
 
         xdoc = parsexml.read_xml_file( 'err2.xml' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
             parsexml.parse_parameterize, xdoc, 'err2', evaluator, None )
 
 

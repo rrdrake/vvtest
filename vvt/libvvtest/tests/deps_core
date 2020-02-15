@@ -16,7 +16,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.TestSpecCreator import TestCreator
+from libvvtest.testcreator import TestCreator
 from libvvtest.testcase import TestCase
 from libvvtest.TestSpec import TestSpec
 from libvvtest.TestExec import TestExec

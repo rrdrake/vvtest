@@ -17,7 +17,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.TestSpecCreator as TestSpecCreator
+import libvvtest.testcreator as testcreator
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.parsevvt as parsevvt
 
@@ -438,7 +438,7 @@ class preload_tests( vtu.vvtestTestCase ):
 
         tspec = vtu.make_fake_TestSpec()
         vspecs = ScriptReader( 'testA.vvt' )
-        evl = TestSpecCreator.ExpressionEvaluator( 'XBox', [] )
+        evl = testcreator.ExpressionEvaluator( 'XBox', [] )
 
         parsevvt.parse_preload_label( tspec, vspecs, evl )
         assert tspec.getPreloadLabel() == 'fakepython'

@@ -19,7 +19,7 @@ from testutils import print3
 
 from libvvtest.ScriptReader import ScriptReader
 from libvvtest.TestSpec import TestSpec
-import libvvtest.TestSpecCreator as TSC
+import libvvtest.testcreator as testcreator
 from libvvtest.filtering import TestFilter
 import libvvtest.parsevvt as parsevvt
 
@@ -421,11 +421,11 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'pink1.vvt' )
         tspec = TestSpec( 'pink1', os.getcwd(), 'pink1.vvt' )
-        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
+        self.assertRaises( testcreator.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
         vspecs = ScriptReader( 'pink2.vvt' )
         tspec = TestSpec( 'pink2', os.getcwd(), 'pink2.vvt' )
-        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
+        self.assertRaises( testcreator.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
         vspecs = ScriptReader( 'pink3.vvt' )
         tspec = TestSpec( 'pink3', os.getcwd(), 'pink3.vvt' )
@@ -435,7 +435,7 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'pink4.vvt' )
         tspec = TestSpec( 'pink4', os.getcwd(), 'pink4.vvt' )
-        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
+        self.assertRaises( testcreator.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
     def test_filtering_out_tests_by_enable(self):
         ""

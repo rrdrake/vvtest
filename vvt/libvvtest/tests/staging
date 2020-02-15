@@ -26,7 +26,7 @@ import libvvtest.depend as depend
 import libvvtest.testlistio as tio
 import libvvtest.testrunner as testrunner
 
-import libvvtest.TestSpecCreator as TSC
+import libvvtest.testcreator as testcreator
 import libvvtest.parsevvt as parsevvt
 import libvvtest.parseutil as parseutil
 
@@ -96,7 +96,7 @@ class staged_parameters( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
         pset = parsevvt.parse_parameterize( vspecs, 'blue', evaluator, None )
@@ -107,7 +107,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         assert vL == [ ['1','1'], ['2','8'], ['3','1'] ]
 
         vspecs = ScriptReader( 'err1.vvt' )
-        self.assertRaises( TSC.TestSpecError,
+        self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err1', evaluator, None )
 
     def create_test_list(self, spec_file):
@@ -115,10 +115,11 @@ class staged_parameters( vtu.vvtestTestCase ):
         tname = os.path.splitext( basename( spec_file ) )[0]
 
         vspecs = ScriptReader( spec_file )
-        evaluator = TSC.ExpressionEvaluator( 'atari', [] )
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
         pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, None )
 
-        testL = TSC.generate_test_objects( tname, os.getcwd(), spec_file, pset )
+        testL = testcreator.generate_test_objects( tname, os.getcwd(),
+                                                   spec_file, pset )
 
         return pset, testL
 
@@ -631,7 +632,7 @@ def reparse_test_string( stringid ):
     ""
     tcase = tio.string_to_test( stringid )
 
-    creator = TSC.TestCreator( 'atari', [] )
+    creator = testcreator.TestCreator( 'atari', [] )
     creator.reparse( tcase.getSpec() )
 
     return tcase

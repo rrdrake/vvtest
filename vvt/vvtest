@@ -170,7 +170,7 @@ class MainEntry:
 
     def constructFilteringObjects(self):
         ""
-        from libvvtest.TestSpecCreator import TestCreator
+        from libvvtest.testcreator import TestCreator
         from libvvtest.filtering import TestFilter
         from libvvtest.timeout import TimeHandler
 

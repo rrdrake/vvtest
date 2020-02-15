@@ -18,7 +18,7 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.filtering import file_search
-from libvvtest.TestSpecCreator import TestCreator
+from libvvtest.testcreator import TestCreator
 
 
 class filtering_by_file_search( vtu.vvtestTestCase ):
