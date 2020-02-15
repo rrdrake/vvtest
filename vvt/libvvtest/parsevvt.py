@@ -21,7 +21,7 @@ from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
 
 
-def testNameList_scr( vspecs ):
+def parse_test_names( vspecs ):
     """
     Determine the test name and check for validity.
     Returns a list of test names.
@@ -87,7 +87,7 @@ def check_test_name_attributes( attrD, lineno ):
                 ' '.join( checkD.keys() ) + ', line ' + str(lineno) )
 
 
-def parseKeywords_scr( tspec, vspecs, tname ):
+def parse_keywords( tspec, vspecs, tname ):
     """
     Parse the test keywords for the test script file.
     
@@ -124,7 +124,7 @@ def parseKeywords_scr( tspec, vspecs, tname ):
     tspec.setKeywords( keys )
 
 
-def parseTestParameters_scr( vspecs, tname, evaluator, force_params ):
+def parse_parameterize( vspecs, tname, evaluator, force_params ):
     """
     Parses the parameter settings for a script test file.
 
@@ -152,7 +152,7 @@ def parseTestParameters_scr( vspecs, tname, evaluator, force_params ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(lnum) )
 
-        if not filterAttr_scr( spec.attrs, tname, None, evaluator, lnum ):
+        if not attr_filter( spec.attrs, tname, None, evaluator, lnum ):
             continue
 
         L = spec.value.split( '=', 1 )
@@ -305,7 +305,7 @@ def parse_param_group_values( name_list, value_string, lineno ):
     return vL
 
 
-def parseAnalyze_scr( t, vspecs, evaluator ):
+def parse_analyze( t, vspecs, evaluator ):
     """
     Parse any analyze specifications.
     
@@ -327,8 +327,8 @@ def parseAnalyze_scr( t, vspecs, evaluator ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(spec.lineno) )
         
-        if not filterAttr_scr( spec.attrs, t.getName(), None,
-                               evaluator, spec.lineno ):
+        if not attr_filter( spec.attrs, t.getName(), None,
+                            evaluator, spec.lineno ):
             continue
 
         if spec.attrs and 'file' in spec.attrs:
@@ -351,7 +351,7 @@ def parseAnalyze_scr( t, vspecs, evaluator ):
     return specval
 
 
-def parseFiles_scr( t, vspecs, evaluator ):
+def parse_working_files( t, vspecs, evaluator ):
     """
         #VVT: copy : file1 file2
         #VVT: link : file3 file4
@@ -366,12 +366,12 @@ def parseFiles_scr( t, vspecs, evaluator ):
     params = t.getParameters()
 
     for spec in vspecs.getSpecList( 'copy' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
-            collectFileNames_scr( spec, cpfiles, tname, params, evaluator )
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+            collect_filenames( spec, cpfiles, tname, params, evaluator )
 
     for spec in vspecs.getSpecList( 'link' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
-            collectFileNames_scr( spec, lnfiles, tname, params, evaluator )
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+            collect_filenames( spec, lnfiles, tname, params, evaluator )
     
     for src,dst in lnfiles:
         t.addLinkFile( src, dst )
@@ -380,7 +380,7 @@ def parseFiles_scr( t, vspecs, evaluator ):
 
     fL = []
     for spec in vspecs.getSpecList( 'sources' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
             if spec.value:
                 L = spec.value.split()
                 variable_expansion( tname, evaluator.getPlatformName(), params, L )
@@ -388,7 +388,7 @@ def parseFiles_scr( t, vspecs, evaluator ):
     t.setSourceFiles( fL )
 
 
-def collectFileNames_scr( spec, flist, tname, paramD, evaluator ):
+def collect_filenames( spec, flist, tname, paramD, evaluator ):
     """
         #VVT: copy : file1 file2
         #VVT: copy (rename) : srcname1,copyname1 srcname2,copyname2
@@ -426,7 +426,7 @@ def collectFileNames_scr( spec, flist, tname, paramD, evaluator ):
         flist.extend( [ [f,None] for f in fL ] )
 
 
-def parseTimeouts_scr( t, vspecs, evaluator ):
+def parse_timeouts( t, vspecs, evaluator ):
     """
       #VVT: timeout : 3600
       #VVT: timeout (testname=vvfull, platforms=Linux) : 3600
@@ -434,7 +434,7 @@ def parseTimeouts_scr( t, vspecs, evaluator ):
     tname = t.getName()
     params = t.getParameters()
     for spec in vspecs.getSpecList( 'timeout' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
             sval = spec.value
             try:
                 ival = int(sval)
@@ -445,7 +445,7 @@ def parseTimeouts_scr( t, vspecs, evaluator ):
             t.setTimeout( ival )
 
 
-def parseBaseline_scr( t, vspecs, evaluator ):
+def parse_baseline( t, vspecs, evaluator ):
     """
       #VVT: baseline : copyfrom,copyto copyfrom,copyto
       #VVT: baseline : --option-name
@@ -462,7 +462,7 @@ def parseBaseline_scr( t, vspecs, evaluator ):
 
     for spec in vspecs.getSpecList( 'baseline' ):
         
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
             
             sval = spec.value.strip()
 
@@ -511,7 +511,7 @@ def parseBaseline_scr( t, vspecs, evaluator ):
                     t.addLinkFile( sval )
 
 
-def parseDependencies_scr( t, vspecs, evaluator ):
+def parse_dependencies( t, vspecs, evaluator ):
     """
     Parse the test names that must run before this test can run.
 
@@ -527,7 +527,7 @@ def parseDependencies_scr( t, vspecs, evaluator ):
     params = t.getParameters()
 
     for spec in vspecs.getSpecList( 'depends on' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
 
             wx = create_dependency_result_expression( spec.attrs )
 
@@ -554,7 +554,7 @@ def parse_preload_label( tspec, vspecs, evaluator ):
     params = tspec.getParameters()
 
     for spec in vspecs.getSpecList( 'preload' ):
-        if filterAttr_scr( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
             val = ' '.join( spec.value.strip().split() )
             tspec.setPreloadLabel( val )
 
@@ -569,7 +569,7 @@ def testname_ok_scr( attrs, tname ):
     return True
 
 
-def filterAttr_scr( attrs, testname, paramD, evaluator, lineno ):
+def attr_filter( attrs, testname, paramD, evaluator, lineno ):
     """
     Checks for known attribute names in the given 'attrs' dictionary.
     Returns False only if at least one attribute evaluates to false.
