@@ -25,6 +25,7 @@ from libvvtest.testcase import TestCase
 import libvvtest.TestSpecCreator as TSC
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testlistio as tio
+import libvvtest.parsevvt as parsevvt
 
 
 class script_tests( vtu.vvtestTestCase ):
@@ -439,41 +440,41 @@ class script_tests( vtu.vvtestTestCase ):
 
     def test_parsing_test_name_specifications(self):
         ""
-        nm,aD = TestSpecCreator.parse_test_name_value( 'testA', 'info' )
+        nm,aD = parsevvt.parse_test_name_value( 'testA', 'info' )
         assert nm == 'testA' and len(aD) == 0
 
         self.assertRaises( TestSpecError,
-            TestSpecCreator.parse_test_name_value, 'testA testB', 'info' )
+            parsevvt.parse_test_name_value, 'testA testB', 'info' )
 
-        nm,aD = TestSpecCreator.parse_test_name_value( '', 'info' )
+        nm,aD = parsevvt.parse_test_name_value( '', 'info' )
         assert nm == '' and len(aD) == 0
 
-        nm,aD = TestSpecCreator.parse_test_name_value( 'testA # comment', 'info' )
+        nm,aD = parsevvt.parse_test_name_value( 'testA # comment', 'info' )
         assert nm == 'testA' and len(aD) == 0
 
-        nm,aD = TestSpecCreator.parse_test_name_value( 'testA ()', 'info' )
+        nm,aD = parsevvt.parse_test_name_value( 'testA ()', 'info' )
         assert nm == 'testA' and len(aD) == 0
 
         self.assertRaises( TestSpecError,
-            TestSpecCreator.parse_test_name_value, 'testA (foo=bar)', 'info' )
+            parsevvt.parse_test_name_value, 'testA (foo=bar)', 'info' )
 
         self.assertRaises( TestSpecError,
-            TestSpecCreator.parse_test_name_value,
+            parsevvt.parse_test_name_value,
                 'testA (depends on=testB ', 'info' )
 
-        nm,aD = TestSpecCreator.parse_test_name_value(
+        nm,aD = parsevvt.parse_test_name_value(
                     'testA (depends on=testB)', 'info' )
         assert nm == 'testA' and aD == { 'depends on':'testB' }
 
-        nm,aD = TestSpecCreator.parse_test_name_value(
+        nm,aD = parsevvt.parse_test_name_value(
                     'testA (depends on=testB, result="*")', 'info' )
         assert nm == 'testA' and aD == { 'depends on':'testB', 'result':'*' }
 
-        nm,aD = TestSpecCreator.parse_test_name_value(
+        nm,aD = parsevvt.parse_test_name_value(
                     'testA (result="*", depends on=testB)', 'info' )
         assert nm == 'testA' and aD == { 'depends on':'testB', 'result':'*' }
 
-        nm,aD = TestSpecCreator.parse_test_name_value(
+        nm,aD = parsevvt.parse_test_name_value(
                     'testA (depends on=testB testC, result=pass)', 'info' )
         assert nm == 'testA' and aD == { 'depends on':'testB testC',
                                          'result':'pass' }
@@ -550,7 +551,7 @@ class script_tests( vtu.vvtestTestCase ):
         evaluator = TSC.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
-        pset = TSC.parseTestParameters_scr( vspecs, 'blue', evaluator, None )
+        pset = parsevvt.parseTestParameters_scr( vspecs, 'blue', evaluator, None )
 
         tmap = pset.getParameterTypeMap()
         assert len( tmap ) == 3

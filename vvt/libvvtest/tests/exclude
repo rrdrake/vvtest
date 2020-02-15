@@ -21,6 +21,7 @@ from libvvtest.ScriptReader import ScriptReader
 from libvvtest.TestSpec import TestSpec
 import libvvtest.TestSpecCreator as TSC
 from libvvtest.filtering import TestFilter
+import libvvtest.parsevvt as parsevvt
 
 
 class exclude_tests( vtu.vvtestTestCase ):
@@ -383,7 +384,7 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'blue.vvt' )
         tspec = TestSpec( 'blue', os.getcwd(), 'blue.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
 
         exprL = tspec.getPlatformEnableExpressions()
         assert len( exprL ) == 1
@@ -391,7 +392,7 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'red.vvt' )
         tspec = TestSpec( 'red', os.getcwd(), 'red.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
 
         exprL = tspec.getPlatformEnableExpressions()
         assert len( exprL ) == 1
@@ -400,41 +401,41 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'green1.vvt' )
         tspec = TestSpec( 'green1', os.getcwd(), 'green1.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
         assert tspec.isEnabled()
 
         vspecs = ScriptReader( 'green2.vvt' )
         tspec = TestSpec( 'green2', os.getcwd(), 'green2.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
         assert tspec.isEnabled()
 
         vspecs = ScriptReader( 'green3.vvt' )
         tspec = TestSpec( 'green3', os.getcwd(), 'green3.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
         assert not tspec.isEnabled()
 
         vspecs = ScriptReader( 'green4.vvt' )
         tspec = TestSpec( 'green4', os.getcwd(), 'green4.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
         assert not tspec.isEnabled()
 
         vspecs = ScriptReader( 'pink1.vvt' )
         tspec = TestSpec( 'pink1', os.getcwd(), 'pink1.vvt' )
-        self.assertRaises( TSC.TestSpecError, TSC.parse_enable, tspec, vspecs )
+        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
         vspecs = ScriptReader( 'pink2.vvt' )
         tspec = TestSpec( 'pink2', os.getcwd(), 'pink2.vvt' )
-        self.assertRaises( TSC.TestSpecError, TSC.parse_enable, tspec, vspecs )
+        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
         vspecs = ScriptReader( 'pink3.vvt' )
         tspec = TestSpec( 'pink3', os.getcwd(), 'pink3.vvt' )
-        TSC.parse_enable( tspec, vspecs )
+        parsevvt.parse_enable( tspec, vspecs )
         assert tspec.isEnabled()
         assert len( tspec.getOptionEnableExpressions() ) == 1
 
         vspecs = ScriptReader( 'pink4.vvt' )
         tspec = TestSpec( 'pink4', os.getcwd(), 'pink4.vvt' )
-        self.assertRaises( TSC.TestSpecError, TSC.parse_enable, tspec, vspecs )
+        self.assertRaises( TSC.TestSpecError, parsevvt.parse_enable, tspec, vspecs )
 
     def test_filtering_out_tests_by_enable(self):
         ""

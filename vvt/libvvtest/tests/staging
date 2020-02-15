@@ -27,6 +27,7 @@ import libvvtest.testlistio as tio
 import libvvtest.testrunner as testrunner
 
 import libvvtest.TestSpecCreator as TSC
+import libvvtest.parsevvt as parsevvt
 
 
 class staged_parameters( vtu.vvtestTestCase ):
@@ -97,7 +98,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         evaluator = TSC.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
-        pset = TSC.parseTestParameters_scr( vspecs, 'blue', evaluator, None )
+        pset = parsevvt.parseTestParameters_scr( vspecs, 'blue', evaluator, None )
 
         assert len( pset.getInstances() ) == 3
         nL,vL = pset.getStagedGroup()
@@ -106,7 +107,7 @@ class staged_parameters( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'err1.vvt' )
         self.assertRaises( TSC.TestSpecError,
-                TSC.parseTestParameters_scr, vspecs, 'err1', evaluator, None )
+                parsevvt.parseTestParameters_scr, vspecs, 'err1', evaluator, None )
 
     def create_test_list(self, spec_file):
         ""
@@ -114,7 +115,7 @@ class staged_parameters( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( spec_file )
         evaluator = TSC.ExpressionEvaluator( 'atari', [] )
-        pset = TSC.parseTestParameters_scr( vspecs, tname, evaluator, None )
+        pset = parsevvt.parseTestParameters_scr( vspecs, tname, evaluator, None )
 
         testL = TSC.generate_test_objects( tname, os.getcwd(), spec_file, pset )
 

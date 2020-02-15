@@ -29,14 +29,14 @@ import testutils as util
 from testutils import print3
 
 import libvvtest.TestList as TestList
-import libvvtest.TestSpecCreator as TestSpecCreator
+import libvvtest.parseutil as parseutil
 
 class performance_cases( vtu.vvtestTestCase ):
 
     def setUp(self):
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-    def test_variableExpansion_function(self):
+    def test_variable_expansion_function(self):
         ""
         perf_variable_expand( 10 )
 
@@ -51,7 +51,7 @@ def perf_variable_expand( num_iterations=10 ):
     while i < num_iterations:
         fL = [ ['foo{$np}_bar.$dt', 'foo{$np}_bar.$dt.base'],
                ['blah{$np}_junk.$dt', 'blah{$np}_junk.$dt.base'] ]
-        TestSpecCreator.variableExpansion( 'tname', 'platname', pD, fL )
+        parseutil.variable_expansion( 'tname', 'platname', pD, fL )
         i += 1
     t1 = time.time()
     print3( 'loop time =', t1-t0 )

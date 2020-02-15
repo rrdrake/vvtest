@@ -122,6 +122,19 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
         assert vrun.getTestIds() == [ 'atest' ]
 
+    def test_bad_xml_warnings(self):
+        ""
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+                <execute> echo "hello" <execute>
+            </rtest>
+            """ )
+        time.sleep(1)
+
+        tlist,scan = construct_TestList_and_TestFileScanner()
+        scan.scanPath( '.' )
+        # magic: not done
+
 
 def construct_TestList_and_TestFileScanner( spectype=None ):
     ""
