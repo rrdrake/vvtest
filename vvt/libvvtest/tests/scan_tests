@@ -44,7 +44,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlist,scan = construct_TestList_and_TestFileScanner()
-        scan.scanPath( 'subdir' )
+        scan.scanPath( tlist, 'subdir' )
 
         tL = list( tlist.getTests() )
         assert len( tL ) == 2
@@ -63,7 +63,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlist,scan = construct_TestList_and_TestFileScanner()
-        scan.scanPath( 'scr.vvt' )
+        scan.scanPath( tlist, 'scr.vvt' )
 
         tL = list( tlist.getTests() )
         assert len( tL ) == 1
@@ -95,7 +95,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlist,scan = construct_TestList_and_TestFileScanner( spectype='vvt' )
-        scan.scanPath( '.' )
+        scan.scanPath( tlist, '.' )
 
         tL = list( tlist.getTests() )
         assert len( tL ) == 1
@@ -103,7 +103,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         assert tL[0].getSpec().getFilepath() == 'scr.vvt'
 
         tlist,scan = construct_TestList_and_TestFileScanner( spectype='xml' )
-        scan.scanPath( '.' )
+        scan.scanPath( tlist, '.' )
 
         tL = list( tlist.getTests() )
         assert len( tL ) == 1
@@ -184,7 +184,7 @@ def scan_path_with_warnings_output( path ):
     ""
     sio = StringIO()
     tlist,scan = construct_TestList_and_TestFileScanner( ostream=sio )
-    scan.scanPath( path )
+    scan.scanPath( tlist, path )
     val = sio.getvalue()
 
     return tlist.getTests(), val.strip()
@@ -196,10 +196,11 @@ def construct_TestList_and_TestFileScanner( spectype=None, ostream=None ):
     tlist = TestList.TestList()
 
     if ostream:
-        scan = TestFileScanner( tlist, creator, spectype=spectype,
+        scan = TestFileScanner( creator,
+                                spectype=spectype,
                                 warning_output_stream=ostream )
     else:
-        scan = TestFileScanner( tlist, creator, spectype=spectype )
+        scan = TestFileScanner( creator, spectype=spectype )
 
     return tlist,scan
 

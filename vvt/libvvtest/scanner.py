@@ -12,7 +12,7 @@ from .testcase import TestCase
 
 class TestFileScanner:
 
-    def __init__(self, testlist, creator,
+    def __init__(self, creator,
                        force_params_dict=None,
                        spectype=None,
                        warning_output_stream=sys.stdout):
@@ -26,7 +26,6 @@ class TestFileScanner:
         only pick up files for those test specification types.  Default is
         both *.xml and *.vvt.
         """
-        self.tlist = testlist
         self.creator = creator
         self.params = force_params_dict
         self.warnout = warning_output_stream
@@ -35,15 +34,15 @@ class TestFileScanner:
 
         self.xdirmap = {}  # TestSpec xdir -> TestCase object
 
-    def scanPaths(self, path_list):
+    def scanPaths(self, testlist, path_list):
         ""
         for d in path_list:
             if not os.path.exists(d):
                 raise FatalError( 'scan path does not exist: ' + str(d) )
 
-            self.scanPath( d )
+            self.scanPath( testlist, d )
 
-    def scanPath(self, path):
+    def scanPath(self, testlist, path):
         """
         Recursively scans for test XML or VVT files starting at 'path'.
         """
@@ -51,13 +50,13 @@ class TestFileScanner:
 
         if os.path.isfile( bpath ):
             basedir,fname = os.path.split( bpath )
-            self.readTestFile( basedir, fname, self.params )
+            self.readTestFile( testlist, basedir, fname, self.params )
 
         else:
             for root,dirs,files in os.walk( bpath ):
-                self._scan_recurse( bpath, root, dirs, files )
+                self._scan_recurse( testlist, bpath, root, dirs, files )
 
-    def _scan_recurse(self, basedir, d, dirs, files):
+    def _scan_recurse(self, testlist, basedir, d, dirs, files):
         """
         This function is given to os.walk to recursively scan a directory
         tree for test XML files.  The 'basedir' is the directory originally
@@ -78,7 +77,7 @@ class TestFileScanner:
             bn,ext = os.path.splitext(f)
             if bn and ext in self.extensions:
                 fname = os.path.join(reldir,f)
-                self.readTestFile( basedir, fname, self.params )
+                self.readTestFile( testlist, basedir, fname, self.params )
 
         linkdirs = []
         for subd in list(dirs):
@@ -100,9 +99,9 @@ class TestFileScanner:
         # manually recurse into soft linked directories
         for ld in linkdirs:
             for lroot,ldirs,lfiles in os.walk( ld ):
-                self._scan_recurse( basedir, lroot, ldirs, lfiles )
+                self._scan_recurse( testlist, basedir, lroot, ldirs, lfiles )
 
-    def readTestFile(self, basepath, relfile, force_params):
+    def readTestFile(self, testlist, basepath, relfile, force_params):
         """
         Initiates the parsing of a test file.  XML test descriptions may be
         skipped if they don't appear to be a test file.  Attributes from
@@ -129,7 +128,7 @@ class TestFileScanner:
         for tspec in testL:
             if not self._is_duplicate_execute_directory( tspec ):
                 tcase = TestCase( tspec )
-                self.tlist.addTest( tcase )
+                testlist.addTest( tcase )
                 self.xdirmap[ tspec.getExecuteDirectory() ] = tcase
 
     def _is_duplicate_execute_directory(self, tspec):

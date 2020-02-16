@@ -48,6 +48,10 @@ class MainEntry:
         self.opts, self.optD, self.dirs = \
             cmdline.parse_command_line( self.argv[1:], version )
 
+        if len( self.dirs ) == 0:
+            # scan current working directory by default
+            self.dirs.append( '.' )
+
         configdir = location.determine_configdir(
                                 self.opts.config,
                                 os.getenv( 'VVTEST_CONFIGDIR' ) )
@@ -169,14 +173,20 @@ class MainEntry:
     def constructFilteringObjects(self):
         ""
         from libvvtest.testcreator import TestCreator
+        from libvvtest.scanner import TestFileScanner
         from libvvtest.filtering import TestFilter
         from libvvtest.testselector import TestSelector
         from libvvtest.timeout import TimeHandler
 
         rtconfig = self.rtdata.getRuntimeConfig()
 
-        creator = TestCreator( rtconfig.platformName(), rtconfig.getOptionList() )
-        self.rtdata.setTestCreator( creator )
+        creator = TestCreator( rtconfig.platformName(),
+                               rtconfig.getOptionList() )
+
+        scanner = TestFileScanner( creator,
+                                   force_params_dict=self.optD['param_dict'],
+                                   spectype=self.opts.scan_type )
+        self.rtdata.setTestScanner( scanner )
 
         plug = import_plugin_module( rtconfig )
         self.rtdata.setUserPlugin( plug )
@@ -267,8 +277,8 @@ class RuntimeData:
     def setRuntimeConfig(self, rtconfig): self.rtconfig = rtconfig
     def getRuntimeConfig(self): return self.rtconfig
 
-    def setTestCreator(self, creator): self.creator = creator
-    def getTestCreator(self): return self.creator
+    def setTestScanner(self, scanner): self.scanner = scanner
+    def getTestScanner(self): return self.scanner
 
     def setUserPlugin(self, plugin): self.plugin = plugin
     def getUserPlugin(self): return self.plugin
@@ -385,7 +395,7 @@ class InformationMode:
         ""
         test_dir = self.rtdata.getTestResultsDir()
         selector = self.rtdata.getTestSelector()
-        creator = self.rtdata.getTestCreator()
+        scanner = self.rtdata.getTestScanner()
 
         tlist = make_TestList( self.rtdata )
 
@@ -394,9 +404,7 @@ class InformationMode:
             tlist.readTestResults()
 
         elif self.opts.keys or self.opts.files:
-            scan_test_source_directories( tlist, creator, scan_dirs,
-                                          self.opts.scan_type,
-                                          self.optD['param_dict'] )
+            scanner.scanPaths( tlist, scan_dirs )
 
         elif os.path.exists( test_dir ):
             tlist.readTestList()
@@ -480,21 +488,6 @@ def create_batch_namer( test_dir ):
 
 ##############################################################################
 
-def scan_test_source_directories( tlist, creator, scan_dirs, scan_type, setparams ):
-    ""
-    from libvvtest.scanner import TestFileScanner
-
-    scan = TestFileScanner( tlist, creator,
-                            force_params_dict=setparams,
-                            spectype=scan_type )
-
-    # default scan directory is the current working directory
-    if len(scan_dirs) == 0:
-        scan_dirs = ['.']
-
-    scan.scanPaths( scan_dirs )
-
-
 def generateTestList( opts, optD, dirs, rtdata ):
     """
     """
@@ -506,13 +499,11 @@ def generateTestList( opts, optD, dirs, rtdata ):
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
     selector = rtdata.getTestSelector()
-    creator = rtdata.getTestCreator()
+    scanner = rtdata.getTestScanner()
 
     tlist = make_TestList( rtdata )
 
-    # magic: move scanning into a class that is stored in rtdata ??
-    scan_test_source_directories( tlist, creator, dirs,
-                                  opts.scan_type, optD['param_dict'] )
+    scanner.scanPaths( tlist, dirs )
 
     timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
@@ -545,8 +536,7 @@ def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
 
     tlist = make_TestList( rtdata )
 
-    creator = rtdata.getTestCreator()
-    scan_test_source_directories( tlist, creator, dirs, scan_type, param_dict )
+    rtdata.getTestScanner().scanPaths( tlist, dirs )
 
     plat = rtdata.getPlatformObject()
     cache = construct_runtime_lookup_cache( plat )
@@ -712,7 +702,7 @@ def runTests( opts, optD, rtdata, dirs ):
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
     selector = rtdata.getTestSelector()
-    creator = rtdata.getTestCreator()
+    scanner = rtdata.getTestScanner()
 
     call_user_prologue( rtdata )
 
@@ -732,8 +722,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
-    scan_test_source_directories( tlist, creator, dirs,
-                                  opts.scan_type, optD['param_dict'] )
+    scanner.scanPaths( tlist, dirs )
 
     tlist.readTestList()
 
