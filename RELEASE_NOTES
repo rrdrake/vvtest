@@ -1,6 +1,8 @@
 
 Improvements:
 
+    - Add support for the LSF batch queue manager.
+
     - Batch jobs that have started are now cancelled upon keyboard interrupt.
       Currently only implemented for SLURM.
 
