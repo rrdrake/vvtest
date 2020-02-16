@@ -12,6 +12,11 @@ sys.excepthook = sys.__excepthook__
 import os
 import time
 
+try:
+    from StringIO import StringIO
+except Exception:
+    from io import StringIO
+
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
@@ -124,24 +129,77 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
 
     def test_bad_xml_warnings(self):
         ""
-        util.writefile( 'atest.xml', """
+        util.writefile( 'A/atest.xml', """
+            <rtest name="atest">
+                <execute> echo "hello" </execute>
+            </rtest>
+            """ )
+
+        util.writefile( 'B/atest.xml', """
             <rtest name="atest">
                 <execute> echo "hello" <execute>
             </rtest>
             """ )
+
+        util.writefile( 'C/note.xml', """\
+<?xml version="1.0" encoding="UTF-8"?>
+<note>
+  <to>Tove</to>
+  <from>Jani</from>
+  <heading>Reminder</heading>
+  <body>Don't forget me this weekend!</body>
+</note>
+""" )
+
+        # file with an error in the XML
+        util.writefile( 'D/note.xml', """\
+<?xml version="1.0" encoding="UTF-8"?>
+<note>
+  <to>Tove</to>
+  <from>Jani<from>
+  <heading>Reminder</heading>
+  <body>Don't forget me this weekend!</body>
+</note>
+""" )
         time.sleep(1)
 
-        tlist,scan = construct_TestList_and_TestFileScanner()
-        scan.scanPath( '.' )
-        # magic: not done
+        tL,out = scan_path_with_warnings_output( 'A' )
+        assert not out.strip()
+        assert len( tL ) == 1
+
+        tL,out = scan_path_with_warnings_output( 'B' )
+        assert util.greplines( 'warning*skipping file*B/atest.xml', out )
+        assert len( tL ) == 0
+
+        tL,out = scan_path_with_warnings_output( 'C' )
+        assert not out.strip()
+        assert len( tL ) == 0
+
+        tL,out = scan_path_with_warnings_output( 'D' )
+        assert not out.strip()
+        assert len( tL ) == 0
 
 
-def construct_TestList_and_TestFileScanner( spectype=None ):
+def scan_path_with_warnings_output( path ):
+    ""
+    sio = StringIO()
+    tlist,scan = construct_TestList_and_TestFileScanner( ostream=sio )
+    scan.scanPath( path )
+    val = sio.getvalue()
+
+    return tlist.getTests(), val.strip()
+
+
+def construct_TestList_and_TestFileScanner( spectype=None, ostream=None ):
     ""
     creator = TestCreator( 'atari', [] )
     tlist = TestList.TestList()
 
-    scan = TestFileScanner( tlist, creator, spectype=spectype )
+    if ostream:
+        scan = TestFileScanner( tlist, creator, spectype=spectype,
+                                warning_output_stream=ostream )
+    else:
+        scan = TestFileScanner( tlist, creator, spectype=spectype )
 
     return tlist,scan
 

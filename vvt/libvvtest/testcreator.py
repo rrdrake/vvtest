@@ -126,8 +126,6 @@ def create_test_list( evaluator, rootpath, relpath, force_params ):
         filedoc = parsexml.read_xml_file( fname )
 
         nameL = parsexml.parse_test_names( filedoc )
-        if nameL == None:
-            return []
 
         tL = []
         for tname in nameL:
@@ -238,7 +236,7 @@ def reparse_test_object( evaluator, testobj ):
 
     if ext == '.xml':
 
-        filedoc = parsexml.read_xml_file( fname )
+        filedoc = parsexml.read_xml_file( fname, strict=True )
 
         # run through the test name logic to check XML validity
         nameL = parsexml.parse_test_names(filedoc)

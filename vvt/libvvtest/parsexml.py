@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os, sys
+import re
 
 from .errors import TestSpecError
 from . import xmlwrapper
@@ -18,16 +19,32 @@ from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 
 
-def read_xml_file( filename ):
+def read_xml_file( filename, strict=False ):
     ""
     docreader = xmlwrapper.XmlDocReader()
 
     try:
         filedoc = docreader.readDoc( filename )
-    except xmlwrapper.XmlError:
-        raise TestSpecError( str( sys.exc_info()[1] ) )
 
-    return filedoc
+    except xmlwrapper.XmlError:
+        if strict or appears_to_be_a_test_file( filename ):
+            raise TestSpecError( str( sys.exc_info()[1] ) )
+        return None
+
+    else:
+        return filedoc
+
+
+def appears_to_be_a_test_file( filename ):
+    ""
+    with open( filename, 'rt' ) as fp:
+        top = fp.read( 512 )
+
+    for line in re.split( r'[\n\r]+', top ):
+        if line.strip().startswith( '<rtest' ):
+            return True
+
+    return False
 
 
 def parse_xml_test( testobj, filedoc, evaluator ):
@@ -640,8 +657,8 @@ def parse_test_names( filedoc ):
     Determine the test name and check for validity.  If this XML file is not
     an "rtest" then returns None.  Otherwise returns a list of test names.
     """
-    if filedoc.getName() != "rtest":
-        return None
+    if filedoc == None or filedoc.getName() != "rtest":
+        return []
 
     # determine the test name
 

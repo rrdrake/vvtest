@@ -12,7 +12,10 @@ from .testcase import TestCase
 
 class TestFileScanner:
 
-    def __init__(self, testlist, creator, force_params_dict=None, spectype=None):
+    def __init__(self, testlist, creator,
+                       force_params_dict=None,
+                       spectype=None,
+                       warning_output_stream=sys.stdout):
         """
         If 'force_params_dict' is not None, it must be a dictionary mapping
         parameter names to a list of parameter values.  Any test that contains
@@ -26,6 +29,8 @@ class TestFileScanner:
         self.tlist = testlist
         self.creator = creator
         self.params = force_params_dict
+        self.warnout = warning_output_stream
+
         self.extensions = make_test_extension_list( spectype )
 
         self.xdirmap = {}  # TestSpec xdir -> TestCase object
@@ -71,7 +76,6 @@ class TestFileScanner:
 
         for f in files:
             bn,ext = os.path.splitext(f)
-            df = os.path.join(d,f)
             if bn and ext in self.extensions:
                 fname = os.path.join(reldir,f)
                 self.readTestFile( basedir, fname, self.params )
@@ -117,9 +121,10 @@ class TestFileScanner:
         try:
             testL = self.creator.fromFile( basepath, relfile, force_params )
         except TestSpecError:
-          print3( "*** skipping file " + os.path.join( basepath, relfile ) + \
-                  ": " + str( sys.exc_info()[1] ) )
-          testL = []
+            print_warning( self.warnout,
+                           "skipping file", os.path.join( basepath, relfile ),
+                           "because", str( sys.exc_info()[1] ) )
+            testL = []
 
         for tspec in testL:
             if not self._is_duplicate_execute_directory( tspec ):
@@ -138,15 +143,16 @@ class TestFileScanner:
 
             tspec0 = tcase0.getSpec()
 
-            print3( '*** warning:',
-                'ignoring test with duplicate execution directory\n',
-                '      first   :', tspec0.getFilename() + '\n',
-                '      second  :', tspec.getFilename() + '\n',
-                '      exec dir:', xdir )
+            warn = [ 'ignoring test with duplicate execution directory',
+                     '      first   : ' + tspec0.getFilename(),
+                     '      second  : ' + tspec.getFilename(),
+                     '      exec dir: ' + xdir ]
 
             ddir = tspec.getDisplayString()
             if ddir != xdir:
-                print3( '       test id :', ddir )
+                warn.append( '       test id : ' + ddir )
+
+            print_warning( self.warnout, '\n'.join( warn ) )
 
             return True
 
@@ -180,6 +186,8 @@ def make_test_extension_list( spectype ):
         return ['.xml','.vvt']
 
 
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
+def print_warning( stream, *args ):
+    ""
+    stream.write( '*** warning: ' )
+    stream.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
+    stream.flush()
