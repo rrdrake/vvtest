@@ -170,6 +170,7 @@ class MainEntry:
         ""
         from libvvtest.testcreator import TestCreator
         from libvvtest.filtering import TestFilter
+        from libvvtest.testselector import TestSelector
         from libvvtest.timeout import TimeHandler
 
         rtconfig = self.rtdata.getRuntimeConfig()
@@ -184,7 +185,6 @@ class MainEntry:
 
         testfilter = TestFilter( rtconfig, plug )
         tsel = TestSelector( test_dir, testfilter, creator )
-        tsel.setBaseline( self.opts.dash_b )
         self.rtdata.setTestSelector( tsel )
 
         timehandler = TimeHandler( plug,
@@ -406,7 +406,7 @@ class InformationMode:
             print3( 'WARNING: previous test results directory not found,',
                     test_dir )
 
-        selector.determineActiveTests( tlist, remove_new_skips=True )
+        selector.prepareActiveTests( tlist, remove_new_skips=True )
 
         return tlist
 
@@ -457,77 +457,6 @@ def make_TestList( rtdata, batchid=None ):
     tlist = TestList.TestList( tdir, batchid )
 
     return tlist
-
-
-class TestSelector:
-
-    def __init__(self, test_dir, testfilter, creator):
-        ""
-        self.tfilter = testfilter
-        self.creator = creator
-
-        self._set_filter_dir( test_dir, os.getcwd() )
-
-        self.is_baseline = False
-
-    def setBaseline(self, is_baseline):
-        ""
-        self.is_baseline = is_baseline
-
-    def applyPermanentFilters(self, tlist):
-        ""
-        groups = tlist.createAnalyzeGroupMap()
-
-        self.tfilter.applyPermanent( tlist.getTestMap() )
-
-        for analyze, tcaseL in groups.iterateGroups():
-            self.tfilter.checkAnalyze( analyze, tcaseL )
-
-        tlist.countActive()
-
-    def determineActiveTests(self, tlist, apply_filters=True,
-                                          remove_new_skips=False):
-        """
-        If 'remove_new_skips' is True then every test skipped by the current
-        filtering is removed entirely from the test list, but skips from a
-        previous run are retained.
-        """
-        groups = tlist.createAnalyzeGroupMap()
-
-        tcasemap = tlist.getTestMap()
-
-        if apply_filters:
-
-            self.tfilter.applyRuntime( tcasemap, self.filterdir,
-                                       force_checks=remove_new_skips )
-
-            for analyze, tcaseL in groups.iterateGroups():
-                self.tfilter.checkAnalyze( analyze, tcaseL )
-
-            if remove_new_skips:
-                self.tfilter.removeNewSkips( tcasemap )
-
-        tspecs = [ tcase.getSpec() for tcase in tlist.getActiveTests() ]
-        self.creator.reparseTests( tspecs )
-
-        if self.is_baseline:
-            # baseline marking must come after TestSpecs are refreshed
-            self.tfilter.applyBaselineSkips( tcasemap )
-
-        tlist.countActive()
-
-    def _set_filter_dir(self, test_dir, cwd):
-        """
-        If the current working directory is a subdir of an existing test
-        results directory, then this function sets the filter directory to
-        the relative path from the top of the test results directory to the
-        current working directory.
-        """
-        if pathutil.is_subdir( test_dir, cwd ):
-            d = pathutil.compute_relative_path( test_dir, cwd )
-            self.filterdir = d
-        else:
-            self.filterdir = None
 
 
 
@@ -817,7 +746,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     tlist.readTestResults( preserve_skips=True )
 
-    selector.determineActiveTests( tlist )
+    selector.prepareActiveTests( tlist )
 
     results_writer = rtdata.getResultsWriter()
 
@@ -1129,7 +1058,7 @@ def restartTests( opts, optD, rtdata ):
     else:
         symlink_batch_files_in_tests( test_dir, tlist, batchid )
 
-    selector.determineActiveTests( tlist, apply_filters=( batchid == None ) )
+    selector.prepareActiveTests( tlist, apply_filters=( batchid == None ) )
 
     perms = rtdata.getPermissionsObject()
 
@@ -1170,7 +1099,7 @@ def baselineTests( opts, optD, rtdata ):
     # add the 'diff' keyword so that only diffs are rebaselined by default
     rtconfig.addResultsKeywordExpression( 'diff' )
 
-    selector.determineActiveTests( tlist )
+    selector.prepareBaselineTests( tlist )
 
     rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()
