@@ -1326,8 +1326,24 @@ def create_tests( relpath, platname='dummy', optlist=[] ):
 
 
 def reparse_test( testobj ):
-    ""
+    """
+    writes the given test to a file, reads it back in as a new TestSpec
+    object, followed by a reparse
+    """
     creator = TestCreator( 'atari', [] )
+
+    tw = tio.TestListWriter( 'tmplist' )
+    tw.start()
+    tw.append( TestCase( testobj ) )
+    tw.finish()
+
+    tr = tio.TestListReader( 'tmplist' )
+    tr.read()
+    tests = list( tr.getTests().values() )
+    assert len( tests ) == 1
+
+    testobj = tests[0].getSpec()
+
     creator.reparse( testobj )
 
 

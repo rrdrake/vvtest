@@ -53,12 +53,6 @@ class TestCreator:
         """
         reparse_test_object( self.evaluator, tspec )
 
-    def reparseTests(self, tspecs):
-        ""
-        for tspec in tspecs:
-            if not tspec.constructionCompleted():
-                self.reparse( tspec )
-
 
 class ExpressionEvaluator:
     """
@@ -236,6 +230,9 @@ def reparse_test_object( evaluator, testobj ):
     Given a TestSpec object, this function opens the original test file,
     parses, and overwrite the test contents.
     """
+    if testobj.constructionCompleted():
+        return
+
     fname = testobj.getFilename()
     ext = os.path.splitext( fname )[1]
 

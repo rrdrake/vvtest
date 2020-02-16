@@ -73,8 +73,8 @@ class TestSelector:
 
     def _refresh_active_tests(self, tlist):
         ""
-        tspecs = [ tcase.getSpec() for tcase in tlist.getActiveTests() ]
-        self.creator.reparseTests( tspecs )
+        for tcase in tlist.getActiveTests():
+            self.creator.reparse( tcase.getSpec() )
 
     def _set_filter_dir(self, test_dir, cwd):
         """
