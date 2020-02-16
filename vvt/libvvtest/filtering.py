@@ -8,6 +8,8 @@ import os, sys
 import re
 import fnmatch
 
+from .pathutil import is_subdir
+
 
 class TestFilter:
 
@@ -338,17 +340,6 @@ class PlatformEvaluator:
             if not wx.evaluate( lambda tok: tok == plat_name ):
                 return False
         return True
-
-
-def is_subdir(parent_dir, subdir):
-    """
-    TODO: test for relative paths
-    """
-    lp = len(parent_dir)
-    ls = len(subdir)
-    if ls > lp and parent_dir + '/' == subdir[0:lp+1]:
-        return subdir[lp+1:]
-    return None
 
 
 def file_search( tspec, regex_patterns, file_globs ):

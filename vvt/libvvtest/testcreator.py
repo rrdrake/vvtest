@@ -53,6 +53,12 @@ class TestCreator:
         """
         reparse_test_object( self.evaluator, tspec )
 
+    def reparseTests(self, tspecs):
+        ""
+        for tspec in tspecs:
+            if not tspec.constructionCompleted():
+                self.reparse( tspec )
+
 
 class ExpressionEvaluator:
     """

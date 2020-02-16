@@ -63,14 +63,14 @@ def relative_execute_directory( xdir, testdir, cwd ):
         return xdir
 
     d = os.path.join( testdir, xdir )
-    sdir = issubdir( cwd, d )
+    sdir = is_subdir( cwd, d )
     if sdir == None or sdir == "":
         return os.path.basename( xdir )
 
     return sdir
 
 
-def issubdir( parent_dir, subdir ):
+def is_subdir( parent_dir, subdir ):
     """
     TODO: test for relative paths
     """

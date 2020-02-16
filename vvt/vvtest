@@ -71,8 +71,6 @@ class MainEntry:
 
         self.constructResultsWriter( start_epoch )
 
-        self.rtdata.setFilterPath()
-
         self.constructFilteringObjects()
 
     def execute(self):
@@ -182,8 +180,12 @@ class MainEntry:
         plug = import_plugin_module( rtconfig )
         self.rtdata.setUserPlugin( plug )
 
+        test_dir = self.rtdata.getTestResultsDir()
+
         testfilter = TestFilter( rtconfig, plug )
-        self.rtdata.setTestFilter( testfilter )
+        tsel = TestSelector( test_dir, testfilter, creator )
+        tsel.setBaseline( self.opts.dash_b )
+        self.rtdata.setTestSelector( tsel )
 
         timehandler = TimeHandler( plug,
                                    self.opts.dash_T,
@@ -271,8 +273,8 @@ class RuntimeData:
     def setUserPlugin(self, plugin): self.plugin = plugin
     def getUserPlugin(self): return self.plugin
 
-    def setTestFilter(self, testfilter): self.testfilter = testfilter
-    def getTestFilter(self): return self.testfilter
+    def setTestSelector(self, selector): self.selector = selector
+    def getTestSelector(self): return self.selector
 
     def setTestSubdir(self, subdir): self.testsubdir = subdir
     def getTestSubdir(self): return self.testsubdir
@@ -304,23 +306,6 @@ class RuntimeData:
 
     def setTestTimeHandler(self, timehandler): self.timehandler = timehandler
     def getTestTimeHandler(self): return self.timehandler
-
-    def setFilterPath(self):
-        ""
-        cwd = os.getcwd()
-        if pathutil.issubdir( self.test_dir, cwd ):
-            d = pathutil.compute_relative_path( self.test_dir, cwd )
-            self.filterdir = d
-        else:
-            self.filterdir = None
-
-    def getFilterPath(self):
-        """
-        If the current working directory is a subdir of an existing test
-        results directory, then this returns the relative path from the
-        top of the test results directory to the current working directory.
-        """
-        return self.filterdir
 
 
 def construct_platform_instance( vvtestdir, opts, optD ):
@@ -399,6 +384,8 @@ class InformationMode:
     def loadTestList(self, scan_dirs):
         ""
         test_dir = self.rtdata.getTestResultsDir()
+        selector = self.rtdata.getTestSelector()
+        creator = self.rtdata.getTestCreator()
 
         tlist = make_TestList( self.rtdata )
 
@@ -407,7 +394,7 @@ class InformationMode:
             tlist.readTestResults()
 
         elif self.opts.keys or self.opts.files:
-            scan_test_source_directories( tlist, scan_dirs,
+            scan_test_source_directories( tlist, creator, scan_dirs,
                                           self.opts.scan_type,
                                           self.optD['param_dict'] )
 
@@ -419,8 +406,7 @@ class InformationMode:
             print3( 'WARNING: previous test results directory not found,',
                     test_dir )
 
-        tlist.determineActiveTests( filter_dir=self.rtdata.getFilterPath(),
-                                    remove_skips=True )
+        selector.determineActiveTests( tlist, remove_new_skips=True )
 
         return tlist
 
@@ -460,9 +446,6 @@ def make_TestList( rtdata, batchid=None ):
     ""
     import libvvtest.TestList as TestList
 
-    rtconfig = rtdata.getRuntimeConfig()
-    creator = rtdata.getTestCreator()
-    testfilter = rtdata.getTestFilter()
     test_dir = rtdata.getTestResultsDir()
 
     if batchid == None:
@@ -471,9 +454,81 @@ def make_TestList( rtdata, batchid=None ):
         namer = create_batch_namer( test_dir )
         tdir = namer.getBatchDir( batchid )
 
-    tlist = TestList.TestList( tdir, batchid, rtconfig, creator, testfilter )
+    tlist = TestList.TestList( tdir, batchid )
 
     return tlist
+
+
+class TestSelector:
+
+    def __init__(self, test_dir, testfilter, creator):
+        ""
+        self.tfilter = testfilter
+        self.creator = creator
+
+        self._set_filter_dir( test_dir, os.getcwd() )
+
+        self.is_baseline = False
+
+    def setBaseline(self, is_baseline):
+        ""
+        self.is_baseline = is_baseline
+
+    def applyPermanentFilters(self, tlist):
+        ""
+        groups = tlist.createAnalyzeGroupMap()
+
+        self.tfilter.applyPermanent( tlist.getTestMap() )
+
+        for analyze, tcaseL in groups.iterateGroups():
+            self.tfilter.checkAnalyze( analyze, tcaseL )
+
+        tlist.countActive()
+
+    def determineActiveTests(self, tlist, apply_filters=True,
+                                          remove_new_skips=False):
+        """
+        If 'remove_new_skips' is True then every test skipped by the current
+        filtering is removed entirely from the test list, but skips from a
+        previous run are retained.
+        """
+        groups = tlist.createAnalyzeGroupMap()
+
+        tcasemap = tlist.getTestMap()
+
+        if apply_filters:
+
+            self.tfilter.applyRuntime( tcasemap, self.filterdir,
+                                       force_checks=remove_new_skips )
+
+            for analyze, tcaseL in groups.iterateGroups():
+                self.tfilter.checkAnalyze( analyze, tcaseL )
+
+            if remove_new_skips:
+                self.tfilter.removeNewSkips( tcasemap )
+
+        tspecs = [ tcase.getSpec() for tcase in tlist.getActiveTests() ]
+        self.creator.reparseTests( tspecs )
+
+        if self.is_baseline:
+            # baseline marking must come after TestSpecs are refreshed
+            self.tfilter.applyBaselineSkips( tcasemap )
+
+        tlist.countActive()
+
+    def _set_filter_dir(self, test_dir, cwd):
+        """
+        If the current working directory is a subdir of an existing test
+        results directory, then this function sets the filter directory to
+        the relative path from the top of the test results directory to the
+        current working directory.
+        """
+        if pathutil.is_subdir( test_dir, cwd ):
+            d = pathutil.compute_relative_path( test_dir, cwd )
+            self.filterdir = d
+        else:
+            self.filterdir = None
+
 
 
 def symlink_batch_files_in_tests( test_dir, tlist, batchid ):
@@ -496,11 +551,11 @@ def create_batch_namer( test_dir ):
 
 ##############################################################################
 
-def scan_test_source_directories( tlist, scan_dirs, scan_type, setparams ):
+def scan_test_source_directories( tlist, creator, scan_dirs, scan_type, setparams ):
     ""
     from libvvtest.scanner import TestFileScanner
 
-    scan = TestFileScanner( tlist,
+    scan = TestFileScanner( tlist, creator,
                             force_params_dict=setparams,
                             spectype=scan_type )
 
@@ -521,15 +576,18 @@ def generateTestList( opts, optD, dirs, rtdata ):
     perms = rtdata.getPermissionsObject()
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
+    selector = rtdata.getTestSelector()
+    creator = rtdata.getTestCreator()
 
     tlist = make_TestList( rtdata )
 
-    scan_test_source_directories( tlist, dirs,
+    # magic: move scanning into a class that is stored in rtdata ??
+    scan_test_source_directories( tlist, creator, dirs,
                                   opts.scan_type, optD['param_dict'] )
 
     timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
-    tlist.applyPermanentFilters()
+    selector.applyPermanentFilters( tlist )
 
     rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()
@@ -558,13 +616,15 @@ def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
 
     tlist = make_TestList( rtdata )
 
-    scan_test_source_directories( tlist, dirs, scan_type, param_dict )
+    creator = rtdata.getTestCreator()
+    scan_test_source_directories( tlist, creator, dirs, scan_type, param_dict )
 
     plat = rtdata.getPlatformObject()
     cache = construct_runtime_lookup_cache( plat )
     rtdata.getTestTimeHandler().load( cache, tlist )
+    selector = rtdata.getTestSelector()
 
-    tlist.applyPermanentFilters()
+    selector.applyPermanentFilters( tlist )
 
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
 
@@ -722,6 +782,8 @@ def runTests( opts, optD, rtdata, dirs ):
     test_dir = rtdata.getTestResultsDir()
     timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
+    selector = rtdata.getTestSelector()
+    creator = rtdata.getTestCreator()
 
     call_user_prologue( rtdata )
 
@@ -741,7 +803,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
-    scan_test_source_directories( tlist, dirs,
+    scan_test_source_directories( tlist, creator, dirs,
                                   opts.scan_type, optD['param_dict'] )
 
     tlist.readTestList()
@@ -749,13 +811,13 @@ def runTests( opts, optD, rtdata, dirs ):
     timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
     # apply filters and save the test list in the TestResults directory
-    tlist.applyPermanentFilters()
+    selector.applyPermanentFilters( tlist )
     tlist.stringFileWrite()
     perms.set( tlist.getFilename() )
 
     tlist.readTestResults( preserve_skips=True )
 
-    tlist.determineActiveTests()
+    selector.determineActiveTests( tlist )
 
     results_writer = rtdata.getResultsWriter()
 
@@ -1047,6 +1109,7 @@ def restartTests( opts, optD, rtdata ):
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
+    selector = rtdata.getTestSelector()
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
@@ -1066,10 +1129,7 @@ def restartTests( opts, optD, rtdata ):
     else:
         symlink_batch_files_in_tests( test_dir, tlist, batchid )
 
-    reld = rtdata.getFilterPath()
-
-    tlist.determineActiveTests( filter_dir=reld,
-                                apply_filters=( batchid == None ) )
+    selector.determineActiveTests( tlist, apply_filters=( batchid == None ) )
 
     perms = rtdata.getPermissionsObject()
 
@@ -1099,6 +1159,7 @@ def baselineTests( opts, optD, rtdata ):
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
+    selector = rtdata.getTestSelector()
 
     tlist = make_TestList( rtdata )
 
@@ -1109,8 +1170,7 @@ def baselineTests( opts, optD, rtdata ):
     # add the 'diff' keyword so that only diffs are rebaselined by default
     rtconfig.addResultsKeywordExpression( 'diff' )
 
-    tlist.determineActiveTests( filter_dir=rtdata.getFilterPath(),
-                                baseline=True )
+    selector.determineActiveTests( tlist )
 
     rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()

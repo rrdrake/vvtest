@@ -10,8 +10,6 @@ import glob
 from os.path import abspath, normpath
 from os.path import join as pjoin
 
-from .errors import TestSpecError
-from .testcase import TestCase
 from . import testlistio
 from .groups import ParameterizeAnalyzeGroups
 from .teststatus import copy_test_results
@@ -25,11 +23,7 @@ class TestList:
 
     base_filename = 'testlist'
 
-    def __init__(self, directory=None,
-                       identifier=None,
-                       runtime_config=None,
-                       testcreator=None,
-                       testfilter=None):
+    def __init__(self, directory=None, identifier=None):
         ""
         if not directory:
             directory = os.getcwd()
@@ -48,12 +42,7 @@ class TestList:
 
         self.groups = None  # a ParameterizeAnalyzeGroups class instance
 
-        self.xdirmap = {}  # TestSpec xdir -> TestCase object
         self.tcasemap = {}  # TestSpec ID -> TestCase object
-
-        self.rtconfig = runtime_config
-        self.creator = testcreator
-        self.testfilter = testfilter
 
     def getFilename(self):
         ""
@@ -230,44 +219,13 @@ class TestList:
         ""
         return self.groups
 
-    def applyPermanentFilters(self):
+    def countActive(self):
         ""
-        self._check_create_parameterize_analyze_group_map()
-
-        self.testfilter.applyPermanent( self.tcasemap )
-
-        for analyze, tcaseL in self.groups.iterateGroups():
-            self.testfilter.checkAnalyze( analyze, tcaseL )
-
-        self.numactive = count_active( self.tcasemap )
-
-    def determineActiveTests(self, filter_dir=None,
-                                   baseline=False,
-                                   apply_filters=True,
-                                   remove_skips=False):
-        """
-        If 'remove_skips' is True then every test skipped by the current
-        filtering is removed entirely from the test list.
-        """
-        self._check_create_parameterize_analyze_group_map()
-
-        if apply_filters:
-            self.testfilter.applyRuntime( self.tcasemap, filter_dir,
-                                          force_checks=remove_skips )
-
-            for analyze, tcaseL in self.groups.iterateGroups():
-                self.testfilter.checkAnalyze( analyze, tcaseL )
-
-            if remove_skips:
-                self.testfilter.removeNewSkips( self.tcasemap )
-
-        refresh_active_tests( self.tcasemap, self.creator )
-
-        if baseline:
-            # baseline marking must come after TestSpecs are refreshed
-            self.testfilter.applyBaselineSkips( self.tcasemap )
-
-        self.numactive = count_active( self.tcasemap )
+        cnt = 0
+        for tcase in self.tcasemap.values():
+            if not tcase.getStat().skipTest():
+                cnt += 1
+        self.numactive = cnt
 
     def numActive(self):
         """
@@ -332,107 +290,19 @@ class TestList:
                 elif result == 'notrun' : ival |= ( 2**5 )
         return ival
 
-    def readTestFile(self, basepath, relfile, force_params):
-        """
-        Initiates the parsing of a test file.  XML test descriptions may be
-        skipped if they don't appear to be a test file.  Attributes from
-        existing tests will be absorbed.
-        """
-        assert basepath
-        assert relfile
-        assert os.path.isabs( basepath )
-        assert not os.path.isabs( relfile )
-
-        basepath = os.path.normpath( basepath )
-        relfile  = os.path.normpath( relfile )
-
-        assert relfile
-
-        try:
-            testL = self.creator.fromFile( basepath, relfile, force_params )
-        except TestSpecError:
-          print3( "*** skipping file " + os.path.join( basepath, relfile ) + \
-                  ": " + str( sys.exc_info()[1] ) )
-          testL = []
-
-        for tspec in testL:
-            if not self._is_duplicate_execute_directory( tspec ):
-                testid = tspec.getID()
-                tcase = TestCase( tspec )
-                self.tcasemap[testid] = tcase
-                self.xdirmap[ tspec.getExecuteDirectory() ] = tcase
-
     def addTest(self, tcase):
         """
         Add/overwrite a test in the list.
         """
         self.tcasemap[ tcase.getSpec().getID() ] = tcase
 
-    def _check_create_parameterize_analyze_group_map(self):
+    def createAnalyzeGroupMap(self):
         ""
         if self.groups == None:
             self.groups = ParameterizeAnalyzeGroups()
             self.groups.rebuild( self.tcasemap )
 
-    def _is_duplicate_execute_directory(self, tspec):
-        ""
-        xdir = tspec.getExecuteDirectory()
-
-        tcase0 = self.xdirmap.get( xdir, None )
-
-        if tcase0 != None and \
-           not tests_are_related_by_staging( tcase0.getSpec(), tspec ):
-
-            tspec0 = tcase0.getSpec()
-
-            print3( '*** warning:',
-                'ignoring test with duplicate execution directory\n',
-                '      first   :', tspec0.getFilename() + '\n',
-                '      second  :', tspec.getFilename() + '\n',
-                '      exec dir:', xdir )
-
-            ddir = tspec.getDisplayString()
-            if ddir != xdir:
-                print3( '       test id :', ddir )
-
-            return True
-
-        return False
-
-
-def tests_are_related_by_staging( tspec1, tspec2 ):
-    ""
-    xdir1 = tspec1.getExecuteDirectory()
-    disp1 = tspec1.getDisplayString()
-
-    xdir2 = tspec2.getExecuteDirectory()
-    disp2 = tspec2.getDisplayString()
-
-    if xdir1 == xdir2 and \
-       tspec1.getFilename() == tspec2.getFilename() and \
-       xdir1 != disp1 and disp1.startswith( xdir1 ) and \
-       xdir2 != disp2 and disp2.startswith( xdir2 ):
-        return True
-
-    return False
-
-
-def count_active( tcase_map ):
-    ""
-    cnt = 0
-    for tcase in tcase_map.values():
-        if not tcase.getStat().skipTest():
-            cnt += 1
-    return cnt
-
-
-def refresh_active_tests( tcase_map, creator ):
-    ""
-    for xdir,tcase in tcase_map.items():
-        tspec = tcase.getSpec()
-        if not tcase.getStat().skipTest():
-            if not tspec.constructionCompleted():
-                creator.reparse( tspec )
+        return self.groups
 
 
 def glob_results_files( basename ):
@@ -441,10 +311,3 @@ def glob_results_files( basename ):
     fileL = glob.glob( basename+'.*' )
     fileL.sort()
     return fileL
-
-
-###########################################################################
-
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()

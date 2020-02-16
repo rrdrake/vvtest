@@ -21,21 +21,21 @@ from testutils import print3
 import libvvtest.pathutil as pathutil
 
 
-class issubdir_tests( vtu.vvtestTestCase ):
+class is_subdir_tests( vtu.vvtestTestCase ):
 
     def setUp(self):
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
     def test_parent_and_subdir_are_the_same(self):
         ""
-        val = pathutil.issubdir( os.getcwd(), os.getcwd() )
+        val = pathutil.is_subdir( os.getcwd(), os.getcwd() )
         print3( val )
         assert val == None
 
     def test_parent_is_the_subdir(self):
         ""
         cwd = os.getcwd()
-        val = pathutil.issubdir( cwd, dirname(cwd) )
+        val = pathutil.is_subdir( cwd, dirname(cwd) )
         print3( val )
         assert val == None
 
@@ -43,7 +43,7 @@ class issubdir_tests( vtu.vvtestTestCase ):
         ""
         sub = os.getcwd()
         par = dirname( sub )
-        val = pathutil.issubdir( par, sub )
+        val = pathutil.is_subdir( par, sub )
         print3( val )
         assert val == basename( sub )
 
@@ -51,7 +51,7 @@ class issubdir_tests( vtu.vvtestTestCase ):
         ""
         sub = abspath( 'subdir' )
         par = dirname( dirname( sub ) )
-        val = pathutil.issubdir( par, sub )
+        val = pathutil.is_subdir( par, sub )
         print3( val )
         d,b1 = os.path.split( sub )
         b2 = basename( d )

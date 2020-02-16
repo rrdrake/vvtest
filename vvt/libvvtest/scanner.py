@@ -6,12 +6,13 @@
 
 import os, sys
 
-from .errors import FatalError
+from .errors import FatalError, TestSpecError
+from .testcase import TestCase
 
 
 class TestFileScanner:
 
-    def __init__(self, testlist, force_params_dict=None, spectype=None):
+    def __init__(self, testlist, creator, force_params_dict=None, spectype=None):
         """
         If 'force_params_dict' is not None, it must be a dictionary mapping
         parameter names to a list of parameter values.  Any test that contains
@@ -23,8 +24,11 @@ class TestFileScanner:
         both *.xml and *.vvt.
         """
         self.tlist = testlist
+        self.creator = creator
         self.params = force_params_dict
         self.extensions = make_test_extension_list( spectype )
+
+        self.xdirmap = {}  # TestSpec xdir -> TestCase object
 
     def scanPaths(self, path_list):
         ""
@@ -42,7 +46,7 @@ class TestFileScanner:
 
         if os.path.isfile( bpath ):
             basedir,fname = os.path.split( bpath )
-            self.tlist.readTestFile( basedir, fname, self.params )
+            self.readTestFile( basedir, fname, self.params )
 
         else:
             for root,dirs,files in os.walk( bpath ):
@@ -70,7 +74,7 @@ class TestFileScanner:
             df = os.path.join(d,f)
             if bn and ext in self.extensions:
                 fname = os.path.join(reldir,f)
-                self.tlist.readTestFile( basedir, fname, self.params )
+                self.readTestFile( basedir, fname, self.params )
 
         linkdirs = []
         for subd in list(dirs):
@@ -94,6 +98,77 @@ class TestFileScanner:
             for lroot,ldirs,lfiles in os.walk( ld ):
                 self._scan_recurse( basedir, lroot, ldirs, lfiles )
 
+    def readTestFile(self, basepath, relfile, force_params):
+        """
+        Initiates the parsing of a test file.  XML test descriptions may be
+        skipped if they don't appear to be a test file.  Attributes from
+        existing tests will be absorbed.
+        """
+        assert basepath
+        assert relfile
+        assert os.path.isabs( basepath )
+        assert not os.path.isabs( relfile )
+
+        basepath = os.path.normpath( basepath )
+        relfile  = os.path.normpath( relfile )
+
+        assert relfile
+
+        try:
+            testL = self.creator.fromFile( basepath, relfile, force_params )
+        except TestSpecError:
+          print3( "*** skipping file " + os.path.join( basepath, relfile ) + \
+                  ": " + str( sys.exc_info()[1] ) )
+          testL = []
+
+        for tspec in testL:
+            if not self._is_duplicate_execute_directory( tspec ):
+                tcase = TestCase( tspec )
+                self.tlist.addTest( tcase )
+                self.xdirmap[ tspec.getExecuteDirectory() ] = tcase
+
+    def _is_duplicate_execute_directory(self, tspec):
+        ""
+        xdir = tspec.getExecuteDirectory()
+
+        tcase0 = self.xdirmap.get( xdir, None )
+
+        if tcase0 != None and \
+           not tests_are_related_by_staging( tcase0.getSpec(), tspec ):
+
+            tspec0 = tcase0.getSpec()
+
+            print3( '*** warning:',
+                'ignoring test with duplicate execution directory\n',
+                '      first   :', tspec0.getFilename() + '\n',
+                '      second  :', tspec.getFilename() + '\n',
+                '      exec dir:', xdir )
+
+            ddir = tspec.getDisplayString()
+            if ddir != xdir:
+                print3( '       test id :', ddir )
+
+            return True
+
+        return False
+
+
+def tests_are_related_by_staging( tspec1, tspec2 ):
+    ""
+    xdir1 = tspec1.getExecuteDirectory()
+    disp1 = tspec1.getDisplayString()
+
+    xdir2 = tspec2.getExecuteDirectory()
+    disp2 = tspec2.getDisplayString()
+
+    if xdir1 == xdir2 and \
+       tspec1.getFilename() == tspec2.getFilename() and \
+       xdir1 != disp1 and disp1.startswith( xdir1 ) and \
+       xdir2 != disp2 and disp2.startswith( xdir2 ):
+        return True
+
+    return False
+
 
 def make_test_extension_list( spectype ):
     ""
@@ -103,3 +178,8 @@ def make_test_extension_list( spectype ):
         return ['.xml']
     else:
         return ['.xml','.vvt']
+
+
+def print3( *args ):
+    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
+    sys.stdout.flush()
