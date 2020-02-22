@@ -167,7 +167,7 @@ class MainEntry:
                                           self.rtdata.getTestResultsDir(),
                                           self.rtdata.getPermissionsObject(),
                                           self.rtdata.getPlatformObject(),
-                                          self.rtdata.cmdL )
+                                          self.rtdata.getCommandLine() )
         self.rtdata.setResultsWriter( resw )
 
     def constructFilteringObjects(self):
@@ -267,6 +267,8 @@ class RuntimeData:
 
         self.vvtestdir = vvtestdir
         self.exepath = exepath
+
+    def getCommandLine(self): return self.cmdL
 
     def getVvtestDir(self): return self.vvtestdir
     def getVvtestPath(self): return self.exepath
@@ -515,7 +517,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     location.create_test_directory( testsubdir, perms, opts.dash_M )
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
-    tlist.stringFileWrite()
+    tlist.stringFileWrite( cmdline=rtdata.getCommandLine() )
     perms.set( tlist.getFilename() )
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
@@ -680,7 +682,7 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
 def call_user_prologue( rtdata ):
     ""
     plug = rtdata.getUserPlugin()
-    cmdL = rtdata.cmdL
+    cmdL = rtdata.getCommandLine()
 
     plug.callPrologue( cmdL )
 
@@ -729,7 +731,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     # apply filters and save the test list in the TestResults directory
     selector.applyPermanentFilters( tlist )
-    tlist.stringFileWrite()
+    tlist.stringFileWrite( cmdline=rtdata.getCommandLine() )
     perms.set( tlist.getFilename() )
 
     tlist.readTestResults( preserve_skips=True )
@@ -925,22 +927,21 @@ def run_test_exec_list( opts, optD, rtdata,
     xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
+    tlrun = execute.TestListRunner( test_dir, tlist, xlist, perms,
+                                    results_writer, plat )
+
     if not opts.batch:
-        execute.run_test_list( opts.qsub_id, tlist, xlist, test_dir, plat,
-                               perms, results_writer )
+        tlrun.runDirect( opts.qsub_id )
 
     else:
-        batchTestList( opts, optD, rtdata,
-                       tlist, xlist, test_dir, plat, perms,
-                       results_writer )
+        batch = create_Batcher( opts, optD, rtdata,
+                                tlist, xlist, test_dir, plat, perms )
+        tlrun.runBatch( batch )
 
 
-def batchTestList( opts, optD, rtdata,
-                   tlist, xlist, test_dir, plat, perms,
-                   results_writer ):
-    """
-    The 'tlist' is a TestList class instance.
-    """
+def create_Batcher( opts, optD, rtdata,
+                    tlist, xlist, test_dir, plat, perms ):
+    ""
     import libvvtest.batchutils as batchutils
     import libvvtest.batching as batching
 
@@ -948,8 +949,6 @@ def batchTestList( opts, optD, rtdata,
 
     batchitf = batching.BatchQueueInterface()
     plat.initializeBatchSystem( batchitf )
-
-    tlist.setResultsSuffix()
 
     qsublimit = opts.batch_limit
     if qsublimit == None:
@@ -972,12 +971,7 @@ def batchTestList( opts, optD, rtdata,
                                 opts.max_timeout,
                                 namer, jobhandler )
 
-    plat.display( isbatched=True )
-
-    batch.writeQsubScripts()
-
-    execute.run_batch( batch, tlist, xlist, perms, results_writer,
-                       test_dir, qsublimit )
+    return batch
 
 
 def determine_job_check_intervals():

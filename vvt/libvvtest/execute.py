@@ -13,10 +13,37 @@ from .printinfo import TestInformationPrinter
 from .outpututils import XstatusString, pretty_time
 
 
-def run_batch( batch, tlist, xlist, perms, results_writer,
-               test_dir, qsublimit ):
+class TestListRunner:
+
+    def __init__(self, test_dir, tlist, xlist, perms, results_writer, plat):
+        ""
+        self.test_dir = test_dir
+        self.tlist = tlist
+        self.xlist = xlist
+        self.perms = perms
+        self.results_writer = results_writer
+        self.plat = plat
+
+    def runDirect(self, qsub_id):
+        ""
+        run_test_list( qsub_id, self.tlist, self.xlist, self.test_dir, self.plat,
+                       self.perms, self.results_writer )
+
+    def runBatch(self, batch):
+        ""
+        self.plat.display( isbatched=True )
+
+        self.tlist.setResultsSuffix()
+
+        batch.writeQsubScripts()
+
+        run_batch( batch, self.tlist, self.xlist, self.perms, self.results_writer,
+                   self.test_dir )
+
+
+def run_batch( batch, tlist, xlist, perms, results_writer, test_dir ):
     ""
-    print3( 'Maximum concurrent batch jobs:', qsublimit )
+    print3( 'Maximum concurrent batch jobs:', batch.getMaxJobs() )
 
     starttime = time.time()
     print3( "Start time:", time.ctime() )

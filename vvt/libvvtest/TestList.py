@@ -65,7 +65,7 @@ class TestList:
         ""
         return self.rundate
 
-    def stringFileWrite(self, extended=False):
+    def stringFileWrite(self, extended=False, **file_attrs):
         """
         Writes all the tests in this container to the test list file.  If
         'extended' is True, additional information is written to make the
@@ -76,9 +76,9 @@ class TestList:
         tlw = testlistio.TestListWriter( self.filename )
 
         if extended:
-            tlw.start( rundate=self.rundate )
+            tlw.start( rundate=self.rundate, **file_attrs )
         else:
-            tlw.start()
+            tlw.start( **file_attrs)
 
         for tcase in self.tcasemap.values():
             tlw.append( tcase, extended=extended )
@@ -87,7 +87,7 @@ class TestList:
 
         return self.filename
 
-    def initializeResultsFile(self):
+    def initializeResultsFile(self, **file_attrs):
         ""
         self.setResultsSuffix()
 
@@ -95,7 +95,7 @@ class TestList:
         
         self.results_file = testlistio.TestListWriter( rfile )
 
-        self.results_file.start()
+        self.results_file.start( **file_attrs )
 
         return rfile
 

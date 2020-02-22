@@ -276,6 +276,25 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
         read_TestList_and_check_fake_test()
 
+    def test_arbitrary_attributes_can_be_written(self):
+        ""
+        tl = TestList.TestList()
+        tcase = create_TestCase()
+        tl.addTest( tcase )
+        tl.stringFileWrite( anything=['A',1] )
+
+        tr = tio.TestListReader( tl.getFilename() )
+        tr.read()
+        assert tr.getAttr( 'anything' ) == ['A',1]
+
+        tl.initializeResultsFile( checkme={'A':1} )
+        tl.writeFinished()
+
+        tr = tio.TestListReader( tl.getResultsFilename() )
+        tr.read()
+        D = tr.getAttr( 'checkme' )
+        assert len(D) == 1 and D['A'] == 1
+
     def test_write_a_test_list_then_results_then_read_it(self):
         ""
         tl = write_TestList_with_fake_test()

@@ -38,6 +38,10 @@ class Batcher:
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
 
+    def getMaxJobs(self):
+        ""
+        return self.maxjobs
+
     def writeQsubScripts(self):
         ""
         self._remove_batch_directories()

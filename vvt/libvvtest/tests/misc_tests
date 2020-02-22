@@ -21,6 +21,7 @@ from libvvtest.location import find_vvtest_test_root_file
 from libvvtest.location import determine_configdir
 from libvvtest.location import split_by_largest_existing_path
 import libvvtest.TestList as TestList
+import libvvtest.testlistio as testlistio
 
 
 class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
@@ -248,6 +249,51 @@ class exit_status_controls( vtu.vvtestTestCase ):
                               raise_on_error=False )
         vrun.assertCounts( total=2, npass=1, skip=1 )
         assert vrun.x == 0
+
+    def test_command_line_is_stored_in_testlist_files(self):
+        ""
+        return  # magic: not done
+
+        util.writefile( 'testA.vvt', """
+            #VVT: keywords : one
+            """ )
+        util.writefile( 'testB.vvt', """
+            #VVT: keywords : two
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-g -k one' )
+        trdir = vrun.resultsDir()
+
+        cmdl = get_command_line( trdir+'/testlist' )
+        assert '-g' in cmdl and '-k' in cmdl and 'one' in cmdl
+
+        vrun = vtu.runvvtest( chdir=trdir )
+        vrun.assertCounts( total=1, npass=1 )
+        cmdl = get_command_line( trdir+'/testlist.*' )
+        assert '--plat' in cmdl
+
+        vtu.remove_results()
+
+        vrun = vtu.runvvtest( '-k two' )
+        vrun.assertCounts( total=1, npass=1 )
+        cmdl = get_command_line( trdir+'/testlist' )
+        assert '-k' in cmdl and 'two' in cmdl
+        cmdl2 = get_command_line( trdir+'/testlist.*' )
+        assert cmdl == cmdl2
+
+
+def get_command_line( filepat ):
+    ""
+    rf = util.globfile( filepat )
+
+    lr = testlistio.TestListReader( rf )
+    lr.read()
+
+    cmdl = lr.getAttr( 'cmdline' )
+    assert type(cmdl) == type([])
+
+    return cmdl
 
 
 ############################################################################
