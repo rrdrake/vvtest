@@ -512,7 +512,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     rtdata.getResultsWriter().prerun( tlist, verbosity=1 )
     print3()
 
-    location.createTestDir( testsubdir, perms, opts.dash_M )
+    location.create_test_directory( testsubdir, perms, opts.dash_M )
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
     tlist.stringFileWrite()
@@ -700,7 +700,6 @@ def runTests( opts, optD, rtdata, dirs ):
     testsubdir = rtdata.getTestSubdir()
     test_dir = rtdata.getTestResultsDir()
     timehandler = rtdata.getTestTimeHandler()
-    plugin = rtdata.getUserPlugin()
     selector = rtdata.getTestSelector()
     scanner = rtdata.getTestScanner()
 
@@ -715,7 +714,7 @@ def runTests( opts, optD, rtdata, dirs ):
 
     perms = rtdata.getPermissionsObject()
 
-    location.createTestDir( testsubdir, perms, opts.dash_M )
+    location.create_test_directory( testsubdir, perms, opts.dash_M )
 
     if opts.dash_w:
         pathutil.remove_directory_contents( testsubdir )
@@ -1026,7 +1025,6 @@ def restartTests( opts, optD, rtdata ):
     batchid = opts.qsub_id
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
-    plugin = rtdata.getUserPlugin()
     selector = rtdata.getTestSelector()
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)

@@ -231,17 +231,7 @@ class execute_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest()
         vrun.assertCounts( total=1, npass=1 )
 
-        # check using the -M option
-
-        vtu.remove_results()
-
-        os.mkdir( 'mir' )
-        time.sleep(1)
-
-        vtu.runvvtest( '-M '+cwd+'/mir' ).assertCounts( total=1, npass=1 )
-
-        # cd into a test and run it
-
+        # cd into a test and re-run it
         os.chdir( vrun.resultsDir()+'/xdir' )
         vtu.runvvtest( '-R' ).assertCounts( total=1, npass=1 )
 

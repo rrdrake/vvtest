@@ -117,7 +117,7 @@ def test_results_subdir_name( rundir, onopts, offopts, platform_name ):
     return testdirname
 
 
-def createTestDir( testdirname, perms, mirdir ):
+def create_test_directory( testdirname, perms, mirdir ):
     """
     Create the given directory name.  If -M is given in the command line
     options, then a mirror directory is created and 'testdirname' will be

@@ -10,11 +10,12 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-import re
+from os.path import abspath
+from os.path import join as pjoin
 import time
-import subprocess
 import shutil
 from glob import glob
+import stat
 
 import vvtestutils as vtu
 import testutils as util
@@ -22,6 +23,71 @@ from testutils import print3
 
 
 class rundir_usage( vtu.vvtestTestCase ):
+
+    def test_using_the_M_option(self):
+        ""
+        os.mkdir( 'mir' )
+
+        util.writefile( "src/atest.vvt", """
+            import os, sys
+            dL = []
+            for i in range(1000):
+                d1 = os.getcwd()
+                dL.append( os.path.basename(d1) )
+                os.chdir( '..' )
+                d2 = os.getcwd()
+                if os.path.samefile( d1, d2 ):
+                    break
+            dL.reverse()
+            print ( 'PWD='+repr( os.sep.join( dL ) ) )
+            """)
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-M', abspath('mir'), 'src' )
+        vrun.assertCounts( total=1, npass=1 )
+
+        pwd = eval( vrun.greplogs( 'PWD=' )[-1].split( 'PWD=', 1 )[1] )
+        trd = util.globfile( pjoin( abspath('mir'), 'TestResults*', 'atest' ) )
+        assert os.path.samefile( pwd, trd )
+        assert os.path.islink( vrun.resultsDir() )
+
+        vrun = vtu.runvvtest( '-R', chdir=vrun.resultsDir() )
+        vrun.assertCounts( total=1, npass=1 )
+        pwd2 = eval( vrun.greplogs( 'PWD=' )[-1].split( 'PWD=', 1 )[1] )
+        assert pwd == pwd2
+
+    def test_using_M_option_when_PWD_is_not_writable(self):
+        ""
+        # magic: not done; the desired behavior is to have the mirror
+        #        directory created and just cd there and run
+        #
+        #   the changes needed expose a more general problem, which is that
+        #   relative pathing is tangled up in the startup sequence
+        #
+        #   fixing the relative pathing would allow --run-dir to be an
+        #   absolute path as well
+        return
+
+        os.mkdir( 'mir' )
+
+        cdir = 'work'
+        util.writefile( cdir+'/atest.vvt', """
+            import vvtest_util as vvt
+            """ )
+
+        savefm = stat.S_IMODE( os.stat(cdir)[stat.ST_MODE] )
+        fm = savefm & ( ~( stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH ) )
+        os.chmod( cdir, fm )
+
+        time.sleep(1)
+
+        try:
+            vrun = vtu.runvvtest( '-M', abspath('mir'), chdir=cdir )
+        finally:
+            os.chmod( cdir, savefm )
+
+        assert len( glob( cdir+'/TestResults*' ) ) == 0
+        vrun.assertCounts( total=1, npass=1 )
 
     def test_using_rundir_option(self):
         ""
