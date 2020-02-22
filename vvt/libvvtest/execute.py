@@ -15,8 +15,10 @@ from .outpututils import XstatusString, pretty_time
 
 class TestListRunner:
 
-    def __init__(self, test_dir, tlist, xlist, perms, results_writer, plat):
+    def __init__(self, cmdargv, test_dir, tlist, xlist, perms,
+                       results_writer, plat):
         ""
+        self.cmdargv = cmdargv
         self.test_dir = test_dir
         self.tlist = tlist
         self.xlist = xlist
@@ -27,7 +29,7 @@ class TestListRunner:
     def runDirect(self, qsub_id):
         ""
         run_test_list( qsub_id, self.tlist, self.xlist, self.test_dir, self.plat,
-                       self.perms, self.results_writer )
+                       self.perms, self.results_writer, self.cmdargv )
 
     def runBatch(self, batch):
         ""
@@ -38,10 +40,10 @@ class TestListRunner:
         batch.writeQsubScripts()
 
         run_batch( batch, self.tlist, self.xlist, self.perms, self.results_writer,
-                   self.test_dir )
+                   self.test_dir, self.cmdargv )
 
 
-def run_batch( batch, tlist, xlist, perms, results_writer, test_dir ):
+def run_batch( batch, tlist, xlist, perms, results_writer, test_dir, cmdargv ):
     ""
     print3( 'Maximum concurrent batch jobs:', batch.getMaxJobs() )
 
@@ -53,7 +55,7 @@ def run_batch( batch, tlist, xlist, perms, results_writer, test_dir ):
 
     uthook = utesthooks.construct_unit_testing_hook( 'batch' )
 
-    rfile = tlist.initializeResultsFile()
+    rfile = tlist.initializeResultsFile( cmdline=cmdargv )
 
     info = TestInformationPrinter( sys.stdout, tlist, batch )
 
@@ -138,7 +140,7 @@ def sleep_with_info_check( info, qsleep ):
 
 
 def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
-                   perms, results_writer ):
+                   perms, results_writer, cmdargv ):
     ""
     plat.display()
     starttime = time.time()
@@ -146,7 +148,7 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
 
     uthook = utesthooks.construct_unit_testing_hook( 'run', qsub_id )
 
-    rfile = tlist.initializeResultsFile()
+    rfile = tlist.initializeResultsFile( cmdline=cmdargv )
 
     try:
 

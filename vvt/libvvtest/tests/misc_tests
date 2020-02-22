@@ -252,8 +252,6 @@ class exit_status_controls( vtu.vvtestTestCase ):
 
     def test_command_line_is_stored_in_testlist_files(self):
         ""
-        return  # magic: not done
-
         util.writefile( 'testA.vvt', """
             #VVT: keywords : one
             """ )
