@@ -4,11 +4,15 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os, sys
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+
+from os.path import join as pjoin
 import tempfile
 import shutil
-
-from command import Command
+import subprocess
 
 
 help_string = """
@@ -75,17 +79,16 @@ def main():
         sys.stdout.write(s)
         return
 
-    echo = 'echo'
+    echo = True
     if ('-q','') in optL:
-        echo = 'none'
+        echo = False
 
     for s in argL:
-        if   s == "generate":
+        if s == "generate":
             generate_keytab()
 
-
         elif s == "init"    :
-            tic = init_ticket( echo='none' )
+            tic = init_ticket( echo=False )
             print3( tic )
 
         elif s == "destroy" :
@@ -99,10 +102,14 @@ def main():
 
 def get_keytab_search_paths():
     ""
+    homedir = os.environ.get( 'KEYTAB_USER_HOME_DIR', '~' )
+
     usr = get_user_name()
+
     pL = []
-    pL.append( os.path.expanduser( '~/.ssh/krb5keytab' ) )
-    pL.append( os.path.expanduser( '~/.'+usr+'.keytab' ) )
+    pL.append( os.path.expanduser( pjoin( homedir, '.ssh', 'krb5keytab' ) ) )
+    pL.append( os.path.expanduser( pjoin( homedir, '.'+usr+'.keytab' ) ) )
+
     return pL
 
 
@@ -140,22 +147,21 @@ def generate_keytab():
     msg = msg.replace( 'KEYTABPATH', keytabpath )
     print3( msg )
 
-    Command( 'ktutil' ).run( raise_on_error=True )
+    shcmd( 'ktutil' )
 
     ktdir = os.path.dirname( keytabpath )
-    Command( 'ls -ld $ktdir $keytabpath' ).run()
+    shcmd( 'ls -ld', ktdir, keytabpath, check=False )
 
 
-def delete_keytab_file( filename, echo="echo" ):
+def delete_keytab_file( filename, echo=True ):
     ""
     if os.path.exists( filename ):
-        if echo != "none":
+        if echo:
             print3( 'rm '+filename )
-        if 'COMMAND_DRYRUN' not in os.environ:
-            os.remove( filename )
+        os.remove( filename )
 
 
-def init_ticket( echo="echo" ):
+def init_ticket( echo=False ):
     """
     Generates a random filename for the Kerberos cache file then runs kinit
     to initialize it using the keytab file.  The KRB5CCNAME environment
@@ -168,9 +174,8 @@ def init_ticket( echo="echo" ):
 
     cachefname = os.path.join( tmpdir, 'krb5ccache' )
 
-    cmd = Command( 'kinit -f -l 24h -c $cachefname',
-                   '-k -t $keytabpath ${usr}@dce.sandia.gov' )
-    cmd.run( echo=echo, raise_on_error=True )
+    shcmd( 'kinit -f -l 24h -c', cachefname,
+                '-k -t', keytabpath, usr+'@dce.sandia.gov', echo=echo )
 
     if 'KRB5CCNAME' in os.environ:
         os.environ['PREVIOUS_KRB5CCNAME'] = os.environ['KRB5CCNAME']
@@ -180,7 +185,7 @@ def init_ticket( echo="echo" ):
     return cachefname
 
 
-def destroy_ticket( echo="echo" ):
+def destroy_ticket( echo=True ):
     """
     Calls kdestroy on the KRB5CCNAME cache file, then removes it.  The
     KRB5CCNAME environment variable is set to PREVIOUS_KRB5CCNAME if defined.
@@ -189,7 +194,7 @@ def destroy_ticket( echo="echo" ):
 
     if cachefname and os.path.exists( cachefname ):
 
-        Command( 'kdestroy -c $cachefname' ).run( echo=echo )
+        shcmd( 'kdestroy -c', cachefname, echo=echo )
 
         # only remove the cache file if it was created with init_cache_file()
 
@@ -198,7 +203,7 @@ def destroy_ticket( echo="echo" ):
         tmpdir = os.path.dirname( cachefname )
 
         if os.path.basename( tmpdir ).startswith( prefix ):
-            if echo != "none":
+            if echo:
                 print3( 'rm -rf '+tmpdir )
             shutil.rmtree( tmpdir, ignore_errors=True )
 
@@ -228,6 +233,22 @@ def get_user_name():
         pass
 
     raise Exception( "could not determine the user name of this process" )
+
+
+def shcmd( *args, **kwargs ):
+    ""
+    echo = kwargs.pop( 'echo', True )
+    check = kwargs.pop( 'check', True )
+
+    cmd = ' '.join( args )
+
+    if echo:
+        print3( cmd )
+
+    if check:
+        subprocess.check_call( cmd, shell=True )
+    else:
+        subprocess.call( cmd, shell=True )
 
 
 def print3( *args ):

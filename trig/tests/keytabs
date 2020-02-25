@@ -23,30 +23,26 @@ from testutils import print3
 # the module being tested
 import keytab
 
-from command import Command
-
 ktfile = pjoin( dirname(trigutil.testsrcdir), 'keytab.py' )
 
-
-######################################################################
 
 class catchall( unittest.TestCase ):
 
     def setUp(self):
         ""
         util.setup_test()
-        os.environ[ 'COMMAND_DRYRUN' ] = ''
 
-    def tearDown(self):
-        ""
-        if 'COMMAND_DRYRUN' in os.environ:
-            del os.environ['COMMAND_DRYRUN']
+        make_fake_keytab_programs()
+
+        os.environ['KEYTAB_USER_HOME_DIR'] = os.getcwd()
 
     def test_man_page(self):
         ""
-        os.environ.pop( 'COMMAND_DRYRUN' )
-        Command( '$ktfile -h' ).run( raise_on_error=True )
-        Command( '$ktfile --help' ).run( raise_on_error=True )
+        x,out = util.runcmd( ktfile+' -h' )
+        assert 'QUICK START' in out
+
+        x,out = util.runcmd( ktfile+' --help' )
+        assert 'QUICK START' in out
 
     def test_getting_user_name(self):
         ""
@@ -56,16 +52,52 @@ class catchall( unittest.TestCase ):
 
     def test_list_of_keytab_file_locations(self):
         ""
-        paths = keytab.get_keytab_search_paths()
+        cwd = os.getcwd()
+        homedir = expanduser( '~' )
+        sshdir = expanduser( '~/.ssh' )
+
+        with util.set_environ( KEYTAB_USER_HOME_DIR=None ):
+            paths = keytab.get_keytab_search_paths()
 
         assert len( paths ) == 2
-        homedir = expanduser( '~' )
         for p in paths:
-            assert p.startswith( homedir )
+            d = os.path.dirname( p )
+            assert self.is_home_dir(d) or \
+                   self.is_home_ssh_dir(d)
+
+        paths = keytab.get_keytab_search_paths()
+        for p in paths:
+            d = os.path.dirname( p )
+            assert not self.is_home_dir(d) and \
+                   not self.is_home_ssh_dir(d)
+            assert d.startswith( cwd )
+
+    def is_home_dir(self, path):
+        ""
+        homedir = expanduser( '~' )
+        assert os.path.exists( homedir )
+
+        if os.path.exists( path ) and os.path.samefile( homedir, path ):
+            return True
+
+        return False
+
+    def is_home_ssh_dir(self, path):
+        ""
+        homedir = expanduser( '~' )
+        assert os.path.exists( homedir )
+
+        d,b = os.path.split( path )
+        if os.path.exists( d ) and os.path.samefile( d, homedir ):
+            return b == '.ssh'
+
+        return False
 
     def test_first_keytab_file_location_is_in_ssh_directory(self):
         ""
-        paths = keytab.get_keytab_search_paths()
+        with util.set_environ( KEYTAB_USER_HOME_DIR=None ):
+            paths = keytab.get_keytab_search_paths()
+
         assert paths[0].startswith( expanduser( '~/.ssh' ) )
 
     def test_find_keytab_returns_first_existing_path(self):
@@ -84,13 +116,10 @@ class catchall( unittest.TestCase ):
         ""
         keytab.generate_keytab()
 
-        os.environ['COMMAND_DRYRUN'] = 'keytab.py'
-        Command( '$ktfile generate' ).run( raise_on_error=True )
+        util.runcmd( ktfile+' generate', verbose=2 )
 
     def test_delete_keytab_file(self):
         ""
-        os.environ.pop( 'COMMAND_DRYRUN' )
-
         # does not fail
         keytab.delete_keytab_file( '/foo/bar/baz.txt' )
 
@@ -103,6 +132,9 @@ class catchall( unittest.TestCase ):
 
     def test_command_line_init_ticket_should_only_echo_the_cache_file(self):
         ""
+        util.writefile( '.ssh/krb5keytab', "fake tab" )
+        time.sleep(1)
+
         util.run_redirect( ktfile+' init', 'init.log' )
 
         time.sleep(1)
@@ -111,67 +143,73 @@ class catchall( unittest.TestCase ):
 
     def test_init_ticket_modifies_environment(self):
         ""
-        os.environ['KRB5CCNAME'] = 'fakevalue'
-
-        return_fname = keytab.init_ticket()
-
+        util.writefile( '.ssh/krb5keytab', "fake tab" )
         time.sleep(1)
-        assert os.environ['PREVIOUS_KRB5CCNAME'] == 'fakevalue'
 
-        fname = os.environ['KRB5CCNAME']
-        assert fname == return_fname
-        check_ticket_cache_and_remove_it( fname )
+        with util.set_environ( KRB5CCNAME='fakevalue' ):
 
-        # should still work if KRB5CCNAME is not defined in the environment
+            return_fname = keytab.init_ticket()
 
-        os.environ.pop( 'KRB5CCNAME' )
-        return_fname = keytab.init_ticket()
+            time.sleep(1)
+            assert os.environ['PREVIOUS_KRB5CCNAME'] == 'fakevalue'
 
-        fname = os.environ['KRB5CCNAME']
-        assert fname == return_fname
-        check_ticket_cache_and_remove_it( fname )
+            fname = os.environ['KRB5CCNAME']
+            assert fname == return_fname
+            check_ticket_cache_and_remove_it( fname )
+
+            # should still work if KRB5CCNAME is not defined in the environment
+
+            os.environ.pop( 'KRB5CCNAME' )
+            return_fname = keytab.init_ticket()
+
+            fname = os.environ['KRB5CCNAME']
+            assert fname == return_fname
+            check_ticket_cache_and_remove_it( fname )
 
     def test_command_line_init_ticket_followed_by_destroy_ticket(self):
         ""
+        util.writefile( '.ssh/krb5keytab', "fake tab" )
+        time.sleep(1)
+
         util.run_redirect( ktfile+' init', 'init.log' )
 
         time.sleep(1)
         fname = util.readfile( 'init.log' ).strip()
         assert os.path.exists( dirname(fname) )
 
-        # have to set this manually to test (used in destroy_ticket() )
-        os.environ['KRB5CCNAME'] = fname
-
         util.writefile( fname, 'junk contents' )
 
-        # allow this one to execute
-        os.environ['COMMAND_DRYRUN'] = 'keytab.py'
-        Command( ktfile+' destroy' ).run( raise_on_error=True )
+        # have to set this manually to test (used in destroy_ticket() )
+        with util.set_environ( KRB5CCNAME=fname ):
+            util.runcmd( ktfile+' destroy', verbose=2 )
 
         assert not os.path.exists( fname )
         assert not os.path.exists( dirname(fname) )
 
     def test_programmatic_init_ticket_followed_by_destroy_ticket(self):
         ""
-        os.environ['KRB5CCNAME'] = 'fakevalue'
-
-        fname = keytab.init_ticket()
-
-        time.sleep(1)
-        assert os.path.exists( dirname(fname) )
-        assert os.environ['KRB5CCNAME'] == fname
-        assert os.environ['PREVIOUS_KRB5CCNAME'] == 'fakevalue'
-
-        util.writefile( fname, 'junk contents' )
+        util.writefile( '.ssh/krb5keytab', "fake tab" )
         time.sleep(1)
 
-        keytab.destroy_ticket()
+        with util.set_environ( KRB5CCNAME='fakevalue' ):
 
-        time.sleep(1)
-        assert not os.path.exists( fname )
-        assert not os.path.exists( dirname(fname) )
-        assert 'PREVIOUS_KRB5CCNAME' not in os.environ
-        assert os.environ['KRB5CCNAME'] == 'fakevalue'
+            fname = keytab.init_ticket()
+
+            time.sleep(1)
+            assert os.path.exists( dirname(fname) )
+            assert os.environ['KRB5CCNAME'] == fname
+            assert os.environ['PREVIOUS_KRB5CCNAME'] == 'fakevalue'
+
+            util.writefile( fname, 'junk contents' )
+            time.sleep(1)
+
+            keytab.destroy_ticket()
+
+            time.sleep(1)
+            assert not os.path.exists( fname )
+            assert not os.path.exists( dirname(fname) )
+            assert 'PREVIOUS_KRB5CCNAME' not in os.environ
+            assert os.environ['KRB5CCNAME'] == 'fakevalue'
 
 
 ######################################################################
@@ -189,6 +227,27 @@ def check_ticket_cache_and_remove_it( filename ):
     # if this fails because there is a file in the directory, then that is
     # a real error - the cache file should not have been created in testing
     os.rmdir( cachedir )
+
+
+def make_fake_keytab_programs():
+    ""
+    util.writescript( 'fakeprogs/ktutil', """
+        #!"""+sys.executable+"""
+        pass
+        """ )
+    util.writescript( 'fakeprogs/kinit', """
+        #!"""+sys.executable+"""
+        pass
+        """ )
+    util.writescript( 'fakeprogs/kdestroy', """
+        #!"""+sys.executable+"""
+        pass
+        """ )
+
+    if 'PATH' in os.environ:
+        os.environ['PATH'] = abspath( 'fakeprogs' )+':'+os.environ['PATH']
+    else:
+        os.environ['PATH'] = abspath( 'fakeprogs' )
 
 
 ######################################################################
