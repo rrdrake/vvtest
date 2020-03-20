@@ -79,6 +79,120 @@ class uploading_a_file( trigutil.trigTestCase ):
         self.run_upload_file_test( None )
 
 
+class file_formatting( trigutil.trigTestCase ):
+
+    def test_reading_xml(self):
+        ""
+        util.writefile( 'good.xml', """\
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Site attr="value">
+                <Testing>
+                    content
+                </Testing>
+            </Site>
+            """ )
+        util.writefile( 'bad.xml', """\
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Site attr="value">
+                <Testing>
+                    content
+                <Testing>
+            </Site>
+            """ )
+        time.sleep(1)
+
+        etree = read_xml_file( 'good.xml' )
+        print3( 'root', etree.tag, etree.attrib )
+        for nd in etree:
+            print3( 'node', nd.tag, nd.attrib )
+
+        self.assertRaises( Exception, read_xml_file, 'bad.xml' )
+
+    def test_setting_global_fields(self):
+        ""
+        fmtr = cdashutil.TestResultsFormatter()
+
+        tm = 1584666632.0827949  # Thu Mar 19 19:10:32 2020
+
+        build_date = tm - 60*60
+        build_group = 'Production'
+        site_name = 'Oz'
+        build_name = 'Wizard'
+        fmtr.setBuildID( build_date, build_group, site_name, build_name )
+
+        start_time = build_date + 20*60
+        end_time = start_time + 50*60
+        fmtr.setTime( start_time, end_time )
+
+        fmtr.writeToFile( 'file.xml' )
+        time.sleep(1)
+
+        etree = read_xml_file( 'file.xml' )
+
+        assert etree.tag == 'Site'
+        assert etree.attrib['BuildStamp'] == '20200319-181032-Production'
+        assert etree.attrib['BuildName'] == 'Wizard'
+        assert etree.attrib['Name'] == 'Oz'
+
+        chkD = {}
+        for nd1 in etree:
+            assert nd1.tag == 'Testing'
+            for nd2 in nd1:
+                chkD[ nd2.tag ] = nd2.text.strip()
+        assert chkD['StartDateTime'] == 'Mar 19 18:30:32 MDT'
+        assert chkD['StartTestTime'].startswith( '1584664232' )
+        assert chkD['EndDateTime'] == 'Mar 19 19:20:32 MDT'
+        assert chkD['EndTestTime'].startswith( '1584667232' )
+        assert int( float( chkD['ElapsedMinutes'] ) + 0.5 ) == 50
+
+    def test_magic(self):
+        ""
+        etree = read_xml_file( '/home/rrdrake/Projects/scidev/scidev_cdash/trig/junk' )
+
+        assert etree.tag == 'Site'
+        # assert etree.attrib['BuildStamp'] == '20200319-191032-Experimental'
+        # assert etree.attrib['BuildName'] == 'Wizard'
+        # assert etree.attrib['Name'] == 'Oz'
+
+        chkD = {}
+        for nd1 in etree:
+            assert nd1.tag == 'Testing'
+            for nd2 in nd1:
+                chkD[ nd2.tag ] = nd2.text
+        for k,v in chkD.items():
+            print3( 'magic: kv', repr(k), repr(v) )
+
+
+# 20200314-1816-Production 20200319-191032-Experimental
+
+'''
+<?xml version="1.0" encoding="UTF-8"?>
+<Site BuildName="a.build.name"
+      BuildStamp="buildstamp"
+      Name="a.site.name"
+      Append="true"
+      >
+    <Testing>
+        <StartDateTime>Mar 14 21:24</StartDateTime>
+        <StartTestTime>1584242696.99</StartTestTime>
+        <EndDateTime>Mar 14 21:25</EndDateTime>
+        <EndTestTime>1584242756.99</EndTestTime>
+        <ElapsedMinutes>1</ElapsedMinutes>
+    </Testing>
+</Site>
+'''
+
+def read_xml_file( filename ):
+    ""
+    import xml.etree.ElementTree as ET
+
+    xml = util.readfile( filename )
+
+    etree = ET.fromstring( xml )
+
+    return etree
+
+
 def write_sample_upload_file( filename ):
     ""
     contents = "some contents\nline two\n"
