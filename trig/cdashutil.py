@@ -40,17 +40,10 @@ class TestResultsFormatter:
 
     def writeToFile(self, filename):
         ""
-        dt = self.date
-        if dt == None: dt = int( time.time() )
-
-        grp = self.group
-        if grp == None: grp = 'Experimental'
-
-        site = self.site
-        if site == None: site = os.uname()[1]
-
-        bld = self.build
-        if bld == None: bld = 'tests'
+        dt   = int( time.time() ) if self.date  == None else self.date
+        grp  = 'Experimental'     if self.group == None else self.group
+        site = os.uname()[1]      if self.site  == None else self.site
+        bld  = 'tests'            if self.build == None else self.build
 
         stamp = make_build_stamp( dt, grp )
 

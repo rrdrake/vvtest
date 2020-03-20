@@ -145,42 +145,6 @@ class file_formatting( trigutil.trigTestCase ):
         assert chkD['EndTestTime'].startswith( '1584667232' )
         assert int( float( chkD['ElapsedMinutes'] ) + 0.5 ) == 50
 
-    def test_magic(self):
-        ""
-        etree = read_xml_file( '/home/rrdrake/Projects/scidev/scidev_cdash/trig/junk' )
-
-        assert etree.tag == 'Site'
-        # assert etree.attrib['BuildStamp'] == '20200319-191032-Experimental'
-        # assert etree.attrib['BuildName'] == 'Wizard'
-        # assert etree.attrib['Name'] == 'Oz'
-
-        chkD = {}
-        for nd1 in etree:
-            assert nd1.tag == 'Testing'
-            for nd2 in nd1:
-                chkD[ nd2.tag ] = nd2.text
-        for k,v in chkD.items():
-            print3( 'magic: kv', repr(k), repr(v) )
-
-
-# 20200314-1816-Production 20200319-191032-Experimental
-
-'''
-<?xml version="1.0" encoding="UTF-8"?>
-<Site BuildName="a.build.name"
-      BuildStamp="buildstamp"
-      Name="a.site.name"
-      Append="true"
-      >
-    <Testing>
-        <StartDateTime>Mar 14 21:24</StartDateTime>
-        <StartTestTime>1584242696.99</StartTestTime>
-        <EndDateTime>Mar 14 21:25</EndDateTime>
-        <EndTestTime>1584242756.99</EndTestTime>
-        <ElapsedMinutes>1</ElapsedMinutes>
-    </Testing>
-</Site>
-'''
 
 def read_xml_file( filename ):
     ""
