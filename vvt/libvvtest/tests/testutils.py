@@ -228,14 +228,15 @@ def writescript( fname, content ):
     except Exception: pass
 
 
-def runcmd( cmd, chdir=None, raise_on_error=True, print_output=True ):
+def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):
     ""
     dstr = ''
     if chdir:
         dstr = 'cd '+chdir+' && '
         cwd = os.getcwd()
 
-    print3( 'RUN: '+dstr+cmd )
+    if verbose > 0:
+        print3( 'RUN: '+dstr+cmd )
 
     if chdir:
         os.chdir( chdir )
@@ -256,10 +257,16 @@ def runcmd( cmd, chdir=None, raise_on_error=True, print_output=True ):
         if chdir:
             os.chdir( cwd )
 
-    if print_output:
+    if x != 0:
+        if raise_on_error:
+            if verbose < 1:
+                print3( 'RUN: '+dstr+cmd )
+            print3( out )
+            raise Exception( 'runcmd failed: '+repr(dstr+cmd) )
+        elif verbose >= 1:
+            print3( out )
+    elif verbose >= 2:
         print3( out )
-
-    assert x == 0 or not raise_on_error, 'runcmd failed: exit='+str(x)
 
     return x,out
 
@@ -680,49 +687,52 @@ def list_all_directories( rootpath ):
 
 def read_xml_file( filename ):
     ""
-    import xml
-    import xml.dom.minidom as minidom
-    doc = minidom.parse( filename )
-    return doc
+    import xml.etree.ElementTree as ET
+
+    xml = readfile( filename )
+    etree = ET.fromstring( xml )
+
+    return etree
 
 
-def print_xml( domnode, indent='' ):
-    ""
-    if domnode.localName:
-        print3( indent, domnode.localName )
-    if domnode.hasChildNodes():
-        for nd in domnode.childNodes:
-            print_xml( nd, indent+'  ' )
-
-
-def find_child_xml_node( node, childname ):
-    ""
-    child = None
-
-    if node.hasChildNodes():
-        for subnd in node.childNodes:
-            if subnd.nodeName and subnd.nodeName.strip() == childname:
-                child = subnd
-                break
-
-    return child
-
-
-def get_subtext_from_xml_node( node ):
+def recursive_find_xml_element( xmlnode, name, _nodes=None ):
     """
-    Concatenates XML element content from all children and their children.
+    recursively finds all XML sub-elements with the name 'name', such as
+
+        for nd in recursive_find_xml_element( xmlnode, 'TestList' ):
+            pass
     """
-    txt = ''
+    if _nodes == None:
+        _nodes = []
 
-    if node.hasChildNodes():
-        for subnd in node.childNodes:
-            if subnd.nodeValue and subnd.nodeValue.strip():
-                txt += subnd.nodeValue
-            for subsubnd in subnd.childNodes:
-                if subsubnd.nodeValue and subsubnd.nodeValue.strip():
-                    txt += subsubnd.nodeValue
+    for nd in xmlnode:
+        if nd.tag == name:
+            _nodes.append( nd )
+        recursive_find_xml_element( nd, name, _nodes )
 
-    return txt
+    return _nodes
+
+
+def get_sub_text_from_xml_node( xmlnode, _text=None ):
+    """
+    Concatenates the content at and under the given ElementTree node, such as
+
+        text = get_sub_text_from_xml_node( xmlnode )
+    """
+    if _text == None:
+        _text = []
+
+    if xmlnode.text:
+        _text.append( xmlnode.text )
+
+    for nd in xmlnode:
+
+        get_sub_text_from_xml_node( nd, _text )
+
+        if nd.tail:
+            _text.append( nd.tail )
+
+    return ''.join( _text )
 
 
 class change_directory:
@@ -853,9 +863,9 @@ def get_file_group( path ):
     return ent[0]
 
 
-def create_bare_repo_with_topic_branch( reponame, subdir=None, tag=None ):
+def create_bare_repo_with_file_and_branch( reponame, subdir=None, tag=None ):
     ""
-    url = create_local_bare_repository( reponame, subdir )
+    url = create_bare_repo( reponame, subdir )
     push_file_to_repo( url, 'file.txt', 'file contents' )
     push_new_branch_with_file( url, 'topic', 'file.txt', 'new contents' )
 
@@ -865,7 +875,7 @@ def create_bare_repo_with_topic_branch( reponame, subdir=None, tag=None ):
     return url
 
 
-def create_local_bare_repository( reponame, subdir=None ):
+def create_bare_repo( reponame, subdir=None ):
     ""
     if not subdir:
         subdir = 'bare_repo_'+random_string()
@@ -878,7 +888,7 @@ def create_local_bare_repository( reponame, subdir=None ):
         if not reponame.endswith( '.git' ):
             reponame += '.git'
 
-        runcmd( 'git init --bare '+reponame, print_output=False )
+        runcmd( 'git init --bare '+reponame, verbose=0 )
 
         url = 'file://'+os.getcwd()+'/'+reponame
 
@@ -892,16 +902,14 @@ def push_file_to_repo( url, filename, filecontents ):
 
     with change_directory( workdir ):
 
-        runcmd( 'git clone '+url, print_output=False )
+        runcmd( 'git clone '+url, verbose=0 )
 
         os.chdir( globfile( '*' ) )
-
         writefile( filename, filecontents )
 
-        runcmd( 'git add '+filename, print_output=False )
-        runcmd( 'git commit -m "push_file_to_repo '+time.ctime()+'"',
-                print_output=False )
-        runcmd( 'git push origin master', print_output=False )
+        runcmd( 'git add '+filename, verbose=0 )
+        runcmd( 'git commit -m "push_file_to_repo '+time.ctime()+'"', verbose=0 )
+        runcmd( 'git push origin master', verbose=0 )
 
 
 def push_tag_to_repo( url, tagname ):
@@ -911,12 +919,12 @@ def push_tag_to_repo( url, tagname ):
 
     with change_directory( workdir ):
 
-        runcmd( 'git clone '+url, print_output=False )
+        runcmd( 'git clone '+url, verbose=0 )
 
         os.chdir( globfile( '*' ) )
 
-        runcmd( 'git tag '+tagname, print_output=False )
-        runcmd( 'git push origin '+tagname, print_output=False )
+        runcmd( 'git tag '+tagname, verbose=0 )
+        runcmd( 'git push origin '+tagname, verbose=0 )
 
 
 def push_new_branch_with_file( url, branchname, filename, filecontents ):
@@ -926,18 +934,18 @@ def push_new_branch_with_file( url, branchname, filename, filecontents ):
 
     with change_directory( workdir ):
 
-        runcmd( 'git clone '+url, print_output=False )
+        runcmd( 'git clone '+url, verbose=0 )
 
         os.chdir( globfile( '*' ) )
 
-        runcmd( 'git checkout -b '+branchname, print_output=False )
+        runcmd( 'git checkout -b '+branchname, verbose=0 )
 
         writefile( filename, filecontents )
 
-        runcmd( 'git add '+filename, print_output=False )
+        runcmd( 'git add '+filename, verbose=0 )
         runcmd( 'git commit -m "push_new_branch_with_file ' + time.ctime()+'"',
-                print_output=False )
-        runcmd( 'git push -u origin '+branchname, print_output=False )
+                verbose=0 )
+        runcmd( 'git push -u origin '+branchname, verbose=0 )
 
 
 def push_new_file_to_branch( url, branchname, filename, filecontents ):
@@ -947,30 +955,30 @@ def push_new_file_to_branch( url, branchname, filename, filecontents ):
 
     with change_directory( workdir ):
 
-        runcmd( 'git clone '+url, print_output=False )
+        runcmd( 'git clone '+url, verbose=0 )
 
         os.chdir( globfile( '*' ) )
 
-        runcmd( 'git checkout '+branchname, print_output=False )
+        runcmd( 'git checkout '+branchname, verbose=0 )
 
         writefile( filename, filecontents )
 
-        runcmd( 'git add '+filename, print_output=False )
+        runcmd( 'git add '+filename, verbose=0 )
         runcmd( 'git commit -m "push_new_file_to_branch ' + time.ctime()+'"',
-                print_output=False )
-        runcmd( 'git push', print_output=False )
+                verbose=0 )
+        runcmd( 'git push', verbose=0 )
 
 
 def create_local_branch( local_directory, branchname ):
     ""
     with change_directory( local_directory ):
-        runcmd( 'git checkout -b '+branchname, print_output=False )
+        runcmd( 'git checkout -b '+branchname, verbose=0 )
 
 
 def checkout_to_previous_sha1( directory ):
     ""
     with change_directory( directory ):
-        runcmd( 'git checkout HEAD^1', print_output=False )
+        runcmd( 'git checkout HEAD^1', verbose=0 )
 
 
 module_uniq_id = 0

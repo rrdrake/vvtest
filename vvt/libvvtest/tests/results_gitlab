@@ -436,7 +436,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
 
     def make_git_repo(self):
         ""
-        url = util.create_local_bare_repository( 'arepo' )
+        url = util.create_bare_repo( 'arepo' )
         util.push_file_to_repo( url, 'file.txt', 'file contents' )
 
         return url

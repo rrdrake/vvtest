@@ -687,49 +687,52 @@ def list_all_directories( rootpath ):
 
 def read_xml_file( filename ):
     ""
-    import xml
-    import xml.dom.minidom as minidom
-    doc = minidom.parse( filename )
-    return doc
+    import xml.etree.ElementTree as ET
+
+    xml = readfile( filename )
+    etree = ET.fromstring( xml )
+
+    return etree
 
 
-def print_xml( domnode, indent='' ):
-    ""
-    if domnode.localName:
-        print3( indent, domnode.localName )
-    if domnode.hasChildNodes():
-        for nd in domnode.childNodes:
-            print_xml( nd, indent+'  ' )
-
-
-def find_child_xml_node( node, childname ):
-    ""
-    child = None
-
-    if node.hasChildNodes():
-        for subnd in node.childNodes:
-            if subnd.nodeName and subnd.nodeName.strip() == childname:
-                child = subnd
-                break
-
-    return child
-
-
-def get_subtext_from_xml_node( node ):
+def recursive_find_xml_element( xmlnode, name, _nodes=None ):
     """
-    Concatenates XML element content from all children and their children.
+    recursively finds all XML sub-elements with the name 'name', such as
+
+        for nd in recursive_find_xml_element( xmlnode, 'TestList' ):
+            pass
     """
-    txt = ''
+    if _nodes == None:
+        _nodes = []
 
-    if node.hasChildNodes():
-        for subnd in node.childNodes:
-            if subnd.nodeValue and subnd.nodeValue.strip():
-                txt += subnd.nodeValue
-            for subsubnd in subnd.childNodes:
-                if subsubnd.nodeValue and subsubnd.nodeValue.strip():
-                    txt += subsubnd.nodeValue
+    for nd in xmlnode:
+        if nd.tag == name:
+            _nodes.append( nd )
+        recursive_find_xml_element( nd, name, _nodes )
 
-    return txt
+    return _nodes
+
+
+def get_sub_text_from_xml_node( xmlnode, _text=None ):
+    """
+    Concatenates the content at and under the given ElementTree node, such as
+
+        text = get_sub_text_from_xml_node( xmlnode )
+    """
+    if _text == None:
+        _text = []
+
+    if xmlnode.text:
+        _text.append( xmlnode.text )
+
+    for nd in xmlnode:
+
+        get_sub_text_from_xml_node( nd, _text )
+
+        if nd.tail:
+            _text.append( nd.tail )
+
+    return ''.join( _text )
 
 
 class change_directory:

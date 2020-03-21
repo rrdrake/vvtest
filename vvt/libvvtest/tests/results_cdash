@@ -1,0 +1,49 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import basename, abspath
+import time
+import glob
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+import libvvtest.cdashwriter as cdashwriter
+
+
+class foundational_stuff( vtu.vvtestTestCase ):
+
+    def test_recognizing_http_urls(self):
+        ""
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        assert not cdashwriter.is_http_url( 'subdir' )
+        assert not cdashwriter.is_http_url( abspath('subdir') )
+        assert not cdashwriter.is_http_url( 'foobarbaz' )
+        assert not cdashwriter.is_http_url( abspath('foobarbaz') )
+
+        assert cdashwriter.is_http_url( 'http://hostname' )
+        assert cdashwriter.is_http_url( 'http://hostname.com' )
+        assert cdashwriter.is_http_url( 'http://hostname.com/' )
+        assert cdashwriter.is_http_url( 'http://hostname.com/cdash' )
+
+        assert cdashwriter.is_http_url( 'https://hostname' )
+        assert cdashwriter.is_http_url( 'https://hostname.com' )
+        assert cdashwriter.is_http_url( 'https://hostname.com/' )
+        assert cdashwriter.is_http_url( 'https://hostname.com/cdash' )
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )

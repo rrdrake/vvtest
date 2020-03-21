@@ -783,7 +783,8 @@ def information_mode( opts ):
 def need_console_output( opts ):
     ""
     if information_mode( opts ):
-        if opts.html or opts.junit or opts.gitlab or opts.save_results:
+        if opts.html or opts.junit or opts.gitlab or \
+           opts.save_results or opts.cdash:
             return False
 
     return True
@@ -814,6 +815,10 @@ def construct_results_writers( opts, optD,
 
         if opts.gitlab:
             wr = construct_gitlab_writer( test_dir, opts, optD, perms )
+            writers.addWriter( wr )
+
+        if opts.cdash:
+            wr = construct_cdash_writer( test_dir, opts, optD, perms )
             writers.addWriter( wr )
 
         if opts.save_results:
@@ -881,6 +886,18 @@ def construct_gitlab_writer( test_dir, opts, optD, perms ):
     gitlabobj.setNamingTags( optD['onopts'], opts.results_tag )
 
     return gitlabobj
+
+
+def construct_cdash_writer( test_dir, opts, optD, perms ):
+    ""
+    import libvvtest.cdashwriter as cdashwriter
+
+    cdashobj = cdashwriter.CDashWriter( opts.cdash, test_dir, perms )
+
+    cdashobj.setOutputDate( opts.results_date )
+    # magic cdashobj.setNamingTags( opts.results_tag )
+
+    return cdashobj
 
 
 def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):

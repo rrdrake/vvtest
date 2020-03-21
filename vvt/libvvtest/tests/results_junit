@@ -52,9 +52,10 @@ class junit_output_format_tests( vtu.vvtestTestCase ):
     def assert_junit_test_names(self, doc):
         ""
         tL = []
-        for nd in doc.getElementsByTagName('testcase'):
-            tL.append( (nd.getAttribute('name'),nd.getAttribute('time')) )
+        for nd in doc.findall('testsuite/testcase'):
+            tL.append( (nd.get('name'),nd.get('time')) )
         tL.sort()
+
         assert [ tup[0] for tup in tL ] == [ 'DiffTest.np=1',
                                              'DiffTest.np=2',
                                              'FailTest',
@@ -68,13 +69,13 @@ class junit_output_format_tests( vtu.vvtestTestCase ):
 
     def assert_output_for_diff_and_fail_tests(self, doc):
         ""
-        for nd in doc.getElementsByTagName('testcase'):
-            sysnd = util.find_child_xml_node( nd, 'system-out' )
-            if nd.getAttribute('name').startswith( 'DiffTest' ):
-                txt = util.get_subtext_from_xml_node(sysnd)
+        for nd in doc.findall( 'testsuite/testcase' ):
+            sysnd = nd.find( 'system-out' )
+            if nd.get('name').startswith( 'DiffTest' ):
+                txt = util.get_sub_text_from_xml_node(sysnd)
                 assert 'fake difference of 29' in txt
-            elif nd.getAttribute('name').startswith( 'FailTest' ):
-                txt = util.get_subtext_from_xml_node(sysnd)
+            elif nd.get('name').startswith( 'FailTest' ):
+                txt = util.get_sub_text_from_xml_node(sysnd)
                 assert 'pitch a fake exception' in txt
 
     def test_no_tests_to_run_still_produces_a_junit_file(self):
@@ -95,7 +96,7 @@ class junit_output_format_tests( vtu.vvtestTestCase ):
 
             assert os.path.exists( 'ju.xml' )
             doc = util.read_xml_file( 'ju.xml' )
-            assert len( doc.getElementsByTagName('testcase') ) == 0
+            assert len( util.recursive_find_xml_element( doc, 'testcase' ) ) == 0
 
 
 def write_three_test_files():

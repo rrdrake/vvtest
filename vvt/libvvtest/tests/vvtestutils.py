@@ -230,7 +230,7 @@ class VvtestCommandRunner:
         chdir          = options.get( 'chdir',          None )
 
         x,out = util.runcmd( self.cmd, chdir=chdir,
-                             raise_on_error=False, print_output=False )
+                             raise_on_error=False, verbose=1 )
 
         if not quiet:
             print3( out )
