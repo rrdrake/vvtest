@@ -112,7 +112,7 @@ class file_formatting( trigutil.trigTestCase ):
         ""
         fmtr = cdashutil.TestResultsFormatter()
 
-        tm = 1584666632.0827949  # Thu Mar 19 19:10:32 2020
+        tm = 1584666632.0827949  # Thu Mar 19 19:10:32 2020 MDT
 
         build_date = tm - 60*60
         build_group = 'Production'
@@ -144,6 +144,127 @@ class file_formatting( trigutil.trigTestCase ):
         assert chkD['EndDateTime'] == 'Mar 19 19:20:32 MDT'
         assert chkD['EndTestTime'].startswith( '1584667232' )
         assert int( float( chkD['ElapsedMinutes'] ) + 0.5 ) == 50
+
+    def test_listing_tests(self):
+        ""
+        fmtr = cdashutil.TestResultsFormatter()
+
+        fmtr.addTest( 'atest' )
+        fmtr.addTest( 'btest', status='failed', output='Houston, big problem' )
+        fmtr.addTest( 'ctest', status='notrun', detail='keyword skip' )
+
+        fmtr.writeToFile( 'file.xml' )
+        time.sleep(1)
+
+        etree = read_xml_file( 'file.xml' )
+        listnames = extract_test_list( etree )
+        tests = extract_test_results( etree )
+
+        assert listnames == set( ['./atest','./btest','./ctest'] )
+
+        atest = tests['./atest']
+        assert atest['name'] == 'atest'
+        assert atest['path'] == '.'
+        assert atest['status'] == 'passed'
+
+        btest = tests['./btest']
+        assert btest['name'] == 'btest'
+        assert btest['path'] == '.'
+        assert btest['status'] == 'failed'
+        assert btest['output'].strip() == 'Houston, big problem'
+
+        ctest = tests['./ctest']
+        assert ctest['name'] == 'ctest'
+        assert ctest['path'] == '.'
+        assert ctest['status'] == 'notrun'
+        assert ctest['Completion Status'].strip() == 'keyword skip'
+
+        assert len( tests ) == 3
+
+    def test_command_line(self):
+        ""
+        fmtr = cdashutil.TestResultsFormatter()
+        fmtr.addTest( 'atest', cmdline='/usr/bin/ugly -command line' )
+        fmtr.writeToFile( 'file.xml' )
+        time.sleep(1)
+
+        etree = read_xml_file( 'file.xml' )
+        tests = extract_test_results( etree )
+
+        atest = tests['./atest']
+        assert atest['cmdline'].strip() == '/usr/bin/ugly -command line'
+
+    def test_elapsed_time(self):
+        ""
+        fmtr = cdashutil.TestResultsFormatter()
+        fmtr.addTest( 'atest', runtime=0 )
+        fmtr.addTest( 'btest', runtime=5.8 )
+        fmtr.writeToFile( 'file.xml' )
+        time.sleep(1)
+
+        etree = read_xml_file( 'file.xml' )
+        tests = extract_test_results( etree )
+
+        atest = tests['./atest']
+        assert int( float( atest['Execution Time'] ) + 0.5 ) == 0
+
+        btest = tests['./btest']
+        assert abs( float( btest['Execution Time'] ) - 5.8 ) < 0.00001
+
+
+def extract_test_results( etree ):
+    ""
+    tests = {}
+
+    nd0 = etree.findall( 'Testing' )[0]
+    for nd1 in nd0.findall( 'Test' ):
+        testinfo = parse_test( nd1 )
+        tests[ testinfo['fullname'] ] = testinfo
+
+    return tests
+
+
+def parse_test( nd ):
+    ""
+    testinfo = { 'status': nd.attrib['Status'] }
+
+    for nd1 in nd:
+        if nd1.tag == 'Name':
+            testinfo['name'] = nd1.text
+        elif nd1.tag == 'Path':
+            testinfo['path'] = nd1.text
+        elif nd1.tag == 'FullName':
+            testinfo['fullname'] = nd1.text
+        elif nd1.tag == 'FullCommandLine':
+            testinfo['cmdline'] = nd1.text
+        elif nd1.tag == 'Results':
+            parse_results( nd1, testinfo )
+
+    return testinfo
+
+
+def parse_results( nd, testinfo ):
+    ""
+    for nd1 in nd:
+        if nd1.tag == 'NamedMeasurement':
+            value = nd1.findall( 'Value' )[0].text
+            testinfo[ nd1.attrib['name'] ] = value
+        elif nd1.tag == 'Measurement':
+            value = nd1.findall( 'Value' )[0].text
+            testinfo['output'] = value
+
+
+def extract_test_list( etree ):
+    ""
+    nd0 = etree.findall( 'Testing' )[0]
+    nd1 = nd0.findall( 'TestList' )[0]
+
+    listnames = set()
+    for nd2 in nd1:
+        assert nd2.tag == 'Test'
+        listnames.add( nd2.text )
+
+    return listnames
 
 
 def read_xml_file( filename ):
