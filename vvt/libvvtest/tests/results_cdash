@@ -25,7 +25,7 @@ from libvvtest.TestList import TestList
 from libvvtest.permsetter import PermissionSetter
 
 
-class the_tests( vtu.vvtestTestCase ):
+class unit_tests( vtu.vvtestTestCase ):
 
     def test_recognizing_http_urls(self):
         ""
@@ -146,6 +146,38 @@ class the_tests( vtu.vvtestTestCase ):
         xml = util.read_xml_file( 'file.xml' )
         assert extract_build_stamp( xml ).startswith( '2017' )
         assert abs( extract_start_time( xml ) - tstart ) <= 2
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_the_workflow(self):
+        ""
+        util.writefile( 'good.vvt', """
+            pass
+            """ )
+        util.writefile( 'bad.vvt', """
+            import sys
+            import vvtest_util as vtu
+            sys.exit( vtu.diff_exit_status )
+            """ )
+        util.writefile( 'ugly.vvt', """
+            #VVT: keywords = notme
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-K notme --cdash file.xml' )
+        vrun.assertCounts( total=2, npass=1, diff=1 )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        testinfo = extract_test_results( xml, 'good' )
+        assert float(testinfo['Execution Time']) < 10
+
+        testinfo = extract_test_results( xml, 'bad' )
+        assert testinfo['Completion Status'] == 'diff'
+        assert float(testinfo['Execution Time']) < 10
+
+        assert extract_test_results( xml, 'ugly' ) == None
 
 
 def make_CDashWriter( destination, subclass_submitter=None ):
