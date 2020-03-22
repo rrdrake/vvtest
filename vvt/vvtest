@@ -40,7 +40,7 @@ class MainEntry:
 
     def constructObjects(self):
         ""
-        start_epoch = time.time()
+        self.start_epoch = time.time()
 
         check_for_bootstrap_file( self.exepath )
 
@@ -73,13 +73,15 @@ class MainEntry:
 
         self.rtdata.setPermissionsObject( self.opts, self.optD )
 
-        self.constructResultsWriter( start_epoch )
+        self.constructResultsWriter()
 
         self.constructFilteringObjects()
 
     def execute(self):
         ""
         exitstat = 0
+
+        set_results_writer_attributes( self.rtdata, self.start_epoch )
 
         if information_mode( self.opts ):
             mode = InformationMode( self.opts, self.optD, self.rtdata )
@@ -160,14 +162,13 @@ class MainEntry:
                             self.rtdata.getPlatformObject().getName() )
         self.rtdata.setTestSubdir( sd )
 
-    def constructResultsWriter(self, start_epoch):
+    def constructResultsWriter(self):
         ""
-        resw = construct_results_writers( self.opts, self.optD, start_epoch,
-                                          self.rtdata.getVvtestDir(),
+        resw = construct_results_writers( self.opts, self.optD,
                                           self.rtdata.getTestResultsDir(),
                                           self.rtdata.getPermissionsObject(),
-                                          self.rtdata.getPlatformObject(),
-                                          self.rtdata.getCommandLine() )
+                                          self.rtdata.getPlatformObject() )
+
         self.rtdata.setResultsWriter( resw )
 
     def constructFilteringObjects(self):
@@ -424,7 +425,7 @@ class InformationMode:
         ""
         from libvvtest.teststatus import RESULTS_KEYWORDS
 
-        print3( "\nresults keywords: " + ' '.join( RESULTS_KEYWORDS ) )
+        print3( "\nresults keywords:", ' '.join( RESULTS_KEYWORDS ) )
         kd = {}
         for tcase in tlist.getActiveTests():
             for k in tcase.getSpec().getKeywords( include_implicit=False ):
@@ -790,10 +791,7 @@ def need_console_output( opts ):
     return True
 
 
-def construct_results_writers( opts, optD,
-                               start_epoch, vvtestdir,
-                               test_dir, perms,
-                               platobj, cmdL ):
+def construct_results_writers( opts, optD, test_dir, perms, platobj ):
     ""
     import libvvtest.resultsout as resultsout
 
@@ -825,11 +823,22 @@ def construct_results_writers( opts, optD,
             wr = construct_testlist_writer( test_dir, opts, optD, perms, platobj )
             writers.addWriter( wr )
 
+    return writers
+
+
+def set_results_writer_attributes( rtdata, start_epoch ):
+    ""
+    writers   = rtdata.getResultsWriter()
+    vvtestdir = rtdata.getVvtestDir()
+    test_dir  = rtdata.getTestResultsDir()
+    platobj   = rtdata.getPlatformObject()
+    cmdL      = rtdata.getCommandLine()
+
     writers.setRunAttr( startepoch=start_epoch )
     writers.setRunAttr( startdate=time.ctime(start_epoch) )
     writers.setRunAttr( platform=platobj.getName() )
     writers.setRunAttr( compiler=platobj.getCompiler() )
-    writers.setRunAttr( commandline=' '.join( cmdL ) )
+    writers.setRunAttr( cmdline=cmdL )
     writers.setRunAttr( hostname=os.uname()[1] )
     writers.setRunAttr( rundir=test_dir )
     writers.setRunAttr( curdir=os.getcwd() )
@@ -838,8 +847,6 @@ def construct_results_writers( opts, optD,
     writers.setRunAttr( PYTHONPATH=os.environ.get( 'PYTHONPATH', '' ) )
     writers.setRunAttr( PATH=os.environ.get( 'PATH', '' ) )
     writers.setRunAttr( LOADEDMODULES=os.environ.get( 'LOADEDMODULES', '' ) )
-
-    return writers
 
 
 def construct_console_writer( test_dir, opts, optD ):
@@ -947,8 +954,7 @@ def run_test_exec_list( opts, optD, rtdata,
     xlist = TestExecList( tlist, runner )
     xlist.createTestExecs( perms )
 
-    tlrun = execute.TestListRunner( rtdata.getCommandLine(),
-                                    test_dir, tlist, xlist, perms,
+    tlrun = execute.TestListRunner( test_dir, tlist, xlist, perms,
                                     results_writer, plat )
 
     if not opts.batch:
@@ -1119,11 +1125,9 @@ def baselineTests( opts, optD, rtdata ):
 
 ###########################################################################
 
-def print3( *args, **kwargs ):
-    s = ' '.join( [ str(x) for x in args ] )
-    if len(kwargs) > 0:
-        s += ' ' + ' '.join( [ str(k)+'='+str(v) for k,v in kwargs.items() ] )
-    sys.stdout.write( s + os.linesep )
+def print3( *args ):
+    ""
+    sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + os.linesep )
     sys.stdout.flush()
 
 

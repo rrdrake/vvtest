@@ -55,7 +55,8 @@ class CDashWriter:
 
     def info(self, atestlist, runinfo):
         ""
-        assert False
+        fmtr = self._create_and_fill_formatter( atestlist, runinfo )
+        self._write_data( fmtr, runinfo )
 
     def _create_and_fill_formatter(self, atestlist, runinfo):
         ""

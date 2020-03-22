@@ -25,6 +25,10 @@ class ResultsWriters:
         ""
         self.runattrs.update( kwargs )
 
+    def getRunAttrs(self):
+        ""
+        return dict( self.runattrs.items() )
+
     def prerun(self, atestlist, verbosity):
         ""
         for wr in self.writers:

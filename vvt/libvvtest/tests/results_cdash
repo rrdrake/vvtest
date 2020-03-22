@@ -153,7 +153,8 @@ class integration_tests( vtu.vvtestTestCase ):
     def test_the_workflow(self):
         ""
         util.writefile( 'good.vvt', """
-            pass
+            import time
+            time.sleep(2)
             """ )
         util.writefile( 'bad.vvt', """
             import sys
@@ -168,7 +169,39 @@ class integration_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-K notme --cdash file.xml' )
         vrun.assertCounts( total=2, npass=1, diff=1 )
 
-        xml = util.read_xml_file( 'file.xml' )
+        time.sleep(1)
+        self.check_good_bad_ugly( 'file.xml' )
+
+        vrun = vtu.runvvtest( '-i --cdash file2.xml' )
+
+        self.check_good_bad_ugly( 'file2.xml' )
+
+        #magic self.assert_same_submit_files( 'file.xml', 'file2.xml' )
+
+    def assert_same_submit_files(self, file1, file2):
+        ""
+        xml1 = util.read_xml_file( file1 )
+        xml2 = util.read_xml_file( file2 )
+
+        assert extract_build_stamp( xml1 ) == extract_build_stamp( xml2 )
+        assert extract_site_name( xml1 ) == extract_site_name( xml2 )
+        assert extract_build_name( xml1 ) == extract_build_name( xml2 )
+
+        t1 = extract_start_time( xml1 )
+        t2 = extract_start_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+        t1 = extract_end_time( xml1 )
+        t2 = extract_end_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+        t1 = extract_elapsed_time( xml1 )
+        t2 = extract_elapsed_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+    def check_good_bad_ugly(self, filename):
+        ""
+        xml = util.read_xml_file( filename )
 
         testinfo = extract_test_results( xml, 'good' )
         assert float(testinfo['Execution Time']) < 10
