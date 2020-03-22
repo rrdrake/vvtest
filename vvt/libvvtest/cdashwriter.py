@@ -23,10 +23,15 @@ class CDashWriter:
         self.cdashutil = cdashutil
 
         self.datestamp = None
+        self.proj = None
 
     def setOutputDate(self, datestamp):
         ""
         self.datestamp = datestamp
+
+    def setCDashProjectName(self, proj):
+        ""
+        self.proj = proj
 
     def prerun(self, atestlist, runinfo, verbosity):
         ""
@@ -39,7 +44,7 @@ class CDashWriter:
     def postrun(self, atestlist, runinfo):
         ""
         fmtr = self._create_and_fill_formatter( atestlist, runinfo )
-        self._write_data( fmtr )
+        self._write_data( fmtr, runinfo )
 
     def info(self, atestlist, runinfo):
         ""
@@ -52,18 +57,25 @@ class CDashWriter:
         set_test_list( fmtr, atestlist )
         return fmtr
 
-    def _write_data(self, fmtr):
+    def _write_data(self, fmtr, runinfo):
         ""
-        fmtr.writeToFile( self.dest )
+        if is_http_url( self.dest ):
 
-    def _dispatch_submission(self, atestlist, runinfo):
-        ""
-        try:
-            pass
+            fname = pjoin( self.testdir, 'vvtest_cdash_submit.xml' )
 
-        except Exception as e:
-            print3( '\n*** WARNING: error submitting CDash results:',
-                    str(e), '\n' )
+            try:
+                fmtr.writeToFile( fname )
+                self.permsetter.set( fname )
+                assert self.proj, 'CDash project name not set'
+                self.cdashutil.submit_file( self.dest, self.proj, fname )
+
+            except Exception as e:
+                print3( '\n*** WARNING: error submitting CDash results:',
+                        str(e), '\n' )
+
+        else:
+            fmtr.writeToFile( self.dest )
+            self.permsetter.set( self.dest )
 
 
 def set_global_data( fmtr, runinfo ):

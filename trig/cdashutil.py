@@ -87,10 +87,8 @@ def submit_file( cdash_url, project_name, filename, method='urllib' ):
 
         if method == 'urllib':
             submit_file_using_urllib( submit_url, filename )
-
         else:
-            cmd = 'curl -T '+filename+' '+submit_url
-            subprocess.check_call( cmd, shell=True )
+            submit_file_using_curl( submit_url, filename )
 
 
 def write_time_section( fp, stamp_date, start, end ):
@@ -226,6 +224,12 @@ def check_submit_response( code, msg ):
         for val in msg.headers:
             res += '\n'+val.strip()
         raise Exception( res )
+
+
+def submit_file_using_curl( submit_url, filename ):
+    ""
+    cmd = 'curl -T '+filename+' '+submit_url
+    subprocess.check_call( cmd, shell=True )
 
 
 def read_file( filename, mode ):
