@@ -57,10 +57,11 @@ class uploading_a_file( trigutil.trigTestCase ):
 
         try:
             if method:
-                cdashutil.submit_file( srv.getURL(), 'CoolProj', 'sub.txt',
-                                       method=method )
+                sub = cdashutil.FileSubmitter( srv.getURL(), 'CoolProj',
+                                               method=method )
             else:
-                cdashutil.submit_file( srv.getURL(), 'CoolProj', 'sub.txt' )
+                sub = cdashutil.FileSubmitter( srv.getURL(), 'CoolProj' )
+            sub.send( 'sub.txt' )
         finally:
             srv.shutdown()
 

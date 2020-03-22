@@ -103,50 +103,47 @@ class the_tests( vtu.vvtestTestCase ):
 
     def test_a_url_destination_will_submit(self):
         ""
+        records = []
+
+        class OverrideFileSubmitter( cdashutil.FileSubmitter ):
+            def urllib_submit(self, submit_url, filename):
+                records.append( ('urllib',submit_url,filename) )
+            def curl_submit(self, submit_url, filename):
+                records.append( ('curl',submit_url,filename) )
+
         testlist = TestList()
 
-        wr = make_CDashWriter( 'file.xml' )
-        records = postrun_with_fake_submit( wr, testlist, {} )
+        wr = make_CDashWriter( 'file.xml',
+                               subclass_submitter=OverrideFileSubmitter )
+        wr.postrun( testlist, {} )
 
         assert os.path.isfile( 'file.xml' )
         assert len( records ) == 0
 
-        wr = make_CDashWriter( 'http://localhost/cdash' )
+        wr = make_CDashWriter( 'http://localhost/cdash',
+                               subclass_submitter=OverrideFileSubmitter )
         wr.setCDashProjectName( 'CoolProj' )
-        records = postrun_with_fake_submit( wr, testlist, {} )
+        wr.postrun( testlist, {} )
 
         assert len( records ) == 1
         assert records[0][1].startswith( 'http://localhost/cdash/' )
         assert records[0][1].endswith( 'project=CoolProj' )
 
 
-def make_CDashWriter( destination ):
+def make_CDashWriter( destination, subclass_submitter=None ):
     ""
     perms = PermissionSetter( os.getcwd(), [] )
-    wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms, cdashutil )
+
+    wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms )
+
+    if subclass_submitter:
+        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
+                              subclass_submitter )
+    else:
+        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
+                              cdashutil.FileSubmitter )
+
     return wr
-
-
-def postrun_with_fake_submit( writer, testlist, runinfo ):
-    ""
-    orig_urllib = cdashutil.submit_file_using_urllib
-    orig_curl   = cdashutil.submit_file_using_curl
-
-    records = []
-    func_urllib = lambda url,fname: records.append( ('urllib',url,fname) )
-    func_curl   = lambda url,fname: records.append( ('curl',url,fname) )
-
-    try:
-        cdashutil.submit_file_using_urllib = func_urllib
-        cdashutil.submit_file_using_curl   = func_curl
-
-        writer.postrun( testlist, runinfo )
-
-    finally:
-        cdashutil.submit_file_using_urllib = orig_urllib
-        cdashutil.submit_file_using_curl   = orig_curl
-
-    return records
 
 
 def extract_test_results( xmlroot, testname ):

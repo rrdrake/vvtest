@@ -75,20 +75,48 @@ class TestResultsFormatter:
             end_element( fp, 'Site' )
 
 
-def submit_file( cdash_url, project_name, filename, method='urllib' ):
-    ""
-    submit_url = cdash_url.rstrip('/')+'/submit.php'
-    submit_url += '?project='+project_name
+class FileSubmitter:
 
-    assert method in ['urllib','curl']
+    def __init__(self, cdash_url, project_name, method='urllib'):
+        ""
+        self.url = cdash_url
+        self.proj = project_name
 
-    with set_environ( http_proxy='', HTTP_PROXY='',
-                      https_proxy='', HTTPS_PROXY='' ):
+        assert method in ['urllib','curl']
+        self.meth = method
 
-        if method == 'urllib':
-            submit_file_using_urllib( submit_url, filename )
+    def send(self, filename):
+        ""
+        submit_url = self.url.rstrip('/')+'/submit.php'
+        submit_url += '?project='+self.proj
+
+        with set_environ( http_proxy='', HTTP_PROXY='',
+                          https_proxy='', HTTPS_PROXY='' ):
+
+            if self.meth == 'urllib':
+                self.urllib_submit( submit_url, filename )
+            else:
+                self.curl_submit( submit_url, filename )
+
+    def urllib_submit(self, submit_url, filename):
+        ""
+        import urllib
+
+        if hasattr( urllib, 'urlopen' ):
+            content = read_file( filename, 'rt' )
+            hnd = urllib.urlopen( submit_url, data=content, proxies={} )
+            check_submit_response( hnd.getcode(), hnd.info() )
         else:
-            submit_file_using_curl( submit_url, filename )
+            # python 3
+            from urllib.request import urlopen
+            content = read_file( filename, 'rb' )
+            hnd = urlopen( submit_url, data=content )
+            check_submit_response( hnd.getcode(), hnd.info() )
+
+    def curl_submit(self, submit_url, filename):
+        ""
+        cmd = 'curl -T '+filename+' '+submit_url
+        subprocess.check_call( cmd, shell=True )
 
 
 def write_time_section( fp, stamp_date, start, end ):
@@ -201,22 +229,6 @@ def string_date( epoch ):
     return time.strftime( '%b %d %H:%M:%S %Z', time.localtime(epoch) )
 
 
-def submit_file_using_urllib( submit_url, filename ):
-    ""
-    import urllib
-
-    if hasattr( urllib, 'urlopen' ):
-        content = read_file( filename, 'rt' )
-        hnd = urllib.urlopen( submit_url, data=content, proxies={} )
-        check_submit_response( hnd.getcode(), hnd.info() )
-    else:
-        # python 3
-        from urllib.request import urlopen
-        content = read_file( filename, 'rb' )
-        hnd = urlopen( submit_url, data=content )
-        check_submit_response( hnd.getcode(), hnd.info() )
-
-
 def check_submit_response( code, msg ):
     ""
     if code not in [200,'200']:
@@ -224,12 +236,6 @@ def check_submit_response( code, msg ):
         for val in msg.headers:
             res += '\n'+val.strip()
         raise Exception( res )
-
-
-def submit_file_using_curl( submit_url, filename ):
-    ""
-    cmd = 'curl -T '+filename+' '+submit_url
-    subprocess.check_call( cmd, shell=True )
 
 
 def read_file( filename, mode ):

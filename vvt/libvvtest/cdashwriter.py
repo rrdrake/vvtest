@@ -15,15 +15,22 @@ print3 = outpututils.print3
 
 class CDashWriter:
 
-    def __init__(self, destination, results_test_dir, permsetter, cdashutil):
+    def __init__(self, destination, results_test_dir, permsetter):
         ""
         self.dest = destination
         self.testdir = results_test_dir
         self.permsetter = permsetter
-        self.cdashutil = cdashutil
+
+        self.formatter = None
+        self.submitter = None
 
         self.datestamp = None
         self.proj = None
+
+    def setCDashFormatter(self, formatter_type, submitter_type):
+        ""
+        self.formatter = formatter_type
+        self.submitter = submitter_type
 
     def setOutputDate(self, datestamp):
         ""
@@ -52,7 +59,7 @@ class CDashWriter:
 
     def _create_and_fill_formatter(self, atestlist, runinfo):
         ""
-        fmtr = self.cdashutil.TestResultsFormatter()
+        fmtr = self.formatter()
         set_global_data( fmtr, runinfo )
         set_test_list( fmtr, atestlist )
         return fmtr
@@ -67,7 +74,8 @@ class CDashWriter:
                 fmtr.writeToFile( fname )
                 self.permsetter.set( fname )
                 assert self.proj, 'CDash project name not set'
-                self.cdashutil.submit_file( self.dest, self.proj, fname )
+                sub = self.submitter( self.dest, self.proj )
+                sub.send( fname )
 
             except Exception as e:
                 print3( '\n*** WARNING: error submitting CDash results:',
