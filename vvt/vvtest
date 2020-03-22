@@ -891,10 +891,13 @@ def construct_gitlab_writer( test_dir, opts, optD, perms ):
 def construct_cdash_writer( test_dir, opts, optD, perms ):
     ""
     import libvvtest.cdashwriter as cdashwriter
+    import cdashutil
 
     cdashobj = cdashwriter.CDashWriter( opts.cdash, test_dir, perms )
+    cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
+                                cdashutil.FileSubmitter )
 
-    cdashobj.setOutputDate( opts.results_date )
+    cdashobj.setResultsDate( opts.results_date )
     # magic cdashobj.setNamingTags( opts.results_tag )
 
     return cdashobj

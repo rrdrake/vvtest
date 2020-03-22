@@ -32,11 +32,11 @@ class CDashWriter:
         self.formatter = formatter_type
         self.submitter = submitter_type
 
-    def setOutputDate(self, datestamp):
+    def setResultsDate(self, datestamp):
         ""
         self.datestamp = datestamp
 
-    def setCDashProjectName(self, proj):
+    def setProjectName(self, proj):
         ""
         self.proj = proj
 
@@ -60,7 +60,7 @@ class CDashWriter:
     def _create_and_fill_formatter(self, atestlist, runinfo):
         ""
         fmtr = self.formatter()
-        set_global_data( fmtr, runinfo )
+        set_global_data( fmtr, self.datestamp, runinfo )
         set_test_list( fmtr, atestlist )
         return fmtr
 
@@ -71,8 +71,8 @@ class CDashWriter:
             fname = pjoin( self.testdir, 'vvtest_cdash_submit.xml' )
 
             try:
-                fmtr.writeToFile( fname )
-                self.permsetter.set( fname )
+                self._write_file( fmtr, fname )
+
                 assert self.proj, 'CDash project name not set'
                 sub = self.submitter( self.dest, self.proj )
                 sub.send( fname )
@@ -82,23 +82,32 @@ class CDashWriter:
                         str(e), '\n' )
 
         else:
-            fmtr.writeToFile( self.dest )
-            self.permsetter.set( self.dest )
+            self._write_file( fmtr, self.dest )
+
+    def _write_file(self, fmtr, filename):
+        ""
+        fmtr.writeToFile( filename )
+        self.permsetter.set( filename )
 
 
-def set_global_data( fmtr, runinfo ):
+def set_global_data( fmtr, date_stamp, runinfo ):
     ""
-    tm = runinfo.get( 'startepoch', time.time() )
+    if date_stamp:
+        bdate = date_stamp
+        tstart = runinfo.get( 'startepoch', bdate )
+    else:
+        bdate = runinfo.get( 'startepoch', time.time() )
+        tstart = bdate
 
     rdir = None
     if 'rundir' in runinfo:
         rdir = basename( runinfo['rundir'] )
 
-    fmtr.setBuildID( build_date=tm,
+    fmtr.setBuildID( build_date=bdate,
                      site_name=runinfo.get( 'hostname', None ),
                      build_name=rdir )
 
-    fmtr.setTime( tm, runinfo.get( 'finishepoch', None ) )
+    fmtr.setTime( tstart, runinfo.get( 'finishepoch', None ) )
 
 
 def set_test_list( fmtr, atestlist ):
