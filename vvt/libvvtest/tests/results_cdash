@@ -19,9 +19,12 @@ import testutils as util
 from testutils import print3
 
 import libvvtest.cdashwriter as cdashwriter
+import cdashutil
+
+from libvvtest.TestList import TestList
 
 
-class foundational_stuff( vtu.vvtestTestCase ):
+class the_tests( vtu.vvtestTestCase ):
 
     def test_recognizing_http_urls(self):
         ""
@@ -42,6 +45,111 @@ class foundational_stuff( vtu.vvtestTestCase ):
         assert cdashwriter.is_http_url( 'https://hostname.com' )
         assert cdashwriter.is_http_url( 'https://hostname.com/' )
         assert cdashwriter.is_http_url( 'https://hostname.com/cdash' )
+
+    def test_sitename_buildname_start_end_elapsed(self):
+        ""
+        wr = cdashwriter.CDashWriter( 'file.xml', os.getcwd(), None, cdashutil )
+
+        tm = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
+
+        runinfo = {
+            'startepoch': tm,
+            'hostname': 'sparky',
+            'rundir': '/path/to/testresultsdir',
+            'finishepoch': tm+73,
+        }
+
+        testlist = TestList()
+
+        wr.postrun( testlist, runinfo )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        assert extract_site_name( xml ) == 'sparky'
+        assert extract_build_name( xml ) == 'testresultsdir'
+
+        assert abs( extract_start_time( xml ) - tm ) <= 2
+        assert abs( extract_end_time( xml ) - (tm+73) ) <= 2
+        assert abs( extract_elapsed_time( xml ) - 73 ) <= 2
+
+    def test_writing_test_results(self):
+        ""
+        wr = cdashwriter.CDashWriter( 'file.xml', os.getcwd(), None, cdashutil )
+
+        testlist = TestList()
+        tcase = vtu.make_fake_TestCase( name='atest', result='pass', runtime=42 )
+        testlist.addTest( tcase )
+        tcase = vtu.make_fake_TestCase( name='btest', result='diff', runtime=23 )
+        testlist.addTest( tcase )
+        tcase = vtu.make_fake_TestCase( name='ctest', result='notrun' )
+        testlist.addTest( tcase )
+
+        wr.postrun( testlist, {} )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        testinfo = extract_test_results( xml, 'sdir/atest.np=4' )
+        assert testinfo['status'] == 'passed'
+        assert abs( float( testinfo['Execution Time'] ) - 42 ) <= 2
+
+        testinfo = extract_test_results( xml, 'sdir/btest.np=4' )
+        assert testinfo['status'] == 'failed'
+        assert testinfo['Completion Status'] == 'diff'
+        assert abs( float( testinfo['Execution Time'] ) - 23 ) <= 2
+
+        testinfo = extract_test_results( xml, 'sdir/ctest.np=4' )
+        assert testinfo['status'] == 'notrun'
+
+
+def extract_test_results( xmlroot, testname ):
+    ""
+    testinfo = None
+
+    for nd0 in xmlroot.findall( 'Testing/Test' ):
+        if nd0.find( 'Name' ).text == testname:
+
+            testinfo = {}
+            testinfo['status'] = nd0.get( 'Status' )
+
+            for nd1 in nd0.findall( 'Results/NamedMeasurement' ):
+                testinfo[ nd1.get('name') ] = nd1.find('Value').text
+
+            nd1 = nd0.find( 'Results/Measurement' )
+            if nd1 != None:
+                testinfo[ 'output' ] = nd1.find('Value').text
+
+    return testinfo
+
+
+def extract_site_name( xmlroot ):
+    ""
+    return xmlroot.get('Name')
+
+
+def extract_build_name( xmlroot ):
+    ""
+    return xmlroot.get('BuildName')
+
+
+def extract_start_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'StartTestTime' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text )
+
+
+def extract_end_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'EndTestTime' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text )
+
+
+def extract_elapsed_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'ElapsedMinutes' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text ) * 60
 
 
 ############################################################################

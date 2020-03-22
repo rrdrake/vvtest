@@ -7,7 +7,7 @@
 import os, sys
 import time
 from os.path import join as pjoin
-from os.path import normpath, abspath
+from os.path import basename
 
 from . import outpututils
 print3 = outpututils.print3
@@ -38,33 +38,23 @@ class CDashWriter:
 
     def postrun(self, atestlist, runinfo):
         ""
-        if self.outurl:
-            self._dispatch_submission( atestlist, runinfo )
-        else:
-            self._write_files( atestlist, runinfo )
+        fmtr = self._create_and_fill_formatter( atestlist, runinfo )
+        self._write_data( fmtr )
 
     def info(self, atestlist, runinfo):
         ""
-        if self.outurl:
-            self._dispatch_submission( atestlist, runinfo )
-        else:
-            self._write_files( atestlist, runinfo )
+        assert False
 
-    def _write_files(self, atestlist, runinfo):
+    def _create_and_fill_formatter(self, atestlist, runinfo):
         ""
-        if not os.path.isdir( self.outdir ):
-            os.mkdir( self.outdir )
+        fmtr = self.cdashutil.TestResultsFormatter()
+        set_global_data( fmtr, runinfo )
+        set_test_list( fmtr, atestlist )
+        return fmtr
 
-        try:
-            self._convert_files( self.outdir, atestlist, runinfo )
-        finally:
-            self.permsetter.recurse( self.outdir )
-
-    def _convert_files(self, destdir, atestlist, runinfo):
+    def _write_data(self, fmtr):
         ""
-        tcaseL = atestlist.getActiveTests( self.sortspec )
-
-        pass
+        fmtr.writeToFile( self.dest )
 
     def _dispatch_submission(self, atestlist, runinfo):
         ""
@@ -74,6 +64,52 @@ class CDashWriter:
         except Exception as e:
             print3( '\n*** WARNING: error submitting CDash results:',
                     str(e), '\n' )
+
+
+def set_global_data( fmtr, runinfo ):
+    ""
+    tm = runinfo.get( 'startepoch', time.time() )
+
+    rdir = None
+    if 'rundir' in runinfo:
+        rdir = basename( runinfo['rundir'] )
+
+    fmtr.setBuildID( build_date=tm,
+                     site_name=runinfo.get( 'hostname', None ),
+                     build_name=rdir )
+
+    fmtr.setTime( tm, runinfo.get( 'finishepoch', None ) )
+
+
+def set_test_list( fmtr, atestlist ):
+    ""
+    tcaseL = atestlist.getActiveTests()
+
+    for tcase in tcaseL:
+
+        tspec = tcase.getSpec()
+        tstat = tcase.getStat()
+
+        vvstat = tstat.getResultStatus()
+
+        if vvstat == 'notrun':
+            fmtr.addTest( tspec.getDisplayString(),
+                          status='notrun' )
+
+        elif vvstat == 'pass':
+            fmtr.addTest( tspec.getDisplayString(),
+                          status='passed',
+                          runtime=tstat.getRuntime( None ) )
+
+        else:
+            fmtr.addTest( tspec.getDisplayString(),
+                          status='failed',
+                          runtime=tstat.getRuntime( None ),
+                          detail=vvstat )
+
+            # TODO: add output=... here
+            #       the output could be an ls -ltra on the test results
+            #       directory plus the execute.log file with the middle removed
 
 
 def is_http_url( destination ):
