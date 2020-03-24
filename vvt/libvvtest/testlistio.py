@@ -118,6 +118,10 @@ class TestListReader:
             return self.attrs.get( name, default[0] )
         return self.attrs[name]
 
+    def getAttrs(self):
+        ""
+        return dict( self.attrs.items() )
+
     def getTests(self):
         """
         Returns dictionary mapping execute dir to TestSpec object.

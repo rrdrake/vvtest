@@ -39,6 +39,7 @@ class TestList:
 
         self.datestamp = None
         self.finish = None
+        self.runattrs = {}
 
         self.groups = None  # a ParameterizeAnalyzeGroups class instance
 
@@ -174,6 +175,10 @@ class TestList:
             self.datestamp = tlr.getStartDate()
             self.finish = tlr.getFinishDate()
 
+            self.runattrs.update( tlr.getAttrs() )
+            if self.finish:
+                self.runattrs['finishepoch'] = self.finish
+
             for xdir,tcase in tlr.getTests().items():
 
                 t = self.tcasemap.get( xdir, None )
@@ -202,6 +207,10 @@ class TestList:
         if self.finish:
             return self.finish
         return default
+
+    def getRunAttrs(self):
+        ""
+        return dict( self.runattrs.items() )
 
     def getTests(self):
         """

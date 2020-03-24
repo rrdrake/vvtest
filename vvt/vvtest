@@ -403,15 +403,13 @@ class InformationMode:
         tlist = make_TestList( self.rtdata )
 
         if self.rtdata.isRestartMode():
-            tlist.readTestList()
-            tlist.readTestResults()
+            self._read_test_list( tlist )
 
         elif self.opts.keys or self.opts.files:
             scanner.scanPaths( tlist, scan_dirs )
 
         elif os.path.exists( test_dir ):
-            tlist.readTestList()
-            tlist.readTestResults()
+            self._read_test_list( tlist )
 
         else:
             print3( 'WARNING: previous test results directory not found,',
@@ -420,6 +418,15 @@ class InformationMode:
         selector.prepareActiveTests( tlist, remove_new_skips=True )
 
         return tlist
+
+    def _read_test_list(self, tlist):
+        ""
+        writers = self.rtdata.getResultsWriter()
+
+        tlist.readTestList()
+        tlist.readTestResults()
+
+        writers.setRunAttr( **tlist.getRunAttrs() )
 
     def printKeywordUnion(self, tlist):
         ""

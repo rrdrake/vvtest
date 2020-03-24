@@ -176,7 +176,20 @@ class integration_tests( vtu.vvtestTestCase ):
 
         self.check_good_bad_ugly( 'file2.xml' )
 
-        #magic self.assert_same_submit_files( 'file.xml', 'file2.xml' )
+        self.assert_same_submit_files( 'file.xml', 'file2.xml' )
+
+    def check_good_bad_ugly(self, filename):
+        ""
+        xml = util.read_xml_file( filename )
+
+        testinfo = extract_test_results( xml, 'good' )
+        assert float(testinfo['Execution Time']) < 10
+
+        testinfo = extract_test_results( xml, 'bad' )
+        assert testinfo['Completion Status'] == 'diff'
+        assert float(testinfo['Execution Time']) < 10
+
+        assert extract_test_results( xml, 'ugly' ) == None
 
     def assert_same_submit_files(self, file1, file2):
         ""
@@ -198,19 +211,6 @@ class integration_tests( vtu.vvtestTestCase ):
         t1 = extract_elapsed_time( xml1 )
         t2 = extract_elapsed_time( xml2 )
         assert abs( t1-t2 ) <= 1
-
-    def check_good_bad_ugly(self, filename):
-        ""
-        xml = util.read_xml_file( filename )
-
-        testinfo = extract_test_results( xml, 'good' )
-        assert float(testinfo['Execution Time']) < 10
-
-        testinfo = extract_test_results( xml, 'bad' )
-        assert testinfo['Completion Status'] == 'diff'
-        assert float(testinfo['Execution Time']) < 10
-
-        assert extract_test_results( xml, 'ugly' ) == None
 
 
 def make_CDashWriter( destination, subclass_submitter=None ):
