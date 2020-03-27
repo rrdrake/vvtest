@@ -5,7 +5,8 @@
 # Government retains certain rights in this software.
 
 import os, sys
-from os.path import normpath, abspath
+from os.path import join as pjoin
+from os.path import normpath, abspath, basename, dirname
 import shutil
 
 
@@ -20,18 +21,18 @@ def find_vvtest_test_root_file( start_directory,
     """
     stopd = None
     if stop_directory:
-        stopd = os.path.normpath( stop_directory )
+        stopd = normpath( stop_directory )
 
-    d = os.path.normpath( start_directory )
+    d = normpath( start_directory )
 
     while d and d != '/':
 
-        mf = os.path.join( d, marker_filename )
+        mf = pjoin( d, marker_filename )
 
         if os.path.exists( mf ):
             return mf
 
-        d = os.path.dirname( d )
+        d = dirname( d )
 
         if stopd and d == stopd:
             break
@@ -99,6 +100,17 @@ def split_by_largest_existing_path( path, rindex=0 ):
         return split_by_largest_existing_path( path, rindex+1 )
 
 
+def determine_test_directory( subdirname, test_cache_file, cwd ):
+    ""
+    if test_cache_file:
+        assert os.path.isabs( test_cache_file )
+        test_dir = normpath( dirname( test_cache_file ) )
+    else:
+        test_dir = normpath( pjoin( cwd, subdirname ) )
+
+    return test_dir
+
+
 def test_results_subdir_name( rundir, onopts, offopts, platform_name ):
     """
     Generates and returns the subdirectory name to hold test results, which is
@@ -123,6 +135,8 @@ def create_test_directory( testdirname, perms, mirdir ):
     options, then a mirror directory is created and 'testdirname' will be
     created as a soft link pointing to the mirror directory.
     """
+    assert os.path.isabs( testdirname )
+
     if mirdir and makeMirrorDirectory( mirdir, testdirname, perms ):
         pass
 
@@ -137,7 +151,7 @@ def create_test_directory( testdirname, perms, mirdir ):
                 os.remove( testdirname )  # remove broken softlink
             os.mkdir( testdirname )
 
-        perms.set( os.path.abspath( testdirname ) )
+        perms.set( testdirname )
 
 
 def makeMirrorDirectory( Mval, testdirname, perms ):
@@ -146,7 +160,7 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
     Returns False only if 'Mval' is the word "any" and a suitable scratch
     directory could not be found.
     """
-    assert testdirname == os.path.basename( testdirname )
+    # magic: pass in curdir here instead of using os.getcwd()
 
     if Mval == 'any':
 
@@ -154,7 +168,7 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
         for d in ['/var/scratch', '/scratch', '/var/scratch1', '/scratch1', \
                   '/var/scratch2', '/scratch2', '/var/scrl1', '/gpfs1']:
             if os.path.exists(d) and os.path.isdir(d):
-                ud = os.path.join( d, usr )
+                ud = pjoin( d, usr )
                 if os.path.exists(ud):
                     if os.path.isdir(ud) and \
                        os.access( ud, os.X_OK ) and os.access( ud, os.W_OK ):
@@ -173,14 +187,14 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
             return False  # a scratch dir could not be found
 
         # include the current directory name in the mirror location
-        curdir = os.path.basename( os.getcwd() )
-        Mval = os.path.join( Mval, curdir )
+        curdir = basename( os.getcwd() )
+        Mval = pjoin( Mval, curdir )
 
         if not os.path.exists( Mval ):
             os.mkdir( Mval )
 
     else:
-        Mval = os.path.abspath( Mval )
+        Mval = abspath( Mval )
 
     if not os.path.exists( Mval ) or not os.path.isdir( Mval ) or \
        not os.access( Mval, os.X_OK ) or not os.access( Mval, os.W_OK ):
@@ -190,7 +204,9 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
         raise Exception( "mirror directory and current working directory " + \
                 "are the same: "+Mval+' == '+os.getcwd() )
 
-    mirdir = os.path.join( Mval, testdirname )
+    subdir = basename( testdirname )
+
+    mirdir = pjoin( Mval, subdir )
 
     if os.path.exists( mirdir ):
         if not os.path.isdir( mirdir ):
@@ -202,7 +218,7 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
             os.remove( mirdir )  # remove broken softlink
         os.mkdir( mirdir )
 
-    perms.set( os.path.abspath( mirdir ) )
+    perms.set( abspath( mirdir ) )
 
     if os.path.islink( testdirname ):
         path = os.readlink( testdirname )
@@ -244,7 +260,7 @@ def getUserName():
         try:
             p = os.path.expanduser( '~' )
             if p != '~':
-                usr = os.path.basename( p )
+                usr = basename( p )
         except Exception:
             usr = None
 

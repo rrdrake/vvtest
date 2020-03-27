@@ -40,32 +40,32 @@ class CDashWriter:
         ""
         self.proj = proj
 
-    def prerun(self, atestlist, runinfo, verbosity):
+    def prerun(self, atestlist, rtinfo, verbosity):
         ""
         pass
 
-    def midrun(self, atestlist, runinfo):
+    def midrun(self, atestlist, rtinfo):
         ""
         pass
 
-    def postrun(self, atestlist, runinfo):
+    def postrun(self, atestlist, rtinfo):
         ""
-        fmtr = self._create_and_fill_formatter( atestlist, runinfo )
-        self._write_data( fmtr, runinfo )
+        fmtr = self._create_and_fill_formatter( atestlist, rtinfo )
+        self._write_data( fmtr, rtinfo )
 
-    def info(self, atestlist, runinfo):
+    def info(self, atestlist, rtinfo):
         ""
-        fmtr = self._create_and_fill_formatter( atestlist, runinfo )
-        self._write_data( fmtr, runinfo )
+        fmtr = self._create_and_fill_formatter( atestlist, rtinfo )
+        self._write_data( fmtr, rtinfo )
 
-    def _create_and_fill_formatter(self, atestlist, runinfo):
+    def _create_and_fill_formatter(self, atestlist, rtinfo):
         ""
         fmtr = self.formatter()
-        set_global_data( fmtr, self.datestamp, runinfo )
+        set_global_data( fmtr, self.datestamp, rtinfo )
         set_test_list( fmtr, atestlist )
         return fmtr
 
-    def _write_data(self, fmtr, runinfo):
+    def _write_data(self, fmtr, rtinfo):
         ""
         if is_http_url( self.dest ):
 
@@ -91,24 +91,24 @@ class CDashWriter:
         self.permsetter.set( filename )
 
 
-def set_global_data( fmtr, date_stamp, runinfo ):
+def set_global_data( fmtr, date_stamp, rtinfo ):
     ""
     if date_stamp:
         bdate = date_stamp
-        tstart = runinfo.get( 'startepoch', bdate )
+        tstart = rtinfo.getInfo( 'startepoch', bdate )
     else:
-        bdate = runinfo.get( 'startepoch', time.time() )
+        bdate = rtinfo.getInfo( 'startepoch', time.time() )
         tstart = bdate
 
-    rdir = None
-    if 'rundir' in runinfo:
-        rdir = basename( runinfo['rundir'] )
+    rdir = rtinfo.getInfo( 'rundir', None )
+    if rdir:
+        rdir = basename( rdir )
 
     fmtr.setBuildID( build_date=bdate,
-                     site_name=runinfo.get( 'hostname', None ),
+                     site_name=rtinfo.getInfo( 'hostname', None ),
                      build_name=rdir )
 
-    fmtr.setTime( tstart, runinfo.get( 'finishepoch', None ) )
+    fmtr.setTime( tstart, rtinfo.getInfo( 'finishepoch', None ) )
 
 
 def set_test_list( fmtr, atestlist ):

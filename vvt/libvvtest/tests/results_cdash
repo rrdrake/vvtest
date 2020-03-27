@@ -23,6 +23,7 @@ import cdashutil
 
 from libvvtest.TestList import TestList
 from libvvtest.permsetter import PermissionSetter
+from libvvtest.runinfo import RuntimeInfo
 
 
 class unit_tests( vtu.vvtestTestCase ):
@@ -53,16 +54,14 @@ class unit_tests( vtu.vvtestTestCase ):
 
         tm = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
 
-        runinfo = {
-            'startepoch': tm,
-            'hostname': 'sparky',
-            'rundir': '/path/to/testresultsdir',
-            'finishepoch': tm+73,
-        }
+        rtinfo = RuntimeInfo( startepoch=tm,
+                              hostname='sparky',
+                              rundir='/path/to/testresultsdir',
+                              finishepoch=tm+73 )
 
         testlist = TestList()
 
-        wr.postrun( testlist, runinfo )
+        wr.postrun( testlist, rtinfo )
 
         xml = util.read_xml_file( 'file.xml' )
 
@@ -85,7 +84,7 @@ class unit_tests( vtu.vvtestTestCase ):
         tcase = vtu.make_fake_TestCase( name='ctest', result='notrun' )
         testlist.addTest( tcase )
 
-        wr.postrun( testlist, {} )
+        wr.postrun( testlist, RuntimeInfo() )
 
         xml = util.read_xml_file( 'file.xml' )
 
@@ -115,7 +114,7 @@ class unit_tests( vtu.vvtestTestCase ):
 
         wr = make_CDashWriter( 'file.xml',
                                subclass_submitter=OverrideFileSubmitter )
-        wr.postrun( testlist, {} )
+        wr.postrun( testlist, RuntimeInfo() )
 
         assert os.path.isfile( 'file.xml' )
         assert len( records ) == 0
@@ -123,7 +122,7 @@ class unit_tests( vtu.vvtestTestCase ):
         wr = make_CDashWriter( 'http://localhost/cdash',
                                subclass_submitter=OverrideFileSubmitter )
         wr.setProjectName( 'CoolProj' )
-        wr.postrun( testlist, {} )
+        wr.postrun( testlist, RuntimeInfo() )
 
         assert len( records ) == 1
         assert records[0][1].startswith( 'http://localhost/cdash/' )
@@ -137,11 +136,11 @@ class unit_tests( vtu.vvtestTestCase ):
         tstart = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
 
         wr.setResultsDate( rdate )
-        runinfo = { 'startepoch': tstart }
+        rtinfo = RuntimeInfo( startepoch=tstart )
 
         testlist = TestList()
 
-        wr.postrun( testlist, runinfo )
+        wr.postrun( testlist, rtinfo )
 
         xml = util.read_xml_file( 'file.xml' )
         assert extract_build_stamp( xml ).startswith( '2017' )

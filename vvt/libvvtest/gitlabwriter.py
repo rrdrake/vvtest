@@ -53,43 +53,43 @@ class GitLabWriter:
         ""
         self.period = period_in_seconds
 
-    def prerun(self, atestlist, runinfo, verbosity):
+    def prerun(self, atestlist, rtinfo, verbosity):
         ""
         if self.outurl:
-            self._dispatch_submission( atestlist, runinfo )
+            self._dispatch_submission( atestlist, rtinfo )
             self.tlast = time.time()
 
-    def midrun(self, atestlist, runinfo):
+    def midrun(self, atestlist, rtinfo):
         ""
         if self.outurl and time.time()-self.tlast > self.period:
-            self._dispatch_submission( atestlist, runinfo )
+            self._dispatch_submission( atestlist, rtinfo )
             self.tlast = time.time()
 
-    def postrun(self, atestlist, runinfo):
+    def postrun(self, atestlist, rtinfo):
         ""
         if self.outurl:
-            self._dispatch_submission( atestlist, runinfo )
+            self._dispatch_submission( atestlist, rtinfo )
         else:
-            self._write_files( atestlist, runinfo )
+            self._write_files( atestlist, rtinfo )
 
-    def info(self, atestlist, runinfo):
+    def info(self, atestlist, rtinfo):
         ""
         if self.outurl:
-            self._dispatch_submission( atestlist, runinfo )
+            self._dispatch_submission( atestlist, rtinfo )
         else:
-            self._write_files( atestlist, runinfo )
+            self._write_files( atestlist, rtinfo )
 
-    def _write_files(self, atestlist, runinfo):
+    def _write_files(self, atestlist, rtinfo):
         ""
         if not os.path.isdir( self.outdir ):
             os.mkdir( self.outdir )
 
         try:
-            self._convert_files( self.outdir, atestlist, runinfo )
+            self._convert_files( self.outdir, atestlist, rtinfo )
         finally:
             self.permsetter.recurse( self.outdir )
 
-    def _convert_files(self, destdir, atestlist, runinfo):
+    def _convert_files(self, destdir, atestlist, rtinfo):
         ""
         tcaseL = atestlist.getActiveTests( self.sortspec )
 
@@ -97,20 +97,19 @@ class GitLabWriter:
                 "tests in GitLab format to", destdir )
 
         conv = GitLabMarkDownConverter( self.testdir, destdir )
-        conv.setRunAttr( **runinfo )
-        conv.saveResults( tcaseL )
+        conv.saveResults( tcaseL, rtinfo )
 
-    def _dispatch_submission(self, atestlist, runinfo):
+    def _dispatch_submission(self, atestlist, rtinfo):
         ""
         try:
-            start,sfx,msg = make_submit_info( runinfo, self.onopts, self.nametag )
+            start,sfx,msg = make_submit_info( rtinfo, self.onopts, self.nametag )
             epoch = self._submission_epoch( start )
 
             gr = gitresults.GitResults( self.outurl, self.testdir )
             try:
                 rdir = gr.createBranchLocation( directory_suffix=sfx,
                                                 epochdate=epoch )
-                self._convert_files( rdir, atestlist, runinfo )
+                self._convert_files( rdir, atestlist, rtinfo )
                 gr.pushResults( msg )
             finally:
                 gr.cleanup()
@@ -129,14 +128,15 @@ class GitLabWriter:
         return epoch
 
 
-def make_submit_info( runinfo, onopts, nametag ):
+def make_submit_info( rtinfo, onopts, nametag ):
     ""
-    start = runinfo['startepoch']
+    start = rtinfo.getInfo( 'startepoch' )
 
     sfxL = []
 
-    if 'platform' in runinfo:
-        sfxL.append( runinfo['platform'] )
+    plat = rtinfo.getInfo( 'platform', None )
+    if plat:
+        sfxL.append( plat )
 
     sfxL.extend( onopts )
 
@@ -182,13 +182,7 @@ class GitLabMarkDownConverter:
 
         self.selector = GitLabFileSelector()
 
-        self.runattrs = {}
-
-    def setRunAttr(self, **kwargs):
-        ""
-        self.runattrs.update( kwargs )
-
-    def saveResults(self, tcaseL):
+    def saveResults(self, tcaseL, rtinfo):
         ""
         parts = outpututils.partition_tests_by_result( tcaseL )
 
@@ -196,7 +190,7 @@ class GitLabMarkDownConverter:
 
         with open( fname, 'w' ) as fp:
 
-            write_run_attributes( fp, self.runattrs )
+            write_run_attributes( fp, rtinfo )
 
             for result in [ 'fail', 'diff', 'timeout',
                             'pass', 'notrun', 'notdone' ]:
@@ -240,14 +234,21 @@ class GitLabMarkDownConverter:
                     '```\n' )
 
 
-def write_run_attributes( fp, attrs ):
+def write_run_attributes( fp, rtinfo ):
     ""
-    nvL = list( attrs.items() )
+    nvL = list( rtinfo.asDict().items() )
     nvL.sort()
     for name,value in nvL:
         fp.write( '* '+name+' = '+str(value)+'\n' )
+
     tm = time.time()
     fp.write( '* currentepoch = '+str(tm)+'\n' )
+
+    t0 = rtinfo.getInfo( 'startepoch', None )
+    t1 = rtinfo.getInfo( 'finishepoch', None )
+    if t0 and t1:
+        fp.write( '* elapsed = '+outpututils.pretty_time( t1-t0 )+'\n' )
+
     fp.write( '\n' )
 
 

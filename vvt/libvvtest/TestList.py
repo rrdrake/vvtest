@@ -39,7 +39,6 @@ class TestList:
 
         self.datestamp = None
         self.finish = None
-        self.runattrs = {}
 
         self.groups = None  # a ParameterizeAnalyzeGroups class instance
 
@@ -152,7 +151,8 @@ class TestList:
         will have its skip setting removed from the test.
         """
         fL = glob_results_files( self.filename )
-        self._read_file_list( fL, preserve_skips )
+        file_attrs = self._read_file_list( fL, preserve_skips )
+        return file_attrs
 
     def resultsFileIsMarkedFinished(self):
         ""
@@ -167,6 +167,8 @@ class TestList:
 
     def _read_file_list(self, files, preserve_skips):
         ""
+        file_attrs = {}
+
         for fn in files:
 
             tlr = testlistio.TestListReader( fn )
@@ -175,9 +177,10 @@ class TestList:
             self.datestamp = tlr.getStartDate()
             self.finish = tlr.getFinishDate()
 
-            self.runattrs.update( tlr.getAttrs() )
+            file_attrs.clear()
+            file_attrs.update( tlr.getAttrs() )
             if self.finish:
-                self.runattrs['finishepoch'] = self.finish
+                file_attrs['finishepoch'] = self.finish
 
             for xdir,tcase in tlr.getTests().items():
 
@@ -186,6 +189,8 @@ class TestList:
                     copy_test_results( t, tcase )
                     if not preserve_skips:
                         t.getSpec().attrs.pop( 'skip', None )
+
+        return file_attrs
 
     def getDateStamp(self, default=None):
         """
@@ -207,10 +212,6 @@ class TestList:
         if self.finish:
             return self.finish
         return default
-
-    def getRunAttrs(self):
-        ""
-        return dict( self.runattrs.items() )
 
     def getTests(self):
         """
