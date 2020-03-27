@@ -666,13 +666,41 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
     def test_using_word_expressions_instead_of_a_list(self):
         ""
+        pf = ParamFilter( 'np' )
+        assert not pf.evaluate( {} )
+        assert not pf.evaluate( { 'foo':5 } )
+        assert     pf.evaluate( { 'np':2 } )
+
+        pf = ParamFilter( '!np' )
+        assert     pf.evaluate( {} )
+        assert     pf.evaluate( { 'foo':5 } )
+        assert not pf.evaluate( { 'np':2 } )
+
         pf = ParamFilter( 'np>2' )
+        assert not pf.evaluate( {} )
+        assert not pf.evaluate( {'foo':5} )
         assert not pf.evaluate( {'np':2} )
         assert     pf.evaluate( {'np':3} )
+
+        # Note: the expr np<=2 is not the same as !np>2
+        #       this is because np<=2 actually means
+        #           (np is defined) AND (np<=2)
+        #       and therefore !np<=2 actually means
+        #           NOT [ (np is defined) AND (np<=2) ]
+        #       or
+        #           (np is not defined) OR (np>2)
+
+        pf = ParamFilter( 'np<=2' )
+        assert     pf.evaluate( {'np':2} )
+        assert not pf.evaluate( {'np':3} )
+        assert not pf.evaluate( {} )
+        assert not pf.evaluate( { 'foo':5 } )
 
         pf = ParamFilter( '!np>2' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':3} )
+        assert     pf.evaluate( {} )
+        assert     pf.evaluate( { 'foo':5 } )
 
         pf = ParamFilter( '!np>3 and np!=1' )
         assert not pf.evaluate( {'np':1} )

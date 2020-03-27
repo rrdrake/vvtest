@@ -27,13 +27,13 @@ class WordExpression:
     True, while an empty string for an expression will always evaluate to
     False.
     """
-    
+
     def __init__(self, expr=None):
         ""
         self.expr = None
 
         self.words = set()   # the words in the expression
-        
+
         self.evalexpr = None
         self.nr_evalexpr = None
 
@@ -103,7 +103,7 @@ class WordExpression:
     def __repr__(self):
         if self.expr == None:return 'WordExpression=None'
         return 'WordExpression="' + self.expr + '"'
-    
+
     def __str__(self): return self.__repr__()
 
 
@@ -312,7 +312,7 @@ def split_but_retain_separator( expr, separator ):
 ##############################################################################
 
 class ParamFilter:
-    
+
     def __init__(self, expr=None):
         """
         If 'expr' is not None, load() is called.
@@ -320,230 +320,214 @@ class ParamFilter:
         self.wexpr = None
         self.wordD = {}
         if expr != None:
-          self.load(expr)
-    
+            self.load(expr)
+
     def load(self, expr):
         """
         Loads the parameter specifications.  The 'expr' argument can be either
         a string word expression or a list of strings.
-        
+
         If a list, each string is composed of parameter specifications
         separated by a '/' character.  A parameter specification is of the
         form:
-          
-          np        parameter np is defined
-          np=       same as "np"
-          !np       parameter np is not defined
-          np!=      same as "!np"
-          np<=4     parameter is less than or equal to four
-          np>=4     parameter is greater than or equal to four
-          np<4      parameter is less than four
-          np>4      parameter is greater than four
-          !np=4     not parameter is equal to four
-        
+
+            np        parameter np is defined
+            np=       same as "np"
+            !np       parameter np is not defined
+            np!=      same as "!np"
+            np<=4     parameter is less than or equal to four
+            np>=4     parameter is greater than or equal to four
+            np<4      parameter is less than four
+            np>4      parameter is greater than four
+            !np=4     not parameter is equal to four
+
         The parameter specifications separated by '/' are OR'ed together and
         the list entries are AND'ed together.
-        
+
         Raises a ValueError if the expression contains a syntax error.
         """
         if type(expr) == type([]):
-          # 'expr' is a list of strings that are AND'ed together
-          self.wexpr = WordExpression()
-          for ors in expr:
-            # the divide character is used as an OR operator
-            L = []
-            for s in ors.split('/'):
-              if s.strip():
-                L.append(s)
-            x = ' or '.join( L )
-            self.wexpr.append(x, 'and')
+            # 'expr' is a list of strings that are AND'ed together
+            self.wexpr = WordExpression()
+            for ors in expr:
+                # the divide character is used as an OR operator
+                L = []
+                for s in ors.split('/'):
+                    if s.strip():
+                        L.append(s)
+                x = ' or '.join( L )
+                self.wexpr.append(x, 'and')
         else:
-          self.wexpr = WordExpression(expr)
-        
+            self.wexpr = WordExpression(expr)
+
         # map each word that appears to an evaluation function object instance
         self.wordD = {}
         for w in self.wexpr.getWordList():
-          self.wordD[w] = self._make_func(w)
-    
+            self.wordD[w] = self._make_func(w)
+
     def evaluate(self, paramD):
         """
         Evaluate the expression previously loaded against the given parameter
         values.  Returns true or false.
         """
         if self.wexpr == None:
-          return 1
+            return 1
         evalobj = ParamFilter.Evaluator(self.wordD, paramD)
         return self.wexpr.evaluate( evalobj.evaluate )
-    
+
     class Evaluator:
         def __init__(self, wordD, paramD):
             self.wordD = wordD
             self.paramD = paramD
         def evaluate(self, word):
             return self.wordD[word].evaluate(self.paramD)
-    
+
     def _make_func(self, word):
         """
         Returns an instance of an evaluation class based on the word.
         """
         if not word: raise ValueError( 'empty word (expected a word)' )
         if word[0] == '!':
-          f = self._make_func( word[1:] )
-          if isinstance(f, ParamFilter.EvalLE):
-            return ParamFilter.EvalGT(f.p, f.v)
-          if isinstance(f, ParamFilter.EvalGE):
-            return ParamFilter.EvalLT(f.p, f.v)
-          if isinstance(f, ParamFilter.EvalNE):
-            return ParamFilter.EvalEQ(f.p, f.v)
-          if isinstance(f, ParamFilter.EvalLT):
-            return ParamFilter.EvalGE(f.p, f.v)
-          if isinstance(f, ParamFilter.EvalGT):
-            return ParamFilter.EvalLE(f.p, f.v)
-          if isinstance(f, ParamFilter.EvalEQ):
-            return ParamFilter.EvalNE(f.p, f.v)
+            f = self._make_func( word[1:] )
+            f.negate = not f.negate
+            return f
         L = word.split( '<=', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalLE( L[0], L[1] )
+            if not L[1]: raise ValueError( "empty less-equal value" )
+            return EvalLE( L[0], L[1] )
         L = word.split( '>=', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalGE( L[0], L[1] )
+            if not L[1]: raise ValueError( "empty greater-equal value" )
+            return EvalGE( L[0], L[1] )
         L = word.split( '!=', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalNE( L[0], L[1] )
+            return EvalNE( L[0], L[1] )
         L = word.split( '<', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalLT( L[0], L[1] )
+            if not L[1]: raise ValueError( "empty less-than value" )
+            return EvalLT( L[0], L[1] )
         L = word.split( '>', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalGT( L[0], L[1] )
+            if not L[1]: raise ValueError( "empty greater-than value" )
+            return EvalGT( L[0], L[1] )
         L = word.split( '=', 1 )
         if len(L) > 1:
-          return ParamFilter.EvalEQ( L[0], L[1] )
-        return ParamFilter.EvalEQ( word, '' )
-    
-    class EvalEQ:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if self.v:
-              if v == None: return 0  # paramD does not have the parameter
-              if type(v) == type(2): return v == int(self.v)
-              elif type(v) == type(2.2): return v == float(self.v)
-              if v == self.v: return 1
-              try:
+            return EvalEQ( L[0], L[1] )
+        return EvalEQ( word, '' )
+
+
+class EvalOperator:
+    def __init__(self, param, value):
+        if not param: raise ValueError( 'parameter name is empty' )
+        self.p = param ; self.v = value
+        self.negate = False
+    def evaluate(self, paramD):
+        b = self._eval_expr( paramD )
+        if self.negate: b = not b
+        return b
+
+
+class EvalEQ( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if self.v:
+            if v == None: return 0  # paramD does not have the parameter
+            if type(v) == type(2): return v == int(self.v)
+            elif type(v) == type(2.2): return v == float(self.v)
+            if v == self.v: return 1
+            try:
                 if int(v) == int(self.v): return 1
-              except: pass
-              try:
+            except Exception: pass
+            try:
                 if float(v) == float(self.v): return 1
-              except: pass
-              return 0
-            return v != None  # true if paramD has the parameter name
-    
-    class EvalNE:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if self.v:
-              if v == None: return 0  # paramD does not have the parameter
-              if type(v) == type(2): return v != int(self.v)
-              elif type(v) == type(2.2): return v != float(self.v)
-              if v == self.v: return 0
-              try:
+            except Exception: pass
+            return 0
+        return v != None  # true if paramD has the parameter name
+
+class EvalNE( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if self.v:
+            if v == None: return 0  # paramD does not have the parameter
+            if type(v) == type(2): return v != int(self.v)
+            elif type(v) == type(2.2): return v != float(self.v)
+            if v == self.v: return 0
+            try:
                 if int(v) == int(self.v): return 0
-              except: pass
-              try:
+            except Exception: pass
+            try:
                 if float(v) == float(self.v): return 0
-              except: pass
-              return 1
-            return v == None  # true if paramD does not have the parameter name
-    
-    class EvalLE:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            if not value: raise ValueError( "empty less-equal value" )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if v == None: return 0
-            if type(v) == type(2): return v <= int(self.v)
-            elif type(v) == type(2.2): return v <= float(self.v)
-            if v == self.v: return 1
-            try:
-              if int(v) > int(self.v): return 0
-              return 1
-            except: pass
-            try:
-              if float(v) > float(self.v): return 0
-              return 1
-            except: pass
-            return v <= self.v
-    
-    class EvalGE:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            if not value: raise ValueError( "empty greater-equal value" )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if v == None: return 0
-            if type(v) == type(2): return v >= int(self.v)
-            elif type(v) == type(2.2): return v >= float(self.v)
-            if v == self.v: return 1
-            try:
-              if int(v) < int(self.v): return 0
-              return 1
-            except: pass
-            try:
-              if float(v) < float(self.v): return 0
-              return 1
-            except: pass
-            return v >= self.v
-    
-    class EvalLT:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            if not value: raise ValueError( "empty less-than value" )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if v == None: return 0
-            if type(v) == type(2): return v < int(self.v)
-            elif type(v) == type(2.2): return v < float(self.v)
-            if v == self.v: return 0
-            try:
-              if int(v) >= int(self.v): return 0
-              return 1
-            except: pass
-            try:
-              if not float(v) < float(self.v): return 0
-              return 1
-            except: pass
-            return v < self.v
-    
-    class EvalGT:
-        def __init__(self, param, value):
-            if not param: raise ValueError( 'parameter name is empty' )
-            if not value: raise ValueError( "empty greater-than value" )
-            self.p = param ; self.v = value
-        def evaluate(self, paramD):
-            v = paramD.get(self.p,None)
-            if v == None: return 0
-            if type(v) == type(2): return v > int(self.v)
-            elif type(v) == type(2.2): return v > float(self.v)
-            if v == self.v: return 0
-            try:
-              if int(v) <= int(self.v): return 0
-              return 1
-            except: pass
-            try:
-              if not float(v) > float(self.v): return 0
-              return 1
-            except: pass
-            return v > self.v
+            except Exception: pass
+            return 1
+        return v == None  # true if paramD does not have the parameter name
+
+class EvalLE( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if v == None: return 0
+        if type(v) == type(2): return v <= int(self.v)
+        elif type(v) == type(2.2): return v <= float(self.v)
+        if v == self.v: return 1
+        try:
+            if int(v) > int(self.v): return 0
+            return 1
+        except Exception: pass
+        try:
+            if float(v) > float(self.v): return 0
+            return 1
+        except Exception: pass
+        return v <= self.v
+
+class EvalGE( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if v == None: return 0
+        if type(v) == type(2): return v >= int(self.v)
+        elif type(v) == type(2.2): return v >= float(self.v)
+        if v == self.v: return 1
+        try:
+            if int(v) < int(self.v): return 0
+            return 1
+        except Exception: pass
+        try:
+            if float(v) < float(self.v): return 0
+            return 1
+        except Exception: pass
+        return v >= self.v
+
+class EvalLT( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if v == None: return 0
+        if type(v) == type(2): return v < int(self.v)
+        elif type(v) == type(2.2): return v < float(self.v)
+        if v == self.v: return 0
+        try:
+            if int(v) >= int(self.v): return 0
+            return 1
+        except Exception: pass
+        try:
+            if not float(v) < float(self.v): return 0
+            return 1
+        except Exception: pass
+        return v < self.v
+
+class EvalGT( EvalOperator ):
+    def _eval_expr(self, paramD):
+        v = paramD.get(self.p,None)
+        if v == None: return 0
+        if type(v) == type(2): return v > int(self.v)
+        elif type(v) == type(2.2): return v > float(self.v)
+        if v == self.v: return 0
+        try:
+            if int(v) <= int(self.v): return 0
+            return 1
+        except Exception: pass
+        try:
+            if not float(v) > float(self.v): return 0
+            return 1
+        except Exception: pass
+        return v > self.v
 
 
 ######################################################################

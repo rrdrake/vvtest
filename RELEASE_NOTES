@@ -71,6 +71,13 @@ Fixes:
 
 Changes:
 
+    - The behavior of "-P <expression>" has changed a little.  Since "-p
+      np<4" means 'np' is a parameter in the test and np<4, it made sense
+      for "-P np<4" to mean 'np' is not a parameter in the test or np>=4.
+      (Before this change, "-P np<4" was equivalent to "-p np>=4", which
+      meant if 'np' was not a parameter in the test, then the test would
+      not get run.)
+
     - The console test list output default has changed for vvtest -i.  It
       now defaults to just writing the non-pass tests (the same as the
       default list output after a vvtest execution).  Use vvtest -iv to get
