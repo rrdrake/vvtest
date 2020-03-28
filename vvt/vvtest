@@ -33,7 +33,9 @@ USER_PLUGIN_MODULE_NAME = 'vvtest_user_plugin'
 class MainEntry:
 
     def __init__(self, argv, vvtestdir, exepath):
-        ""
+        """
+        'vvtestdir' is the (real) directory containing the vvtest script
+        """
         self.argv = argv
         self.vvtestdir = vvtestdir
         self.exepath = exepath
@@ -114,7 +116,7 @@ class MainEntry:
         ""
         from libvvtest.runinfo import RuntimeInfo
 
-        self.rtdata = RuntimeData( self.vvtestdir, self.exepath )
+        self.rtdata = RuntimeData( self.exepath )
 
         rtinfo = RuntimeInfo( startepoch=self.start_epoch,
                               cmdline=self.argv,
@@ -285,19 +287,16 @@ def create_configuration( rtconfig, opts, optD, vvtestdir, configdir ):
 
 class RuntimeData:
 
-    def __init__(self, vvtestdir, exepath):
+    def __init__(self, exepath):
         """
-        'vvtestdir' is the directory containing the vvtest script
         'exepath' is the absolute path to vvtest (without following soft links)
         """
-        self.vvtestdir = vvtestdir
         self.exepath = exepath
+
+    def getVvtestPath(self): return self.exepath
 
     def setRuntimeInfo(self, rtinfo): self.rtinfo = rtinfo
     def getRuntimeInfo(self): return self.rtinfo
-
-    def getVvtestDir(self): return self.vvtestdir
-    def getVvtestPath(self): return self.exepath
 
     def setPlatformObject(self, platobj): self.plat = platobj
     def getPlatformObject(self): return self.plat
