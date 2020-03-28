@@ -31,27 +31,27 @@ class ConsoleWriter:
         assert num > 0
         self.maxnonpass = num
 
-    def prerun(self, atestlist, runinfo, verbosity):
+    def prerun(self, atestlist, rtinfo, verbosity):
         ""
         level = get_prerun_list_level( verbosity, self.verbose )
 
         self._write_test_list_results( atestlist, level )
         self._write_summary( atestlist, 'Test list:' )
 
-    def midrun(self, atestlist, runinfo):
+    def midrun(self, atestlist, rtinfo):
         ""
         pass
 
-    def postrun(self, atestlist, runinfo):
+    def postrun(self, atestlist, rtinfo):
         ""
         if atestlist.numActive() > 0:
             level = 1 + self.verbose
             self._write_test_list_results( atestlist, level )
             self._write_summary( atestlist, 'Summary:' )
 
-        self.write( make_finish_info_string( runinfo ) )
+        self.write( make_finish_info_string( rtinfo ) )
 
-    def info(self, atestlist, runinfo):
+    def info(self, atestlist, rtinfo):
         ""
         level = 1 + self.verbose
         self._write_test_list_results( atestlist, level )
@@ -200,17 +200,18 @@ class ConsoleWriter:
         self.write( astr )
 
 
-def make_finish_info_string( runinfo ):
+def make_finish_info_string( rtinfo ):
     ""
     s = '\n'
 
-    if 'finishepoch' in runinfo:
-        fin = runinfo['finishepoch']
+    fin = rtinfo.getInfo( 'finishepoch', None )
+    if fin != None:
         fdate = time.ctime( fin )
         s += 'Finish date: '+fdate
 
-        if 'startepoch' in runinfo:
-            dt = fin - runinfo['startepoch']
+        start = rtinfo.getInfo( 'startepoch', None )
+        if start != None:
+            dt = fin - start
             elapsed = outpututils.pretty_time( dt )
             s += ' (elapsed time '+elapsed+')'
 

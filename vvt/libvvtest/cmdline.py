@@ -629,6 +629,9 @@ def create_parser( argvlist, vvtest_version ):
         help='Write test summary as a set of files in the GitLab '
              'Flavored Markdown format.  If LOCATION is a Git repository '
              'URL, then push results files to branches there.' )
+    grp.add_argument( '--cdash', metavar='LOCATION',
+        help='Write test results in XML format suitable for CDash.  If '
+             'LOCATION is a URL, then submit the results to the URL.' )
 
     grp = psr.add_argument_group( 'Other operating modes' )
     grp.add_argument( '-b', dest='dash_b', action='store_true',

@@ -25,6 +25,7 @@ from testutils import print3
 import libvvtest.outpututils as outpututils
 import libvvtest.consolewriter as consolewriter
 from libvvtest.consolewriter import ConsoleWriter
+from libvvtest.runinfo import RuntimeInfo
 
 
 class consolue_output_tests( vtu.vvtestTestCase ):
@@ -183,7 +184,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd() )
-        conwr.prerun( tlist, {}, 0 )
+        conwr.prerun( tlist, RuntimeInfo(), 0 )
         val = sio.getvalue()
         cnts = vtu.parse_vvtest_counts( val )
         assert cnts['total'] == 0
@@ -192,7 +193,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd() )
-        conwr.prerun( tlist, {}, 1 )
+        conwr.prerun( tlist, RuntimeInfo(), 1 )
         val = sio.getvalue()
         self.assert_test_list_counts_for_active( val )
         assert 'Test list:' in val and 'Summary:' not in val
@@ -200,7 +201,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=2 )
-        conwr.prerun( tlist, {}, 1 )
+        conwr.prerun( tlist, RuntimeInfo(), 1 )
         val = sio.getvalue()
         self.assert_test_list_counts_for_all( val )
         assert 'Test list:' in val and 'Summary:' not in val
@@ -212,7 +213,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd() )
-        conwr.postrun( tlist, {} )
+        conwr.postrun( tlist, RuntimeInfo() )
         val = sio.getvalue()
         self.assert_test_list_counts_for_nonpass( val )
         self.assert_test_list_summary( val )
@@ -220,7 +221,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=1 )
-        conwr.postrun( tlist, {} )
+        conwr.postrun( tlist, RuntimeInfo() )
         val = sio.getvalue()
         self.assert_test_list_counts_for_active( val )
         self.assert_test_list_summary( val )
@@ -233,7 +234,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd() )
         tm = time.time()
-        conwr.postrun( tlist, {} )
+        conwr.postrun( tlist, RuntimeInfo() )
 
         val = sio.getvalue()
         print3( val )
@@ -250,7 +251,7 @@ class consolue_output_tests( vtu.vvtestTestCase ):
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd() )
         conwr.setMaxNonPass( 2 )
-        conwr.postrun( tlist, {} )
+        conwr.postrun( tlist, RuntimeInfo() )
 
         val = sio.getvalue()
         print3( val )
@@ -262,16 +263,16 @@ class consolue_output_tests( vtu.vvtestTestCase ):
         tlist = MockTestList( self.getFakeTestList() )
 
         tm = time.time()
-        runinfo = { 'finishepoch':tm-10, 'startepoch':tm }
+        rtinfo = RuntimeInfo( finishepoch=tm-10, startepoch=tm )
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=0 )
-        conwr.postrun( tlist, runinfo )
+        conwr.postrun( tlist, rtinfo )
         val1 = sio.getvalue()
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=0 )
-        conwr.info( tlist, runinfo )
+        conwr.info( tlist, rtinfo )
         val2 = sio.getvalue()
 
         self.assert_test_list_counts_for_nonpass( val1 )
@@ -281,12 +282,12 @@ class consolue_output_tests( vtu.vvtestTestCase ):
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=1 )
-        conwr.postrun( tlist, runinfo )
+        conwr.postrun( tlist, rtinfo )
         val1 = sio.getvalue()
 
         sio = StringIO()
         conwr = ConsoleWriter( sio, os.getcwd(), verbose=1 )
-        conwr.info( tlist, runinfo )
+        conwr.info( tlist, rtinfo )
         val2 = sio.getvalue()
 
         self.assert_test_list_counts_for_active( val1 )

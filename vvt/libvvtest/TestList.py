@@ -151,7 +151,8 @@ class TestList:
         will have its skip setting removed from the test.
         """
         fL = glob_results_files( self.filename )
-        self._read_file_list( fL, preserve_skips )
+        file_attrs = self._read_file_list( fL, preserve_skips )
+        return file_attrs
 
     def resultsFileIsMarkedFinished(self):
         ""
@@ -166,6 +167,8 @@ class TestList:
 
     def _read_file_list(self, files, preserve_skips):
         ""
+        file_attrs = {}
+
         for fn in files:
 
             tlr = testlistio.TestListReader( fn )
@@ -174,6 +177,11 @@ class TestList:
             self.datestamp = tlr.getStartDate()
             self.finish = tlr.getFinishDate()
 
+            file_attrs.clear()
+            file_attrs.update( tlr.getAttrs() )
+            if self.finish:
+                file_attrs['finishepoch'] = self.finish
+
             for xdir,tcase in tlr.getTests().items():
 
                 t = self.tcasemap.get( xdir, None )
@@ -181,6 +189,8 @@ class TestList:
                     copy_test_results( t, tcase )
                     if not preserve_skips:
                         t.getSpec().attrs.pop( 'skip', None )
+
+        return file_attrs
 
     def getDateStamp(self, default=None):
         """

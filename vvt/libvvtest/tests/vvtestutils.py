@@ -229,10 +229,13 @@ class VvtestCommandRunner:
         raise_on_error = options.get( 'raise_on_error', True )
         chdir          = options.get( 'chdir',          None )
 
-        x,out = util.runcmd( self.cmd, chdir=chdir,
-                             raise_on_error=False, print_output=False )
+        verb = 1
+        if quiet: verb = 0
 
-        if not quiet:
+        x,out = util.runcmd( self.cmd, chdir=chdir,
+                             raise_on_error=False, verbose=verb )
+
+        if x == 0:
             print3( out )
 
         self.x = x

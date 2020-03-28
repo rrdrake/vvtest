@@ -24,6 +24,7 @@ import libvvtest.outpututils as outpututils
 import libvvtest.listwriter as listwriter
 from libvvtest.TestList import TestList
 import libvvtest.fmtresults as fmtresults
+from libvvtest.runinfo import RuntimeInfo
 
 
 class misc_tests( vtu.vvtestTestCase ):
@@ -114,7 +115,7 @@ class html_output_format_tests( vtu.vvtestTestCase ):
     def assert_tests_in_html(self, lines):
         ""
         assert len( lines ) == 5
-        linestr = ' '.join(lines)
+        linestr = '\n'.join(lines)
         assert len( util.greplines( 'FailTest', linestr ) ) == 1
         assert len( util.greplines( 'DiffTest.np=1', linestr ) ) == 1
         assert len( util.greplines( 'DiffTest.np=2', linestr ) ) == 1
@@ -209,11 +210,11 @@ class save_results_output( vtu.vvtestTestCase ):
         tcase,tlist = self.prep_testlist( 'adir' )
 
         perm = DummyPermissionSetter()
-        attrs = { 'platform':'Xbox', 'compiler':'gcc' }
+        rtinfo = RuntimeInfo( platform='Xbox', compiler='gcc' )
 
         lwr = listwriter.ListWriter( perm, 'odir', abspath('tdir') )
 
-        lwr.writeList( tlist, attrs )
+        lwr.writeList( tlist, rtinfo )
         fL = util.grepfiles( 'adir/sdir/atest.np=4', 'odir/results.*' )
         assert len(fL) == 1
 
@@ -243,11 +244,11 @@ class save_results_output( vtu.vvtestTestCase ):
         tcase,tlist = self.prep_testlist( 'adir' )
 
         perm = DummyPermissionSetter()
-        attrs = { 'platform':'Xbox', 'compiler':'gcc' }
+        rtinfo = RuntimeInfo( platform='Xbox', compiler='gcc' )
 
         lwr = listwriter.ListWriter( perm, 'sparky:'+abspath('odir'),
                                      abspath('tdir'), scpexe=abspath('fakescp') )
-        lwr.writeList( tlist, attrs )
+        lwr.writeList( tlist, rtinfo )
 
         fL = util.grepfiles( 'adir/sdir/atest.np=4', 'odir/results.*.scp' )
         assert len(fL) == 1
@@ -303,26 +304,18 @@ def get_status_lines_from_html( htmldoc ):
     ""
     lines = []
 
-    nodes = gather_list_items_starting_with( htmldoc, 'Status:' )
-    for nd in nodes:
-        assert nd.hasChildNodes()
-        lines.append( util.get_subtext_from_xml_node( nd ) )
+    for nd in recurse_status_list_items( htmldoc ):
+        txt = util.get_sub_text_from_xml_node( nd )
+        lines.append( txt )
 
     return lines
 
 
-def gather_list_items_starting_with( doc, starttext ):
+def recurse_status_list_items( xmlnode ):
     ""
-    nodes = []
-
-    for nd in doc.getElementsByTagName('li'):
-        if nd.hasChildNodes:
-            firstchild = nd.childNodes[0]
-            val = firstchild.nodeValue
-            if val and val.strip().startswith( starttext ):
-                nodes.append( nd )
-
-    return nodes
+    for nd in util.recursive_find_xml_element( xmlnode, 'li' ):
+        if nd.text and nd.text.strip().startswith( 'Status:' ):
+            yield nd
 
 
 ############################################################################

@@ -32,6 +32,7 @@ from libvvtest.testcreator import TestCreator
 from libvvtest.teststatus import TestStatus, DIFF_EXIT_STATUS
 from libvvtest.testcase import TestCase
 from gitinterface import clone_repo, get_remote_branches
+from libvvtest.runinfo import RuntimeInfo
 
 
 class gitlab_output_format_tests( vtu.vvtestTestCase ):
@@ -332,7 +333,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
     def test_test_run_attributes(self):
         ""
         conv = gitlabwriter.GitLabMarkDownConverter( '.', '.' )
-        conv.saveResults( [] )
+        conv.saveResults( [], RuntimeInfo() )
         time.sleep(1)
 
         fval = util.readfile( 'README.md' ).strip()
@@ -341,9 +342,9 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
 
         conv = gitlabwriter.GitLabMarkDownConverter( '.', '.' )
         tm = time.time()
-        conv.setRunAttr( startdate=str(tm)+' / '+time.ctime(tm),
-                         finishdate=str(tm+10)+' / '+time.ctime(tm+10) )
-        conv.saveResults( [] )
+        rtinfo = RuntimeInfo( startdate=str(tm)+' / '+time.ctime(tm),
+                              finishdate=str(tm+10)+' / '+time.ctime(tm+10) )
+        conv.saveResults( [], rtinfo )
         time.sleep(1)
 
         fval = util.readfile( 'README.md' ).strip()
@@ -418,25 +419,25 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         ""
         tm = time.time()
 
-        runinfo = { 'startepoch':tm, 'platform':'xbox' }
-        start,sfx,msg = make_submit_info( runinfo, ['dbg'], None )
+        rtinfo = RuntimeInfo( startepoch=tm, platform='xbox' )
+        start,sfx,msg = make_submit_info( rtinfo, ['dbg'], None )
         assert abs( tm - start ) < 2
         print3( 'sfx', sfx )
         assert 'xbox' in sfx and 'dbg' in sfx
         assert 'vvtest' in msg
 
-        runinfo = { 'startepoch':tm, 'platform':'xbox' }
-        start,sfx,msg = make_submit_info( runinfo, ['dbg'], 'blue' )
+        rtinfo = RuntimeInfo( startepoch=tm, platform='xbox' )
+        start,sfx,msg = make_submit_info( rtinfo, ['dbg'], 'blue' )
         assert 'xbox' in sfx and 'dbg' in sfx and 'blue' in sfx
 
-        runinfo = { 'startepoch':tm }
-        start,sfx,msg = make_submit_info( runinfo, [], None )
+        rtinfo = RuntimeInfo( startepoch=tm )
+        start,sfx,msg = make_submit_info( rtinfo, [], None )
         assert abs( tm - start ) < 2
         assert not sfx
 
     def make_git_repo(self):
         ""
-        url = util.create_local_bare_repository( 'arepo' )
+        url = util.create_bare_repo( 'arepo' )
         util.push_file_to_repo( url, 'file.txt', 'file contents' )
 
         return url
@@ -462,9 +463,9 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         ""
         wr,url = self.make_git_repo_and_overridden_GitLabWriter()
 
-        runinfo = { 'startepoch':1559822821.99,  # Thu Jun  6 06:07:01 2019
-                    'myname':'my value' }
-        wr._dispatch_submission( None, runinfo )
+        rtinfo = RuntimeInfo( startepoch=1559822821.99,  # Thu Jun  6 06:07:01 2019
+                              curdir='my value' )
+        wr._dispatch_submission( None, rtinfo )
 
         git = clone_repo( url, 'checkrepo' )
         branch = get_results_branch( git )
@@ -474,7 +475,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         assert basename( rdir ) == '2019_06_06_06'
 
         val = util.readfile( rdir+'/info.txt' )
-        assert 'myname' in val and 'my value' in val
+        assert 'curdir' in val and 'my value' in val
 
     def test_submit_to_a_faulty_gitlab_url(self):
         ""
@@ -494,13 +495,13 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         ""
         wr,url = self.make_git_repo_and_overridden_GitLabWriter()
 
-        runinfo = { 'startepoch':1559822821.99 }  # Thu Jun  6 06:07:01 2019
-        wr._dispatch_submission( None, runinfo )
+        rtinfo = RuntimeInfo( startepoch=1559822821.99 )  # Thu Jun  6 06:07:01 2019
+        wr._dispatch_submission( None, rtinfo )
 
         time.sleep(1)
 
         rtn,out,err = util.call_capture_output(
-            wr._dispatch_submission, None, runinfo )
+            wr._dispatch_submission, None, rtinfo )
 
         assert 'WARNING' not in out
 
@@ -566,7 +567,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         val = fval.split( '## Tests that', 1 )[0]
         assert len( util.greplines( 'startdate', val ) ) == 1
         assert len( util.greplines( 'finishdate', val ) ) == 1
-        assert len( util.greplines( ' vvtest =', val ) ) == 1
+        assert len( util.greplines( ' vvtestdir =', val ) ) == 1
         assert len( util.greplines( ' python =', val ) ) == 1
         assert len( util.greplines( ' PATH =', val ) ) == 1
         elap = util.greplines( 'elapsed', val )[0].split('=')[1].strip()

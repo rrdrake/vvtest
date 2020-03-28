@@ -19,19 +19,19 @@ class HTMLWriter:
         self.filename = os.path.normpath( os.path.abspath( output_filename ) )
         self.testdir = results_test_dir
 
-    def prerun(self, atestlist, runinfo, verbosity):
+    def prerun(self, atestlist, rtinfo, verbosity):
         ""
         pass
 
-    def midrun(self, atestlist, runinfo):
+    def midrun(self, atestlist, rtinfo):
         ""
         pass
 
-    def postrun(self, atestlist, runinfo):
+    def postrun(self, atestlist, rtinfo):
         ""
         self.writeDocument( atestlist )
 
-    def info(self, atestlist, runinfo):
+    def info(self, atestlist, rtinfo):
         ""
         self.writeDocument( atestlist )
 

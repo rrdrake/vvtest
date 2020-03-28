@@ -1,0 +1,289 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import basename, abspath
+import time
+import glob
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+import libvvtest.cdashwriter as cdashwriter
+import cdashutil
+
+from libvvtest.TestList import TestList
+from libvvtest.permsetter import PermissionSetter
+from libvvtest.runinfo import RuntimeInfo
+
+
+class unit_tests( vtu.vvtestTestCase ):
+
+    def test_recognizing_http_urls(self):
+        ""
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        assert not cdashwriter.is_http_url( 'subdir' )
+        assert not cdashwriter.is_http_url( abspath('subdir') )
+        assert not cdashwriter.is_http_url( 'foobarbaz' )
+        assert not cdashwriter.is_http_url( abspath('foobarbaz') )
+
+        assert cdashwriter.is_http_url( 'http://hostname' )
+        assert cdashwriter.is_http_url( 'http://hostname.com' )
+        assert cdashwriter.is_http_url( 'http://hostname.com/' )
+        assert cdashwriter.is_http_url( 'http://hostname.com/cdash' )
+
+        assert cdashwriter.is_http_url( 'https://hostname' )
+        assert cdashwriter.is_http_url( 'https://hostname.com' )
+        assert cdashwriter.is_http_url( 'https://hostname.com/' )
+        assert cdashwriter.is_http_url( 'https://hostname.com/cdash' )
+
+    def test_sitename_buildname_start_end_elapsed(self):
+        ""
+        wr = make_CDashWriter( 'file.xml' )
+
+        tm = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
+
+        rtinfo = RuntimeInfo( startepoch=tm,
+                              hostname='sparky',
+                              rundir='/path/to/testresultsdir',
+                              finishepoch=tm+73 )
+
+        testlist = TestList()
+
+        wr.postrun( testlist, rtinfo )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        assert extract_site_name( xml ) == 'sparky'
+        assert extract_build_name( xml ) == 'testresultsdir'
+
+        assert abs( extract_start_time( xml ) - tm ) <= 2
+        assert abs( extract_end_time( xml ) - (tm+73) ) <= 2
+        assert abs( extract_elapsed_time( xml ) - 73 ) <= 2
+
+    def test_writing_test_results(self):
+        ""
+        wr = make_CDashWriter( 'file.xml' )
+
+        testlist = TestList()
+        tcase = vtu.make_fake_TestCase( name='atest', result='pass', runtime=42 )
+        testlist.addTest( tcase )
+        tcase = vtu.make_fake_TestCase( name='btest', result='diff', runtime=23 )
+        testlist.addTest( tcase )
+        tcase = vtu.make_fake_TestCase( name='ctest', result='notrun' )
+        testlist.addTest( tcase )
+
+        wr.postrun( testlist, RuntimeInfo() )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        testinfo = extract_test_results( xml, 'sdir/atest.np=4' )
+        assert testinfo['status'] == 'passed'
+        assert abs( float( testinfo['Execution Time'] ) - 42 ) <= 2
+
+        testinfo = extract_test_results( xml, 'sdir/btest.np=4' )
+        assert testinfo['status'] == 'failed'
+        assert testinfo['Completion Status'] == 'diff'
+        assert abs( float( testinfo['Execution Time'] ) - 23 ) <= 2
+
+        testinfo = extract_test_results( xml, 'sdir/ctest.np=4' )
+        assert testinfo['status'] == 'notrun'
+
+    def test_a_url_destination_will_submit(self):
+        ""
+        records = []
+
+        class OverrideFileSubmitter( cdashutil.FileSubmitter ):
+            def urllib_submit(self, submit_url, filename):
+                records.append( ('urllib',submit_url,filename) )
+            def curl_submit(self, submit_url, filename):
+                records.append( ('curl',submit_url,filename) )
+
+        testlist = TestList()
+
+        wr = make_CDashWriter( 'file.xml',
+                               subclass_submitter=OverrideFileSubmitter )
+        wr.postrun( testlist, RuntimeInfo() )
+
+        assert os.path.isfile( 'file.xml' )
+        assert len( records ) == 0
+
+        wr = make_CDashWriter( 'http://localhost/cdash',
+                               subclass_submitter=OverrideFileSubmitter )
+        wr.setProjectName( 'CoolProj' )
+        wr.postrun( testlist, RuntimeInfo() )
+
+        assert len( records ) == 1
+        assert records[0][1].startswith( 'http://localhost/cdash/' )
+        assert records[0][1].endswith( 'project=CoolProj' )
+
+    def test_results_date_forms_cdash_build_stamp(self):
+        ""
+        wr = make_CDashWriter( 'file.xml' )
+
+        rdate  = 1512812080.2058824  # Sat Dec  9 02:34:40 2017 MDT
+        tstart = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
+
+        wr.setResultsDate( rdate )
+        rtinfo = RuntimeInfo( startepoch=tstart )
+
+        testlist = TestList()
+
+        wr.postrun( testlist, rtinfo )
+
+        xml = util.read_xml_file( 'file.xml' )
+        assert extract_build_stamp( xml ).startswith( '2017' )
+        assert abs( extract_start_time( xml ) - tstart ) <= 2
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_the_workflow(self):
+        ""
+        util.writefile( 'good.vvt', """
+            import time
+            time.sleep(2)
+            """ )
+        util.writefile( 'bad.vvt', """
+            import sys
+            import vvtest_util as vtu
+            sys.exit( vtu.diff_exit_status )
+            """ )
+        util.writefile( 'ugly.vvt', """
+            #VVT: keywords = notme
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-K notme --cdash file.xml' )
+        vrun.assertCounts( total=2, npass=1, diff=1 )
+
+        time.sleep(1)
+        self.check_good_bad_ugly( 'file.xml' )
+
+        vrun = vtu.runvvtest( '-i --cdash file2.xml' )
+
+        self.check_good_bad_ugly( 'file2.xml' )
+
+        self.assert_same_submit_files( 'file.xml', 'file2.xml' )
+
+    def check_good_bad_ugly(self, filename):
+        ""
+        xml = util.read_xml_file( filename )
+
+        testinfo = extract_test_results( xml, 'good' )
+        assert float(testinfo['Execution Time']) < 10
+
+        testinfo = extract_test_results( xml, 'bad' )
+        assert testinfo['Completion Status'] == 'diff'
+        assert float(testinfo['Execution Time']) < 10
+
+        assert extract_test_results( xml, 'ugly' ) == None
+
+    def assert_same_submit_files(self, file1, file2):
+        ""
+        xml1 = util.read_xml_file( file1 )
+        xml2 = util.read_xml_file( file2 )
+
+        assert extract_build_stamp( xml1 ) == extract_build_stamp( xml2 )
+        assert extract_site_name( xml1 ) == extract_site_name( xml2 )
+        assert extract_build_name( xml1 ) == extract_build_name( xml2 )
+
+        t1 = extract_start_time( xml1 )
+        t2 = extract_start_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+        t1 = extract_end_time( xml1 )
+        t2 = extract_end_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+        t1 = extract_elapsed_time( xml1 )
+        t2 = extract_elapsed_time( xml2 )
+        assert abs( t1-t2 ) <= 1
+
+
+def make_CDashWriter( destination, subclass_submitter=None ):
+    ""
+    perms = PermissionSetter( os.getcwd(), [] )
+
+    wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms )
+
+    if subclass_submitter:
+        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
+                              subclass_submitter )
+    else:
+        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
+                              cdashutil.FileSubmitter )
+
+    return wr
+
+
+def extract_test_results( xmlroot, testname ):
+    ""
+    testinfo = None
+
+    for nd0 in xmlroot.findall( 'Testing/Test' ):
+        if nd0.find( 'Name' ).text == testname:
+
+            testinfo = {}
+            testinfo['status'] = nd0.get( 'Status' )
+
+            for nd1 in nd0.findall( 'Results/NamedMeasurement' ):
+                testinfo[ nd1.get('name') ] = nd1.find('Value').text
+
+            nd1 = nd0.find( 'Results/Measurement' )
+            if nd1 != None:
+                testinfo[ 'output' ] = nd1.find('Value').text
+
+    return testinfo
+
+
+def extract_site_name( xmlroot ):
+    ""
+    return xmlroot.get('Name')
+
+
+def extract_build_name( xmlroot ):
+    ""
+    return xmlroot.get('BuildName')
+
+
+def extract_build_stamp( xmlroot ):
+    ""
+    return xmlroot.get('BuildStamp')
+
+
+def extract_start_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'StartTestTime' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text )
+
+
+def extract_end_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'EndTestTime' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text )
+
+
+def extract_elapsed_time( xmlroot ):
+    ""
+    ndL = util.recursive_find_xml_element( xmlroot, 'ElapsedMinutes' )
+    assert len( ndL ) == 1
+    return float( ndL[0].text ) * 60
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
