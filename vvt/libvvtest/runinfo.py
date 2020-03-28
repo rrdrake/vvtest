@@ -25,7 +25,7 @@ class RuntimeInfo:
         'rundir',  # the test results directory
         'curdir',
         'python',  # the python executable path
-        'vvtest',
+        'vvtestdir',  # the (real) directory containing the vvtest script
         'PYTHONPATH',
         'PATH',
         'LOADEDMODULES',

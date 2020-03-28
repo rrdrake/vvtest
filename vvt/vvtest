@@ -120,7 +120,7 @@ class MainEntry:
 
         rtinfo = RuntimeInfo( startepoch=self.start_epoch,
                               cmdline=self.argv,
-                              vvtest=self.vvtestdir,
+                              vvtestdir=self.vvtestdir,
                               curdir=self.curdir )
         self.rtdata.setRuntimeInfo( rtinfo )
 
