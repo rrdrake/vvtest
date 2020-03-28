@@ -538,7 +538,9 @@ def generateTestList( opts, optD, dirs, rtdata ):
     rtdata.getResultsWriter().prerun( tlist, rtinfo, verbosity=1 )
     print3()
 
-    location.create_test_directory( test_dir, perms, opts.dash_M )
+    location.create_test_directory( test_dir, opts.dash_M,
+                                    rtinfo.getInfo('curdir'), perms )
+
     writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
 
     tlist.stringFileWrite( **rtinfo.asDict() )
@@ -725,7 +727,8 @@ def runTests( opts, optD, rtdata, dirs ):
 
     perms = rtdata.getPermissionsObject()
 
-    location.create_test_directory( test_dir, perms, opts.dash_M )
+    location.create_test_directory( test_dir, opts.dash_M,
+                                    rtinfo.getInfo('curdir'), perms )
 
     if opts.dash_w:
         pathutil.remove_directory_contents( test_dir )

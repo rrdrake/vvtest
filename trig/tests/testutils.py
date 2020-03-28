@@ -842,6 +842,26 @@ def has_world_execute( path ):
     return int( fm & stat.S_IXOTH ) != 0
 
 
+def remove_execute_perms( path ):
+    ""
+    fm = stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
+
+    perm = fm & ( ~( stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH ) )
+    os.chmod( path, perm )
+
+    return fm
+
+
+def remove_write_perms( path ):
+    ""
+    fm = stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
+
+    perm = fm & ( ~( stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH ) )
+    os.chmod( path, perm )
+
+    return fm
+
+
 def probe_for_two_different_groups():
     ""
     import grp

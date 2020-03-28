@@ -9,6 +9,18 @@ from os.path import join as pjoin
 from os.path import normpath, abspath, basename, dirname
 import shutil
 
+from .errors import FatalError
+
+
+SCRATCH_DIR_SEARCH_LIST = [ '/scratch',
+                            '/var/scratch',
+                            '/var/scratch1',
+                            '/scratch1',
+                            '/var/scratch2',
+                            '/scratch2',
+                            '/var/scrl1',
+                            '/gpfs1' ]
+
 
 def find_vvtest_test_root_file( start_directory,
                                 stop_directory,
@@ -106,6 +118,7 @@ def determine_test_directory( subdirname, test_cache_file, cwd ):
         assert os.path.isabs( test_cache_file )
         test_dir = normpath( dirname( test_cache_file ) )
     else:
+        assert os.path.isabs( cwd )
         test_dir = normpath( pjoin( cwd, subdirname ) )
 
     return test_dir
@@ -129,7 +142,7 @@ def test_results_subdir_name( rundir, onopts, offopts, platform_name ):
     return testdirname
 
 
-def create_test_directory( testdirname, perms, mirdir ):
+def create_test_directory( testdirname, Mval, curdir, perms ):
     """
     Create the given directory name.  If -M is given in the command line
     options, then a mirror directory is created and 'testdirname' will be
@@ -137,7 +150,7 @@ def create_test_directory( testdirname, perms, mirdir ):
     """
     assert os.path.isabs( testdirname )
 
-    if mirdir and makeMirrorDirectory( mirdir, testdirname, perms ):
+    if Mval and make_mirror_directory( testdirname, Mval, curdir, perms ):
         pass
 
     else:
@@ -154,60 +167,61 @@ def create_test_directory( testdirname, perms, mirdir ):
         perms.set( testdirname )
 
 
-def makeMirrorDirectory( Mval, testdirname, perms ):
+def make_mirror_directory( testdirname, Mval, curdir, perms,
+                           scratchdirs=SCRATCH_DIR_SEARCH_LIST ):
     """
     Create a directory in another location then soft link 'testdirname' to it.
     Returns False only if 'Mval' is the word "any" and a suitable scratch
     directory could not be found.
     """
-    # magic: pass in curdir here instead of using os.getcwd()
+    assert os.path.isabs( testdirname )
 
     if Mval == 'any':
+        Mval = make_any_scratch_directory( scratchdirs, perms )
+        if not Mval:
+            return False
 
-        usr = getUserName()
-        for d in ['/var/scratch', '/scratch', '/var/scratch1', '/scratch1', \
-                  '/var/scratch2', '/scratch2', '/var/scrl1', '/gpfs1']:
-            if os.path.exists(d) and os.path.isdir(d):
-                ud = pjoin( d, usr )
-                if os.path.exists(ud):
-                    if os.path.isdir(ud) and \
-                       os.access( ud, os.X_OK ) and os.access( ud, os.W_OK ):
-                        Mval = ud
-                        break
-                elif os.access( d, os.X_OK ) and os.access( d, os.W_OK ):
-                    try:
-                        os.mkdir(ud)
-                    except Exception:
-                        pass
-                    else:
-                        Mval = ud
-                        break
+    elif not os.path.isabs( Mval ):
+        Mval = pjoin( curdir, Mval )
 
-        if Mval == 'any':
-            return False  # a scratch dir could not be found
+    assert os.path.isabs( Mval )
 
-        # include the current directory name in the mirror location
-        curdir = basename( os.getcwd() )
-        Mval = pjoin( Mval, curdir )
+    if not os.path.exists( Mval ) or not writable_directory( Mval ):
+        raise FatalError( "invalid or non-existent mirror directory: "+Mval )
 
-        if not os.path.exists( Mval ):
-            os.mkdir( Mval )
+    if os.path.samefile( Mval, curdir ):
+        raise FatalError( "mirror directory and current working directory " + \
+                "cannot be the same: "+Mval+' == '+curdir )
+
+    mirdir = pjoin( Mval, basename( testdirname ) )
+
+    check_and_make_directory( mirdir )
+    perms.set( mirdir )
+
+    force_link_directory( testdirname, mirdir )
+
+    return True
+
+
+def force_link_directory( linkpath, targetpath ):
+    ""
+    if os.path.islink( linkpath ):
+        path = os.readlink( linkpath )
+        if path != targetpath:
+            os.remove( linkpath )
+            os.symlink( targetpath, linkpath )
 
     else:
-        Mval = abspath( Mval )
+        if os.path.exists( linkpath ):
+            if os.path.isdir( linkpath ):
+                shutil.rmtree( linkpath )
+            else:
+                os.remove( linkpath )
+        os.symlink( targetpath, linkpath )
 
-    if not os.path.exists( Mval ) or not os.path.isdir( Mval ) or \
-       not os.access( Mval, os.X_OK ) or not os.access( Mval, os.W_OK ):
-        raise Exception( "invalid or non-existent mirror directory: "+Mval )
 
-    if os.path.samefile( Mval, os.getcwd() ):
-        raise Exception( "mirror directory and current working directory " + \
-                "are the same: "+Mval+' == '+os.getcwd() )
-
-    subdir = basename( testdirname )
-
-    mirdir = pjoin( Mval, subdir )
-
+def check_and_make_directory( mirdir ):
+    ""
     if os.path.exists( mirdir ):
         if not os.path.isdir( mirdir ):
             # replace regular file with a directory
@@ -218,23 +232,61 @@ def makeMirrorDirectory( Mval, testdirname, perms ):
             os.remove( mirdir )  # remove broken softlink
         os.mkdir( mirdir )
 
-    perms.set( abspath( mirdir ) )
 
-    if os.path.islink( testdirname ):
-        path = os.readlink( testdirname )
-        if path != mirdir:
-            os.remove( testdirname )
-            os.symlink( mirdir, testdirname )
+def make_any_scratch_directory( searchdirs, perms ):
+    ""
+    Mval = search_and_make_scratch_directory( searchdirs, perms )
 
-    else:
-        if os.path.exists( testdirname ):
-            if os.path.isdir( testdirname ):
-                shutil.rmtree( testdirname )
+    if not Mval:
+        return None  # a scratch dir could not be found
+
+    Mval = pjoin( Mval, 'vvtest_rundir' )
+
+    if not os.path.exists( Mval ):
+        os.mkdir( Mval )
+
+    return Mval
+
+
+def search_and_make_scratch_directory( searchdirs, perms ):
+    ""
+    for d in searchdirs:
+
+        sdir = make_scratch_mirror( d, perms )
+        if sdir:
+            return sdir
+
+    return None
+
+
+def make_scratch_mirror( scratch, perms ):
+    ""
+    if os.path.exists( scratch ) and os.path.isdir( scratch ):
+
+        usr = getUserName()
+        ud = pjoin( scratch, usr )
+
+        if os.path.exists(ud):
+            if writable_directory(ud):
+                return ud
+
+        elif writable_directory( scratch ):
+            try:
+                os.mkdir(ud)
+            except Exception:
+                pass
             else:
-                os.remove( testdirname )
-        os.symlink( mirdir, testdirname )
+                perms.set( ud )
+                return ud
 
-    return True
+    return None
+
+
+def writable_directory( path ):
+    ""
+    return os.path.isdir( path ) and \
+           os.access( path, os.X_OK ) and \
+           os.access( path, os.W_OK )
 
 
 def getUserName():
