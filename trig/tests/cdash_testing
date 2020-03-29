@@ -109,6 +109,18 @@ class file_formatting( trigutil.trigTestCase ):
 
         self.assertRaises( Exception, read_xml_file, 'bad.xml' )
 
+    def test_escaping_content_to_be_xml_safe(self):
+        ""
+        esc = cdashutil.escape( 'foo>bar foo<bar & "foo"'+" 'bar'" )
+        print3( esc )
+        assert esc == 'foo&gt;bar foo&lt;bar &amp; &quot;foo&quot; &apos;bar&apos;'
+
+        assert cdashutil.escape( 'foo\nbar' ) == 'foo\nbar'
+
+        assert cdashutil.escape( 'foo\bbar' ) == 'foobar'
+
+        assert cdashutil.attr_escape( 'foo\n<bar>' ) == 'foo &lt;bar&gt;'
+
     def test_setting_global_fields(self):
         ""
         fmtr = cdashutil.TestResultsFormatter()
