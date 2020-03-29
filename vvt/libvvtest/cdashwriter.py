@@ -61,6 +61,8 @@ class CDashWriter:
 
     def _create_and_fill_formatter(self, atestlist, rtinfo):
         ""
+        print3( '\nComposing CDash submission data...' )
+
         fmtr = self.formatter()
         set_global_data( fmtr, self.datestamp, rtinfo )
         set_test_list( fmtr, atestlist, self.testdir )
@@ -73,18 +75,25 @@ class CDashWriter:
             fname = pjoin( self.testdir, 'vvtest_cdash_submit.xml' )
 
             try:
+                print3( 'Writing CDash submission file:', fname )
                 self._write_file( fmtr, fname )
 
                 assert self.proj, 'CDash project name not set'
                 sub = self.submitter( self.dest, self.proj )
+                print3( 'Sending CDash file to:', self.dest + ',',
+                        'project='+self.proj )
                 sub.send( fname )
+
+                print3()
 
             except Exception as e:
                 print3( '\n*** WARNING: error submitting CDash results:',
                         str(e), '\n' )
 
         else:
+            print3( 'Writing CDash submission file:', self.dest )
             self._write_file( fmtr, self.dest )
+            print3()
 
     def _write_file(self, fmtr, filename):
         ""

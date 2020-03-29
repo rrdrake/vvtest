@@ -632,6 +632,9 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--cdash', metavar='LOCATION',
         help='Write test results in XML format suitable for CDash.  If '
              'LOCATION is a URL, then submit the results to the URL.' )
+    grp.add_argument( '--cdash-project', metavar='NAME', action='store',
+        help='CDash URL submissions will be sent to this project name. '
+             'Required if the --cdash option value is an http URL.' )
 
     grp = psr.add_argument_group( 'Other operating modes' )
     grp.add_argument( '-b', dest='dash_b', action='store_true',
