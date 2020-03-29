@@ -10,6 +10,7 @@ sys.excepthook = sys.__excepthook__
 import os
 import subprocess
 import time
+import string
 
 
 class TestResultsFormatter:
@@ -198,7 +199,7 @@ def start_element( fp, elmt_name, **kwargs ):
     ""
     fp.write( '<'+elmt_name )
     for n,v in kwargs.items():
-        fp.write( ' '+n+'="'+v+'"' )
+        fp.write( ' '+n+'="'+attr_escape(v)+'"' )
     fp.write( '>\n' )
 
 
@@ -214,7 +215,44 @@ def write_xml_header( fp ):
 
 def simple_element( fp, name, value ):
     ""
-    fp.write( '<'+name+'>'+value+'</'+name+'>\n' )
+    fp.write( '<'+name+'>'+escape(value)+'</'+name+'>\n' )
+
+
+charmap = {}
+
+for i in range(256):
+    c = chr(i)
+    if c in string.printable or c == '\n':
+        charmap[c] = c
+    elif c == '\t':
+        charmap[c] = ' '
+    else:
+        charmap[c] = ''
+
+charmap['>'] = '&gt;'
+charmap['<'] = '&lt;'
+charmap['"'] = '&quot;'
+charmap["'"] = '&apos;'
+charmap['&'] = '&amp;'
+
+def escape( buf ):
+    """
+        > is &gt;
+        < is &lt;
+        " is &quot;
+        ' is &apos;
+        & is &amp;
+    """
+    buf2 = ''
+    for c in buf:
+        buf2 += charmap.get( c, '?' )
+
+    return buf2
+
+
+def attr_escape( buf ):
+    ""
+    return escape( buf ).replace( '\n', ' ' )
 
 
 def make_build_stamp( epoch, group ):

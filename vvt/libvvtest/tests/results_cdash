@@ -11,6 +11,7 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 from os.path import basename, abspath
+from os.path import join as pjoin
 import time
 import glob
 
@@ -146,6 +147,123 @@ class unit_tests( vtu.vvtestTestCase ):
         assert extract_build_stamp( xml ).startswith( '2017' )
         assert abs( extract_start_time( xml ) - tstart ) <= 2
 
+    def test_reading_file_properties(self):
+        ""
+        util.writefile( 'file1', 'junk one' )
+        util.writefile( 'subdir/file2', 'junk two' )
+        os.symlink( 'subdir/file2', 'alink' )
+
+        tm = time.time()
+
+        props = cdashwriter.read_file_properties( 'file1' )
+        assert props['type'] == '-'
+        assert abs( props['mtime'] - tm ) < 10
+        assert props['size'] >= 8 and props['size'] < 1000000
+        assert type(props['owner']) == type('') and props['owner']
+        assert type(props['group']) == type('') and props['group']
+        assert props['mode'][0] == 'r' and props['mode'][2] == '-'
+        assert props['mode'][5] == '-' and props['mode'][8] == '-'
+
+        props = cdashwriter.read_file_properties( 'subdir' )
+        assert props['type'] == 'd'
+        assert abs( props['mtime'] - tm ) < 10
+        assert props['size'] >= 0 and props['size'] < 1000000
+        assert type(props['owner']) == type('') and props['owner']
+        assert type(props['group']) == type('') and props['group']
+        assert props['mode'][0] == 'r' and props['mode'][2] == 'x'
+
+        props = cdashwriter.read_file_properties( 'alink' )
+        assert props['type'] == 'l'
+        assert props['link'] == 'subdir/file2'
+        assert abs( props['mtime'] - tm ) < 10
+        assert props['size'] >= 0 and props['size'] < 1000000
+        assert type(props['owner']) == type('') and props['owner']
+        assert type(props['group']) == type('') and props['group']
+        assert props['mode'][0] == 'r' and props['mode'][2] == 'x'
+
+        props = cdashwriter.read_file_properties( 'noexist' )
+        assert props['type'] == '?'
+        assert props['mtime'] < 2
+        assert props['size'] < 2
+        assert props['owner'] == '?'
+        assert props['group'] == '?'
+        assert props['mode'] == '?????????'
+
+    def test_sorted_list_of_files_with_properties(self):
+        ""
+        util.writefile( 'file1', 'junk one' )
+        util.writefile( 'subdir/file2', 'junk two' )
+        os.symlink( 'subdir/file2', 'alink' )
+
+        tm0 = time.time() - 654
+        tm1 = tm0 + 234
+
+        os.utime( 'file1', (tm0,tm0) )
+        os.utime( 'subdir', (tm1,tm1) )
+
+        fL = os.listdir( '.' ) + [ '.' ]
+        files = cdashwriter.list_file_properties( '.', fL )
+        assert len(files) == 4
+        assert files[0][0] == 'file1'
+        assert files[1][0] == 'subdir'
+
+        os.utime( 'file1', (tm1,tm1) )
+        os.utime( 'subdir', (tm0,tm0) )
+
+        files = cdashwriter.list_file_properties( '.', fL )
+        assert len(files) == 4
+        assert files[1][0] == 'file1'
+        assert files[0][0] == 'subdir'
+
+    def test_string_list_files_in_a_directory(self):
+        ""
+        util.writefile( 'file1', 'junk one' )
+        util.writefile( 'subdir/file2', 'junk two' )
+        os.symlink( 'subdir/file2', 'alink' )
+
+        lines = cdashwriter.list_directory_as_strings( '.' )
+        for line in lines:
+            print3( line )
+        assert len( lines ) == 4
+        out = '\n'.join( lines )
+        assert len( util.greplines( 'alink*subdir', out ) ) == 1
+        assert len( util.greplines( 'file1', out ) ) == 1
+        assert len( util.greplines( 'subdir', out ) ) == 2
+        assert len( util.greplines( ' .', out ) ) == 1
+
+    def test_output_from_failed_tests(self):
+        ""
+        fmtr = cdashutil.TestResultsFormatter()
+
+        testlist = TestList()
+        tcase = vtu.make_fake_TestCase( name='atest', result='diff', runtime=23 )
+        testlist.addTest( tcase )
+
+        xdir = tcase.getSpec().getExecuteDirectory()
+
+        util.writefile( pjoin( xdir, 'file1.txt' ), """
+            my contents
+            """ )
+        os.mkdir( pjoin( xdir, 'asubdir' ) )
+        os.symlink( 'file1.txt', pjoin( xdir, 'file2.txt' ) )
+        util.writefile( pjoin( xdir, 'execute.log' ), """
+            bunch of info
+            more info
+            """ )
+
+        cdashwriter.set_test_list( fmtr, testlist, os.getcwd() )
+
+        fmtr.writeToFile( 'file.xml' )
+
+        xml = util.read_xml_file( 'file.xml' )
+        out = extract_test_output( xml, 'sdir/atest.np=4' )
+        print3( out )
+        yr = time.strftime( "%Y", time.localtime() )
+        assert len( util.greplines( yr+'* execute.log', out ) ) == 1
+        assert len( util.greplines( '$ cat*execute.log', out ) ) == 1
+        assert len( util.greplines( 'bunch of info', out ) ) == 1
+        assert len( util.greplines( 'more info', out ) ) == 1
+
 
 class integration_tests( vtu.vvtestTestCase ):
 
@@ -158,6 +276,7 @@ class integration_tests( vtu.vvtestTestCase ):
         util.writefile( 'bad.vvt', """
             import sys
             import vvtest_util as vtu
+            print ( 'hello from the bad test' )
             sys.exit( vtu.diff_exit_status )
             """ )
         util.writefile( 'ugly.vvt', """
@@ -282,6 +401,31 @@ def extract_elapsed_time( xmlroot ):
     ndL = util.recursive_find_xml_element( xmlroot, 'ElapsedMinutes' )
     assert len( ndL ) == 1
     return float( ndL[0].text ) * 60
+
+
+def extract_test_output( xmlroot, testname ):
+    ""
+    out = None
+
+    for nd0 in util.recursive_find_xml_element( xmlroot, 'Test' ):
+        for nd1 in nd0:
+            if nd1.tag == 'Name' and nd1.text == testname:
+                out = extract_measurement( nd0 )
+                break
+
+    return out
+
+
+def extract_measurement( xmlnode ):
+    ""
+    out = None
+
+    for nd0 in util.recursive_find_xml_element( xmlnode, 'Measurement' ):
+        for nd1 in nd0:
+            if nd1.tag == 'Value':
+                out = nd1.text
+
+    return out
 
 
 ############################################################################
