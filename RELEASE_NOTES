@@ -1,6 +1,12 @@
 
 Improvements:
 
+    - Add support for Kitware CDash.  The --cdash <file or URL> option will
+      cause vvtest to either write an XML file in CDash format to the given
+      file name, or to write and submit an XML file to a CDash URL.  If a
+      URL, the --cdash-project <name> option must be given so the CDash server
+      knows which project to store the test results.
+
     - Add support for the LSF batch queue manager.
 
     - Batch jobs that have started are now cancelled upon keyboard interrupt.
