@@ -129,6 +129,44 @@ class compute_relative_path_tests( vtu.vvtestTestCase ):
         assert val == basename(d1)
 
 
+class fault_tolerant_remove_tests( vtu.vvtestTestCase ):
+
+    def test_remove_a_directory_which_cannot_be_removed(self):
+        ""
+        cwd = os.getcwd()
+
+        util.writefile( 'subdir/file.txt', "junk" )
+        sdir = abspath( 'subdir' )
+
+        save_mode = util.remove_write_perms( 'subdir' )
+
+        try:
+            time.sleep(1)
+
+            pathutil.fault_tolerant_remove( 'subdir' )
+
+            assert os.path.samefile( os.getcwd(), cwd )
+            assert not os.path.exists( 'subdir' )
+            fn1 = util.globfile( '*/file.txt' )
+            assert fn1.startswith( 'vvtest_remove_' )
+            dn1 = dirname( fn1 )
+
+            # a second time does not change the name; this is important
+            # because otherwise multiple unsuccessful removes can make the
+            # "remove" file name grow indefinitely
+
+            pathutil.fault_tolerant_remove( dn1 )
+
+            fn2 = util.globfile( '*/file.txt' )
+            assert fn2.startswith( 'vvtest_remove_' )
+            dn2 = dirname( fn2 )
+            assert dn2 == dn1
+
+        finally:
+            for pn in os.listdir('.'):
+                if os.path.isdir( pn ):
+                    os.chmod( pn, save_mode )
+
 
 ############################################################################
 

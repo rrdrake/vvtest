@@ -95,7 +95,7 @@ def remove_directory_contents( path ):
 
 def random_string( numchars=8 ):
     ""
-    seq = string.ascii_uppercase + string.digits
+    seq = string.ascii_letters + string.digits
     cL = [ random.choice( seq ) for _ in range(numchars) ]
     return ''.join( cL )
 
@@ -104,9 +104,11 @@ def fault_tolerant_remove( path, num_attempts=5 ):
     ""
     dn,fn = os.path.split( path )
 
-    rmpath = os.path.join( dn, 'remove_'+fn + '_'+ random_string() )
-
-    os.rename( path, rmpath )
+    if fn.startswith( 'vvtest_remove_' ):
+        rmpath = path
+    else:
+        rmpath = os.path.join( dn, 'vvtest_remove_'+random_string()+'_'+fn )
+        os.rename( path, rmpath )
 
     for i in range( num_attempts ):
         try:
