@@ -624,8 +624,6 @@ def writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms ):
                                    str(opts.timeout_multiplier).strip() + '\n' )
         if opts.dash_e:
             fp.write( 'USE_ENV=1\n' )
-        if opts.dash_A:
-            fp.write( 'ALL_PLATFORMS=1\n' )
         if opts.check:
             fp.write( 'CHECK=' + ' '.join( opts.check ) + '\n' )
         fp.close()
@@ -689,8 +687,6 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
                     rtconfig.setAttr( 'multiplier', opts.timeout_multiplier )
             elif kvpair[0] == 'USE_ENV':
                 opts.dash_e = True
-            elif kvpair[0] == 'ALL_PLATFORMS':  # magic: take this out???
-                opts.dash_A = True
             elif kvpair[0] == 'CHECK':
                 opts.check = kvpair[1].split()
 
