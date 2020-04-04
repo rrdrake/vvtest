@@ -224,7 +224,6 @@ class info_tests( vtu.vvtestTestCase ):
     def test_info_mode_should_not_apply_default_filters(self):
         ""
         util.writefile( 'config/platform_plugin.py', """
-            import os, sys
             def initialize( plat ):
                 plat.setattr( 'maxprocs', 4 )
             """ )

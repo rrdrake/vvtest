@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 import glob
 
@@ -128,6 +129,32 @@ class filter_and_num_processors( vtu.vvtestTestCase ):
         rtconfig.setMaxProcs( 5 )
         assert     rtconfig.evaluate_maxprocs( 5 )
         assert not rtconfig.evaluate_maxprocs( 6 )
+
+    def test_max_procs_filter_is_not_applied_in_restart_mode(self):
+        ""
+        util.writefile( 'config/platform_plugin.py', """
+            def initialize( plat ):
+                plat.setattr( 'maxprocs', 4 )
+            """ )
+        util.writefile( 'procs.vvt', """
+            #VVT: parameterize : np = 1 8
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( "--config config" )
+        vrun.assertCounts( total=1, npass=1 )
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( "-R --config", abspath('config'), chdir=tdir )
+        vrun.assertCounts( total=1, npass=1 )
+
+        vtu.remove_results()
+
+        vrun = vtu.runvvtest( "-N 8 --config config" )
+        vrun.assertCounts( total=2, npass=2 )
+
+        vrun = vtu.runvvtest( "-R --config", abspath('config'), chdir=tdir )
+        vrun.assertCounts( total=2, npass=2 )
 
 
 ########################################################################

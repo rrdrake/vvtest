@@ -109,6 +109,22 @@ class tdd_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '--include-tdd', batch=True )
         vrun.assertCounts( total=4, npass=4 )
 
+    def test_the_include_tdd_option_is_remembered_in_restart_mode(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: keywords = foo
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: keywords = foo TDD
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '--include-tdd' )
+        vrun.assertCounts( total=2, npass=2 )
+
+        vrun = vtu.runvvtest( '-R', chdir=vrun.resultsDir() )
+        vrun.assertCounts( total=2, npass=2 )
+
     def test_that_tests_marked_TDD_carry_the_mark_to_the_test_results_file(self):
         ""
         util.writefile( "testone.xml", """
