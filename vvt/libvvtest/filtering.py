@@ -98,10 +98,7 @@ class TestFilter:
         ""
         tspec = tcase.getSpec()
 
-        if self.rtconfig.getAttr( 'include_tdd', False ):
-            ok = True
-        else:
-            ok = ( 'TDD' not in tspec.getKeywords() )
+        ok = self.rtconfig.evaluate_TDD( tspec.getKeywords() )
 
         if not ok:
             tcase.getStat().markSkipByTDD()
@@ -232,7 +229,7 @@ class TestFilter:
 
         if not include_all:
 
-            subdir = clean_up_filter_directory( filter_dir )
+            subdir = normalize_filter_directory( filter_dir )
 
             for tcase in tcase_map.values():
 
@@ -247,14 +244,17 @@ class TestFilter:
                         self.checkMaxProcessors( tcase ) and \
                         self.checkRuntime( tcase )
 
-                    # these don't work in restart mode
+                    # these don't work in restart mode because they require
+                    # the test file to be reparsed
                     #   self.checkFileSearch( tcase )
                     #   self.checkEnabled( tcase )
+                    #   self.userValidation( tcase )
+
+                    # these affect the tests that are created (and change
+                    # the TestResults.* directory name), although there may
+                    # be an argument for allowing them in restart mode
                     #   self.checkPlatform( tcase )
                     #   self.checkOptions( tcase )
-                    #   self.userValidation( tcase )
-                    # although checkPlatform() & checkOptions() is because
-                    # those expressions can affect the tests that are created
 
             self.filterByCummulativeRuntime( tcase_map )
 
@@ -312,7 +312,7 @@ def filter_analyze_parameter_set( analyze_tcase, paramsets ):
     pset.applyParamFilter( evalfunc )
 
 
-def clean_up_filter_directory( filter_dir ):
+def normalize_filter_directory( filter_dir ):
     ""
     subdir = None
 

@@ -124,12 +124,8 @@ class filter_and_num_processors( vtu.vvtestTestCase ):
         rtconfig = RuntimeConfig()
         assert rtconfig.evaluate_maxprocs( 1 )
 
-        rtconfig = RuntimeConfig( maxprocs=5 )
-        assert     rtconfig.evaluate_maxprocs( 5 )
-        assert not rtconfig.evaluate_maxprocs( 6 )
-
         rtconfig = RuntimeConfig()
-        rtconfig.setAttr( 'maxprocs', 5 )
+        rtconfig.setMaxProcs( 5 )
         assert     rtconfig.evaluate_maxprocs( 5 )
         assert not rtconfig.evaluate_maxprocs( 6 )
 

@@ -23,11 +23,9 @@ class RuntimeConfig:
        'set_platform_expr', # platform expression
        'search_file_globs', # file glob patterns used with 'search_regexes'
        'search_regexes',    # list of regexes for seaching within files
-       'include_tdd',       # if True, tests marked TDD are not excluded
        'include_all',       # boolean to turn off test inclusion filtering
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
-       'maxprocs',          # maximum number of processors, np
     ]
 
     defaults = { \
@@ -47,8 +45,7 @@ class RuntimeConfig:
     }
 
     def __init__(self, **kwargs ):
-        """
-        """
+        ""
         self.attrs = {}
 
         for n,v in RuntimeConfig.defaults.items():
@@ -56,6 +53,12 @@ class RuntimeConfig:
 
         for k,v in kwargs.items():
             self.setAttr( k, v )
+
+        self.maxprocs = None
+        self.apply_maxprocs = True
+
+        self.include_tdd = False
+        self.apply_tdd = True
 
     def setAttr(self, name, value):
         """
@@ -139,7 +142,6 @@ class RuntimeConfig:
         """
         Evaluate the given expression against the list of command line options.
         """
-        #x = FilterExpressions.WordExpression(expr)
         opL = self.attrs.get( 'option_list', [] )
         return expr.evaluate( opL.count )
 
@@ -157,11 +159,34 @@ class RuntimeConfig:
 
         return True
 
+    def setIncludeTDD(self, true_or_false):
+        ""
+        self.include_tdd = true_or_false
+
+    def applyTDDExpression(self, true_or_false):
+        ""
+        self.apply_tdd = true_or_false
+
+    def evaluate_TDD(self, test_keywords):
+        ""
+        if self.apply_tdd and not self.include_tdd:
+            if 'TDD' in test_keywords:
+                return False
+
+        return True
+
+    def setMaxProcs(self, numprocs):
+        ""
+        self.maxprocs = numprocs
+
+    def applyMaxProcsExpression(self, true_or_false):
+        ""
+        self.apply_maxprocs = true_or_false
+
     def evaluate_maxprocs(self, test_np):
         ""
-        maxprocs = self.attrs.get( 'maxprocs', None )
-
-        if maxprocs != None and test_np > maxprocs:
-            return False
+        if self.apply_maxprocs:
+            if self.maxprocs != None and test_np > self.maxprocs:
+                return False
 
         return True
