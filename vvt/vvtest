@@ -160,7 +160,7 @@ class MainEntry:
         if self.opts.dash_g:
             raise FatalError( 'cannot use -g in a TestResults directory' )
 
-        readCommandInfo( self.opts, self.optD, rtconfig, self.cache_file )
+        read_cache_file( self.opts, self.optD, rtconfig, self.cache_file )
 
     def constructPlatform(self):
         ""
@@ -539,7 +539,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     location.create_test_directory( test_dir, opts.dash_M,
                                     rtinfo.getInfo('curdir'), perms )
 
-    writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
+    write_cache_file( opts, optD, rtdata, test_dir, plat, perms )
 
     tlist.stringFileWrite( **rtinfo.asDict() )
     perms.set( tlist.getFilename() )
@@ -590,21 +590,16 @@ def construct_runtime_lookup_cache( plat ):
     return cache
 
 
-def writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms ):
-    """
-    Creates the test results information file.
-    """
+def write_cache_file( opts, optD, rtdata, test_dir, plat, perms ):
+    ""
     rtconfig = rtdata.getRuntimeConfig()
 
     f = pjoin(test_dir, 'test.cache')
     if not os.path.exists( f ):
         fp = open( f, "w" )
         fp.write( 'VERSION=' + str(version) + '\n' )
-        fp.write( 'DIR=' + os.getcwd() + '\n' )
         if opts.plat:
               fp.write( 'PLATFORM=' + opts.plat.strip() + '\n' )
-        if optD['param_list']:
-            fp.write( 'PARAMETERS=' + str( optD['param_list'] ) + '\n' )
         if rtconfig.getAttr('exepath'):
             fp.write( \
                 'PROJECT=' + abspath( rtconfig.getAttr('exepath') ) + '\n' )
@@ -638,13 +633,8 @@ def get_test_cache_file():
     return fn
 
 
-def readCommandInfo( opts, optD, rtconfig, cache_file ):
-    """
-    Check for a file called 'test.cache' that indicates whether the
-    current working directory is a TestResults directory (or subdirectory)
-    then open that file for information.  The test results directory is
-    returned, or None if not in a TestRestults directory.
-    """
+def read_cache_file( opts, optD, rtconfig, cache_file ):
+    ""
     with open( cache_file, "r" ) as fp:
         write_version = 0
         for line in fp.readlines():
@@ -652,15 +642,9 @@ def readCommandInfo( opts, optD, rtconfig, cache_file ):
             kvpair = line.split( '=', 1 )
             if kvpair[0] == 'VERSION':
                 write_version = kvpair[1]
-            elif kvpair[0] == 'DIR':
-                previous_run_dir = kvpair[1]
             elif kvpair[0] == 'PLATFORM':
                 if not opts.plat:
                     opts.plat = kvpair[1]
-            elif kvpair[0] == 'PARAMETERS':
-                L = eval( kvpair[1] )
-                if optD['param_list']: optD['param_list'].extend(L)
-                else:                  optD['param_list'] = L
             elif kvpair[0] == 'PROJECT':
                 # do not replace if the command line contains -j
                 if not opts.bin_dir:
@@ -722,7 +706,7 @@ def runTests( opts, optD, rtdata, dirs ):
     if opts.dash_w:
         pathutil.remove_directory_contents( test_dir )
 
-    writeCommandInfo( opts, optD, rtdata, test_dir, plat, perms )
+    write_cache_file( opts, optD, rtdata, test_dir, plat, perms )
 
     scanner.scanPaths( tlist, dirs )
 
