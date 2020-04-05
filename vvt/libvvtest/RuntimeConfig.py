@@ -17,7 +17,6 @@ from . import FilterExpressions
 class RuntimeConfig:
 
     known_attrs = [
-       'param_expr_list',   # k-format or string expression parameter filter
        'option_list',       # list of build options
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
@@ -50,6 +49,8 @@ class RuntimeConfig:
 
         self.keyexpr = None
 
+        self.paramexpr = None
+
         self.maxprocs = None
         self.apply_maxprocs = True
 
@@ -69,9 +70,6 @@ class RuntimeConfig:
         Set the value of an attribute name (which must be known).
         """
         self.attrs[name] = value
-
-        if name == 'param_expr_list':
-            self.attrs['param_filter'] = FilterExpressions.ParamFilter( value )
 
     def getAttr(self, name, *default):
         """
@@ -142,11 +140,16 @@ class RuntimeConfig:
             return self.keyexpr.evaluate( keyword_list.count, include_results )
         return True
 
+    def setParameterExpression(self, string_expr_list):
+        ""
+        self.paramexpr = FilterExpressions.ParamFilter( string_expr_list )
+
     def evaluate_parameters(self, paramD):
         ""
-        pf = self.attrs.get( 'param_filter', None )
-        if pf == None: return 1
-        return pf.evaluate(paramD)
+        if self.paramexpr:
+            return self.paramexpr.evaluate( paramD )
+        else:
+            return True
 
     def evaluate_option_expr(self, expr):
         """

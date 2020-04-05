@@ -168,7 +168,7 @@ class create_derived_options( vtu.vvtestTestCase ):
     def test_creating_unified_parameter_list(self):
         ""
         pL = cmdline.create_parameter_list( None, None )
-        assert len( pL ) == 0
+        assert pL == None
 
         pL = cmdline.create_parameter_list( ['np=1'], None )
         assert pL == [ 'np=1' ]

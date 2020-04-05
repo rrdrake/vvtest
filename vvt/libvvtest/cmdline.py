@@ -865,7 +865,10 @@ def create_parameter_list( params, not_params ):
                 if len(orL) > 0:
                     plist.append( '/'.join( orL ) )
 
-    return plist
+    if len( plist ) == 0:
+        return None
+    else:
+        return plist
 
 
 def create_platform_expression( platforms, not_platforms ):
