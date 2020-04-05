@@ -368,9 +368,6 @@ def construct_RuntimeConfig( opts, optD ):
     rtconfig.setIncludeTDD( opts.include_tdd == True )
     rtconfig.setFileSearch( optD['search_regexes'], search_fnmatch )
 
-    if opts.qsub_id != None:
-        rtconfig.setAttr( 'include_all', True )
-
     return rtconfig
 
 

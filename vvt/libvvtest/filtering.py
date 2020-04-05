@@ -226,34 +226,30 @@ class TestFilter:
 
     def applyRuntime(self, tcase_map, filter_dir, force_checks=False):
         ""
-        include_all = self.rtconfig.getAttr( 'include_all', False )
+        subdir = normalize_filter_directory( filter_dir )
 
-        if not include_all:
+        for tcase in tcase_map.values():
 
-            subdir = normalize_filter_directory( filter_dir )
+            tspec = tcase.getSpec()
 
-            for tcase in tcase_map.values():
+            if not tcase.getStat().skipTest() or force_checks:
 
-                tspec = tcase.getSpec()
+                self.checkSubdirectory( tcase, subdir ) and \
+                    self.checkKeywords( tcase, results_keywords=True ) and \
+                    self.checkParameters( tcase, permanent=False ) and \
+                    self.checkTDD( tcase ) and \
+                    self.checkMaxProcessors( tcase ) and \
+                    self.checkRuntime( tcase )
 
-                if not tcase.getStat().skipTest() or force_checks:
+                # these don't work in restart mode because they require
+                # the test file to be reparsed
+                #   self.checkFileSearch( tcase )
+                #   self.checkEnabled( tcase )
+                #   self.userValidation( tcase )
+                #   self.checkPlatform( tcase )
+                #   self.checkOptions( tcase )
 
-                    self.checkSubdirectory( tcase, subdir ) and \
-                        self.checkKeywords( tcase, results_keywords=True ) and \
-                        self.checkParameters( tcase, permanent=False ) and \
-                        self.checkTDD( tcase ) and \
-                        self.checkMaxProcessors( tcase ) and \
-                        self.checkRuntime( tcase )
-
-                    # these don't work in restart mode because they require
-                    # the test file to be reparsed
-                    #   self.checkFileSearch( tcase )
-                    #   self.checkEnabled( tcase )
-                    #   self.userValidation( tcase )
-                    #   self.checkPlatform( tcase )
-                    #   self.checkOptions( tcase )
-
-            self.filterByCummulativeRuntime( tcase_map )
+        self.filterByCummulativeRuntime( tcase_map )
 
     def filterByCummulativeRuntime(self, tcase_map):
         ""

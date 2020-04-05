@@ -20,7 +20,6 @@ class RuntimeConfig:
        'param_expr_list',   # k-format or string expression parameter filter
        'keyword_expr',      # a WordExpression object for keyword filtering
        'option_list',       # list of build options
-       'include_all',       # boolean to turn off test inclusion filtering
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
     ]
