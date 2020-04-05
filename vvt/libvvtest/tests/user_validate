@@ -114,8 +114,10 @@ class validate_plugin_unit_tests( vtu.vvtestTestCase ):
                 if 'bad' in specs['keywords']:
                     return 'bad boys not allowed'
 
-        plug = UserPluginBridge( RuntimeConfig(), FakePluginModule() )
-        tf = TestFilter( RuntimeConfig(), plug )
+        rtconfig = vtu.make_RuntimeConfig( 'XBox', None )
+
+        plug = UserPluginBridge( rtconfig, FakePluginModule() )
+        tf = TestFilter( rtconfig, plug )
 
         tcase = vtu.make_fake_TestCase( keywords=['good'] )
         assert tf.userValidation( tcase )

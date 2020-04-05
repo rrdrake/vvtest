@@ -161,7 +161,7 @@ class UserPluginBridge:
                   'keywords'   : tspec.getKeywords( include_implicit=False ),
                   'parameters' : tspec.getParameters(),
                   'timeout'    : tspec.getTimeout(),
-                  'platform'   : self.rtconfig.platformName(),
+                  'platform'   : self.rtconfig.getPlatformName(),
                   'options'    : self.rtconfig.getOptionList() }
         return specs
 

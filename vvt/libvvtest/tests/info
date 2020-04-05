@@ -189,22 +189,22 @@ class info_tests( vtu.vvtestTestCase ):
         tdir = vrun.resultsDir()
 
         vrun = vtu.runvvtest( '-i -v', chdir=tdir )
-        assert test_names( vrun ) == ['marmot','zebra','ardvark','otter']
+        assert ordered_testids( vrun ) == ['marmot','zebra','ardvark','otter']
 
         vrun = vtu.runvvtest( '-i -v --sort nx', chdir=tdir )
-        assert test_names( vrun ) == ['ardvark','marmot','otter','zebra']
+        assert ordered_testids( vrun ) == ['ardvark','marmot','otter','zebra']
 
         vrun = vtu.runvvtest( '-i -v --sort x', chdir=tdir )
-        assert test_names( vrun ) == ['marmot','zebra','ardvark','otter']
+        assert ordered_testids( vrun ) == ['marmot','zebra','ardvark','otter']
 
         vrun = vtu.runvvtest( '-i -v --sort t', chdir=tdir )
-        assert test_names( vrun ) == ['zebra','marmot','ardvark','otter']
+        assert ordered_testids( vrun ) == ['zebra','marmot','ardvark','otter']
 
         vrun = vtu.runvvtest( '-i -v --sort sr', chdir=tdir )
-        assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
+        assert ordered_testids( vrun ) == ['otter','ardvark','zebra','marmot']
 
         vrun = vtu.runvvtest( '-i -v --sort d', chdir=tdir )
-        assert test_names( vrun ) == ['otter','ardvark','zebra','marmot']
+        assert ordered_testids( vrun ) == ['otter','ardvark','zebra','marmot']
 
     def test_sorting_with_near_duplicate_tests(self):
         ""
@@ -219,9 +219,9 @@ class info_tests( vtu.vvtestTestCase ):
         tdir = vrun.resultsDir()
 
         vrun = vtu.runvvtest( '-i -v --sort n', chdir=tdir )
-        assert test_names( vrun ) == ['dupname', 'dupname']
+        assert ordered_testids( vrun ) == ['dupname', 'dupname']
 
-    def test_info_mode_should_not_apply_default_filters(self):
+    def test_info_mode_should_not_apply_default_max_procs_filter(self):
         ""
         util.writefile( 'config/platform_plugin.py', """
             def initialize( plat ):
@@ -244,6 +244,83 @@ class info_tests( vtu.vvtestTestCase ):
 
         vrun = vtu.runvvtest( "-i -v --config", abspath('config'), chdir=tdir )
         vrun.assertCounts( total=2, npass=2 )
+
+    def test_info_mode_should_not_apply_default_platform_filter(self):
+        ""
+        util.writefile( 'config1/idplatform.py', """
+            def platform( opts ):
+                return 'XBox'
+            """ )
+        util.writefile( 'config2/idplatform.py', """
+            def platform( opts ):
+                return 'PlayStation'
+            """ )
+        util.writefile( 'xbox.vvt', """
+            #VVT: enable (platforms="XBox")
+            """ )
+        util.writefile( 'ps.vvt', """
+            #VVT: enable (platforms="PlayStation")
+            """ )
+        util.writefile( 'both.vvt', """
+            #VVT: enable (platforms="XBox or PlayStation")
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( "--config config1", addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( "-i -v --config config1", addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+
+        vrun = vtu.runvvtest( "-i -v --config", abspath('config1'),
+                              chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+
+        # a new default platform means a new TestResults directory
+        vrun = vtu.runvvtest( "-i -v --config config2", addplatform=False )
+        vrun.assertCounts( total=0 )
+
+        # a new default platform has no effect with -i
+        vrun = vtu.runvvtest( "-i -v --config", abspath('config2'),
+                              chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+
+        # a new specified platform means a new TestResults directory
+        vrun = vtu.runvvtest( "-i -v --plat PlayStation --config config1",
+                              addplatform=False )
+        vrun.assertCounts( total=0 )
+
+        # a new specified platform has no effect with -i in restart mode
+        vrun = vtu.runvvtest( "-i -v --plat PlayStation --config",
+                              abspath('config1'), chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+
+        # same thing but different default platform
+        vrun = vtu.runvvtest( "-i -v --plat PlayStation --config",
+                              abspath('config2'), chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','xbox']
+
+        vtu.remove_results()
+
+        # run with non-default platform
+        vrun = vtu.runvvtest( "--plat PlayStation --config config1",
+                              addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','ps']
+        tdir = vrun.resultsDir()
+
+        # leaving off --plat PlayStation in restart mode should not matter
+        vrun = vtu.runvvtest( "-i -v --config", abspath('config1'),
+                              chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','ps']
 
     def test_using_the_files_option_with_a_multi_test_xml_file(self):
         ""
@@ -448,7 +525,7 @@ def assert_files( vrun, relative_filenames ):
     assert fL == relative_filenames
 
 
-def test_names( vrun ):
+def ordered_testids( vrun ):
     ""
     nameL = []
     for line in vtu.extract_testlines( vrun.out ):

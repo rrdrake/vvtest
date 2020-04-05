@@ -54,8 +54,8 @@ class vvtestTestCase( unittest.TestCase ):
         util.setup_test( cleanout )
 
         # for batch tests
-        os.environ['VVTEST_BATCH_CHECK_INTERVAL'] = '5'
-        os.environ['VVTEST_BATCH_CHECK_TIMEOUT'] = '15'
+        os.environ['VVTEST_BATCH_CHECK_INTERVAL'] = '1'
+        os.environ['VVTEST_BATCH_CHECK_TIMEOUT'] = '5'
         os.environ['VVTEST_BATCH_SLEEP_LENGTH'] = '1'
 
         # force the results files to be written locally for testing;
@@ -754,7 +754,7 @@ def make_RuntimeConfig( platname, options ):
     rtconfig = RuntimeConfig()
 
     if platname:
-        rtconfig.setAttr( 'platform_name', platname )
+        rtconfig.setPlatformName( platname )
     if options:
         rtconfig.setAttr( 'option_list', options )
 

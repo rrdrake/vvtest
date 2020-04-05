@@ -18,9 +18,6 @@ class RuntimeConfig:
        'param_expr_list',   # k-format or string expression parameter filter
        'keyword_expr',      # a WordExpression object for keyword filtering
        'option_list',       # list of build options
-       'platform_name',     # target platform name
-       'ignore_platforms',  # boolean to turn off filtering by platform
-       'set_platform_expr', # platform expression
        'search_file_globs', # file glob patterns used with 'search_regexes'
        'search_regexes',    # list of regexes for seaching within files
        'include_all',       # boolean to turn off test inclusion filtering
@@ -48,11 +45,9 @@ class RuntimeConfig:
         ""
         self.attrs = {}
 
-        for n,v in RuntimeConfig.defaults.items():
-            self.setAttr( n, v )
-
-        for k,v in kwargs.items():
-            self.setAttr( k, v )
+        self.platname = None
+        self.platexpr = None
+        self.apply_platexpr = True
 
         self.maxprocs = None
         self.apply_maxprocs = True
@@ -60,15 +55,19 @@ class RuntimeConfig:
         self.include_tdd = False
         self.apply_tdd = True
 
+        for n,v in RuntimeConfig.defaults.items():
+            self.setAttr( n, v )
+
+        for k,v in kwargs.items():
+            self.setAttr( k, v )
+
     def setAttr(self, name, value):
         """
         Set the value of an attribute name (which must be known).
         """
         self.attrs[name] = value
 
-        if name in ['platform_name','set_platform_expr']:
-            self._set_platform_expression()
-        elif name == 'param_expr_list':
+        if name == 'param_expr_list':
             self.attrs['param_filter'] = FilterExpressions.ParamFilter( value )
 
     def getAttr(self, name, *default):
@@ -80,9 +79,46 @@ class RuntimeConfig:
             return self.attrs[name]
         return self.attrs.get( name, default[0] )
 
-    def platformName(self):
+    def setPlatformName(self, name):
         ""
-        return self.getAttr( 'platform_name', None )
+        self.platname = name
+
+    def getPlatformName(self):
+        ""
+        return self.platname
+
+    def setPlatformExpression(self, expr):
+        ""
+        self.platexpr = expr
+
+    def getPlatformExpression(self):
+        ""
+        return self.platexpr
+
+    def applyPlatformExpression(self, true_or_false):
+        ""
+        self.apply_platexpr = true_or_false
+
+    def evaluate_platform_include(self, list_of_platform_expr):
+        ""
+        ok = True
+
+        if self.apply_platexpr:
+
+            pname = self.getPlatformName()
+            pexpr = self.getPlatformExpression()
+            if pexpr != None:
+                platexpr = pexpr
+            else:
+                # the current platform is used as the expression
+                platexpr = FilterExpressions.WordExpression( pname )
+
+            # to evaluate the command line expression, each platform name in the
+            # expression is evaluated using PlatformEvaluator.satisfies_platform()
+            pev = PlatformEvaluator( list_of_platform_expr )
+            ok = platexpr.evaluate( pev.satisfies_platform )
+
+        return ok
 
     def getOptionList(self):
         ""
@@ -106,37 +142,6 @@ class RuntimeConfig:
         pf = self.attrs.get( 'param_filter', None )
         if pf == None: return 1
         return pf.evaluate(paramD)
-
-    def _set_platform_expression(self):
-        pexpr = self.attrs.get( 'set_platform_expr', None )
-        pname = self.attrs.get( 'platform_name', None )
-        if pexpr != None:
-            self.attrs['platform_expr'] = pexpr
-        elif pname != None:
-            self.attrs['platform_expr'] = FilterExpressions.WordExpression( pname )
-        else:
-            self.attrs['platform_expr'] = FilterExpressions.WordExpression()
-
-    def evaluate_platform_include(self, platform_test_func):
-        """
-        Evaluate the command line platform expression using the given function
-        to test each platform name.  That is, the 'platform_test_func' is given
-        a platform name and is expected to return true if the test would run
-        on that platform.
-        """
-        ip = self.attrs.get( 'ignore_platforms', 0 )
-        if ip: return 1
-
-        # if the current platform was not given, no filtering by platform
-        # is performed
-        pn = self.attrs.get('platform_name',None)
-        if not pn: return 1
-
-        platexpr = self.attrs['platform_expr']
-
-        # to evaluate the command line expression, each platform name in the
-        # expression is evaluated using the given 'platform_test_func'
-        return platexpr.evaluate( platform_test_func )
 
     def evaluate_option_expr(self, expr):
         """
@@ -189,4 +194,22 @@ class RuntimeConfig:
             if self.maxprocs != None and test_np > self.maxprocs:
                 return False
 
+        return True
+
+
+class PlatformEvaluator:
+    """
+    Tests can use platform expressions to enable/disable the test.  This class
+    caches the expressions and provides a function that answers the question
+
+        "Would the test run on the given platform name?"
+    """
+    def __init__(self, list_of_word_expr):
+        self.exprL = list_of_word_expr
+
+    def satisfies_platform(self, plat_name):
+        ""
+        for wx in self.exprL:
+            if not wx.evaluate( lambda tok: tok == plat_name ):
+                return False
         return True

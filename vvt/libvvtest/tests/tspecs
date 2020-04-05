@@ -19,7 +19,6 @@ from testutils import print3
 
 import libvvtest.TestSpec as TestSpec
 from libvvtest.testcreator import TestCreator
-from libvvtest.filtering import PlatformEvaluator
 from libvvtest.errors import TestSpecError
 import libvvtest.FilterExpressions as FilterExpressions
 from libvvtest.RuntimeConfig import RuntimeConfig
@@ -431,7 +430,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
               <include platform=""/>
             </rtest>""" )
 
-        create_test_and_eval_platform_expr( 'ok8.xml', None, True )
         create_test_and_eval_platform_expr( 'ok8.xml', 'Dummy', False )
 
         util.writefile( 'ok8a.xml', """
@@ -439,7 +437,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
               <include platforms=""/>
             </rtest>""" )
 
-        create_test_and_eval_platform_expr( 'ok8a.xml', None, True )
         create_test_and_eval_platform_expr( 'ok8a.xml', 'Dummy', False )
 
         util.writefile( 'ok8b.xml', """
@@ -447,7 +444,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
               <include platform=""/>
             </rtest>""" )
 
-        create_test_and_eval_platform_expr( 'ok8b.xml', None, True )
         create_test_and_eval_platform_expr( 'ok8b.xml', 'Dummy', False )
 
         util.writefile( 'ok9.xml', """
@@ -1377,15 +1373,14 @@ def create_test_and_eval_platform_expr( filename, platname, boolean_result,
                                         platform_expr=None,
                                         option_list=None ):
     ""
-    rtcfg = RuntimeConfig( platform_name=platname,
-                           set_platform_expr=platform_expr,
-                           option_list=option_list )
+    rtcfg = RuntimeConfig( option_list=option_list )
+    rtcfg.setPlatformName( platname )
+    rtcfg.setPlatformExpression( platform_expr )
 
     tL = create_tests( filename, platname, option_list )
 
     exprL = tL[0].getPlatformEnableExpressions()
-    pev = PlatformEvaluator( exprL )
-    pval = rtcfg.evaluate_platform_include( pev.satisfies_platform )
+    pval = rtcfg.evaluate_platform_include( exprL )
 
     if option_list != None:
         exprL = tL[0].getOptionEnableExpressions()

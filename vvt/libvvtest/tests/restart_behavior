@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 import glob
 
@@ -180,6 +181,81 @@ class restart_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-R', chdir=tdir )
         vrun.assertCounts( total=2, npass=2 )
         assert vrun.getTestIds() == [ 'bar', 'foo' ]
+
+    def test_using_plat_option_in_restart_mode(self):
+        ""
+        util.writefile( 'config1/idplatform.py', """
+            def platform( opts ):
+                return 'XBox'
+            """ )
+        util.writefile( 'config2/idplatform.py', """
+            def platform( opts ):
+                return 'PlayStation'
+            """ )
+        util.writefile( 'xbox.vvt', """
+            #VVT: enable (platforms="XBox")
+            import vvtest_util as vvt
+            assert vvt.PLATFORM == 'XBox', 'wrong platform: '+vvt.PLATFORM
+            """ )
+        util.writefile( 'ps.vvt', """
+            #VVT: enable (platforms="PlayStation")
+            import vvtest_util as vvt
+            assert vvt.PLATFORM == 'PlayStation', 'wrong platform: '+vvt.PLATFORM
+            """ )
+        util.writefile( 'both.vvt', """
+            #VVT: enable (platforms="XBox or PlayStation")
+            """ )
+        time.sleep(1)
+
+        # filters by XBox
+        vrun = vtu.runvvtest( "--config config1", addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        print3( 'magic: testids', vrun.getTestIds() )
+        assert vrun.getTestIds() == ['both','xbox']
+        tdir = vrun.resultsDir()
+
+        # restart but switch to PlayStation platform
+        vrun = vtu.runvvtest( "-R --config", abspath('config2'),
+                              chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=1, fail=1 )
+        assert vrun.getTestIds() == ['both','xbox']
+        assert vrun.greplogs( 'wrong platform: PlayStation', 'xbox' )
+
+        # but the --plat option is felt in restart mode
+        vrun = vtu.runvvtest( "-R --plat PlayStation --config",
+                              abspath('config1'), chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=1, fail=1 )
+        assert vrun.getTestIds() == ['both','xbox']
+        assert vrun.greplogs( 'wrong platform: PlayStation', 'xbox' )
+
+        # change default platform but specify --plat again
+        vrun = vtu.runvvtest( "-R --plat PlayStation --config",
+                              abspath('config2'), chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=1, fail=1 )
+        assert vrun.getTestIds() == ['both','xbox']
+        assert vrun.greplogs( 'wrong platform: PlayStation', 'xbox' )
+
+        vtu.remove_results()
+
+        # specify --plat on a fresh vvtest command
+        vrun = vtu.runvvtest( "--plat PlayStation --config config1",
+                              addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','ps']
+        tdir = vrun.resultsDir()
+
+        # default platform is XBox but --plat PlayStation is remembered
+        vrun = vtu.runvvtest( "-R --config", abspath('config1'),
+                              chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['both','ps']
+
+        # specifying --plat in restart mode takes precedence
+        vrun = vtu.runvvtest( "-R --plat XBox --config",
+                              abspath('config1'), chdir=tdir, addplatform=False )
+        vrun.assertCounts( total=2, npass=1, fail=1 )
+        assert vrun.getTestIds() == ['both','ps']
+        assert vrun.greplogs( 'wrong platform: XBox', 'ps' )
 
 
 ########################################################################

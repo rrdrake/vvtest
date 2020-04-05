@@ -46,8 +46,9 @@ class TestFilter:
         ""
         tspec = tcase.getSpec()
 
-        pev = PlatformEvaluator( tspec.getPlatformEnableExpressions() )
-        ok = self.rtconfig.evaluate_platform_include( pev.satisfies_platform )
+        exprlist = tspec.getPlatformEnableExpressions()
+        ok = self.rtconfig.evaluate_platform_include( exprlist )
+
         if not ok:
             tcase.getStat().markSkipByPlatform()
 
@@ -249,10 +250,6 @@ class TestFilter:
                     #   self.checkFileSearch( tcase )
                     #   self.checkEnabled( tcase )
                     #   self.userValidation( tcase )
-
-                    # these affect the tests that are created (and change
-                    # the TestResults.* directory name), although there may
-                    # be an argument for allowing them in restart mode
                     #   self.checkPlatform( tcase )
                     #   self.checkOptions( tcase )
 
@@ -322,24 +319,6 @@ def normalize_filter_directory( filter_dir ):
             subdir = None
 
     return subdir
-
-
-class PlatformEvaluator:
-    """
-    Tests can use platform expressions to enable/disable the test.  This class
-    caches the expressions and provides a function that answers the question
-
-        "Would the test run on the given platform name?"
-    """
-    def __init__(self, list_of_word_expr):
-        self.exprL = list_of_word_expr
-
-    def satisfies_platform(self, plat_name):
-        ""
-        for wx in self.exprL:
-            if not wx.evaluate( lambda tok: tok == plat_name ):
-                return False
-        return True
 
 
 def file_search( tspec, regex_patterns, file_globs ):
