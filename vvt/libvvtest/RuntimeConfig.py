@@ -8,6 +8,8 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+import fnmatch
+import re
 
 from . import FilterExpressions
 
@@ -18,8 +20,6 @@ class RuntimeConfig:
        'param_expr_list',   # k-format or string expression parameter filter
        'keyword_expr',      # a WordExpression object for keyword filtering
        'option_list',       # list of build options
-       'search_file_globs', # file glob patterns used with 'search_regexes'
-       'search_regexes',    # list of regexes for seaching within files
        'include_all',       # boolean to turn off test inclusion filtering
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
@@ -54,6 +54,8 @@ class RuntimeConfig:
 
         self.include_tdd = False
         self.apply_tdd = True
+
+        self.filesearch = None
 
         for n,v in RuntimeConfig.defaults.items():
             self.setAttr( n, v )
@@ -196,6 +198,17 @@ class RuntimeConfig:
 
         return True
 
+    def setFileSearch(self, list_of_regex, list_of_file_globs):
+        ""
+        self.filesearch = FileSearcher( list_of_regex, list_of_file_globs )
+
+    def evaluate_file_search(self, testfilename, name, params, files):
+        ""
+        if self.filesearch:
+            return self.filesearch.search( testfilename, name, params, files )
+        else:
+            return True
+
 
 class PlatformEvaluator:
     """
@@ -213,3 +226,117 @@ class PlatformEvaluator:
             if not wx.evaluate( lambda tok: tok == plat_name ):
                 return False
         return True
+
+
+class FileSearcher:
+
+    def __init__(self, regex_patterns, file_globs):
+        ""
+        self.regex = regex_patterns
+        self.globs = file_globs
+
+    def search(self, testfilename, name, params, files):
+        """
+        Searches certain test files that are linked or copied in the test for
+        regular expression patterns.  Returns true if at least one pattern
+        matched in one of the files.  Also returns true if no regular
+        expressions were given at construction.
+        """
+        if self.regex == None or len(self.regex) == 0:
+            return True
+
+        if self.search_filename( testfilename ):
+            return True
+
+        if self.globs == None:
+            # filter not applied if no file glob patterns
+            return True
+
+        varD = { 'NAME':name }
+        for k,v in params.items():
+            varD[k] = v
+
+        xmldir = os.path.dirname( testfilename )
+        for src,dest in files:
+            src = expand_variables(src,varD)
+            for fn in self.globs:
+                if fnmatch.fnmatch( os.path.basename(src), fn ):
+                    f = os.path.join( xmldir, src )
+                    if os.path.isfile(f):
+                        if self.search_filename( f ):
+                            return True
+
+        return False
+
+
+    def search_filename(self, filename):
+        ""
+        try:
+            with open(filename) as fp:
+                content = fp.read()
+
+        except Exception:
+            pass
+
+        else:
+            for p in self.regex:
+                try:
+                    if p.search(content):
+                        return True
+                except Exception:
+                    pass
+
+        return False
+
+
+curly_pat = re.compile( '[$][{][^}]*[}]' )
+var_pat   = re.compile( '[$][a-zA-Z][a-zA-Z0-9_]*' )
+
+
+def expand_variables(s, vardict):
+    """
+    Expands the given string with values from the dictionary.  It will
+    expand ${NAME} and $NAME style variables.
+    """
+    if s:
+
+        # first, substitute from dictionary argument
+
+        if len(vardict) > 0:
+
+            idx = 0
+            while idx < len(s):
+                m = curly_pat.search( s, idx )
+                if m != None:
+                    p = m.span()
+                    varname = s[ p[0]+2 : p[1]-1 ]
+                    if varname in vardict:
+                        varval = vardict[varname]
+                        s = s[:p[0]] + varval + s[p[1]:]
+                        idx = p[0] + len(varval)
+                    else:
+                        idx = p[1]
+                else:
+                    break
+
+            idx = 0
+            while idx < len(s):
+                m = var_pat.search( s, idx )
+                if m != None:
+                    p = m.span()
+                    varname = s[ p[0]+1 : p[1] ]
+                    if varname in vardict:
+                        varval = vardict[varname]
+                        s = s[:p[0]] + varval + s[p[1]:]
+                        idx = p[0] + len(varval)
+                    else:
+                        idx = p[1]
+                else:
+                    break
+
+        # then replace un-expanded variables with empty strings
+        
+        s = curly_pat.sub('', s)
+        s = var_pat.sub('', s)
+
+    return s

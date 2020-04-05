@@ -59,7 +59,7 @@ platform names.
 >  Options -x, -X, -A select by platform name
 >  Options --tmin, --tmax, --tsum select based on previous runtime
 
-Also, the -s, --search option can be used to search input files for regular
+Also, the --search option can be used to search input files for regular
 expression patterns.
 
 The "TDD" keyword is special.  If a test adds TDD to its keyword list, then
@@ -405,6 +405,8 @@ help_deprecated = """
 
 >DEPRECATED BUT STILL AVAILABLE:
 
+The -s option is now deprecated, which is the same as --search.
+
 The -v option used to print the program version, but now means "verbose".
 Use --version instead to get the version.
 
@@ -504,10 +506,12 @@ def create_parser( argvlist, vvtest_version ):
              'runtimes is less than the given number of seconds.' )
 
     # more filtering
-    grp.add_argument( '-s', '--search', metavar='REGEX', dest='search',
+    grp.add_argument( '--search', metavar='REGEX', dest='search',
                       action='append',
         help='Include tests that have an input file containing the '
-             'given regular expression.' )
+             'given regular expression.  Multiple are ORed together.' )
+    grp.add_argument( '-s', metavar='REGEX', dest='dash_s', action='append',
+        help='Deprecated; use --search instead.' )
     grp.add_argument( '--include-tdd', action='store_true',
         help='Include tests that contain the keyword "TDD", which are '
              'normally not included.' )
@@ -704,6 +708,12 @@ def check_deprecated_option_use( opts ):
     if opts.qsub_length:
         # --batch-limit replaced with --batch-limit
         opts.batch_length = opts.qsub_length
+
+    if opts.dash_s:
+        if opts.search == None:
+            opts.search = opts.dash_s
+        else:
+            opts.search.extend( opts.dash_s )
 
 
 def adjust_options_and_create_derived_options( opts ):

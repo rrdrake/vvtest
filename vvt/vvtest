@@ -359,8 +359,6 @@ def construct_RuntimeConfig( opts, optD ):
     rtconfig = RuntimeConfig( \
                   param_expr_list=optD['param_list'],
                   keyword_expr=optD['keyword_expr'],
-                  search_file_globs=search_fnmatch,
-                  search_regexes=optD['search_regexes'],
                   runtime_range=[ opts.tmin, opts.tmax ],
                   runtime_sum=opts.tsum )
 
@@ -368,6 +366,7 @@ def construct_RuntimeConfig( opts, optD ):
     if opts.dash_A:
         rtconfig.applyPlatformExpression( False )
     rtconfig.setIncludeTDD( opts.include_tdd == True )
+    rtconfig.setFileSearch( optD['search_regexes'], search_fnmatch )
 
     if opts.qsub_id != None:
         rtconfig.setAttr( 'include_all', True )

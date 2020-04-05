@@ -1,6 +1,8 @@
 
 Improvements:
 
+    - The --search option now searches the test source file by default.
+
     - Add support for Kitware CDash.  The --cdash <file or URL> option will
       cause vvtest to either write an XML file in CDash format to the given
       file name, or to write and submit an XML file to a CDash URL.  If a
@@ -76,6 +78,9 @@ Fixes:
       inside the test results directory.
 
 Changes:
+
+    - The -s option is now deprecated in favor of --search, which is a
+      synomym.
 
     - The behavior of "-P <expression>" has changed a little.  Since "-p
       np<4" means 'np' is a parameter in the test and np<4, it made sense
