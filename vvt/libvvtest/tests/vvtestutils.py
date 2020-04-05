@@ -756,7 +756,7 @@ def make_RuntimeConfig( platname, options ):
     if platname:
         rtconfig.setPlatformName( platname )
     if options:
-        rtconfig.setAttr( 'option_list', options )
+        rtconfig.setOptionList( options )
 
     return rtconfig
 

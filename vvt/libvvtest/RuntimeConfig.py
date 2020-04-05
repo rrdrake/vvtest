@@ -17,7 +17,6 @@ from . import FilterExpressions
 class RuntimeConfig:
 
     known_attrs = [
-       'option_list',       # list of build options
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
     ]
@@ -50,6 +49,8 @@ class RuntimeConfig:
         self.keyexpr = None
 
         self.paramexpr = None
+
+        self.optlist = []
 
         self.maxprocs = None
         self.apply_maxprocs = True
@@ -115,9 +116,16 @@ class RuntimeConfig:
 
         return ok
 
+    def setOptionList(self, list_of_options):
+        ""
+        if list_of_options:
+            self.optlist = list( list_of_options )
+        else:
+            self.optlist = []
+
     def getOptionList(self):
         ""
-        return self.attrs.get( 'option_list', [] )
+        return self.optlist
 
     def setKeywordExpression(self, word_expr):
         ""
@@ -155,8 +163,7 @@ class RuntimeConfig:
         """
         Evaluate the given expression against the list of command line options.
         """
-        opL = self.attrs.get( 'option_list', [] )
-        return expr.evaluate( opL.count )
+        return expr.evaluate( self.optlist.count )
 
     def evaluate_runtime(self, test_runtime):
         """

@@ -171,7 +171,7 @@ class MainEntry:
         self.rtdata.setPlatformObject( plat )
 
         rtconfig.setPlatformName( plat.getName() )
-        rtconfig.setAttr( 'option_list', self.optD['onopts'] + [plat.getCompiler()] )
+        rtconfig.setOptionList( self.optD['onopts'] + [plat.getCompiler()] )
         rtconfig.setMaxProcs( plat.getMaxProcs() )
 
         rtinfo.setInfo( platform=plat.getName(),
