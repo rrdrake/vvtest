@@ -356,9 +356,7 @@ def construct_RuntimeConfig( opts, optD ):
     ""
     from libvvtest.RuntimeConfig import RuntimeConfig
 
-    rtconfig = RuntimeConfig( \
-                  runtime_range=[ opts.tmin, opts.tmax ],
-                  runtime_sum=opts.tsum )
+    rtconfig = RuntimeConfig()
 
     rtconfig.setPlatformExpression( optD['platform_expr'] )
     if opts.dash_A:
@@ -367,6 +365,8 @@ def construct_RuntimeConfig( opts, optD ):
     rtconfig.setParameterExpression( optD['param_list'] )
     rtconfig.setIncludeTDD( opts.include_tdd == True )
     rtconfig.setFileSearch( optD['search_regexes'], search_fnmatch )
+    rtconfig.setRuntimeRange( opts.tmin, opts.tmax )
+    rtconfig.setRuntimeSum( opts.tsum )
 
     return rtconfig
 

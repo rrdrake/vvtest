@@ -253,7 +253,7 @@ class TestFilter:
 
     def filterByCummulativeRuntime(self, tcase_map):
         ""
-        rtsum = self.rtconfig.getAttr( 'runtime_sum', None )
+        rtsum = self.rtconfig.getRuntimeSum()
         if rtsum != None:
 
             # first, generate list with times

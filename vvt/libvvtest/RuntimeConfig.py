@@ -16,11 +16,6 @@ from . import FilterExpressions
 
 class RuntimeConfig:
 
-    known_attrs = [
-       'runtime_range',     # [ minimum runtime, maximum runtime ]
-       'runtime_sum',       # maximum accumulated runtime
-    ]
-
     defaults = {
         'vvtestdir'  : None,  # the top level vvtest directory
         'configdir'  : [],    # the configuration directory(ies)
@@ -59,6 +54,9 @@ class RuntimeConfig:
         self.apply_tdd = True
 
         self.filesearch = None
+
+        self.runtime_range = None
+        self.runtime_sum = None
 
         for n,v in RuntimeConfig.defaults.items():
             self.setAttr( n, v )
@@ -165,19 +163,32 @@ class RuntimeConfig:
         """
         return expr.evaluate( self.optlist.count )
 
+    def setRuntimeRange(self, min_runtime, max_runtime):
+        ""
+        self.runtime_range = [ min_runtime, max_runtime ]
+
     def evaluate_runtime(self, test_runtime):
         """
         If a runtime range is specified in this object, the given runtime is
         evaluated against that range.  False is returned only if the given
         runtime is outside the specified range.
         """
-        mn,mx = self.attrs.get( 'runtime_range', [None,None] )
-        if mn != None and test_runtime < mn:
-            return False
-        if mx != None and test_runtime > mx:
-            return False
+        if self.runtime_range:
+            mn,mx = self.runtime_range
+            if mn != None and test_runtime < mn:
+                return False
+            if mx != None and test_runtime > mx:
+                return False
 
         return True
+
+    def setRuntimeSum(self, time_sum):
+        ""
+        self.runtime_sum = time_sum
+
+    def getRuntimeSum(self):
+        ""
+        return self.runtime_sum
 
     def setIncludeTDD(self, true_or_false):
         ""
