@@ -359,9 +359,7 @@ class XML_test_specifications( vtu.vvtestTestCase ):
               <parameterize not_keywords="fast" paramA="A1 A2" paramB="B1 B2"/>
             </rtest>""" )
 
-        wx = FilterExpressions.WordExpression('fast')
-        uf = RuntimeConfig( keyword_expr=wx )
-        self.assertRaises( TestSpecError, create_tests, 'ok6f.xml', uf )
+        self.assertRaises( TestSpecError, create_tests, 'ok6f.xml' )
 
         # duplicate parameterize blocks
         util.writefile( 'ok6h.xml', """

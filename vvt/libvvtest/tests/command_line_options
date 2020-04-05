@@ -149,7 +149,7 @@ class create_derived_options( vtu.vvtestTestCase ):
     def test_creating_keyword_expression(self):
         ""
         expr = cmdline.create_keyword_expression( None, None )
-        assert len( expr.getWordList() ) == 0
+        assert expr == None
 
         expr = cmdline.create_keyword_expression( ['pass'], None )
         assert expr.getWordList() == [ 'pass' ]

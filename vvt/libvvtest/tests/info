@@ -468,7 +468,7 @@ class info_tests( vtu.vvtestTestCase ):
         tf = TestFilter( rtconfig, None )
         tf.checkKeywords( tcase )
         assert len( list( tf.getSkipped() ) ) == 0
-        rtconfig.setAttr( 'keyword_expr', WordExpression( 'not key1' ) )
+        rtconfig.setKeywordExpression( WordExpression( 'not key1' ) )
         tf.checkKeywords( tcase )
         tL = list( tf.getSkipped() )
         assert len(tL) == 1 and id( tL[0] ) == id( tcase )

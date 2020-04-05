@@ -121,8 +121,9 @@ Tests can be selected based on their parameter names and values using the
 >  -p np           means include tests that define the parameter name np
 >  -P np           means exclude tests that define the parameter name np
 >  -p np<16        means include tests with np less than 16
->  -P np<=16       means exclude tests with np less than or equal to 16
+>  -P np<=16       means include tests with np not defined or np>16
 >  -p np!=4        means include tests with np not equal to 4
+>  -P np!=4        means include tests with np not defined or np==4
 >  -p np>4 -p np<8 means include tests with np>4 AND np<8
 >  -p np<4/np>8    means include tests with np<4 OR np>8
 >  -p np=1/!np     means include tests with np=1 OR (param np is not defined)
@@ -813,6 +814,14 @@ def adjust_options_and_create_derived_options( opts ):
 
 def create_keyword_expression( keywords, not_keywords ):
     ""
+    # construction will check for validity
+    if keywords:
+        for kws in keywords:
+            FilterExpressions.WordExpression( convert_from_k_format([kws]) )
+    if not_keywords:
+        for kws in not_keywords:
+            FilterExpressions.WordExpression( convert_from_k_format([kws]) )
+
     keywL = []
 
     if keywords:
@@ -824,12 +833,11 @@ def create_keyword_expression( keywords, not_keywords ):
             bangL = map( lambda k: '!'+k, s.split('/') )
             keywL.append( '/'.join( bangL ) )
 
-    expr = FilterExpressions.WordExpression()
+    if len( keywL ) > 0:
+        words = convert_from_k_format(keywL)
+        return FilterExpressions.WordExpression( words )
 
-    if len(keywL) > 0:
-        expr.append( convert_from_k_format(keywL), 'and' )
-
-    return expr
+    return None
 
 
 def create_parameter_list( params, not_params ):

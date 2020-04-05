@@ -16,15 +16,14 @@ from . import FilterExpressions
 
 class RuntimeConfig:
 
-    known_attrs = [ \
+    known_attrs = [
        'param_expr_list',   # k-format or string expression parameter filter
-       'keyword_expr',      # a WordExpression object for keyword filtering
        'option_list',       # list of build options
        'runtime_range',     # [ minimum runtime, maximum runtime ]
        'runtime_sum',       # maximum accumulated runtime
     ]
 
-    defaults = { \
+    defaults = {
         'vvtestdir'  : None,  # the top level vvtest directory
         'configdir'  : [],    # the configuration directory(ies)
         'exepath'    : None,  # the path to the executables
@@ -45,8 +44,11 @@ class RuntimeConfig:
         self.attrs = {}
 
         self.platname = None
+        self.default_platexpr = None
         self.platexpr = None
         self.apply_platexpr = True
+
+        self.keyexpr = None
 
         self.maxprocs = None
         self.apply_maxprocs = True
@@ -83,6 +85,8 @@ class RuntimeConfig:
     def setPlatformName(self, name):
         ""
         self.platname = name
+        # by default, the current platform is used as the expression
+        self.default_platexpr = FilterExpressions.WordExpression( name )
 
     def getPlatformName(self):
         ""
@@ -91,10 +95,6 @@ class RuntimeConfig:
     def setPlatformExpression(self, expr):
         ""
         self.platexpr = expr
-
-    def getPlatformExpression(self):
-        ""
-        return self.platexpr
 
     def applyPlatformExpression(self, true_or_false):
         ""
@@ -105,19 +105,15 @@ class RuntimeConfig:
         ok = True
 
         if self.apply_platexpr:
-
-            pname = self.getPlatformName()
-            pexpr = self.getPlatformExpression()
-            if pexpr != None:
-                platexpr = pexpr
+            if self.platexpr:
+                expr = self.platexpr
             else:
-                # the current platform is used as the expression
-                platexpr = FilterExpressions.WordExpression( pname )
+                expr = self.default_platexpr
 
             # to evaluate the command line expression, each platform name in the
             # expression is evaluated using PlatformEvaluator.satisfies_platform()
             pev = PlatformEvaluator( list_of_platform_expr )
-            ok = platexpr.evaluate( pev.satisfies_platform )
+            ok = expr.evaluate( pev.satisfies_platform )
 
         return ok
 
@@ -125,17 +121,25 @@ class RuntimeConfig:
         ""
         return self.attrs.get( 'option_list', [] )
 
-    def addResultsKeywordExpression(self, add_expr):
+    def setKeywordExpression(self, word_expr):
         ""
-        expr = self.attrs['keyword_expr']
-        if not expr.containsResultsKeywords():
-            expr.append( add_expr, 'and' )
+        self.keyexpr = word_expr
+
+    def addResultsKeywordExpression(self, add_expr):
+        """
+        If a keyword expression already exists in this object and contains
+        results keywords (such as "diff" or "notdone"), then do nothing.
+        Otherwise AND the new expression to the existing.
+        """
+        if self.keyexpr == None:
+            self.keyexpr = FilterExpressions.WordExpression( add_expr )
+        elif not self.keyexpr.containsResultsKeywords():
+            self.keyexpr.append( add_expr, 'and' )
 
     def satisfies_keywords(self, keyword_list, include_results=True):
         ""
-        if 'keyword_expr' in self.attrs:
-            expr = self.attrs['keyword_expr']
-            return expr.evaluate( keyword_list.count, include_results )
+        if self.keyexpr:
+            return self.keyexpr.evaluate( keyword_list.count, include_results )
         return True
 
     def evaluate_parameters(self, paramD):
