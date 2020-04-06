@@ -29,6 +29,7 @@ import libvvtest.TestList as TestList
 import libvvtest.testlistio as testlistio
 from libvvtest.permsetter import PermissionSetter
 from libvvtest.errors import FatalError
+from libvvtest.teststatus import DIFF_EXIT_STATUS
 
 
 class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
@@ -477,6 +478,44 @@ class exit_status_controls( vtu.vvtestTestCase ):
         assert '-k' in cmdl and 'two' in cmdl
         cmdl2 = get_command_line( trdir+'/testlist.*' )
         assert cmdl == cmdl2
+
+    def test_exit_status_is_stored_in_test_results_file(self):
+        ""
+        util.writefile( 'good.vvt', """
+            pass
+            """ )
+        util.writefile( 'bad.vvt', """
+            raise Exception( 'fake exception' )
+            """ )
+        util.writefile( 'ugly.vvt', """
+            import sys
+            import vvtest_util as vvt
+            sys.exit( vvt.diff_exit_status )
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        tdir = vrun.resultsDir()
+        vrun.assertCounts( total=3, npass=1, diff=1, fail=1 )
+
+        fn = util.globfile( tdir+'/testlist.*' )
+        rd = testlistio.TestListReader( fn )
+        rd.read()
+
+        testD = rd.getTests()
+        assert len( testD ) == 3
+
+        for tcase in testD.values():
+            tspec = tcase.getSpec()
+            if tspec.getName() == 'good':
+                assert tspec.getAttr( 'result' ) == 'pass'
+                assert tspec.getAttr( 'xvalue' ) == 0
+            elif tspec.getName() == 'bad':
+                assert tspec.getAttr( 'result' ) == 'fail'
+                assert tspec.getAttr( 'xvalue' ) > 0
+            elif tspec.getName() == 'ugly':
+                assert tspec.getAttr( 'result' ) == 'diff'
+                assert tspec.getAttr( 'xvalue' ) == DIFF_EXIT_STATUS
 
 
 def get_command_line( filepat ):

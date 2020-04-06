@@ -594,43 +594,30 @@ def write_cache_file( opts, optD, rtdata, test_dir, plat, perms ):
     ""
     rtconfig = rtdata.getRuntimeConfig()
 
-    f = pjoin(test_dir, 'test.cache')
+    f = pjoin( test_dir, 'test.cache' )
     if not os.path.exists( f ):
-        fp = open( f, "w" )
-        fp.write( 'VERSION=' + str(version) + '\n' )
-        if opts.plat:
-              fp.write( 'PLATFORM=' + opts.plat.strip() + '\n' )
-        if rtconfig.getAttr('exepath'):
-            fp.write( \
-                'PROJECT=' + abspath( rtconfig.getAttr('exepath') ) + '\n' )
-        if optD['onopts']:
-            fp.write( 'ONOPTS=' + '+'.join( optD['onopts'] ) + '\n' )
-        if optD['offopts']:
-            fp.write( 'OFFOPTS=' + '+'.join( optD['offopts'] ) + '\n' )
-        if opts.dash_T != None:
-            fp.write( 'TIMEOUT=' + str(opts.dash_T).strip() + '\n' )
-        if opts.timeout_multiplier != None:
-            fp.write( 'TIMEOUT_MULTIPLIER=' + \
-                                   str(opts.timeout_multiplier).strip() + '\n' )
-        if opts.dash_e:
-            fp.write( 'USE_ENV=1\n' )
-        if opts.check:
-            fp.write( 'CHECK=' + ' '.join( opts.check ) + '\n' )
-        fp.close()
+        with open( f, "w" ) as fp:
+            fp.write( 'VERSION=' + str(version) + '\n' )
+            if opts.plat:
+                  fp.write( 'PLATFORM=' + opts.plat.strip() + '\n' )
+            if rtconfig.getAttr('exepath'):
+                fp.write( \
+                    'PROJECT=' + abspath( rtconfig.getAttr('exepath') ) + '\n' )
+            if optD['onopts']:
+                fp.write( 'ONOPTS=' + '+'.join( optD['onopts'] ) + '\n' )
+            if optD['offopts']:
+                fp.write( 'OFFOPTS=' + '+'.join( optD['offopts'] ) + '\n' )
+            if opts.dash_T != None:
+                fp.write( 'TIMEOUT=' + str(opts.dash_T).strip() + '\n' )
+            if opts.timeout_multiplier != None:
+                fp.write( 'TIMEOUT_MULTIPLIER=' + \
+                                       str(opts.timeout_multiplier).strip() + '\n' )
+            if opts.dash_e:
+                fp.write( 'USE_ENV=1\n' )
+            if opts.check:
+                fp.write( 'CHECK=' + ' '.join( opts.check ) + '\n' )
 
-    perms.set( abspath(f) )
-
-
-def get_test_cache_file():
-    """
-    returns None if the current directory is not inside a TestResults directory
-    """
-    # an environment variable is used to identify vvtest run recursion
-    troot = os.environ.get( 'VVTEST_TEST_ROOT', None )
-
-    fn = location.find_vvtest_test_root_file( os.getcwd(), troot, 'test.cache' )
-
-    return fn
+        perms.set( abspath(f) )
 
 
 def read_cache_file( opts, optD, rtconfig, cache_file ):
@@ -669,6 +656,18 @@ def read_cache_file( opts, optD, rtconfig, cache_file ):
                 opts.dash_e = True
             elif kvpair[0] == 'CHECK':
                 opts.check = kvpair[1].split()
+
+
+def get_test_cache_file():
+    """
+    returns None if the current directory is not inside a TestResults directory
+    """
+    # an environment variable is used to identify vvtest run recursion
+    troot = os.environ.get( 'VVTEST_TEST_ROOT', None )
+
+    fn = location.find_vvtest_test_root_file( os.getcwd(), troot, 'test.cache' )
+
+    return fn
 
 
 def call_user_epilogue( rtdata, tlist ):

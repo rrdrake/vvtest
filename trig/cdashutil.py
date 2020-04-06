@@ -40,15 +40,30 @@ class TestResultsFormatter:
         self.start = start_time
         if end_time != None: self.end = end_time
 
-    def addTest(self, name, prefix='.',
-                            status='passed',
-                            cmdline='',
-                            runtime=None,
-                            detail='',
-                            output='' ):
-        ""
-        tup = ( name, prefix, status, cmdline, runtime, detail, output )
-        self.tests.append( tup )
+    def addTest(self, name, **attrs):
+        """
+            name      : name of the test
+            prefix    : the "Path" value in the submission; thats all I know
+            status    : "passed" or "failed" or "notrun"
+            cmdline   : the test command line, but can be anything
+            runtime   : number of seconds
+            output    : multi-line test output
+            exitcode  : something like "Completed" or "Failed"
+            exitvalue : typically an integer, such as 0 or 1
+        """
+        results = {
+                 'name' : name,
+               'prefix' : attrs.pop( 'prefix'    , '.' ),
+               'status' : attrs.pop( 'status'    , 'passed' ),
+              'cmdline' : attrs.pop( 'cmdline'   , '' ),
+              'runtime' : attrs.pop( 'runtime'   , None ),
+               'detail' : attrs.pop( 'detail'    , '' ),
+               'output' : attrs.pop( 'output'    , '' ),
+             'exitcode' : attrs.pop( 'exitcode'  , None ),
+            'exitvalue' : attrs.pop( 'exitvalue' , None ),
+        }
+        assert len( attrs ) == 0, 'unexpected attribute(s): '+str(attrs)
+        self.tests.append( results )
 
     def writeToFile(self, filename):
         ""
@@ -138,8 +153,8 @@ def write_tests_section( fp, testlist ):
     ""
     start_element( fp, 'TestList' )
 
-    for name,prefix,status,cmdline,runtime,detail,output in testlist:
-        simple_element( fp, 'Test', prefix+'/'+name )
+    for results in testlist:
+        simple_element( fp, 'Test', results['prefix']+'/'+results['name'] )
 
     end_element( fp, 'TestList' )
 
@@ -149,26 +164,30 @@ def write_tests_section( fp, testlist ):
 
 def write_test_result( fp, results ):
     ""
-    name,prefix,status,cmdline,runtime,detail,output = results
+    start_element( fp, 'Test', Status=results['status'] )
 
-    start_element( fp, 'Test', Status=status )
-
-    simple_element( fp, 'Name', name )
-    simple_element( fp, 'Path', prefix )
-    simple_element( fp, 'FullName', prefix+'/'+name )
-    if cmdline:
-        simple_element( fp, 'FullCommandLine', cmdline )
+    simple_element( fp, 'Name', results['name'] )
+    simple_element( fp, 'Path', results['prefix'] )
+    simple_element( fp, 'FullName', results['prefix']+'/'+results['name'] )
+    if results['cmdline']:
+        simple_element( fp, 'FullCommandLine', results['cmdline'] )
 
     start_element( fp, 'Results' )
 
-    if runtime != None:
-        write_float_measurement( fp, 'Execution Time', runtime )
+    if results['runtime'] != None:
+        write_float_measurement( fp, 'Execution Time', results['runtime'] )
 
-    if detail:
-        write_string_measurement( fp, 'Completion Status', detail )
+    if results['detail']:
+        write_string_measurement( fp, 'Completion Status', results['detail'] )
 
-    if output:
-        write_measurement( fp, output )
+    if results['exitcode'] != None:
+        write_string_measurement( fp, 'Exit Code', results['exitcode'] )
+
+    if results['exitvalue'] != None:
+        write_string_measurement( fp, 'Exit Value', results['exitvalue'] )
+
+    if results['output']:
+        write_measurement( fp, results['output'] )
 
     end_element( fp, 'Results' )
     end_element( fp, 'Test' )

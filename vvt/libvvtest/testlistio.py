@@ -124,7 +124,7 @@ class TestListReader:
 
     def getTests(self):
         """
-        Returns dictionary mapping execute dir to TestSpec object.
+        Returns dictionary mapping (file name, execute dir) to TestCase object.
         """
         return self.tests
 

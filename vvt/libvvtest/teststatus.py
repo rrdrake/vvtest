@@ -235,6 +235,8 @@ class TestStatus:
         self.tspec.setAttr( 'state', 'done' )
         self.setRuntime( int(time.time()-tzero) )
 
+        self.tspec.setAttr( 'xvalue', exit_status )
+
         result = translate_exit_status_to_result_string( exit_status )
         self.tspec.setAttr( 'result', result )
 
@@ -247,7 +249,7 @@ class TestStatus:
 def copy_test_results( to_tcase, from_tcase ):
     ""
     for k,v in from_tcase.getSpec().getAttrs().items():
-        if k in ['state','xtime','xdate','result']:
+        if k in ['state','xtime','xdate','xvalue','result']:
             to_tcase.getSpec().setAttr( k, v )
 
 

@@ -165,6 +165,7 @@ class file_formatting( trigutil.trigTestCase ):
         fmtr.addTest( 'atest' )
         fmtr.addTest( 'btest', status='failed', output='Houston, big problem' )
         fmtr.addTest( 'ctest', status='notrun', detail='keyword skip' )
+        fmtr.addTest( 'dtest', exitcode='Completed', exitvalue='0' )
 
         fmtr.writeToFile( 'file.xml' )
         time.sleep(1)
@@ -173,7 +174,7 @@ class file_formatting( trigutil.trigTestCase ):
         listnames = extract_test_list( etree )
         tests = extract_test_results( etree )
 
-        assert listnames == set( ['./atest','./btest','./ctest'] )
+        assert listnames == set( ['./atest','./btest','./ctest','./dtest'] )
 
         atest = tests['./atest']
         assert atest['name'] == 'atest'
@@ -192,7 +193,14 @@ class file_formatting( trigutil.trigTestCase ):
         assert ctest['status'] == 'notrun'
         assert ctest['Completion Status'].strip() == 'keyword skip'
 
-        assert len( tests ) == 3
+        ctest = tests['./dtest']
+        assert ctest['name'] == 'dtest'
+        assert ctest['path'] == '.'
+        assert ctest['status'] == 'passed'
+        assert ctest['Exit Code'].strip() == 'Completed'
+        assert ctest['Exit Value'].strip() == '0'
+
+        assert len( tests ) == 4
 
     def test_command_line(self):
         ""

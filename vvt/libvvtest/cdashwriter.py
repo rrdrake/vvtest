@@ -139,7 +139,8 @@ def set_test_list( fmtr, atestlist, testdir ):
         elif vvstat == 'pass':
             fmtr.addTest( tspec.getDisplayString(),
                           status='passed',
-                          runtime=tstat.getRuntime( None ) )
+                          runtime=tstat.getRuntime( None ),
+                          exitvalue=tspec.getAttr( 'xvalue', None ) )
 
         else:
 
@@ -150,7 +151,8 @@ def set_test_list( fmtr, atestlist, testdir ):
                           status='failed',
                           runtime=tstat.getRuntime( None ),
                           detail=vvstat,
-                          output=out )
+                          output=out,
+                          exitvalue=tspec.getAttr( 'xvalue', None ) )
 
 
 def is_http_url( destination ):

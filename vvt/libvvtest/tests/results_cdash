@@ -302,10 +302,12 @@ class integration_tests( vtu.vvtestTestCase ):
 
         testinfo = extract_test_results( xml, 'good' )
         assert float(testinfo['Execution Time']) < 10
+        assert int(testinfo['Exit Value']) == 0
 
         testinfo = extract_test_results( xml, 'bad' )
         assert testinfo['Completion Status'] == 'diff'
         assert float(testinfo['Execution Time']) < 10
+        assert int(testinfo['Exit Value']) > 0
 
         assert extract_test_results( xml, 'ugly' ) == None
 
