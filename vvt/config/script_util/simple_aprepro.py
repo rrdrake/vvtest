@@ -240,7 +240,7 @@ class SimpleAprepro:
         for jdx, line in enumerate(self.src_txt):
 
             # Process escaped curly braces.
-            clean_line = line.replace("\{", "{").replace("\}", "}")
+            clean_line = line.replace(r"\{", "{").replace(r"\}", "}")
 
             # Process the aprepro directive blocks.
             split_line = re.split(r"({[^{]*?})", clean_line)
