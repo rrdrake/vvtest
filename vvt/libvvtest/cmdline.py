@@ -279,29 +279,29 @@ It does this by limiting the tests in flight to use equal or fewer processors
 than are available.  Each test is assumed to need one CPU core, unless the
 test specifies a larger value.
 
-The -n option will set the number of processers to utilize to the given value.
-By default, this number is set to the maximum number of processors on the
-platform.
-      
-The -N option will wet the maximum number of processers available on the
-current platform.  By default, the system is probed to determine this value.
-Note that tests requiring more than this number of processors are not run.
-      
+The -n option sets the number of CPU cores occupied at any one time.  Tests
+that take more than this number are run last and sequentially.  By default,
+this number is set to the maximum number of processors on the platform.
+
+The -N option will set the maximum number of processers available on the
+current platform, and causes tests taking more than this number to be filtered
+out.  By default, the system is probed to determine this value.
+
 The --plat option sets the platform name for use by plugins and default
 resource settings. This can be used to specify the platform name,
 thus overriding the default platform name.  For example, you could use
 "--plat Linux".
-      
+
 The --platopt option specifies platform options.
 Some platform plugins understand special
 options.  Use this to send command line options into the platform
 plugin.  For example, use "--platopt ppn=4" to set the number
 of processors per node to an artificial value of 4.
-      
+
 The -T option will apply a timeout value in seconds to each test.  Zero means
 no timeout.  In batch mode, note that the time given to the batch
 queue for each batch job is the sum of the timeouts of each test.
-      
+
 The --timeout-multiplier option will
 apply a float multiplier to the timeout value for each test.
 
@@ -558,10 +558,17 @@ def create_parser( argvlist, vvtest_version ):
     # resources
     grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )
     grp.add_argument( '-n', dest='dash_n', type=int,
-        help='Set the number of processors to use at one time.' )
+        help='The number of CPU cores to occupy at any one time. '
+             'Tests taking more than this number are run last.' )
     grp.add_argument( '-N', dest='dash_N', type=int,
-        help='Set the maximum number of processors to use, and filter out '
-             'tests requiring more.' )
+        help='The maximum number of available CPU cores.  Tests taking '
+             'more than this value are not run.' )
+    grp.add_argument( '--devices', type=int,
+        help='The number of devices (e.g. GPUs) to occupy at any one time. '
+             'Tests taking more than this number are run last.' )
+    grp.add_argument( '--max-devices', type=int,
+        help='The maximum number of available devices (e.g. GPUs).  Tests '
+             'taking more than this value are not run.' )
     grp.add_argument( '--plat',
         help='Use this platform name for defaults and plugins.' )
     grp.add_argument( '--platopt', action='append',
@@ -776,6 +783,14 @@ def adjust_options_and_create_derived_options( opts ):
 
         errtype = 'max procs'
         if opts.dash_N != None and float(opts.dash_N) <= 0:
+            raise Exception( 'must be positive' )
+
+        errtype = 'num devices'
+        if opts.devices != None and opts.devices <= 0:
+            raise Exception( 'must be positive' )
+
+        errtype = 'max devices'
+        if opts.max_devices != None and float(opts.max_devices) <= 0:
             raise Exception( 'must be positive' )
 
         errtype = 'timeout'

@@ -47,4 +47,4 @@ def initialize( plat ):
             plat.setBatchSystem( "lsf", 4 )
         else:
             # 44 cpus per node
-            plat.setBatchSystem( "lsf", 44 )
+            plat.setBatchSystem( "lsf", 44, devices_per_node=4 )

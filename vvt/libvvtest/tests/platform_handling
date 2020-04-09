@@ -173,8 +173,10 @@ class constructing_platform( vtu.vvtestTestCase ):
     def test_the_create_Platform_instance_function(self):
         ""
         plat = vvplatform.create_Platform_instance(
-                    os.getcwd(),
-                    None, None, None, None, None, None, None, None, None )
+                    os.getcwd(), None, None, None, None,
+                    None, None, None, None,
+                    None, None,
+                    None )
 
         optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
         plat = vvplatform.create_Platform_instance(
@@ -182,7 +184,7 @@ class constructing_platform( vtu.vvtestTestCase ):
                     'XBox', True,
                     optD,
                     True,
-                    10, 20,
+                    10, 20, None, None,
                     ['dbg'], ['symbols'],
                     23 )
         self.check_platform_object( plat )

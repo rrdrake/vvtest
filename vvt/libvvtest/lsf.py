@@ -19,6 +19,7 @@ class BatchLSF:
         ""
         if ppn <= 0: ppn = 1
         self.ppn = ppn
+        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.runcmd = runcmd
 
     def setRunCommand(self, run_function):

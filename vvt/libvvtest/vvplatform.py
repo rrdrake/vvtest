@@ -101,24 +101,24 @@ class Platform:
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
-    def initProcs(self, set_num, set_max):
+    def initProcs(self, num_procs, max_procs, num_devices, max_devices):
         """
         Determines the number of processors and the maximum number for the
         current platform.
 
         For max procs:
-            1. Use 'set_max' if not None
+            1. Use 'max_procs' if not None
             2. The "maxprocs" attribute if set by the platform plugin
             3. Try to probe the system
             4. The value one if all else fails
 
         For num procs:
-            1. Use 'set_num' if not None
+            1. Use 'num_procs' if not None
             2. The value of max procs
 
         This function should not be called for batch mode.
         """
-        if set_max == None:
+        if max_procs == None:
             mx = self.attrs.get( 'maxprocs', None )
             if mx == None:
                 if self.batchspec != None:
@@ -127,12 +127,12 @@ class Platform:
                     mx = probe_max_processors()
             self.maxprocs = mx if mx != None else 1
         else:
-            self.maxprocs = set_max
+            self.maxprocs = max_procs
 
-        if set_num == None:
+        if num_procs == None:
             self.nprocs = self.maxprocs
         else:
-            self.nprocs = set_num
+            self.nprocs = num_procs
 
         if '--qsub-id' in self.optdict:
             self.procpool = ResourcePool( 1 )
@@ -244,13 +244,12 @@ class ResourcePool:
 
 
 def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
-                              numprocs, maxprocs,
+                              numprocs, maxprocs, devices, max_devices,
                               onopts, offopts,
                               qsubid ):
     """
     This function is an adaptor around construct_Platform(), which passes
-    through the command line arguments as a dictionary.  This design is
-    ugly but changing it requires interface changes.
+    through the command line arguments as a dictionary.
     """
     optdict = {}
     if platname:         optdict['--plat']    = platname
@@ -262,13 +261,24 @@ def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
     if offopts:          optdict['-O']        = offopts
     if qsubid != None:   optdict['--qsub-id'] = qsubid
 
-    return construct_Platform( vvtestdir, optdict, isbatched=isbatched )
+    return construct_Platform( vvtestdir, optdict,
+                               isbatched=isbatched,
+                               devices=devices,
+                               max_devices=max_devices )
 
 
 def construct_Platform( vvtestdir, optdict, **kwargs ):
     """
     This function constructs a Platform object, determines the platform &
     compiler, and loads the platform plugin.
+
+    It is retained for backward compatibility for now.  A script written by
+    a project team called this function to set environment variables in the
+    platform plugin and called certain methods on the resulting Platform object.
+
+    I want to get rid of that usage, but I'd like to abstract out the use
+    case and satisfy it in a better way (one that does not mean poking into
+    the internals of vvtest).
     """
     assert vvtestdir
     assert os.path.exists( vvtestdir )
@@ -294,7 +304,9 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
     initialize_platform( plat )
 
     plat.initProcs( optdict.get( '-n', None ),
-                    optdict.get( '-N', None ) )
+                    optdict.get( '-N', None ),
+                    kwargs.get( 'devices', None ),
+                    kwargs.get( 'max_devices', None ) )
 
     return plat
 

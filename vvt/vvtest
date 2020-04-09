@@ -345,6 +345,8 @@ def construct_platform_instance( vvtestdir, opts, optD ):
                 opts.dash_e,
                 opts.dash_n,
                 opts.dash_N,
+                opts.devices,
+                opts.max_devices,
                 optD['onopts'],        # -o
                 optD['offopts'],       # -O
                 opts.qsub_id )         # --qsub-id

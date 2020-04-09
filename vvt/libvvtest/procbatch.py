@@ -13,9 +13,10 @@ from .runcmd import runcmd
 
 class ProcessBatch:
 
-    def __init__(self, ppn):
+    def __init__(self, ppn, **kwargs):
         if ppn <= 0: ppn = 1
         self.ppn = ppn
+        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.childids = []
 
     def header(self, np, qtime, workdir, outfile, plat_attrs):

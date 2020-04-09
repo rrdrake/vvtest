@@ -136,13 +136,14 @@ class BatchQueueInterface:
               moab      : for Cray machines running Moab (may work in general)
               pbs       : standard PBS system
               slurm     : standard SLURM system
+              lsf       : LSF, such as the Sierra platform
 
         It can also be a python object which implements the batch functions.
         """
         if type(qtype) == type(''):
             if qtype == 'procbatch':
                 from . import procbatch
-                self.batch = procbatch.ProcessBatch( ppn )
+                self.batch = procbatch.ProcessBatch( ppn, **kwargs )
             elif qtype == 'craypbs':
                 from . import craypbs
                 self.batch = craypbs.BatchCrayPBS( ppn, **kwargs )
