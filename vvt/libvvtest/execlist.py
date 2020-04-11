@@ -23,18 +23,18 @@ class TestExecList:
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
-    def createTestExecs(self, perms):
+    def createTestExecs(self):
         """
         Creates the set of TestExec objects from the active test list.
         """
-        self._createTestExecList( perms )
-        self.sortTestExecList()  # sorts tests by longest running first
+        self._generate_backlog_from_testlist()
+        self.sortBySizeAndRuntime()  # sorts tests by longest running first
         self._connect_execute_dependencies()
 
         for tcase in self.getTestExecList():
             self.runner.initialize_for_execution( tcase )
 
-    def _createTestExecList(self, perms):
+    def _generate_backlog_from_testlist(self):
         ""
         self.backlog = {}
 
@@ -69,7 +69,7 @@ class TestExecList:
 
             depend.check_connect_dependencies( tcase, tmap )
 
-    def sortTestExecList(self):
+    def sortBySizeAndRuntime(self):
         """
         Sort the TestExec objects by runtime, descending order.  This is so
         popNext() will try to avoid launching long running tests at the end
@@ -83,11 +83,36 @@ class TestExecList:
                 if tm == None: tm = 0
                 xdir = tcase.getSpec().getDisplayString()
                 sortL.append( (tm,xdir,tcase) )
-            sortL.sort()
-            sortL.reverse()
+            sortL.sort( reverse=True )
             tcaseL[:] = [ tcase for tm,xdir,tcase in sortL ]
 
-    def getTestExecProcList(self):
+    def sortBySizeAndTimeout(self):
+        ""
+        self.sortlist = []
+
+        for np in self.backlog.keys():
+            for tcase in self.backlog[np]:
+                tm = tcase.getSpec().getAttr( 'timeout' )
+                xdir = tcase.getSpec().getDisplayString()
+                self.sortlist.append( (np,tm,xdir,tcase) )
+
+        self.sortlist.sort()
+
+    def getNextTest(self):
+        ""
+        # magic: goal here is to store the backlog in a class that can
+        #        do the sorting and pop-ing efficiently
+        if len( self.sortlist ) > 0:
+            np,tm,xdir,tcase = self.sortlist.pop()
+            for i in range( len(self.backlog[np]) ):
+                # magic: use getID() instead (also above)
+                if xdir == self.backlog[np][i].getSpec().getDisplayString():
+                    self._pop_test_exec( np, i )
+                    return tcase
+        return None
+
+
+    def getTestExecProcList(self):  # magic: remove
         """
         Returns a list of integers; each integer is the number of processors
         needed by one or more tests in the TestExec list.
@@ -102,6 +127,7 @@ class TestExecList:
 
         If 'consume' is True, the tests are moved from backlog to waiting.
         """
+        # magic: remove the numprocs and consume arguments
         xL = []
 
         for np,tcaseL in list( self.backlog.items() ):
@@ -240,6 +266,7 @@ class TestExecList:
 
     def _pop_next_test(self, npL, platform=None):
         ""
+        # magic: instead of query procs with np, ask for available np
         for np in npL:
             if platform == None or platform.queryProcs(np):
                 tcaseL = self.backlog[np]

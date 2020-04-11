@@ -21,6 +21,98 @@ from testutils import print3
 import libvvtest.batchutils as batchutils
 
 
+class batching_unit_tests( vtu.vvtestTestCase ):
+
+    def test_batch_grouping_is_by_np_and_timeout(self):
+        ""
+        tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
+        gpr = batchutils.BatchTestGrouper( xlist, None, None )
+        gpr.construct()
+
+        batches = gpr.getGroups()
+        assert len( batches ) == 2
+        grpL = batch_group_to_list( batches[0] )
+        assert grpL == [['sdir/atest1.np=2', 2, 22], ['sdir/atest0.np=2', 2, 12]]
+        grpL = batch_group_to_list( batches[1] )
+        assert grpL == [['sdir/atest1.np=1', 1, 21], ['sdir/atest0.np=1', 1, 11]]
+
+    def test_limit_batch_size_by_time(self):
+        ""
+        tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
+        gpr = batchutils.BatchTestGrouper( xlist, 5, None )
+        gpr.construct()
+
+        batches = gpr.getGroups()
+        assert len( batches ) == 4
+        assert batch_group_to_list( batches[0] ) == [['sdir/atest1.np=2', 2, 22]]
+        assert batch_group_to_list( batches[1] ) == [['sdir/atest1.np=1', 1, 21]]
+        assert batch_group_to_list( batches[2] ) == [['sdir/atest0.np=2', 2, 12]]
+        assert batch_group_to_list( batches[3] ) == [['sdir/atest0.np=1', 1, 11]]
+
+    def test_grouping_tests_with_dependencies(self):
+        ""
+        cwd = os.getcwd()
+
+        util.writefile( 'testA.vvt', """
+            #VVT: parameterize : np = 2
+            #VVT: parameterize : foo = bar baz
+            """ )
+        util.writefile( 'testB.vvt', """
+            #VVT: depends on = testA.*
+            """ )
+        util.writefile( 'testC.vvt', """
+            #VVT: parameterize : np = 2 4
+            #VVT: analyze = --analyze
+            """ )
+        time.sleep(1)
+
+        tlist,xlist = vtu.scan_to_make_TestExecList( '.', timeout_attr=5 )
+
+        gpr = batchutils.BatchTestGrouper( xlist, 60, None )
+        gpr.construct()
+
+        batches = gpr.getGroups()
+        assert len( batches ) == 4
+        gL = batch_group_to_list( batches[0] )
+        assert batch_group_to_list( batches[0] ) == [['testC.np=2', 2, 5],
+                                                     ['testA.foo=baz.np=2', 2, 5],
+                                                     ['testA.foo=bar.np=2', 2, 5]]
+        assert batch_group_to_list( batches[1] ) == [['testC.np=4', 4, 5]]
+        assert batch_group_to_list( batches[2] ) == [['testB', 0, 5]]
+        assert batch_group_to_list( batches[3] ) == [['testC', 0, 5]]
+
+    def test_grouping_tests_with_no_timeout(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : np = 3
+            #VVT: parameterize : foo = bar baz
+            """ )
+        time.sleep(1)
+
+        tlist,xlist = vtu.scan_to_make_TestExecList( '.', timeout_attr=0 )
+
+        gpr = batchutils.BatchTestGrouper( xlist, 60, None )
+        gpr.construct()
+
+        batches = gpr.getGroups()
+        assert len( batches ) == 2
+        assert batch_group_to_list( batches[0] ) == [['atest.foo=bar.np=3', 3, 0]]
+        assert batch_group_to_list( batches[1] ) == [['atest.foo=baz.np=3', 3, 0]]
+
+
+def batch_group_to_list( batchgroup ):
+    ""
+    gL = []
+
+    for tcase in batchgroup:
+        tspec = tcase.getSpec()
+        gL.append( [ tspec.getDisplayString(),
+                     int( tspec.getParameters().get('np', 0) ),
+                     tspec.getAttr( 'timeout' ) ] )
+
+    return gL
+
+
 class inlining_results_file_includes( vtu.vvtestTestCase ):
 
     def test_specifying_platform_options(self):

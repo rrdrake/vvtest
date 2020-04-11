@@ -36,7 +36,7 @@ class InformationPrinter( vtu.vvtestTestCase ):
         ""
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-        self.xlist, self.tlist = make_fake_TestExecList()
+        self.tlist, self.xlist = make_fake_TestExecList()
 
     def test_print_list_information(self):
         ""
@@ -111,24 +111,23 @@ class InformationPrinter( vtu.vvtestTestCase ):
 
 def make_fake_TestExecList():
     ""
-    tlist = TestList( None )
+    tlist = TestList()
 
     txL = []
 
     for i in range(2):
         ts = vtu.make_fake_TestCase( 'running', name='atest'+str(i) )
         tlist.addTest( ts )
-        ts.getSpec().setConstructionCompleted()
 
     xlist = TestExecList( tlist, None )
 
-    xlist._createTestExecList( None )
+    xlist._generate_backlog_from_testlist()
 
     # mark the tests as running
     for tcase in xlist.consumeBacklog():
         xlist.moveToStarted( tcase )
 
-    return xlist, tlist
+    return tlist, xlist
 
 
 def make_fake_Batcher( tlist ):

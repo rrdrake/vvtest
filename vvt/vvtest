@@ -549,7 +549,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
     xlist = TestExecList( tlist, runner )
-    xlist.createTestExecs( perms )
+    xlist.createTestExecs()
 
     print3( "\nTest directory:", basename( test_dir ) )
 
@@ -921,7 +921,7 @@ def run_test_exec_list( opts, optD, rtdata,
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
     xlist = TestExecList( tlist, runner )
-    xlist.createTestExecs( perms )
+    xlist.createTestExecs()
 
     tlrun = execute.TestListRunner( test_dir, tlist, xlist, perms,
                                     rtinfo, results_writer, plat )
@@ -1097,7 +1097,7 @@ def baselineTests( opts, optD, rtdata ):
         runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
         xlist = TestExecList( tlist, runner )
-        xlist.createTestExecs( perms )
+        xlist.createTestExecs()
 
         execute.run_baseline( xlist, plat )
 

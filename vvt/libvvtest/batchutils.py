@@ -286,8 +286,7 @@ class BatchTestGrouper:
         for np in list( self.xlist.getTestExecProcList() ):
             qL.extend( self._process_groups( np ) )
 
-        qL.sort()
-        qL.reverse()
+        qL.sort( reverse=True )
 
         self.groups = [ L[3] for L in qL ]
 
@@ -321,14 +320,17 @@ class BatchTestGrouper:
         for tcase in self.xlist.getTestExecList( np, consume=True ):
             xdir = tcase.getSpec().getDisplayString()
             xL.append( (tcase.getSpec().getAttr('timeout'),xdir,tcase) )
-        xL.sort()
+        xL.sort( reverse=True )
 
         grpL = []
         tsum = 0
         for rt,xdir,tcase in xL:
             tspec = tcase.getSpec()
-            if tcase.numDependencies() > 0 or tspec.getAttr('timeout') < 1:
-                # analyze tests and those with no timeout get their own group
+            if tcase.numDependencies() > 0:
+                # tests with dependencies (like analyze tests) get their own group
+                qL.append( [ rt, np, len(qL), [tcase] ] )
+            elif tspec.getAttr('timeout') < 1:
+                # if zero timeout, then use the max
                 qL.append( [ self.Tzero, np, len(qL), [tcase] ] )
             else:
                 if len(grpL) > 0 and tsum + rt > self.qlen:

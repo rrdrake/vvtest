@@ -43,6 +43,10 @@ import libvvtest.teststatus as teststatus
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.userplugin import UserPluginBridge, import_module_by_name
 import libvvtest.paramset as paramset
+from libvvtest.TestList import TestList
+from libvvtest.execlist import TestExecList
+from libvvtest.testcreator import TestCreator
+from libvvtest.scanner import TestFileScanner
 
 
 ##########################################################################
@@ -652,9 +656,11 @@ def make_fake_TestSpec( name='atest', keywords=['key1','key2'] ):
 def make_fake_TestCase( result=None, runtime=None, name='atest',
                         keywords=['key1','key2'] ):
     ""
-    tcase = testcase.TestCase( make_fake_TestSpec( name, keywords ) )
-
+    tspec = make_fake_TestSpec( name, keywords )
+    tcase = testcase.TestCase( tspec )
     tstat = tcase.getStat()
+
+    tspec.setConstructionCompleted()
 
     tstat.resetResults()
 
@@ -715,6 +721,54 @@ def make_fake_staged_TestCase( stage_index=0 ):
         tspec.setStagedParameters( False, True, 'stage', 'np' )
 
     return tcase
+
+
+def make_fake_TestExecList_with_timeouts():
+    ""
+    tlist = TestList()
+
+    txL = []
+
+    for i in range(2):
+        for j in range(2):
+
+            tspec = make_fake_TestSpec( name='atest'+str(i) )
+            tspec.setParameters( { 'np':str(j+1) } )
+            tspec.setConstructionCompleted()
+
+            tcase = testcase.TestCase( tspec )
+            tcase.getStat().resetResults()
+
+            tcase.getSpec().setAttr( 'timeout', (i+1)*10+j+1 )
+
+            tlist.addTest( tcase )
+
+    xlist = TestExecList( tlist, None )
+
+    xlist._generate_backlog_from_testlist()
+
+    return tlist, xlist
+
+
+def scan_to_make_TestExecList( path, timeout_attr=None ):
+    ""
+    tlist = TestList()
+
+    tc = TestCreator( 'XBox', [] )
+    scan = TestFileScanner( tc )
+    scan.scanPath( tlist, path )
+
+    if timeout_attr != None:
+        for tcase in tlist.getTests():
+            tcase.getSpec().setAttr( 'timeout', timeout_attr )
+
+    tlist.createAnalyzeGroupMap()
+
+    xlist = TestExecList( tlist, None )
+    xlist._generate_backlog_from_testlist()
+    xlist._connect_execute_dependencies()
+
+    return tlist, xlist
 
 
 # python imports can get confused when importing the same module name more
