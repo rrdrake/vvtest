@@ -143,6 +143,11 @@ class Platform:
         ""
         return self.procpool.available( np )
 
+    def maxAvailableSize(self):
+        ""
+        return self.procpool._get_num_available()
+        # magic: change name, remove available()
+
     def obtainProcs(self, np):
         """
         """

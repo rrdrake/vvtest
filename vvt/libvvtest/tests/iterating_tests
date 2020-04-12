@@ -17,13 +17,84 @@ import testutils as util
 print3 = util.print3
 
 import libvvtest.testcase as testcase
+import libvvtest.execlist as execlist
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
 
 
 class iterating_the_backlog( vtu.vvtestTestCase ):
 
-    def test_iterating_by_size_and_timeout(self):
+    def test_iterate_backlog_by_size_and_runtime(self):
+        ""
+        tests = vtu.make_TestCase_list()
+
+        back = execlist.TestBacklog()
+        for tcase in tests:
+            back.insert( tcase )
+
+        back.sort()
+
+        tL = []
+        for tcase in back.iterate():
+            tL.append( runtime_tuple(tcase) )
+            print3( tL[-1] )
+
+        assert tL == [ ['sdir/atest1.np=2', 2, 22],
+                       ['sdir/atest0.np=2', 2, 12],
+                       ['sdir/atest1.np=1', 1, 21],
+                       ['sdir/atest0.np=1', 1, 11] ]
+
+    def test_consuming_the_backlog_by_size_and_runtime(self):
+        ""
+        tests = vtu.make_TestCase_list()
+
+        back = execlist.TestBacklog()
+        for tcase in tests:
+            back.insert( tcase )
+
+        back.sort()
+
+        tcase = back.pop( max_size=4,
+                          constraint=lambda tc: tc.getStat().getRuntime() < 20 )
+
+        print3( runtime_tuple(tcase) )
+        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=2', 2, 12 ]
+
+        tcase = back.pop( max_size=1,
+                          constraint=lambda tc: tc.getStat().getRuntime() < 20 )
+
+        print3( runtime_tuple(tcase) )
+        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=1', 1, 11 ]
+
+        tL = []
+        for tcase in back.consume():
+            tL.append( runtime_tuple(tcase) )
+            print3( tL[-1] )
+
+        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
+                       [ 'sdir/atest1.np=1', 1, 21 ] ]
+
+    def test_iterate_backlog_by_size_and_timeout(self):
+        ""
+        tests = vtu.make_TestCase_list( timespec='timeout' )
+
+        back = execlist.TestBacklog()
+        for tcase in tests:
+            back.insert( tcase )
+
+        back.sort( secondary='timeout' )
+
+        tL = []
+        for tcase in back.consume():
+            tL.append( timeout_tuple(tcase) )
+            print3( tL[-1] )
+
+        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
+                       [ 'sdir/atest0.np=2', 2, 12 ],
+                       [ 'sdir/atest1.np=1', 1, 21 ],
+                       [ 'sdir/atest0.np=1', 1, 11 ] ]
+
+    def test_iterate_TestExecList_by_size_and_timeout(self):
         ""
         tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
 
@@ -33,18 +104,28 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
         while True:
             tcase = xlist.getNextTest()
             if tcase:
-                tspec = tcase.getSpec()
-                tL.append( [ tspec.getName(),
-                             tspec.getParameterValue('np'),
-                             tspec.getAttr('timeout') ] )
+                tL.append( timeout_tuple(tcase) )
                 xlist.moveToStarted( tcase )
             else:
                 break
 
-        assert tL == [ [ 'atest1', '2', 22 ],
-                       [ 'atest0', '2', 12 ],
-                       [ 'atest1', '1', 21 ],
-                       [ 'atest0', '1', 11 ] ]
+        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
+                       [ 'sdir/atest0.np=2', 2, 12 ],
+                       [ 'sdir/atest1.np=1', 1, 21 ],
+                       [ 'sdir/atest0.np=1', 1, 11 ] ]
+
+
+def runtime_tuple( tcase ):
+    ""
+    return [ tcase.getSpec().getDisplayString(),
+             int( tcase.getSpec().getParameterValue('np') ),
+             tcase.getStat().getRuntime() ]
+
+def timeout_tuple( tcase ):
+    ""
+    return [ tcase.getSpec().getDisplayString(),
+             int( tcase.getSpec().getParameterValue('np') ),
+             tcase.getSpec().getAttr('timeout') ]
 
 
 ############################################################################

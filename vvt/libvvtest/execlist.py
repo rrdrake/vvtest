@@ -18,7 +18,7 @@ class TestExecList:
         self.tlist = tlist
         self.runner = runner
 
-        self.backlog = {}  # np -> list of TestCase objects
+        self.backlog = TestBacklog()
         self.waiting = {}  # TestSpec ID -> TestCase object
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
@@ -31,39 +31,25 @@ class TestExecList:
         self.sortBySizeAndRuntime()  # sorts tests by longest running first
         self._connect_execute_dependencies()
 
-        for tcase in self.getTestExecList():
+        for tcase in self.backlog.iterate():
             self.runner.initialize_for_execution( tcase )
 
     def _generate_backlog_from_testlist(self):
         ""
-        self.backlog = {}
-
         for tcase in self.tlist.getTests():
-
-            tspec = tcase.getSpec()
-
             if not tcase.getStat().skipTest():
-
-                assert tspec.constructionCompleted()
-
+                assert tcase.getSpec().constructionCompleted()
                 tcase.setExec( TestExec() )
-
-                np = int( tspec.getParameters().get('np', 0) )
-                if np in self.backlog:
-                    self.backlog[np].append( tcase )
-                else:
-                    self.backlog[np] = [ tcase ]
+                self.backlog.insert( tcase )
 
     def _connect_execute_dependencies(self):
         ""
         tmap = self.tlist.getTestMap()
         groups = self.tlist.getGroupMap()
 
-        for tcase in self.getTestExecList():
+        for tcase in self.backlog.iterate():
 
-            tspec = tcase.getSpec()
-
-            if tspec.isAnalyze():
+            if tcase.getSpec().isAnalyze():
                 grpL = groups.getGroup( tcase )
                 depend.connect_analyze_dependencies( tcase, grpL, tmap )
 
@@ -76,72 +62,20 @@ class TestExecList:
         of the testing sequence, which can add significantly to the total wall
         time.
         """
-        for np,tcaseL in self.backlog.items():
-            sortL = []
-            for tcase in tcaseL:
-                tm = tcase.getStat().getRuntime( None )
-                if tm == None: tm = 0
-                xdir = tcase.getSpec().getDisplayString()
-                sortL.append( (tm,xdir,tcase) )
-            sortL.sort( reverse=True )
-            tcaseL[:] = [ tcase for tm,xdir,tcase in sortL ]
+        self.backlog.sort()
 
     def sortBySizeAndTimeout(self):
         ""
-        self.sortlist = []
-
-        for np in self.backlog.keys():
-            for tcase in self.backlog[np]:
-                tm = tcase.getSpec().getAttr( 'timeout' )
-                xdir = tcase.getSpec().getDisplayString()
-                self.sortlist.append( (np,tm,xdir,tcase) )
-
-        self.sortlist.sort()
+        self.backlog.sort( secondary='timeout' )
 
     def getNextTest(self):
         ""
-        # magic: goal here is to store the backlog in a class that can
-        #        do the sorting and pop-ing efficiently
-        if len( self.sortlist ) > 0:
-            np,tm,xdir,tcase = self.sortlist.pop()
-            for i in range( len(self.backlog[np]) ):
-                # magic: use getID() instead (also above)
-                if xdir == self.backlog[np][i].getSpec().getDisplayString():
-                    self._pop_test_exec( np, i )
-                    return tcase
-        return None
+        tcase = self.backlog.pop()
 
+        if tcase != None:
+            self.waiting[ tcase.getSpec().getID() ] = tcase
 
-    def getTestExecProcList(self):  # magic: remove
-        """
-        Returns a list of integers; each integer is the number of processors
-        needed by one or more tests in the TestExec list.
-        """
-        return self.backlog.keys()
-
-    def getTestExecList(self, numprocs=None, consume=False):
-        """
-        If 'numprocs' is None, all TestExec objects are returned.  If 'numprocs'
-        is not None, a list of TestExec objects is returned each of which need
-        that number of processors to run.
-
-        If 'consume' is True, the tests are moved from backlog to waiting.
-        """
-        # magic: remove the numprocs and consume arguments
-        xL = []
-
-        for np,tcaseL in list( self.backlog.items() ):
-            if numprocs == None:
-                xL.extend( tcaseL )
-                if consume:
-                    self._consume_tests( np )
-            elif numprocs == np:
-                xL.extend( tcaseL )
-                if consume:
-                    self._consume_tests( np )
-                break
-
-        return xL
+        return tcase
 
     def popNext(self, platform):
         """
@@ -154,25 +88,19 @@ class TestExecList:
 
         In the latter case, numRunning() will be zero.
         """
-        npL = list( self.backlog.keys() )
-        npL.sort()
-        npL.reverse()
-
-        # find longest runtime test such that the num procs is available
-        tcase = self._pop_next_test( npL, platform )
+        # find longest runtime test with size constraint
+        tcase = self._pop_next_test( platform )
         if tcase == None and len(self.started) == 0:
-            # search for tests that need more processors than platform has
-            tcase = self._pop_next_test( npL )
+            # find longest runtime test without size constraint
+            tcase = self._pop_next_test()
 
         return tcase
 
     def consumeBacklog(self):
         ""
-        for np,tcaseL in list( self.backlog.items() ):
-            while len( tcaseL ) > 0:
-                tcase = tcaseL[0]
-                self._pop_test_exec( np, 0 )
-                yield tcase
+        for tcase in self.backlog.consume():
+            self.waiting[ tcase.getSpec().getID() ] = tcase
+            yield tcase
 
     def startTest(self, tcase, platform, baseline=0):
         ""
@@ -201,12 +129,7 @@ class TestExecList:
         """
         All remaining tests are removed from the backlog and returned.
         """
-        tL = []
-        for np,tcaseL in list( self.backlog.items() ):
-            tL.extend( tcaseL )
-            del tcaseL[:]
-            self.backlog.pop( np )
-        return tL
+        return [ tcase for tcase in self.backlog.consume() ]
 
     def getRunning(self):
         """
@@ -258,36 +181,174 @@ class TestExecList:
 
         return tcase
 
-    def _consume_tests(self, np):
+    def _pop_next_test(self, platform=None):
         ""
-        tcaseL = self.backlog[np]
-        while len( tcaseL ) > 0:
-            self._pop_test_exec( np, 0 )
+        if platform == None:
+            def testok( tcase ):
+                return tcase.getBlockingDependency() == None
+            tcase = self.backlog.pop( constraint=testok )
+        else:
+            avail = platform.maxAvailableSize()
+            def testok( tcase ):
+                np = tcase.getSpec().getParameters().get('np',0)
+                npval = max( int(np), 1 )
+                block = tcase.getBlockingDependency()
+                return npval <= avail and block == None
+            # magic: send avail down into pop for efficiency
+            #        - in fact, using max_size means the testok() function
+            #          is not needed
+            tcase = self.backlog.pop( constraint=testok )
 
-    def _pop_next_test(self, npL, platform=None):
+        if tcase != None:
+            self.waiting[ tcase.getSpec().getID() ] = tcase
+
+        return tcase
+
+
+class TestBacklog:
+    """
+    be able to iterate by largest np first then largest runtime/timeout
+    be able to pop a test that fits the criteria
+
+    advantage of storing by np is that in a search for a test that will
+    fit, all tests with a larger np can be skipped right over
+
+    but how would that work with (np,ndevice) ??
+        - maybe skip np but have to iterate for ndevice
+
+    needs:
+        - iterate the list, determine if the test can be accepted, if so then
+          pop it off the backlog and place into 'waiting'
+        - the order of iteration matters for efficiency
+            - batch prefers alignment with size (with timeout secondary)
+            - pooled prefers large runtimes first (with constraint on size)
+    """
+
+    def __init__(self):
         ""
-        # magic: instead of query procs with np, ask for available np
-        for np in npL:
-            if platform == None or platform.queryProcs(np):
-                tcaseL = self.backlog[np]
-                N = len(tcaseL)
-                i = 0
-                while i < N:
-                    tcase = tcaseL[i]
-                    if tcase.getBlockingDependency() == None:
-                        self._pop_test_exec( np, i )
-                        return tcase
-                    i += 1
-        return None
+        self.tests = []
+        self.testcmp = None
 
-    def _pop_test_exec(self, np, i):
+    def insert(self, tcase):
+        """
+        Note: to support streaming, this function would have to use
+              self.testcmp to do an insert (rather than an append)
+        """
+        self.tests.append( tcase )
+
+    def sort(self, secondary='runtime'):
         ""
-        tcaseL = self.backlog[np]
-        tcase = tcaseL[i]
+        if secondary == 'runtime':
+            self.testcmp = TestCaseCompare( make_runtime_key )
+        else:
+            self.testcmp = TestCaseCompare( make_timeout_key )
 
-        del tcaseL[i]
+        if sys.version_info[0] < 3:
+            self.tests.sort( self.testcmp.compare, reverse=True )
+        else:
+            self.tests.sort( key=self.testcmp.getKey, reverse=True )
 
-        self.waiting[ tcase.getSpec().getID() ] = tcase
+    def getStartingIndex(self, max_size=None):
+        ""
+        return 0
 
-        if len(tcaseL) == 0:
-            self.backlog.pop( np )
+    def pop(self, max_size=None, constraint=None):
+        ""
+        tcase = None
+
+        idx = self.getStartingIndex( max_size )
+        while idx < len( self.tests ):
+            if constraint == None or constraint( self.tests[idx] ):
+                tcase = self.tests.pop( idx )
+                break
+            idx += 1
+
+        return tcase
+
+    def consume(self):
+        ""
+        while len( self.tests ) > 0:
+            tcase = self.tests.pop( 0 )
+            yield tcase
+
+    def iterate(self):
+        ""
+        for tcase in self.tests:
+            yield tcase
+
+
+def make_runtime_key( tcase ):
+    ""
+    return [ int( tcase.getSpec().getParameters().get( 'np', 0 ) ),
+             tcase.getStat().getRuntime( 0 ) ]
+
+def make_timeout_key( tcase ):
+    ""
+    ts = tcase.getSpec()
+    return [ int( ts.getParameters().get( 'np', 0 ) ),
+             ts.getAttr( 'timeout' ) ]
+
+
+class TestCaseCompare:
+
+    def __init__(self, make_key):
+        ""
+        self.kfunc = make_key
+
+    def compare(self, x, y):
+        ""
+        k1 = self.kfunc(x)
+        k2 = self.kfunc(y)
+        if k1 < k2: return -1
+        if k2 < k1: return 1
+        return 0
+
+    def getKey(self, x):
+        ""
+        return self.kfunc( x )
+
+
+
+
+
+
+def bisect_right( a, x, less_than ):
+    ""
+    lo = 0
+    hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2
+        if less_than( x, a[mid] ): hi = mid
+        else: lo = mid+1
+    return lo
+
+
+def less_than_using_np_and_runtime( x, y ):
+    ""
+    return [ int( x.getSpec().getParameters().get( 'np', 0 ) ),
+             x.getStat().getRuntime( 0 ) ] \
+           < \
+           [ int( y.getSpec().getParameters().get( 'np', 0 ) ),
+             y.getStat().getRuntime( 0 ) ]
+
+
+def less_than_using_np_and_timeout( x, y ):
+    ""
+    tspec1 = x.getSpec()
+    tspec2 = y.getSpec()
+    return [ int( tspec1.getParameters().get( 'np', 0 ) ),
+             tspec1.getAttr( 'timeout' ) ] \
+           < \
+           [ int( tspec2.getParameters().get( 'np', 0 ) ),
+             tspec2.getAttr( 'timeout' ) ]
+
+
+def insort_right( a, x, less_than ):
+    ""
+    lo = 0
+    hi = len(a)
+    while lo < hi:
+        mid = (lo+hi)//2
+        if less_than( x, a[mid] ): hi = mid
+        else: lo = mid+1
+    a.insert(lo, x)

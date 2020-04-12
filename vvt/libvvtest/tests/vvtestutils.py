@@ -723,11 +723,9 @@ def make_fake_staged_TestCase( stage_index=0 ):
     return tcase
 
 
-def make_fake_TestExecList_with_timeouts():
+def make_TestCase_list( timespec='runtime' ):
     ""
-    tlist = TestList()
-
-    txL = []
+    tests = []
 
     for i in range(2):
         for j in range(2):
@@ -739,9 +737,24 @@ def make_fake_TestExecList_with_timeouts():
             tcase = testcase.TestCase( tspec )
             tcase.getStat().resetResults()
 
-            tcase.getSpec().setAttr( 'timeout', (i+1)*10+j+1 )
+            if timespec == 'runtime':
+                tcase.getStat().setRuntime( (i+1)*10+j+1 )
+            else:
+                assert timespec == 'timeout'
+                tcase.getSpec().setAttr( 'timeout', (i+1)*10+j+1 )
 
-            tlist.addTest( tcase )
+            tests.append( tcase )
+
+    return tests
+
+
+def make_fake_TestExecList_with_timeouts():
+    ""
+    tests = make_TestCase_list( timespec='timeout' )
+
+    tlist = TestList()
+    for tcase in tests:
+        tlist.addTest( tcase )
 
     xlist = TestExecList( tlist, None )
 

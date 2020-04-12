@@ -204,7 +204,16 @@ class info_tests( vtu.vvtestTestCase ):
         assert ordered_testids( vrun ) == ['otter','ardvark','zebra','marmot']
 
         vrun = vtu.runvvtest( '-i -v --sort d', chdir=tdir )
-        assert ordered_testids( vrun ) == ['otter','ardvark','zebra','marmot']
+        assert ordered_testids( vrun ) == self.sorted_by_date_executed( vrun )
+
+    def sorted_by_date_executed(self, vrun):
+        ""
+        dateL = [ [ vrun.startDate('one/zebra'),   'zebra'   ],
+                  [ vrun.startDate('one/marmot'),  'marmot'  ],
+                  [ vrun.startDate('two/ardvark'), 'ardvark' ],
+                  [ vrun.startDate('two/otter'),   'otter' ] ]
+        dateL.sort()
+        return [ L[1] for L in dateL ]
 
     def test_sorting_with_near_duplicate_tests(self):
         ""

@@ -281,11 +281,9 @@ class BatchTestGrouper:
 
     def construct(self):
         ""
-        qL = []
+        batches = self._process_groups()
 
-        for np in list( self.xlist.getTestExecProcList() ):
-            qL.extend( self._process_groups( np ) )
-
+        qL = [ grp.asList() for grp in batches ]
         qL.sort( reverse=True )
 
         self.groups = [ L[3] for L in qL ]
@@ -312,38 +310,81 @@ class BatchTestGrouper:
 
         return qtime
 
-    def _process_groups(self, np):
+    def _process_groups(self):
         ""
-        qL = []
+        self.batches = []
+        self.group = None
 
-        xL = []
-        for tcase in self.xlist.getTestExecList( np, consume=True ):
-            xdir = tcase.getSpec().getDisplayString()
-            xL.append( (tcase.getSpec().getAttr('timeout'),xdir,tcase) )
-        xL.sort( reverse=True )
-
-        grpL = []
-        tsum = 0
-        for rt,xdir,tcase in xL:
-            tspec = tcase.getSpec()
-            if tcase.numDependencies() > 0:
-                # tests with dependencies (like analyze tests) get their own group
-                qL.append( [ rt, np, len(qL), [tcase] ] )
-            elif tspec.getAttr('timeout') < 1:
-                # if zero timeout, then use the max
-                qL.append( [ self.Tzero, np, len(qL), [tcase] ] )
+        self.xlist.sortBySizeAndTimeout()
+        while True:
+            tcase = self.xlist.getNextTest()
+            if tcase != None:
+                np = int( tcase.getSpec().getParameters().get('np', 0) )
+                tm = tcase.getSpec().getAttr('timeout')
+                self._add_test_case( np, tm, tcase )
             else:
-                if len(grpL) > 0 and tsum + rt > self.qlen:
-                    qL.append( [ tsum, np, len(qL), grpL ] )
-                    grpL = []
-                    tsum = 0
-                grpL.append( tcase )
-                tsum += rt
+                break
 
-        if len(grpL) > 0:
-            qL.append( [ tsum, np, len(qL), grpL ] )
+        if self.group != None:
+            self.batches.append( self.group )
 
-        return qL
+        return self.batches
+
+    def _add_test_case(self, np, timeval, tcase):
+        ""
+        tspec = tcase.getSpec()
+
+        if tcase.numDependencies() > 0:
+            # tests with dependencies (like analyze tests) get their own group
+            self.batches.append( BatchGroup( np, timeval, [tcase] ) )
+
+        elif tspec.getAttr('timeout') < 1:
+            # zero timeout means no limit, so give it the max time value
+            self.batches.append( BatchGroup( np, self.Tzero, [tcase] ) )
+
+        else:
+            self._check_start_new_group( np, timeval )
+            if self.group == None:
+                self.group = BatchGroup( np )
+            self.group.appendTest( tcase, timeval )
+
+    def _check_start_new_group(self, np, timeval):
+        ""
+        if self.group != None:
+            if self.group.needNewGroup( np, timeval, self.qlen ):
+                self.batches.append( self.group )
+                self.group = None
+
+
+class BatchGroup:
+
+    uniqid = 0
+
+    def __init__(self, np, timeval=None, tests=None):
+        ""
+        self.np = np
+        self.tsum = ( 0 if timeval == None else timeval )
+        self.tests = ( [] if tests == None else tests )
+
+        self.groupid = BatchGroup.uniqid
+        BatchGroup.uniqid += 1
+
+    def appendTest(self, tcase, timeval):
+        ""
+        self.tests.append( tcase )
+        self.tsum += timeval
+
+    def needNewGroup(self, np, timeval, tlimit):
+        ""
+        if len(self.tests) > 0:
+            if self.np != np or self.tsum + timeval > tlimit:
+                return True
+
+        return False
+
+    def asList(self):
+        ""
+        return [ self.tsum, self.np, self.groupid, self.tests ]
 
 
 def make_batch_TestList( batchdir, batchid, suffix, qlist ):

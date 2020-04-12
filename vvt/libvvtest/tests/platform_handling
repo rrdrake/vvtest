@@ -285,7 +285,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             import vvtest_util as vvt
             print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
             print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
-            time.sleep(1)
+            time.sleep(2)
             """ )
         util.writefile( "btest.vvt", """
             #VVT: parameterize: np = 3
@@ -293,7 +293,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             import vvtest_util as vvt
             print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
             print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
-            time.sleep(1)
+            time.sleep(2)
             """ )
         util.writescript( "ctest.vvt", """
             #!/bin/sh
@@ -301,7 +301,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             source vvtest_util.sh
             echo "procids=$RESOURCE_IDS_np"
             echo "proctotal=$RESOURCE_TOTAL_np"
-            sleep 1
+            sleep 2
             """ )
         time.sleep(1)
 

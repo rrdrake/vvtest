@@ -73,13 +73,21 @@ class batching_unit_tests( vtu.vvtestTestCase ):
 
         batches = gpr.getGroups()
         assert len( batches ) == 4
+        for bat in batches:
+            print3( batch_group_to_list(bat) )
         gL = batch_group_to_list( batches[0] )
-        assert batch_group_to_list( batches[0] ) == [['testC.np=2', 2, 5],
-                                                     ['testA.foo=baz.np=2', 2, 5],
-                                                     ['testA.foo=bar.np=2', 2, 5]]
+        gL.sort()  # order within the group is not guaranteed with equal times
+        assert gL == [ ['testA.foo=bar.np=2', 2, 5],
+                       ['testA.foo=baz.np=2', 2, 5],
+                       ['testC.np=2', 2, 5] ]
         assert batch_group_to_list( batches[1] ) == [['testC.np=4', 4, 5]]
-        assert batch_group_to_list( batches[2] ) == [['testB', 0, 5]]
-        assert batch_group_to_list( batches[3] ) == [['testC', 0, 5]]
+        g2 = batch_group_to_list( batches[2] )
+        g3 = batch_group_to_list( batches[3] )
+        if g2 == [['testB', 0, 5]]:
+            assert g3 == [['testC', 0, 5]]
+        else:
+            assert g2 == [['testC', 0, 5]]
+            assert g3 == [['testB', 0, 5]]
 
     def test_grouping_tests_with_no_timeout(self):
         ""
@@ -95,9 +103,16 @@ class batching_unit_tests( vtu.vvtestTestCase ):
         gpr.construct()
 
         batches = gpr.getGroups()
+        for bat in batches:
+            print3( batch_group_to_list(bat) )
         assert len( batches ) == 2
-        assert batch_group_to_list( batches[0] ) == [['atest.foo=bar.np=3', 3, 0]]
-        assert batch_group_to_list( batches[1] ) == [['atest.foo=baz.np=3', 3, 0]]
+        g1 = batch_group_to_list( batches[0] )
+        g2 = batch_group_to_list( batches[1] )
+        if g1 == [['atest.foo=bar.np=3', 3, 0]]:
+            assert g2 == [['atest.foo=baz.np=3', 3, 0]]
+        else:
+            assert g1 == [['atest.foo=baz.np=3', 3, 0]]
+            assert g2 == [['atest.foo=bar.np=3', 3, 0]]
 
 
 def batch_group_to_list( batchgroup ):
