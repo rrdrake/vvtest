@@ -16,9 +16,8 @@ class Platform:
         self.vvtesthome = vvtesthome
         self.optdict = optdict
 
-        self.maxprocs = 1
-        self.nprocs = 1
-        self.procpool = ResourcePool( self.nprocs )
+        self.procpool = ResourcePool( 1, 1 )
+        self.devicepool = None
 
         self.platname = None
         self.cplrname = None
@@ -33,16 +32,19 @@ class Platform:
     def getName(self):  return self.platname
     def getCompiler(self): return self.cplrname
     def getOptions(self): return self.optdict
-    def getMaxProcs(self): return self.maxprocs
-    def getNumProcs(self): return self.nprocs
+
+    def getMaxProcs(self): return self.procpool.maxAvailable()
+    def getNumProcs(self): return self.procpool.numTotal()
 
     def display(self, isbatched=False):
         ""
         s = "Platform " + self.platname
         if not isbatched:
-            if self.nprocs > 0:
-                s += ", num procs = " + str(self.nprocs)
-            s += ", max procs = " + str(self.maxprocs)
+            s += ", num procs = " + str(self.getNumProcs())
+            s += ", max procs = " + str(self.getMaxProcs())
+            if self.devicepool != None:
+                s += ', num devices = '+str(self.devicepool.numTotal())
+                s += ', max devices = '+str(self.devicepool.maxAvailable())
         print3( s )
 
     def getEnvironment(self):
@@ -84,6 +86,9 @@ class Platform:
 
         self.batchspec = ( batch, ppn, kwargs )
 
+        if int( self.getattr( 'maxprocs', 0 ) ) < 1:
+            self.setattr( 'maxprocs', 2**31 )
+
     def initializeBatchSystem(self, batchitf):
         ""
         if self.batchspec:
@@ -101,7 +106,9 @@ class Platform:
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
-    def initProcs(self, num_procs, max_procs, num_devices, max_devices):
+    def initProcs(self, isbatched,
+                        num_procs, max_procs,
+                        num_devices, max_devices ):
         """
         Determines the number of processors and the maximum number for the
         current platform.
@@ -118,46 +125,49 @@ class Platform:
 
         This function should not be called for batch mode.
         """
-        if max_procs == None:
-            mx = self.attrs.get( 'maxprocs', None )
-            if mx == None:
-                if self.batchspec != None:
-                    mx = 2**31 - 1  # by default, no limit for batch systems
-                else:
-                    mx = probe_max_processors()
-            self.maxprocs = mx if mx != None else 1
-        else:
-            self.maxprocs = max_procs
+        maxnp = ( 2**31 if isbatched else None )
 
-        if num_procs == None:
-            self.nprocs = self.maxprocs
-        else:
-            self.nprocs = num_procs
+        np,maxnp = \
+            determine_processor_cores( num_procs,
+                                       max_procs,
+                                       self.attrs.get( 'maxprocs', maxnp ) )
 
-        if '--qsub-id' in self.optdict:
-            self.procpool = ResourcePool( 1 )
-        else:
-            self.procpool = ResourcePool( self.nprocs )
+        nd,maxdev = \
+            determine_device_count( num_devices,
+                                    max_devices,
+                                    self.attrs.get( 'maxdevices', None ) )
 
-    def maxAvailableSize(self):
+        self.procpool = ResourcePool( np, maxnp )
+
+        if nd != None:
+            self.devicepool = ResourcePool( nd, maxdev )
+
+    def sizeAvailable(self):
         ""
-        return self.procpool.numAvailable()
+        sznp = self.procpool.numAvailable()
+        if self.devicepool == None:
+            return ( sznp, 0 )
+        else:
+            return ( sznp, self.devicepool.numAvailable() )
 
-    def getResources(self, np):
+    def getResources(self, np, ndevice):
         ""
-        np = max( 1, np )
+        procs = self.procpool.get( max( 1, np ) )
 
-        procs = self.procpool.get( np )
+        if self.devicepool == None or ndevice == None:
+            devices = None
+        else:
+            devices = self.devicepool.get( max( 0, int(ndevice) ) )
 
-        job_info = construct_job_info( procs, self.nprocs, self.maxprocs,
+        job_info = construct_job_info( procs, self.procpool,
+                                       devices, self.devicepool,
                                        self.getattr( 'mpifile', '' ),
                                        self.getattr( 'mpiopts', '' ) )
 
         return job_info
 
     def returnResources(self, job_info):
-        """
-        """
+        ""
         self.procpool.put( job_info.procs )
 
     # ----------------------------------------------------------------
@@ -192,13 +202,57 @@ class Platform:
         return None
 
 
+def determine_processor_cores( num_procs, max_procs, plugin_max ):
+    ""
+    if max_procs == None:
+        mx = plugin_max
+        if mx == None:
+            mx = probe_max_processors( 4 )
+    else:
+        mx = max_procs
+
+    if num_procs == None:
+        np = mx
+    else:
+        np = num_procs
+
+    return np,mx
+
+
+def determine_device_count( num_devices, max_devices, plugin_max ):
+    ""
+    if max_devices == None:
+        mx = plugin_max
+    else:
+        mx = max_devices
+
+    if num_devices == None:
+        nd = mx
+    else:
+        nd = num_devices
+        if mx == None:
+            # magic: probe for devices
+            mx = num_devices
+
+    return nd,mx
+
+
 class ResourcePool:
 
-    def __init__(self, total):
+    def __init__(self, total, maxavail=None):
         ""
         self.total = total
+        self.maxavail = maxavail
         self.idx = 0
         self.pool = []
+
+    def maxAvailable(self):
+        ""
+        return self.maxavail
+
+    def numTotal(self):
+        ""
+        return self.total
 
     def numAvailable(self):
         ""
@@ -258,7 +312,6 @@ def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
     if maxprocs != None: optdict['-N']        = maxprocs
     if onopts:           optdict['-o']        = onopts
     if offopts:          optdict['-O']        = offopts
-    if qsubid != None:   optdict['--qsub-id'] = qsubid
 
     return construct_Platform( vvtestdir, optdict,
                                isbatched=isbatched,
@@ -296,13 +349,15 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
 
     set_platform_options( plat, optdict.get( '--platopt', {} ) )
 
-    if kwargs.get( 'isbatched', False ):
+    isbatched = kwargs.get( 'isbatched', False )
+    if isbatched:
         # this may get overridden by platform_plugin.py
         plat.setBatchSystem( 'procbatch', 1 )
 
     initialize_platform( plat )
 
-    plat.initProcs( optdict.get( '-n', None ),
+    plat.initProcs( isbatched,
+                    optdict.get( '-n', None ),
                     optdict.get( '-N', None ),
                     kwargs.get( 'devices', None ),
                     kwargs.get( 'max_devices', None ) )
@@ -402,12 +457,23 @@ class JobInfo:
         ""
         self.procs = procs
         self.maxprocs = maxprocs
+        self.devices = None
+        self.maxdevices = None
         self.mpi_opts = ''
 
 
-def construct_job_info( procs, numprocs, maxprocs, mpifile, mpiopts ):
+def construct_job_info( procs, procpool,
+                        devices, devicepool,
+                        mpifile, mpiopts ):
     ""
+    numprocs = procpool.numTotal()
+    maxprocs = procpool.maxAvailable()
+
     job_info = JobInfo( procs, maxprocs )
+
+    if devices != None:
+        job_info.devices = devices
+        job_info.maxdevices = devicepool.maxAvailable()
 
     if mpifile == 'hostfile':
         # use OpenMPI style machine file
@@ -429,7 +495,7 @@ def construct_job_info( procs, numprocs, maxprocs, mpifile, mpiopts ):
     return job_info
 
 
-def probe_max_processors():
+def probe_max_processors( fail_value=4 ):
     """
     Tries to determine the number of processors on the current machine.  On
     Linux systems, it uses /proc/cpuinfo.  On OSX systems, it uses sysctl.
@@ -460,6 +526,9 @@ def probe_max_processors():
             fp.close()
         except:
             mx = None
+
+    if not mx or mx < 1:
+        mx = fail_value
 
     return mx
 

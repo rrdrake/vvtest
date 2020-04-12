@@ -199,7 +199,6 @@ class constructing_platform( vtu.vvtestTestCase ):
         assert plat.getattr( 'account' ) == 'fy666'
         assert plat.getattr( 'walltime' ) == '2:34'
         opts = plat.getOptions()
-        assert opts['--qsub-id'] == 23
         assert opts['-o'] == ['dbg']
         assert opts['-O'] == ['symbols']
         assert opts['-e'] == True

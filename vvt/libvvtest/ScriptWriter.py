@@ -111,6 +111,11 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                'RESOURCE_IDS_np = '+repr(resourceobj.procs),
                'RESOURCE_TOTAL_np = '+repr(resourceobj.maxprocs) )
 
+        if resourceobj.devices != None:
+            w.add( '',
+               'RESOURCE_IDS_ndevice = '+repr(resourceobj.devices),
+               'RESOURCE_TOTAL_ndevice = '+repr(resourceobj.maxdevices) )
+
         ###################################################################
     
     elif lang in ['sh','bash']:
@@ -197,6 +202,12 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
         w.add( '',
                'RESOURCE_IDS_np="'+' '.join(sprocs)+'"',
                'RESOURCE_TOTAL_np="'+str(resourceobj.maxprocs)+'"' )
+
+        if resourceobj.devices != None:
+            sdevs = [ str(devid) for devid in resourceobj.devices ]
+            w.add( '',
+               'RESOURCE_IDS_ndevice = '+' '.join(sdevs),
+               'RESOURCE_TOTAL_ndevice = "'+str(resourceobj.maxdevices)+'"' )
 
         w.add( '',
                'source $VVTESTSRC/config/script_util.sh' )

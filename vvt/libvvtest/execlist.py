@@ -67,8 +67,9 @@ class TestExecList:
         texec = tcase.getExec()
 
         np = int( tspec.getParameters().get('np', 0) )
+        nd = tspec.getParameters().get( 'ndevice', None )
 
-        obj = platform.getResources( np )
+        obj = platform.getResources( np, nd )
         texec.setResourceObject( obj )
 
         texec.start( baseline )
@@ -198,20 +199,31 @@ class TestConstraint:
     def __init__(self, platform):
         ""
         if platform == None:
-            self.maxnp = None
+            self.maxsize = None
         else:
-            self.maxnp = platform.maxAvailableSize()
+            self.maxsize = platform.sizeAvailable()
 
     def getMaxNP(self):
         ""
-        return self.maxnp
+        if self.maxsize == None:
+            return None
+        else:
+            return self.maxsize[0]
 
     def apply(self, tcase):
         ""
-        if self.maxnp != None:
+        if self.maxsize != None:
+
+            maxnp = self.maxsize[0]
             np = tcase.getSpec().getParameters().get('np',0)
             npval = max( int(np), 1 )
-            if npval > self.maxnp:
+            if npval > maxnp:
+                return False
+
+            maxdevice = self.maxsize[1]
+            ndev = tcase.getSpec().getParameters().get('ndevice',0)
+            ndev = max( int(ndev), 0 )
+            if ndev > maxdevice:
                 return False
 
         if tcase.getBlockingDependency() != None:

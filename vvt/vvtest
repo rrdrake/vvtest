@@ -991,13 +991,12 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     if opts.postclean: cmd += ' -C'
     if opts.analyze: cmd += ' -a'
 
-    cmd += ' --plat '+rtconfig.getPlatformName()
-
-    if opts.perms:
-        cmd += ' --perms '+','.join( opts.perms )
+    cmd += ' -n 1'  # force sequential batch execution
 
     for cfgdir in rtconfig.getAttr('configdir'):
         cmd += ' --config='+cfgdir
+
+    cmd += ' --plat '+rtconfig.getPlatformName()
 
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
@@ -1005,6 +1004,9 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
                 cmd += ' --platopt ' + k + '=' + v
             else:
                 cmd += ' --platopt ' + k
+
+    if opts.perms:
+        cmd += ' --perms '+','.join( opts.perms )
 
     for arg in rtconfig.getAttr('testargs'):
         cmd += ' --test-args="'+arg+'"'
