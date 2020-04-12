@@ -28,54 +28,11 @@ class TestExecList:
         Creates the set of TestExec objects from the active test list.
         """
         self._generate_backlog_from_testlist()
-        self.sortBySizeAndRuntime()  # sorts tests by longest running first
+        self._sort_by_size_and_runtime()
         self._connect_execute_dependencies()
 
         for tcase in self.backlog.iterate():
             self.runner.initialize_for_execution( tcase )
-
-    def _generate_backlog_from_testlist(self):
-        ""
-        for tcase in self.tlist.getTests():
-            if not tcase.getStat().skipTest():
-                assert tcase.getSpec().constructionCompleted()
-                tcase.setExec( TestExec() )
-                self.backlog.insert( tcase )
-
-    def _connect_execute_dependencies(self):
-        ""
-        tmap = self.tlist.getTestMap()
-        groups = self.tlist.getGroupMap()
-
-        for tcase in self.backlog.iterate():
-
-            if tcase.getSpec().isAnalyze():
-                grpL = groups.getGroup( tcase )
-                depend.connect_analyze_dependencies( tcase, grpL, tmap )
-
-            depend.check_connect_dependencies( tcase, tmap )
-
-    def sortBySizeAndRuntime(self):
-        """
-        Sort the TestExec objects by runtime, descending order.  This is so
-        popNext() will try to avoid launching long running tests at the end
-        of the testing sequence, which can add significantly to the total wall
-        time.
-        """
-        self.backlog.sort()
-
-    def sortBySizeAndTimeout(self):
-        ""
-        self.backlog.sort( secondary='timeout' )
-
-    def getNextTest(self):
-        ""
-        tcase = self.backlog.pop()
-
-        if tcase != None:
-            self.waiting[ tcase.getSpec().getID() ] = tcase
-
-        return tcase
 
     def popNext(self, platform):
         """
@@ -180,6 +137,49 @@ class TestExecList:
             self.tlist.appendTestResult( tcase )
 
         return tcase
+
+    def sortBySizeAndTimeout(self):
+        ""
+        self.backlog.sort( secondary='timeout' )
+
+    def getNextTest(self):
+        ""
+        tcase = self.backlog.pop()
+
+        if tcase != None:
+            self.waiting[ tcase.getSpec().getID() ] = tcase
+
+        return tcase
+
+    def _generate_backlog_from_testlist(self):
+        ""
+        for tcase in self.tlist.getTests():
+            if not tcase.getStat().skipTest():
+                assert tcase.getSpec().constructionCompleted()
+                tcase.setExec( TestExec() )
+                self.backlog.insert( tcase )
+
+    def _sort_by_size_and_runtime(self):
+        """
+        Sort the TestExec objects by runtime, descending order.  This is so
+        popNext() will try to avoid launching long running tests at the end
+        of the testing sequence, which can add significantly to the total wall
+        time.
+        """
+        self.backlog.sort()
+
+    def _connect_execute_dependencies(self):
+        ""
+        tmap = self.tlist.getTestMap()
+        groups = self.tlist.getGroupMap()
+
+        for tcase in self.backlog.iterate():
+
+            if tcase.getSpec().isAnalyze():
+                grpL = groups.getGroup( tcase )
+                depend.connect_analyze_dependencies( tcase, grpL, tmap )
+
+            depend.check_connect_dependencies( tcase, tmap )
 
     def _pop_next_test(self, platform=None):
         ""
