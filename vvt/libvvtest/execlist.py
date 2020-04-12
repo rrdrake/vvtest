@@ -68,7 +68,7 @@ class TestExecList:
 
         np = int( tspec.getParameters().get('np', 0) )
 
-        obj = platform.obtainProcs( np )
+        obj = platform.getResources( np )
         texec.setResourceObject( obj )
 
         texec.start( baseline )

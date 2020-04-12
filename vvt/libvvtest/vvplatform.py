@@ -139,19 +139,13 @@ class Platform:
         else:
             self.procpool = ResourcePool( self.nprocs )
 
-    def queryProcs(self, np):
-        ""
-        return self.procpool.available( np )
-
     def maxAvailableSize(self):
         ""
-        return self.procpool._get_num_available()
-        # magic: change name, remove available()
+        return self.procpool.numAvailable()
 
-    def obtainProcs(self, np):
-        """
-        """
-        if np <= 0: np = 1
+    def getResources(self, np):
+        ""
+        np = max( 1, np )
 
         procs = self.procpool.get( np )
 
@@ -161,7 +155,7 @@ class Platform:
 
         return job_info
 
-    def giveProcs(self, job_info):
+    def returnResources(self, job_info):
         """
         """
         self.procpool.put( job_info.procs )
@@ -206,10 +200,16 @@ class ResourcePool:
         self.idx = 0
         self.pool = []
 
-    def available(self, num):
+    def numAvailable(self):
+        ""
+        n = len( self.pool )
+        n += ( self.total - self.idx )
+        return n
+
+    def isAvailable(self, num):
         ""
         num = max( num, 1 )
-        avail = self._get_num_available()
+        avail = self.numAvailable()
         return num <= avail
 
     def get(self, num):
@@ -240,12 +240,6 @@ class ResourcePool:
                 pset.add( i )
                 self.pool.append( i )
         self.pool.sort()
-
-    def _get_num_available(self):
-        ""
-        n = len( self.pool )
-        n += ( self.total - self.idx )
-        return n
 
 
 def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,

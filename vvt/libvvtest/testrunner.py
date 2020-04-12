@@ -229,7 +229,7 @@ class ExecutionHandler:
 
         self.check_run_postclean()
 
-        self.platform.giveProcs( self.tcase.getExec().getResourceObject() )
+        self.platform.returnResources( self.tcase.getExec().getResourceObject() )
 
     def make_execute_command(self, baseline, pyexe):
         ""

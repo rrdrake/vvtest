@@ -216,7 +216,7 @@ class resource_pooling( vtu.vvtestTestCase ):
         ""
         pool = vvplatform.ResourcePool( 10 )
 
-        assert pool.available( 3 )
+        assert pool.isAvailable( 3 )
         idxL = pool.get( 3 )
         idxL.sort()
         assert idxL == [0,1,2]
@@ -225,17 +225,17 @@ class resource_pooling( vtu.vvtestTestCase ):
         ""
         pool = vvplatform.ResourcePool( 10 )
 
-        assert pool.available( 5 )
+        assert pool.isAvailable( 5 )
         pool.get( 5 )
-        assert pool.available( 4 )
-        assert pool.available( 5 )
-        assert not pool.available( 6 )
+        assert pool.isAvailable( 4 )
+        assert pool.isAvailable( 5 )
+        assert not pool.isAvailable( 6 )
         pool.get( 4 )
-        assert pool.available( 1 )
-        assert not pool.available( 2 )
+        assert pool.isAvailable( 1 )
+        assert not pool.isAvailable( 2 )
         pool.get( 1 )
-        assert not pool.available( 0 )
-        assert not pool.available( 1 )
+        assert not pool.isAvailable( 0 )
+        assert not pool.isAvailable( 1 )
 
     def test_get_then_put_resources(self):
         ""
@@ -245,7 +245,7 @@ class resource_pooling( vtu.vvtestTestCase ):
         L2 = pool.get( 5 )
         assert_no_overlap( L1, L2 )
         pool.put( L1 )
-        assert pool.available( 5 )
+        assert pool.isAvailable( 5 )
         L3 = pool.get(5)
         assert_no_overlap( L2, L3 )
 
@@ -255,25 +255,25 @@ class resource_pooling( vtu.vvtestTestCase ):
 
         L1 = pool.get( 1 )
         L2 = pool.get( 1 )
-        assert not pool.available( 1 )
+        assert not pool.isAvailable( 1 )
         pool.put( L2 )
         pool.put( L1 )
-        assert pool.available( 1 )
-        assert pool.available( 2 )
-        assert not pool.available( 3 )
+        assert pool.isAvailable( 1 )
+        assert pool.isAvailable( 2 )
+        assert not pool.isAvailable( 3 )
 
     def test_oversubscribing_the_pool(self):
         ""
         pool = vvplatform.ResourcePool( 10 )
 
-        assert not pool.available( 11 )
+        assert not pool.isAvailable( 11 )
         L1 = pool.get( 11 )
         assert len( L1 ) == 11
         assert len( set(L1) ) == 10
 
         pool.put( L1 )
-        assert pool.available( 10 )
-        assert not pool.available( 11 )
+        assert pool.isAvailable( 10 )
+        assert not pool.isAvailable( 11 )
         L1 = pool.get( 5 )
         L2 = pool.get( 5 )
         assert_no_overlap( L1, L2 )
