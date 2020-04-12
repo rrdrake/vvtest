@@ -183,21 +183,9 @@ class TestExecList:
 
     def _pop_next_test(self, platform=None):
         ""
-        if platform == None:
-            def testok( tcase ):
-                return tcase.getBlockingDependency() == None
-            tcase = self.backlog.pop( constraint=testok )
-        else:
-            avail = platform.maxAvailableSize()
-            def testok( tcase ):
-                np = tcase.getSpec().getParameters().get('np',0)
-                npval = max( int(np), 1 )
-                block = tcase.getBlockingDependency()
-                return npval <= avail and block == None
-            # magic: send avail down into pop for efficiency
-            #        - in fact, using max_size means the testok() function
-            #          is not needed
-            tcase = self.backlog.pop( constraint=testok )
+        constraint = TestConstraint( platform )
+
+        tcase = self.backlog.pop( constraint )
 
         if tcase != None:
             self.waiting[ tcase.getSpec().getID() ] = tcase
@@ -205,23 +193,43 @@ class TestExecList:
         return tcase
 
 
+class TestConstraint:
+
+    def __init__(self, platform):
+        ""
+        if platform == None:
+            self.maxnp = None
+        else:
+            self.maxnp = platform.maxAvailableSize()
+
+    def getMaxNP(self):
+        ""
+        return self.maxnp
+
+    def apply(self, tcase):
+        ""
+        if self.maxnp != None:
+            np = tcase.getSpec().getParameters().get('np',0)
+            npval = max( int(np), 1 )
+            if npval > self.maxnp:
+                return False
+
+        if tcase.getBlockingDependency() != None:
+            return False
+
+        return True
+
+
 class TestBacklog:
     """
-    be able to iterate by largest np first then largest runtime/timeout
-    be able to pop a test that fits the criteria
+    Stores a list of TestCase objects.  They can be sorted either by
 
-    advantage of storing by np is that in a search for a test that will
-    fit, all tests with a larger np can be skipped right over
+        ( num procs, runtime )
+    or
+        ( num procs, timeout ).
 
-    but how would that work with (np,ndevice) ??
-        - maybe skip np but have to iterate for ndevice
-
-    needs:
-        - iterate the list, determine if the test can be accepted, if so then
-          pop it off the backlog and place into 'waiting'
-        - the order of iteration matters for efficiency
-            - batch prefers alignment with size (with timeout secondary)
-            - pooled prefers large runtimes first (with constraint on size)
+    The former is used for pooled execution, while the later for collecting
+    groups of tests for batching.
     """
 
     def __init__(self):
@@ -241,6 +249,7 @@ class TestBacklog:
         if secondary == 'runtime':
             self.testcmp = TestCaseCompare( make_runtime_key )
         else:
+            assert secondary == 'timeout'
             self.testcmp = TestCaseCompare( make_timeout_key )
 
         if sys.version_info[0] < 3:
@@ -248,17 +257,17 @@ class TestBacklog:
         else:
             self.tests.sort( key=self.testcmp.getKey, reverse=True )
 
-    def getStartingIndex(self, max_size=None):
-        ""
-        return 0
-
-    def pop(self, max_size=None, constraint=None):
+    def pop(self, constraint=None):
         ""
         tcase = None
 
-        idx = self.getStartingIndex( max_size )
+        if constraint:
+            idx = self._get_starting_index( constraint.getMaxNP() )
+        else:
+            idx = 0
+
         while idx < len( self.tests ):
-            if constraint == None or constraint( self.tests[idx] ):
+            if constraint == None or constraint.apply( self.tests[idx] ):
                 tcase = self.tests.pop( idx )
                 break
             idx += 1
@@ -276,6 +285,13 @@ class TestBacklog:
         for tcase in self.tests:
             yield tcase
 
+    def _get_starting_index(self, max_np):
+        ""
+        if max_np == None:
+            return 0
+        else:
+            return bisect_left( self.tests, max_np )
+
 
 def make_runtime_key( tcase ):
     ""
@@ -290,6 +306,11 @@ def make_timeout_key( tcase ):
 
 
 class TestCaseCompare:
+    """
+    This class is a convenience for supporting Python 2 and 3 sorting.
+    Python 2 needs the compare function.  Python 3 just needs a "get key"
+    function, which could easily be done without this class.
+    """
 
     def __init__(self, make_key):
         ""
@@ -308,47 +329,26 @@ class TestCaseCompare:
         return self.kfunc( x )
 
 
-
-
-
-
-def bisect_right( a, x, less_than ):
+def bisect_left( tests, np ):
     ""
     lo = 0
-    hi = len(a)
+    hi = len(tests)
     while lo < hi:
         mid = (lo+hi)//2
-        if less_than( x, a[mid] ): hi = mid
-        else: lo = mid+1
+        npmid = int( tests[mid].getSpec().getParameters().get('np',0) )
+        if np < npmid: lo = mid+1
+        else: hi = mid
     return lo
 
-
-def less_than_using_np_and_runtime( x, y ):
-    ""
-    return [ int( x.getSpec().getParameters().get( 'np', 0 ) ),
-             x.getStat().getRuntime( 0 ) ] \
-           < \
-           [ int( y.getSpec().getParameters().get( 'np', 0 ) ),
-             y.getStat().getRuntime( 0 ) ]
-
-
-def less_than_using_np_and_timeout( x, y ):
-    ""
-    tspec1 = x.getSpec()
-    tspec2 = y.getSpec()
-    return [ int( tspec1.getParameters().get( 'np', 0 ) ),
-             tspec1.getAttr( 'timeout' ) ] \
-           < \
-           [ int( tspec2.getParameters().get( 'np', 0 ) ),
-             tspec2.getAttr( 'timeout' ) ]
-
-
-def insort_right( a, x, less_than ):
-    ""
-    lo = 0
-    hi = len(a)
-    while lo < hi:
-        mid = (lo+hi)//2
-        if less_than( x, a[mid] ): hi = mid
-        else: lo = mid+1
-    a.insert(lo, x)
+# To insert into the sorted test list, a specialization of insort_right is
+# needed.  The comparison is based on np, and the list is in descending order.
+# This function is just the python implementation of bisect.insort_right().
+# def insort_right( a, x, less_than ):
+#     ""
+#     lo = 0
+#     hi = len(a)
+#     while lo < hi:
+#         mid = (lo+hi)//2
+#         if less_than( x, a[mid] ): hi = mid
+#         else: lo = mid+1
+#     a.insert(lo, x)
