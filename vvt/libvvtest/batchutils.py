@@ -148,9 +148,9 @@ class Batcher:
         bdir = self.namer.getBatchDir( batchid )
         tlist = make_batch_TestList( bdir, batchid, self.suffix, testL )
 
-        maxnp = compute_max_np( tlist )
+        maxsize = compute_max_size( tlist )
 
-        bjob.setMaxNP( maxnp )
+        bjob.setMaxSize( maxsize )
         bjob.setAttr( 'testlist', tlist )
 
     def _start_job(self, bjob):
@@ -319,9 +319,9 @@ class BatchTestGrouper:
         while True:
             tcase = self.xlist.getNextTest()
             if tcase != None:
-                np = int( tcase.getSpec().getParameters().get('np', 0) )
+                size = tcase.getSize()
                 tm = tcase.getSpec().getAttr('timeout')
-                self._add_test_case( np, tm, tcase )
+                self._add_test_case( size, tm, tcase )
             else:
                 break
 
@@ -330,8 +330,9 @@ class BatchTestGrouper:
 
         return self.batches
 
-    def _add_test_case(self, np, timeval, tcase):
+    def _add_test_case(self, size, timeval, tcase):
         ""
+        np,nd = size
         tspec = tcase.getSpec()
 
         if tcase.numDependencies() > 0:
@@ -399,16 +400,14 @@ def make_batch_TestList( batchdir, batchid, suffix, qlist ):
     return tl
 
 
-def compute_max_np( tlist ):
+def compute_max_size( tlist ):
     ""
-    maxnp = 0
+    maxsize = (0,0)
     for tcase in tlist.getTests():
-        tspec = tcase.getSpec()
-        np = int( tspec.getParameters().get('np', 0) )
-        if np <= 0: np = 1
-        maxnp = max( maxnp, np )
+        np,nd = tcase.getSize()
+        maxsize = ( max( np, maxsize[0] ), max( nd, maxsize[1] ) )
 
-    return maxnp
+    return maxsize
 
 
 def apply_queue_timeout_bump_factor( qtime ):

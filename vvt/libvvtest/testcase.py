@@ -34,6 +34,13 @@ class TestCase:
         ""
         self.texec = texec
 
+    def getSize(self):
+        ""
+        tspec = self.getSpec()
+        np = max( 1, int( tspec.getParameters().get( 'np', 1 ) ) )
+        nd = max( 0, int( tspec.getParameters().get( 'ndevice', 0 ) ) )
+        return np,nd
+
     def setHasDependent(self):
         ""
         self.has_dependent = True

@@ -262,15 +262,10 @@ def start_test( xlist, tcase, platform, is_baseline=False ):
     ""
     xlist.moveToStarted( tcase )
 
-    tspec = tcase.getSpec()
+    obj = platform.getResources( tcase.getSize() )
+
     texec = tcase.getExec()
-
-    np = int( tspec.getParameters().get('np', 0) )
-    nd = tspec.getParameters().get( 'ndevice', None )
-
-    obj = platform.getResources( np, nd )
     texec.setResourceObject( obj )
-
     texec.start( is_baseline )
 
     tcase.getStat().markStarted( texec.getStartTime() )

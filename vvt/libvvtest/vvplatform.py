@@ -150,9 +150,11 @@ class Platform:
         else:
             return ( sznp, self.devicepool.numAvailable() )
 
-    def getResources(self, np, ndevice):
+    def getResources(self, size):
         ""
-        procs = self.procpool.get( max( 1, np ) )
+        np,ndevice = size
+
+        procs = self.procpool.get( np )
 
         if self.devicepool == None or ndevice == None:
             devices = None

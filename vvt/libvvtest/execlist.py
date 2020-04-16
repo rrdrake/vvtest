@@ -194,16 +194,10 @@ class TestConstraint:
         ""
         if self.maxsize != None:
 
-            maxnp = self.maxsize[0]
-            np = tcase.getSpec().getParameters().get('np',0)
-            npval = max( int(np), 1 )
-            if npval > maxnp:
-                return False
+            np,nd = tcase.getSize()
+            maxnp,maxnd = self.maxsize
 
-            maxdevice = self.maxsize[1]
-            ndev = tcase.getSpec().getParameters().get('ndevice',0)
-            ndev = max( int(ndev), 0 )
-            if ndev > maxdevice:
+            if np > maxnp or nd > maxnd:
                 return False
 
         if tcase.getBlockingDependency() != None:
@@ -287,14 +281,11 @@ class TestBacklog:
 
 def make_runtime_key( tcase ):
     ""
-    return [ int( tcase.getSpec().getParameters().get( 'np', 0 ) ),
-             tcase.getStat().getRuntime( 0 ) ]
+    return [ tcase.getSize()[0], tcase.getStat().getRuntime( 0 ) ]
 
 def make_timeout_key( tcase ):
     ""
-    ts = tcase.getSpec()
-    return [ int( ts.getParameters().get( 'np', 0 ) ),
-             ts.getAttr( 'timeout' ) ]
+    return [ tcase.getSize()[0], tcase.getSpec().getAttr( 'timeout' ) ]
 
 
 class TestCaseCompare:
@@ -327,8 +318,7 @@ def bisect_left( tests, np ):
     hi = len(tests)
     while lo < hi:
         mid = (lo+hi)//2
-        npmid = int( tests[mid].getSpec().getParameters().get('np',0) )
-        if np < npmid: lo = mid+1
+        if np < tests[mid].getSize()[0]: lo = mid+1
         else: hi = mid
     return lo
 

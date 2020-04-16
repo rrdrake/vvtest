@@ -20,7 +20,7 @@ class BatchJob:
 
         self.jobscript = None
         self.outfile = None
-        self.maxnp = None
+        self.maxsize = None
         self.jobid = None
         self.wrkdir = None
 
@@ -33,7 +33,7 @@ class BatchJob:
         self.attrs = {}
 
     def getBatchID(self): return self.batchid
-    def getMaxNP(self): return self.maxnp
+    def getMaxSize(self): return self.maxsize
 
     def getJobScriptName(self): return self.jobscript
 
@@ -72,9 +72,9 @@ class BatchJob:
         ""
         self.wrkdir = dirpath
 
-    def setMaxNP(self, maxnp):
+    def setMaxSize(self, maxsize):
         ""
-        self.maxnp = maxnp
+        self.maxsize = maxsize
 
     def setJobID(self, jobid):
         ""
@@ -166,9 +166,11 @@ class BatchQueueInterface:
 
         return self.batch
 
-    def writeJobScript(self, np, queue_time, workdir, qout_file,
+    def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):
         ""
+        np,nd = size
+
         qt = self.attrs.get( 'walltime', queue_time )
 
         hdr = '#!/bin/csh -f\n' + \
@@ -266,8 +268,8 @@ class BatchJobHandler:
 
         fn = batchjob.getJobScriptName()
 
-        maxnp = batchjob.getMaxNP()
-        self.batchitf.writeJobScript( maxnp, qtime, wrkdir, pout, fn, cmd )
+        maxsize = batchjob.getMaxSize()
+        self.batchitf.writeJobScript( maxsize, qtime, wrkdir, pout, fn, cmd )
 
         return fn
 

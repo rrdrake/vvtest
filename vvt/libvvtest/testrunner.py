@@ -301,7 +301,7 @@ class ExecutionHandler:
 
             # note that this writes a different sequence if the test is an
             # analyze test
-            cshScriptWriter.writeScript( tspec,
+            cshScriptWriter.writeScript( self.tcase,
                                          self.commondb,
                                          self.platform,
                                          self.rtconfig.getAttr('vvtestdir'),
