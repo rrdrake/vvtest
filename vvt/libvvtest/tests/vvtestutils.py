@@ -748,9 +748,9 @@ def make_TestCase_list( timespec='runtime' ):
     return tests
 
 
-def make_fake_TestExecList_with_timeouts():
+def make_fake_TestExecList( timespec='runtime' ):
     ""
-    tests = make_TestCase_list( timespec='timeout' )
+    tests = make_TestCase_list( timespec=timespec )
 
     tlist = TestList()
     for tcase in tests:

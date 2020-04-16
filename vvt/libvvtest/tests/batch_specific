@@ -25,7 +25,7 @@ class batching_unit_tests( vtu.vvtestTestCase ):
 
     def test_batch_grouping_is_by_np_and_timeout(self):
         ""
-        tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
+        tlist, xlist = vtu.make_fake_TestExecList( timespec='timeout' )
         gpr = batchutils.BatchTestGrouper( xlist, None, None )
         gpr.construct()
 
@@ -38,7 +38,7 @@ class batching_unit_tests( vtu.vvtestTestCase ):
 
     def test_limit_batch_size_by_time(self):
         ""
-        tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
+        tlist, xlist = vtu.make_fake_TestExecList( timespec='timeout' )
         gpr = batchutils.BatchTestGrouper( xlist, 5, None )
         gpr.construct()
 

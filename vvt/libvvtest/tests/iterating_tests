@@ -26,13 +26,7 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
 
     def test_skipping_ahead_in_backlog_list_by_max_procs(self):
         ""
-        tests = vtu.make_TestCase_list()
-
-        back = execlist.TestBacklog()
-        for tcase in tests:
-            back.insert( tcase )
-
-        back.sort()
+        back = make_test_backlog_object()
 
         assert back._get_starting_index(None) == 0
         assert back._get_starting_index(3) == 0
@@ -42,13 +36,7 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
 
     def test_iterate_backlog_by_size_and_runtime(self):
         ""
-        tests = vtu.make_TestCase_list()
-
-        back = execlist.TestBacklog()
-        for tcase in tests:
-            back.insert( tcase )
-
-        back.sort()
+        back = make_test_backlog_object()
 
         tL = []
         for tcase in back.iterate():
@@ -62,13 +50,7 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
 
     def test_consuming_the_backlog_by_size_and_runtime(self):
         ""
-        tests = vtu.make_TestCase_list()
-
-        back = execlist.TestBacklog()
-        for tcase in tests:
-            back.insert( tcase )
-
-        back.sort()
+        back = make_test_backlog_object()
 
         class MyConstraint:
             def __init__(self, maxnp):
@@ -98,13 +80,7 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
 
     def test_iterate_backlog_by_size_and_timeout(self):
         ""
-        tests = vtu.make_TestCase_list( timespec='timeout' )
-
-        back = execlist.TestBacklog()
-        for tcase in tests:
-            back.insert( tcase )
-
-        back.sort( secondary='timeout' )
+        back = make_test_backlog_object( timespec='timeout' )
 
         tL = []
         for tcase in back.consume():
@@ -116,9 +92,34 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
                        [ 'sdir/atest1.np=1', 1, 21 ],
                        [ 'sdir/atest0.np=1', 1, 11 ] ]
 
+    def test_iterate_TestExecList_by_size_and_constraint(self):
+        ""
+        tlist, xlist = vtu.make_fake_TestExecList( timespec='runtime' )
+        tlist.initializeResultsFile()
+
+        xlist._sort_by_size_and_runtime()
+
+        tcase1 = xlist.popNext( (1,0) )
+        assert tcase1.getStat().getRuntime() == 21
+        xlist.moveToStarted( tcase1 )
+
+        tcase2 = xlist.popNext( (1,0) )
+        assert tcase2.getStat().getRuntime() == 11
+        xlist.moveToStarted( tcase2 )
+
+        assert xlist.popNext( (1,0) ) == None
+
+        xlist.testDone( tcase1 )
+        assert xlist.popNext( (1,0) ) == None
+        xlist.testDone( tcase2 )
+
+        tcase3 = xlist.popNext( (1,0) )
+        xlist.moveToStarted( tcase3 )
+        assert tcase3.getStat().getRuntime() == 22
+
     def test_iterate_TestExecList_by_size_and_timeout(self):
         ""
-        tlist, xlist = vtu.make_fake_TestExecList_with_timeouts()
+        tlist, xlist = vtu.make_fake_TestExecList( timespec='timeout' )
 
         xlist.sortBySizeAndTimeout()
 
@@ -148,6 +149,19 @@ def timeout_tuple( tcase ):
     return [ tcase.getSpec().getDisplayString(),
              int( tcase.getSpec().getParameterValue('np') ),
              tcase.getSpec().getAttr('timeout') ]
+
+
+def make_test_backlog_object( timespec='runtime' ):
+    ""
+    tests = vtu.make_TestCase_list( timespec=timespec )
+
+    back = execlist.TestBacklog()
+    for tcase in tests:
+        back.insert( tcase )
+
+    back.sort( secondary=timespec )
+
+    return back
 
 
 ############################################################################

@@ -59,7 +59,7 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, baseline=0):
+    def start(self, is_baseline=False):
         """
         Launches the child process.
         """
@@ -73,7 +73,7 @@ class TestExec:
         self.pid = os_fork_with_retry( 10 )
         if self.pid == 0:
             # child process is the test itself
-            self._prepare_and_execute_test( baseline )
+            self._prepare_and_execute_test( is_baseline )
 
     def getStartTime(self):
         ""
@@ -141,12 +141,12 @@ class TestExec:
             time.sleep(5)
             self.poll()
 
-    def _prepare_and_execute_test(self, baseline):
+    def _prepare_and_execute_test(self, is_baseline):
         ""
         try:
             os.chdir( self.rundir )
 
-            cmd_list = self.handler.prepare_for_launch( baseline )
+            cmd_list = self.handler.prepare_for_launch( is_baseline )
 
             sys.stdout.flush() ; sys.stderr.flush()
 

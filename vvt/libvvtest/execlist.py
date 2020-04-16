@@ -34,7 +34,7 @@ class TestExecList:
         for tcase in self.backlog.iterate():
             self.runner.initialize_for_execution( tcase )
 
-    def popNext(self, platform):
+    def popNext(self, maxsize):
         """
         Finds a test to execute.  Returns a TestExec object, or None if no
         test can run.  In this case, one of the following is true
@@ -46,10 +46,10 @@ class TestExecList:
         In the latter case, numRunning() will be zero.
         """
         # find longest runtime test with size constraint
-        tcase = self._pop_next_test( platform )
+        tcase = self._pop_next_test( maxsize )
         if tcase == None and len(self.started) == 0:
             # find longest runtime test without size constraint
-            tcase = self._pop_next_test()
+            tcase = self._pop_next_test( None )
 
         return tcase
 
@@ -58,23 +58,6 @@ class TestExecList:
         for tcase in self.backlog.consume():
             self.waiting[ tcase.getSpec().getID() ] = tcase
             yield tcase
-
-    def startTest(self, tcase, platform, baseline=0):
-        ""
-        self.moveToStarted( tcase )
-
-        tspec = tcase.getSpec()
-        texec = tcase.getExec()
-
-        np = int( tspec.getParameters().get('np', 0) )
-        nd = tspec.getParameters().get( 'ndevice', None )
-
-        obj = platform.getResources( np, nd )
-        texec.setResourceObject( obj )
-
-        texec.start( baseline )
-
-        tcase.getStat().markStarted( texec.getStartTime() )
 
     def moveToStarted(self, tcase):
         ""
@@ -182,9 +165,9 @@ class TestExecList:
 
             depend.check_connect_dependencies( tcase, tmap )
 
-    def _pop_next_test(self, platform=None):
+    def _pop_next_test(self, maxsize):
         ""
-        constraint = TestConstraint( platform )
+        constraint = TestConstraint( maxsize )
 
         tcase = self.backlog.pop( constraint )
 
@@ -196,12 +179,9 @@ class TestExecList:
 
 class TestConstraint:
 
-    def __init__(self, platform):
+    def __init__(self, maxsize):
         ""
-        if platform == None:
-            self.maxsize = None
-        else:
-            self.maxsize = platform.sizeAvailable()
+        self.maxsize = maxsize
 
     def getMaxNP(self):
         ""
@@ -240,7 +220,7 @@ class TestBacklog:
     or
         ( num procs, timeout ).
 
-    The former is used for pooled execution, while the later for collecting
+    The former is used for pooled execution, while the latter for collecting
     groups of tests for batching.
     """
 
@@ -354,7 +334,8 @@ def bisect_left( tests, np ):
 
 # To insert into the sorted test list, a specialization of insort_right is
 # needed.  The comparison is based on np, and the list is in descending order.
-# This function is just the python implementation of bisect.insort_right().
+# This function is just the python implementation of bisect.insort_right()
+# and would need to be modified to work for this use case.
 # def insort_right( a, x, less_than ):
 #     ""
 #     lo = 0

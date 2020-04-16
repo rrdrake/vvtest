@@ -162,13 +162,13 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
 
         while True:
 
-            tnext = xlist.popNext( plat )
+            tnext = xlist.popNext( plat.sizeAvailable() )
 
             if tnext != None:
                 tspec = tnext.getSpec()
                 texec = tnext.getExec()
                 print3( 'Starting:', exec_path( tspec, test_dir ) )
-                xlist.startTest( tnext, plat )
+                start_test( xlist, tnext, plat )
                 tlist.appendTestResult( tnext )
 
             elif xlist.numRunning() == 0:
@@ -234,7 +234,7 @@ def run_baseline( xlist, plat ):
 
         sys.stdout.write( "baselining "+xdir+"..." )
 
-        xlist.startTest( tcase, plat, baseline=1 )
+        start_test( xlist, tcase, plat, is_baseline=True )
 
         tm = int( os.environ.get( 'VVTEST_BASELINE_TIMEOUT', 30 ) )
         for i in range(tm):
@@ -256,6 +256,24 @@ def run_baseline( xlist, plat ):
 
     if failures:
         print3( "\n\n !!!!!!!!!!!  THERE WERE FAILURES  !!!!!!!!!! \n\n" )
+
+
+def start_test( xlist, tcase, platform, is_baseline=False ):
+    ""
+    xlist.moveToStarted( tcase )
+
+    tspec = tcase.getSpec()
+    texec = tcase.getExec()
+
+    np = int( tspec.getParameters().get('np', 0) )
+    nd = tspec.getParameters().get( 'ndevice', None )
+
+    obj = platform.getResources( np, nd )
+    texec.setResourceObject( obj )
+
+    texec.start( is_baseline )
+
+    tcase.getStat().markStarted( texec.getStartTime() )
 
 
 def print3( *args ):

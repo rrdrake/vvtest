@@ -21,7 +21,7 @@ from testutils import print3
 
 class device_tests( vtu.vvtestTestCase ):
 
-    def test_run_a_test_with_two_devices(self):
+    def test_run_a_test_using_two_devices(self):
         ""
         util.writefile( 'config/idplatform.py', """
             def platform( opts ):
