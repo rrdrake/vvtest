@@ -125,7 +125,7 @@ def make_fake_TestExecList():
 
     # mark the tests as running
     for tcase in xlist.consumeBacklog():
-        xlist.moveToStarted( tcase )
+        pass
 
     return tlist, xlist
 

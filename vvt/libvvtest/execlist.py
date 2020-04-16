@@ -51,20 +51,17 @@ class TestExecList:
             # find longest runtime test without size constraint
             tcase = self._pop_next_test( None )
 
+        if tcase != None:
+            self._move_to_started( tcase )
+
         return tcase
 
     def consumeBacklog(self):
         ""
         for tcase in self.backlog.consume():
             self.waiting[ tcase.getSpec().getID() ] = tcase
+            self._move_to_started( tcase )
             yield tcase
-
-    def moveToStarted(self, tcase):
-        ""
-        tid = tcase.getSpec().getID()
-
-        self.waiting.pop( tid )
-        self.started[ tid ] = tcase
 
     def popRemaining(self):
         """
@@ -134,6 +131,13 @@ class TestExecList:
             self.waiting[ tcase.getSpec().getID() ] = tcase
 
         return tcase
+
+    def _move_to_started(self, tcase):
+        ""
+        tid = tcase.getSpec().getID()
+
+        self.waiting.pop( tid )
+        self.started[ tid ] = tcase
 
     def _generate_backlog_from_testlist(self):
         ""

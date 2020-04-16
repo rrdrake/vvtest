@@ -43,10 +43,10 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
             tL.append( runtime_tuple(tcase) )
             print3( tL[-1] )
 
-        assert tL == [ ['sdir/atest1.np=2', 2, 22],
-                       ['sdir/atest0.np=2', 2, 12],
-                       ['sdir/atest1.np=1', 1, 21],
-                       ['sdir/atest0.np=1', 1, 11] ]
+        assert tL == [ ['sdir/atest1.np=2', (2,0), 22],
+                       ['sdir/atest0.np=2', (2,0), 12],
+                       ['sdir/atest1.np=1', (1,0), 21],
+                       ['sdir/atest0.np=1', (1,0), 11] ]
 
     def test_consuming_the_backlog_by_size_and_runtime(self):
         ""
@@ -63,20 +63,20 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
         tcase = back.pop( MyConstraint(4) )
 
         print3( runtime_tuple(tcase) )
-        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=2', 2, 12 ]
+        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=2', (2,0), 12 ]
 
         tcase = back.pop( MyConstraint(1) )
 
         print3( runtime_tuple(tcase) )
-        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=1', 1, 11 ]
+        assert runtime_tuple(tcase) == [ 'sdir/atest0.np=1', (1,0), 11 ]
 
         tL = []
         for tcase in back.consume():
             tL.append( runtime_tuple(tcase) )
             print3( tL[-1] )
 
-        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
-                       [ 'sdir/atest1.np=1', 1, 21 ] ]
+        assert tL == [ [ 'sdir/atest1.np=2', (2,0), 22 ],
+                       [ 'sdir/atest1.np=1', (1,0), 21 ] ]
 
     def test_iterate_backlog_by_size_and_timeout(self):
         ""
@@ -87,10 +87,10 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
             tL.append( timeout_tuple(tcase) )
             print3( tL[-1] )
 
-        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
-                       [ 'sdir/atest0.np=2', 2, 12 ],
-                       [ 'sdir/atest1.np=1', 1, 21 ],
-                       [ 'sdir/atest0.np=1', 1, 11 ] ]
+        assert tL == [ [ 'sdir/atest1.np=2', (2,0), 22 ],
+                       [ 'sdir/atest0.np=2', (2,0), 12 ],
+                       [ 'sdir/atest1.np=1', (1,0), 21 ],
+                       [ 'sdir/atest0.np=1', (1,0), 11 ] ]
 
     def test_iterate_TestExecList_by_size_and_constraint(self):
         ""
@@ -101,11 +101,9 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
 
         tcase1 = xlist.popNext( (1,0) )
         assert tcase1.getStat().getRuntime() == 21
-        xlist.moveToStarted( tcase1 )
 
         tcase2 = xlist.popNext( (1,0) )
         assert tcase2.getStat().getRuntime() == 11
-        xlist.moveToStarted( tcase2 )
 
         assert xlist.popNext( (1,0) ) == None
 
@@ -114,7 +112,6 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
         xlist.testDone( tcase2 )
 
         tcase3 = xlist.popNext( (1,0) )
-        xlist.moveToStarted( tcase3 )
         assert tcase3.getStat().getRuntime() == 22
 
     def test_iterate_TestExecList_by_size_and_timeout(self):
@@ -128,26 +125,99 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
             tcase = xlist.getNextTest()
             if tcase:
                 tL.append( timeout_tuple(tcase) )
-                xlist.moveToStarted( tcase )
+                # this checks that the test is "waiting"
+                xlist._move_to_started( tcase )
             else:
                 break
 
-        assert tL == [ [ 'sdir/atest1.np=2', 2, 22 ],
-                       [ 'sdir/atest0.np=2', 2, 12 ],
-                       [ 'sdir/atest1.np=1', 1, 21 ],
-                       [ 'sdir/atest0.np=1', 1, 11 ] ]
+        assert tL == [ [ 'sdir/atest1.np=2', (2,0), 22 ],
+                       [ 'sdir/atest0.np=2', (2,0), 12 ],
+                       [ 'sdir/atest1.np=1', (1,0), 21 ],
+                       [ 'sdir/atest0.np=1', (1,0), 11 ] ]
+
+    def test_iteration_order_is_by_num_procs_even_with_num_devices_present(self):
+        ""
+        write_np_and_ndevice_tests()
+        time.sleep(1)
+
+        tlist,xlist = prepare_TestExecList()
+
+        tL = []
+        for tcase in xlist.consumeBacklog():
+            tL.append( runtime_tuple(tcase) )
+            print3( tL[-1] )
+
+        assert tL[:3] == [ ['testB.ndevice=4.np=4', (4, 4), None],
+                           ['testC.np=3', (3, 0), None],
+                           ['testB.ndevice=2.np=2', (2, 2), None] ]
+        # with same np and same runtime, the order is not guaranteed
+        tL2 = tL[3:]
+        tL2.sort()
+        assert tL2 == [ ['testA.ndevice=0', (1, 0), None],
+                        ['testA.ndevice=2', (1, 2), None],
+                        ['testA.ndevice=4', (1, 4), None] ]
+
+    def test_iteration_with_num_devices_constraint(self):
+        ""
+        write_np_and_ndevice_tests()
+        time.sleep(1)
+
+        tlist,xlist = prepare_TestExecList()
+
+        tL = []
+
+        tcase = xlist.popNext( (4,2) )
+        tL.append( runtime_tuple(tcase) )
+
+        tcase = xlist.popNext( (1,2) )
+        tL.append( runtime_tuple(tcase) )
+
+        tcase = xlist.popNext( (1,2) )
+        tL.append( runtime_tuple(tcase) )
+
+        assert xlist.popNext( (1,2) ) == None
+
+        assert tL[0] == ['testC.np=3', (3, 0), None]
+        # with same np and same runtime, the order is not guaranteed
+        tL2 = tL[1:]
+        tL2.sort()
+        assert tL2 == [ ['testA.ndevice=0', (1, 0), None],
+                        ['testA.ndevice=2', (1, 2), None] ]
+
+
+def write_np_and_ndevice_tests():
+    ""
+    util.writefile( 'testA.vvt', """
+        #VVT: parameterize : ndevice = 0 2 4
+        """ )
+    util.writefile( 'testB.vvt', """
+        #VVT: parameterize : np,ndevice = 2,2 4,4
+        """ )
+    util.writefile( 'testC.vvt', """
+        #VVT: parameterize : np = 3
+        """ )
+
+
+def prepare_TestExecList():
+    ""
+    tlist,xlist = vtu.scan_to_make_TestExecList( '.' )
+    xlist = TestExecList( tlist, None )
+    xlist._generate_backlog_from_testlist()
+    xlist._sort_by_size_and_runtime()
+
+    return tlist, xlist
 
 
 def runtime_tuple( tcase ):
     ""
     return [ tcase.getSpec().getDisplayString(),
-             int( tcase.getSpec().getParameterValue('np') ),
-             tcase.getStat().getRuntime() ]
+             tcase.getSize(),
+             tcase.getStat().getRuntime( None ) ]
 
 def timeout_tuple( tcase ):
     ""
     return [ tcase.getSpec().getDisplayString(),
-             int( tcase.getSpec().getParameterValue('np') ),
+             tcase.getSize(),
              tcase.getSpec().getAttr('timeout') ]
 
 

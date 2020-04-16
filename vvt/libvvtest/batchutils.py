@@ -325,7 +325,7 @@ class BatchTestGrouper:
             else:
                 break
 
-        if self.group != None:
+        if self.group != None and not self.group.empty():
             self.batches.append( self.group )
 
         return self.batches
@@ -345,16 +345,15 @@ class BatchTestGrouper:
 
         else:
             self._check_start_new_group( np, timeval )
-            if self.group == None:
-                self.group = BatchGroup( np )
             self.group.appendTest( tcase, timeval )
 
     def _check_start_new_group(self, np, timeval):
         ""
-        if self.group != None:
-            if self.group.needNewGroup( np, timeval, self.qlen ):
-                self.batches.append( self.group )
-                self.group = None
+        if self.group == None:
+            self.group = BatchGroup( np )
+        elif self.group.needNewGroup( np, timeval, self.qlen ):
+            self.batches.append( self.group )
+            self.group = BatchGroup( np )
 
 
 class BatchGroup:
@@ -374,6 +373,10 @@ class BatchGroup:
         ""
         self.tests.append( tcase )
         self.tsum += timeval
+
+    def empty(self):
+        ""
+        return len( self.tests ) == 0
 
     def needNewGroup(self, np, timeval, tlimit):
         ""

@@ -260,8 +260,6 @@ def run_baseline( xlist, plat ):
 
 def start_test( xlist, tcase, platform, is_baseline=False ):
     ""
-    xlist.moveToStarted( tcase )
-
     obj = platform.getResources( tcase.getSize() )
 
     texec = tcase.getExec()
