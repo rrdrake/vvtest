@@ -28,12 +28,7 @@ class BatchLSF:
 
     def header(self, size, qtime, workdir, outfile, plat_attrs):
         ""
-        np,ndevice = size
-
-        if np <= 0: np = 1
-        nnodes = int( np/self.ppn )
-        if (np%self.ppn) != 0:
-            nnodes += 1
+        nnodes = self.computeNumNodes( size )
 
         hdr = '#BSUB -W ' + minutes_of_time(qtime) + '\n' + \
               '#BSUB -nnodes ' + str(nnodes) + '\n' + \
@@ -42,6 +37,31 @@ class BatchLSF:
               'cd ' + workdir + ' || exit 1\n'
 
         return hdr
+
+    def computeNumNodes(self, size):
+        ""
+        np,ndevice = size
+
+        nnode1 = self._num_nodes( np, self.ppn )
+
+        if self.dpn > 0 and ndevice != None:
+            nnode2 = self._num_nodes( ndevice, self.dpn )
+        else:
+            nnode2 = 0
+
+        return max( nnode1, nnode2 )
+
+    def _num_nodes(self, num, numper):
+        ""
+        num = max( 0, num )
+        if num > 0:
+            nnode = int( num/numper )
+            if (num%numper) != 0:
+                nnode += 1
+        else:
+            nnode = 0
+
+        return nnode
 
     def submit(self, fname, workdir, outfile,
                      queue=None, account=None, **kwargs):

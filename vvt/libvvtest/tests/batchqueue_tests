@@ -20,7 +20,7 @@ from testutils import print3
 from libvvtest.batching import BatchQueueInterface
 
 
-class misc_tests( vtu.vvtestTestCase ):
+class general_tests( vtu.vvtestTestCase ):
 
     def test_the_runcmd_function_which_lives_in_its_own_file(self):
         ""
@@ -31,10 +31,18 @@ class misc_tests( vtu.vvtestTestCase ):
         assert x == 0
         assert os.uname()[1] in out.strip()
 
+    def test_queue_type_construction(self):
+        ""
+        for qtype in ['procbatch','craypbs','pbs','slurm','moab','lsf']:
+            bq = BatchQueueInterface()
+            assert not bq.isBatched()
+            bq.setQueueType( qtype, 12 )
+            assert bq.isBatched()
 
-class queue_interface_types( vtu.vvtestTestCase ):
 
-    def test_procbatch_smoke_test(self):
+class procbatch_tests( vtu.vvtestTestCase ):
+
+    def test_smoke_test(self):
         ""
         util.writefile( 'script', """
             echo "running script"
@@ -62,15 +70,41 @@ class queue_interface_types( vtu.vvtestTestCase ):
         assert os.path.exists( 'touch.txt' )
         assert len( util.grepfiles( 'running script', 'out.txt' ) ) == 1
 
-    def test_slurm_smoke_test(self):
+
+class slurm_tests( vtu.vvtestTestCase ):
+
+    save_cmds = []
+
+    def mock_run_command(self, cmdL, changedir=None):
+        ""
+        slurm_tests.save_cmds.append( cmdL )
+
+        if cmdL[0] == 'sbatch':
+            return 0, 'Submitted batch job 291041'
+
+        if cmdL[0] == 'squeue':
+            return 0, """
+15994641 PD
+16004759 PD
+16004368 R
+16001384 R
+16001384 CD
+"""
+
+        if cmdL[0] == 'scancel':
+            return 0, ''
+
+        raise Exception( 'mock failure' )
+
+    def test_smoke_test(self):
         ""
         from libvvtest.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
-        obj.setRunCommand( mock_slurm_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {} )
-        assert 'SBATCH' in hdr
+        assert 'SBATCH' in hdr and 'nodes=1' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
                                         'work_directory',
@@ -82,38 +116,81 @@ class queue_interface_types( vtu.vvtestTestCase ):
         assert stateD[ 16004368 ] == 'running'
         assert stateD[ 16014368 ] == ''
 
-    def test_slurm_qos_test(self):
+    def test_num_nodes_computation(self):
+        ""
+        from libvvtest.slurm import BatchSLURM
+
+        obj = BatchSLURM( 16 )
+        assert obj.computeNumNodes( (1,0) ) == 1
+        assert obj.computeNumNodes( (16,0) ) == 1
+        assert obj.computeNumNodes( (17,0) ) == 2
+        assert obj.computeNumNodes( (31,0) ) == 2
+        assert obj.computeNumNodes( (31,None) ) == 2
+
+        obj = BatchSLURM( 16, devices_per_node=4 )
+        assert obj.computeNumNodes( (4,0) ) == 1
+        assert obj.computeNumNodes( (1,2) ) == 1
+        assert obj.computeNumNodes( (1,4) ) == 1
+        assert obj.computeNumNodes( (32,4) ) == 2
+        assert obj.computeNumNodes( (16,6) ) == 2
+        assert obj.computeNumNodes( (32,6) ) == 2
+        assert obj.computeNumNodes( (31,None) ) == 2
+
+    def test_qos_test(self):
         """
         Make sure the header function can correctly include the --qos tag.
         """
         from libvvtest.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
-        obj.setRunCommand( mock_slurm_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {'QoS': 'long'} )
         print("This is hdr", hdr)
         assert '#SBATCH --qos=long' in hdr
 
-    def test_slurm_cancel_function(self):
+    def test_cancel_function(self):
         ""
         from libvvtest.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
-        obj.setRunCommand( mock_slurm_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         obj.cancel( 123456 )
-        assert int( slurm_cmds[-1][-1] ) == 123456
+        assert int( slurm_tests.save_cmds[-1][-1] ) == 123456
 
-    def test_lsf_smoke_test(self):
+
+class lsf_tests( vtu.vvtestTestCase ):
+
+    save_cmds = []
+
+    def mock_run_command(self, cmdL, changedir=None):
+        ""
+        lsf_tests.save_cmds.append( cmdL )
+
+        if cmdL[0] == 'bsub':
+            return 0, 'Job <68628> is submitted to default queue <normal>.'
+
+        if cmdL[0] == 'bjobs':
+            return 0, """
+68628   PEND
+68728   RUN
+"""
+
+        if cmdL[0] == 'bkill':
+            return 0, ''
+
+        raise Exception( 'mock failure' )
+
+    def test_smoke_test(self):
         ""
         from libvvtest.lsf import BatchLSF
 
         obj = BatchLSF( 44 )
-        obj.setRunCommand( mock_lsf_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {} )
-        assert 'BSUB' in hdr
+        assert 'BSUB' in hdr and 'nnodes 1' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
                                         'work_directory',
@@ -126,22 +203,58 @@ class queue_interface_types( vtu.vvtestTestCase ):
         assert stateD[ 68728 ] == 'running'
         assert stateD[ 38594 ] == ''
 
-    def test_lsf_cancel_function(self):
+    def test_num_nodes_computation(self):
+        ""
+        from libvvtest.lsf import BatchLSF
+
+        obj = BatchLSF( 16 )
+        assert obj.computeNumNodes( (1,0) ) == 1
+        assert obj.computeNumNodes( (16,0) ) == 1
+        assert obj.computeNumNodes( (17,0) ) == 2
+        assert obj.computeNumNodes( (31,0) ) == 2
+        assert obj.computeNumNodes( (31,None) ) == 2
+
+        obj = BatchLSF( 16, devices_per_node=4 )
+        assert obj.computeNumNodes( (4,0) ) == 1
+        assert obj.computeNumNodes( (1,2) ) == 1
+        assert obj.computeNumNodes( (1,4) ) == 1
+        assert obj.computeNumNodes( (32,4) ) == 2
+        assert obj.computeNumNodes( (16,6) ) == 2
+        assert obj.computeNumNodes( (32,6) ) == 2
+        assert obj.computeNumNodes( (31,None) ) == 2
+
+    def test_cancel_function(self):
         ""
         from libvvtest.lsf import BatchLSF
 
         obj = BatchLSF( 44 )
-        obj.setRunCommand( mock_lsf_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         obj.cancel( 123456 )
-        assert int( lsf_cmds[-1][-1] ) == 123456
+        assert int( lsf_tests.save_cmds[-1][-1] ) == 123456
 
-    def test_craypbs_smoke_test(self):
+
+class craypbs_tests( vtu.vvtestTestCase ):
+
+    def mock_run_command(self, cmdL, changedir=None):
+        ""
+        if cmdL[0] == 'msub':
+            return 0, '12345.sdb'
+
+        if cmdL[0] == 'showq':
+            return 0, """
+123456.sdb n/a Running field
+12345.sdb n/a Running field
+123457.sdb n/a Idle field
+"""
+        raise Exception( 'mock failure' )
+
+    def test_smoke_test(self):
         ""
         from libvvtest.craypbs import BatchCrayPBS
 
         obj = BatchCrayPBS( 16 )
-        obj.setRunCommand( mock_craypbs_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt'), {} )
         assert 'MSUB' in hdr
@@ -157,12 +270,28 @@ class queue_interface_types( vtu.vvtestTestCase ):
         assert stateD[ '123457.sdb' ] == 'pending'
         assert stateD[ '7345.sdb' ] == ''
 
-    def test_pbs_smoke_test(self):
+
+class pbs_tests( vtu.vvtestTestCase ):
+
+    def mock_run_command(self, cmdL, changedir=None):
+        ""
+        if cmdL[0] == 'qsub':
+            return 0, '12345.ladmin1'
+
+        if cmdL[0] == 'qstat':
+            return 0, """
+123456.ladmin1 field1 field2 field3 Q field6
+12345.ladmin1 field1 field2 field3 R field6
+123457.ladmin1 field1 field2 field3 C field6
+"""
+        raise Exception( 'mock failure' )
+
+    def test_smoke_test(self):
         ""
         from libvvtest.pbs import BatchPBS
 
         obj = BatchPBS( 16 )
-        obj.setRunCommand( mock_pbs_run_command )
+        obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt'), {})
         assert 'PBS' in hdr
@@ -178,89 +307,6 @@ class queue_interface_types( vtu.vvtestTestCase ):
         assert stateD[ '12345.ladmin1' ] == 'running'
         assert stateD[ '123456.ladmin1' ] == 'pending'
         assert stateD[ '7345.ladmin1' ] == ''
-
-    def test_queue_type_construction(self):
-        ""
-        for qtype in ['procbatch','craypbs','pbs','slurm','moab']:
-            bq = BatchQueueInterface()
-            assert not bq.isBatched()
-            bq.setQueueType( qtype, 12 )
-            assert bq.isBatched()
-
-
-#############################################################
-
-slurm_cmds = []
-
-def mock_slurm_run_command( cmdL, changedir=None ):
-    ""
-    slurm_cmds.append( cmdL )
-
-    if cmdL[0] == 'sbatch':
-        return 0, 'Submitted batch job 291041'
-
-    if cmdL[0] == 'squeue':
-        return 0, """
-15994641 PD
-16004759 PD
-16004368 R
-16001384 R
-16001384 CD
-"""
-
-    if cmdL[0] == 'scancel':
-        return 0, ''
-
-    raise Exception( 'mock failure' )
-
-
-lsf_cmds = []
-
-def mock_lsf_run_command( cmdL, changedir=None ):
-    ""
-    lsf_cmds.append( cmdL )
-
-    if cmdL[0] == 'bsub':
-        return 0, 'Job <68628> is submitted to default queue <normal>.'
-
-    if cmdL[0] == 'bjobs':
-        return 0, """
-68628   PEND
-68728   RUN
-"""
-
-    if cmdL[0] == 'bkill':
-        return 0, ''
-
-    raise Exception( 'mock failure' )
-
-
-def mock_craypbs_run_command( cmdL, changedir=None ):
-    ""
-    if cmdL[0] == 'msub':
-        return 0, '12345.sdb'
-
-    if cmdL[0] == 'showq':
-        return 0, """
-123456.sdb n/a Running field
-12345.sdb n/a Running field
-123457.sdb n/a Idle field
-"""
-    raise Exception( 'mock failure' )
-
-
-def mock_pbs_run_command( cmdL, changedir=None ):
-    ""
-    if cmdL[0] == 'qsub':
-        return 0, '12345.ladmin1'
-
-    if cmdL[0] == 'qstat':
-        return 0, """
-123456.ladmin1 field1 field2 field3 Q field6
-12345.ladmin1 field1 field2 field3 R field6
-123457.ladmin1 field1 field2 field3 C field6
-"""
-    raise Exception( 'mock failure' )
 
 
 ############################################################################

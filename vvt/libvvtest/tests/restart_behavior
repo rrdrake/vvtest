@@ -210,7 +210,6 @@ class restart_tests( vtu.vvtestTestCase ):
         # filters by XBox
         vrun = vtu.runvvtest( "--config config1", addplatform=False )
         vrun.assertCounts( total=2, npass=2 )
-        print3( 'magic: testids', vrun.getTestIds() )
         assert vrun.getTestIds() == ['both','xbox']
         tdir = vrun.resultsDir()
 
