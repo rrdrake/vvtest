@@ -19,11 +19,14 @@ class ProcessBatch:
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.childids = []
 
-    def header(self, np, qtime, workdir, outfile, plat_attrs):
+    def header(self, size, qtime, workdir, outfile, plat_attrs):
         """
         """
+        np,ndevice = size
+
         hdr = '\n' + \
               '# np = '+str(np) + '\n' + \
+              '# ndevice = '+str(ndevice) + '\n' + \
               '# qtime = '+str(qtime) + '\n' + \
               '# workdir = '+str(workdir) + '\n' + \
               '# outfile = '+str(outfile) + '\n\n' + \

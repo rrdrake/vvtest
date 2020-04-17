@@ -94,6 +94,19 @@ class TestExecList:
         """
         return len(self.started)
 
+    def sortBySizeAndTimeout(self):
+        ""
+        self.backlog.sort( secondary='timeout' )
+
+    def getNextTest(self):
+        ""
+        tcase = self.backlog.pop()
+
+        if tcase != None:
+            self.waiting[ tcase.getSpec().getID() ] = tcase
+
+        return tcase
+
     def checkStateChange(self, tmp_tcase):
         ""
         tid = tmp_tcase.getSpec().getID()
@@ -116,19 +129,6 @@ class TestExecList:
         if tcase:
             copy_test_results( tcase, tmp_tcase )
             self.tlist.appendTestResult( tcase )
-
-        return tcase
-
-    def sortBySizeAndTimeout(self):
-        ""
-        self.backlog.sort( secondary='timeout' )
-
-    def getNextTest(self):
-        ""
-        tcase = self.backlog.pop()
-
-        if tcase != None:
-            self.waiting[ tcase.getSpec().getID() ] = tcase
 
         return tcase
 

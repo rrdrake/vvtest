@@ -171,6 +171,8 @@ class Platform:
     def returnResources(self, job_info):
         ""
         self.procpool.put( job_info.procs )
+        if self.devicepool != None and job_info.devices != None:
+            self.devicepool.put( job_info.devices )
 
     # ----------------------------------------------------------------
 
@@ -264,13 +266,13 @@ class ResourcePool:
 
     def isAvailable(self, num):
         ""
-        num = max( num, 1 )
+        assert num >= 0
         avail = self.numAvailable()
         return num <= avail
 
     def get(self, num):
         ""
-        num = max( num, 1 )
+        assert num >= 0
 
         items = []
 

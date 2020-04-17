@@ -169,12 +169,10 @@ class BatchQueueInterface:
     def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):
         ""
-        np,nd = size
-
         qt = self.attrs.get( 'walltime', queue_time )
 
         hdr = '#!/bin/csh -f\n' + \
-              self.batch.header( np, qt, workdir, qout_file, self.attrs ) + '\n'
+              self.batch.header( size, qt, workdir, qout_file, self.attrs ) + '\n'
 
         if qout_file:
             hdr += 'touch '+qout_file + ' || exit 1\n'

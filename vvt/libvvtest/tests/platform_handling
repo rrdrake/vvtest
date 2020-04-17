@@ -233,7 +233,7 @@ class resource_pooling( vtu.vvtestTestCase ):
         assert pool.isAvailable( 1 )
         assert not pool.isAvailable( 2 )
         pool.get( 1 )
-        assert not pool.isAvailable( 0 )
+        assert     pool.isAvailable( 0 )
         assert not pool.isAvailable( 1 )
 
     def test_get_then_put_resources(self):
@@ -334,6 +334,36 @@ class resource_pooling( vtu.vvtestTestCase ):
         assert tot1 == maxprocs
         assert tot2 == maxprocs
         assert tot3 == maxprocs
+
+
+class resource_management( vtu.vvtestTestCase ):
+
+    def test_the_platform_np_and_ndevice_resource_pools(self):
+        ""
+        plat = vvplatform.Platform( '/fake', {} )
+        plat.initProcs( False, None, 16, None, 4 )
+
+        assert plat.sizeAvailable() == (16,4)
+
+        obj1 = plat.getResources( (4,0) )
+        assert plat.sizeAvailable() == (12,4)
+
+        obj2 = plat.getResources( (1,2) )
+        assert plat.sizeAvailable() == (11,2)
+
+        obj3 = plat.getResources( (11,2) )
+        assert plat.sizeAvailable() == (0,0)
+
+        plat.returnResources( obj2 )
+        assert plat.sizeAvailable() == (1,2)
+
+        plat.returnResources( obj1 )
+        assert plat.sizeAvailable() == (5,2)
+
+    def test_filtering_by_max_devices(self):
+        ""
+        # magic: a test with more devices than the max, will not get run
+        pass
 
 
 def assert_no_overlap( L1, L2 ):

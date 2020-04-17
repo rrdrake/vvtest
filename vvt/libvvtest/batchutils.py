@@ -332,37 +332,36 @@ class BatchTestGrouper:
 
     def _add_test_case(self, size, timeval, tcase):
         ""
-        np,nd = size
         tspec = tcase.getSpec()
 
         if tcase.numDependencies() > 0:
             # tests with dependencies (like analyze tests) get their own group
-            self.batches.append( BatchGroup( np, timeval, [tcase] ) )
+            self.batches.append( BatchGroup( size, timeval, [tcase] ) )
 
         elif tspec.getAttr('timeout') < 1:
             # zero timeout means no limit, so give it the max time value
-            self.batches.append( BatchGroup( np, self.Tzero, [tcase] ) )
+            self.batches.append( BatchGroup( size, self.Tzero, [tcase] ) )
 
         else:
-            self._check_start_new_group( np, timeval )
+            self._check_start_new_group( size, timeval )
             self.group.appendTest( tcase, timeval )
 
-    def _check_start_new_group(self, np, timeval):
+    def _check_start_new_group(self, size, timeval):
         ""
         if self.group == None:
-            self.group = BatchGroup( np )
-        elif self.group.needNewGroup( np, timeval, self.qlen ):
+            self.group = BatchGroup( size )
+        elif self.group.needNewGroup( size, timeval, self.qlen ):
             self.batches.append( self.group )
-            self.group = BatchGroup( np )
+            self.group = BatchGroup( size )
 
 
 class BatchGroup:
 
     uniqid = 0
 
-    def __init__(self, np, timeval=None, tests=None):
+    def __init__(self, size, timeval=None, tests=None):
         ""
-        self.np = np
+        self.size = size
         self.tsum = ( 0 if timeval == None else timeval )
         self.tests = ( [] if tests == None else tests )
 
@@ -378,17 +377,17 @@ class BatchGroup:
         ""
         return len( self.tests ) == 0
 
-    def needNewGroup(self, np, timeval, tlimit):
+    def needNewGroup(self, size, timeval, tlimit):
         ""
         if len(self.tests) > 0:
-            if self.np != np or self.tsum + timeval > tlimit:
+            if self.size != size or self.tsum + timeval > tlimit:
                 return True
 
         return False
 
     def asList(self):
         ""
-        return [ self.tsum, self.np, self.groupid, self.tests ]
+        return [ self.tsum, self.size, self.groupid, self.tests ]
 
 
 def make_batch_TestList( batchdir, batchid, suffix, qlist ):

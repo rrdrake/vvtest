@@ -21,8 +21,10 @@ class BatchSLURM:
         ""
         self.runcmd = run_function
 
-    def header(self, np, qtime, workdir, outfile, plat_attrs):
+    def header(self, size, qtime, workdir, outfile, plat_attrs):
         ""
+        np,ndevice = size
+
         if np <= 0: np = 1
         nnodes = int( np/self.ppn )
         if (np%self.ppn) != 0:
