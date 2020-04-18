@@ -188,6 +188,7 @@ def parse_parameterize( vspecs, tname, evaluator, force_params ):
         if len(nameL) == 1:
             valL = parse_param_values( nameL[0], valuestr, force_params )
             check_parameter_values( valL, lnum )
+            check_special_parameters( nameL[0], valL, lnum )
         else:
             valL = parse_param_group_values( nameL, valuestr, lnum )
             check_forced_group_parameter( force_params, nameL, lnum )
@@ -286,6 +287,21 @@ def check_parameter_values( value_list, lineno ):
                                  v+'", line ' + str(lineno) )
 
 
+def check_special_parameters( param_name, value_list, lineno ):
+    ""
+    if param_name in [ 'np', 'ndevice' ]:
+        for val in value_list:
+            try:
+                ival = int(val)
+            except Exception:
+                ival = None
+
+            if ival == None or ival < 0:
+                raise TestSpecError( 'np and ndevice parameter values '
+                                     'must be non-negative integers: "' + \
+                                     val+'", line ' + str(lineno) )
+
+
 def parse_param_values( param_name, value_string, force_params ):
     ""
     if force_params != None and param_name in force_params:
@@ -311,6 +327,8 @@ def parse_param_group_values( name_list, value_string, lineno ):
                                   s+'", line ' + str(lineno) )
 
         check_parameter_values( gL, lineno )
+        for name,val in zip( name_list, gL ):
+            check_special_parameters( name, [val], lineno )
 
         vL.append( gL )
 

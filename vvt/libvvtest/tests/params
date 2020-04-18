@@ -396,6 +396,19 @@ class parameter_tests( vtu.vvtestTestCase ):
         util.writefile( 'err7.vvt', """
             #VVT: parameterize : hsize,dt = 1.1, 0.1  2|2, 0.01
             """ )
+        util.writefile( 'err8.vvt', """
+            #VVT: parameterize : np = 1 2.2 3
+            """ )
+        util.writefile( 'err9.vvt', """
+            #VVT: parameterize : np,foo = 1,a 2.2,b 3,c
+            """ )
+        util.writefile( 'err10.vvt', """
+            #VVT: parameterize : ndevice = 1 2 3.3
+            """ )
+        util.writefile( 'ok11.vvt', """
+            #VVT: parameterize : np = 0 4
+            #VVT: parameterize : ndevice = 0 4
+            """ )
         time.sleep(1)
 
         evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
@@ -432,6 +445,21 @@ class parameter_tests( vtu.vvtestTestCase ):
         vspecs = ScriptReader( 'err7.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, vspecs, 'err7', evaluator, None )
+
+        vspecs = ScriptReader( 'err8.vvt' )
+        self.assertRaises( testcreator.TestSpecError,
+                parsevvt.parse_parameterize, vspecs, 'err8', evaluator, None )
+
+        vspecs = ScriptReader( 'err9.vvt' )
+        self.assertRaises( testcreator.TestSpecError,
+                parsevvt.parse_parameterize, vspecs, 'err9', evaluator, None )
+
+        vspecs = ScriptReader( 'err10.vvt' )
+        self.assertRaises( testcreator.TestSpecError,
+                parsevvt.parse_parameterize, vspecs, 'err10', evaluator, None )
+
+        vspecs = ScriptReader( 'ok11.vvt' )
+        parsevvt.parse_parameterize( vspecs, 'ok11', evaluator, None )
 
     def test_for_duplicate_parameters_in_xml_form(self):
         ""
