@@ -13,7 +13,7 @@ def compute_num_nodes( size, cores_per_node, devices_per_node ):
 
     nnode1 = compute_node_count( np, cores_per_node )
 
-    if devices_per_node > 0 and ndevice != None:
+    if devices_per_node and ndevice:
         nnode2 = compute_node_count( ndevice, devices_per_node )
     else:
         nnode2 = 0

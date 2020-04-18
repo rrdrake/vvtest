@@ -17,7 +17,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from batch.batching import BatchQueueInterface
+from batch.qinterface import BatchQueueInterface
 
 
 class general_tests( vtu.vvtestTestCase ):

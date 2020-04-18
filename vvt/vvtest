@@ -940,10 +940,11 @@ def create_Batcher( opts, optD, rtdata,
     ""
     import libvvtest.batchutils as batchutils
     import batch.batching as batching
+    from batch.qinterface import BatchQueueInterface
 
     assert opts.qsub_id == None
 
-    batchitf = batching.BatchQueueInterface()
+    batchitf = BatchQueueInterface()
     plat.initializeBatchSystem( batchitf )
 
     qsublimit = opts.batch_limit
