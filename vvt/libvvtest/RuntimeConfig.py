@@ -47,8 +47,8 @@ class RuntimeConfig:
 
         self.optlist = []
 
-        self.maxprocs = None
-        self.apply_maxprocs = True
+        self.maxsize = None
+        self.apply_maxsize = True
 
         self.include_tdd = False
         self.apply_tdd = True
@@ -206,18 +206,20 @@ class RuntimeConfig:
 
         return True
 
-    def setMaxProcs(self, numprocs):
+    def setMaxSize(self, maxsize):
         ""
-        self.maxprocs = numprocs
+        self.maxsize = maxsize
 
-    def applyMaxProcsExpression(self, true_or_false):
+    def applyMaxSizeExpression(self, true_or_false):
         ""
-        self.apply_maxprocs = true_or_false
+        self.apply_maxsize = true_or_false
 
-    def evaluate_maxprocs(self, test_np):
+    def evaluate_maxsize(self, test_size):
         ""
-        if self.apply_maxprocs:
-            if self.maxprocs != None and test_np > self.maxprocs:
+        if self.apply_maxsize and self.maxsize != None:
+            np,nd = test_size
+            maxnp,maxnd = self.maxsize
+            if np > maxnp or nd > maxnd:
                 return False
 
         return True

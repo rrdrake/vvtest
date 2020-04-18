@@ -816,7 +816,7 @@ def make_user_plugin( content=None, platname=None, options=None ):
     return plug
 
 
-def make_RuntimeConfig( platname, options ):
+def make_RuntimeConfig( platname='XBox', options=[] ):
     ""
     rtconfig = RuntimeConfig()
 

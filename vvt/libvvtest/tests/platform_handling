@@ -193,8 +193,8 @@ class constructing_platform( vtu.vvtestTestCase ):
         ""
         assert plat.vvtesthome == os.getcwd()
         assert plat.getName() == 'XBox'
-        assert plat.getMaxProcs() == 20
-        assert plat.getNumProcs() == 10
+        assert plat.getMaxSize() == (20,0)
+        assert plat.getSize() == (10,0)
         assert plat.getattr( 'queue' ) == 'justdoit'
         assert plat.getattr( 'account' ) == 'fy666'
         assert plat.getattr( 'walltime' ) == '2:34'
@@ -296,7 +296,7 @@ class resource_pooling( vtu.vvtestTestCase ):
             """ )
         util.writescript( "ctest.vvt", """
             #!/bin/sh
-            #VVT: parameterize: np = 2
+            #VVT: parameterize: np,ndevice = 2,0
             source vvtest_util.sh
             echo "procids=$RESOURCE_IDS_np"
             echo "proctotal=$RESOURCE_TOTAL_np"

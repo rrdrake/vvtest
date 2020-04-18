@@ -172,7 +172,7 @@ class MainEntry:
 
         rtconfig.setPlatformName( plat.getName() )
         rtconfig.setOptionList( self.optD['onopts'] + [plat.getCompiler()] )
-        rtconfig.setMaxProcs( plat.getMaxProcs() )
+        rtconfig.setMaxSize( plat.getMaxSize() )
 
         rtinfo.setInfo( platform=plat.getName(),
                         compiler=plat.getCompiler() )
@@ -422,7 +422,7 @@ class InformationMode:
 
         elif have_cache:
             if self.opts.dash_N == None:
-                rtconfig.applyMaxProcsExpression( False )
+                rtconfig.applyMaxSizeExpression( False )
             rtconfig.applyTDDExpression( False )
             self._read_test_list( tlist )
 
@@ -1044,7 +1044,7 @@ def restartTests( opts, optD, rtdata ):
 
     rtconfig.applyTDDExpression( False )
     if opts.dash_N == None:
-        rtconfig.applyMaxProcsExpression( False )
+        rtconfig.applyMaxSizeExpression( False )
 
     selector.prepareActiveTests( tlist, apply_filters=( batchid == None ) )
 

@@ -33,18 +33,35 @@ class Platform:
     def getCompiler(self): return self.cplrname
     def getOptions(self): return self.optdict
 
-    def getMaxProcs(self): return self.procpool.maxAvailable()
-    def getNumProcs(self): return self.procpool.numTotal()
+    def getMaxSize(self):
+        ""
+        maxnp = self.procpool.maxAvailable()
+        if self.devicepool != None:
+            maxnd = self.devicepool.maxAvailable()
+        else:
+            maxnd = 0
+        return (maxnp,maxnd)
+
+    def getSize(self):
+        ""
+        np = self.procpool.numTotal()
+        if self.devicepool != None:
+            nd = self.devicepool.numTotal()
+        else:
+            nd = 0
+        return (np,nd)
 
     def display(self, isbatched=False):
         ""
         s = "Platform " + self.platname
         if not isbatched:
-            s += ", num procs = " + str(self.getNumProcs())
-            s += ", max procs = " + str(self.getMaxProcs())
+            np,nd = self.getSize()
+            maxnp,maxnd = self.getMaxSize()
+            s += ", num procs = " + str(np)
+            s += ", max procs = " + str(maxnp)
             if self.devicepool != None:
-                s += ', num devices = '+str(self.devicepool.numTotal())
-                s += ', max devices = '+str(self.devicepool.maxAvailable())
+                s += ', num devices = '+str(nd)
+                s += ', max devices = '+str(maxnd)
         print3( s )
 
     def getEnvironment(self):

@@ -18,8 +18,69 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.filtering import TestFilter
+
 
 class device_tests( vtu.vvtestTestCase ):
+
+    def test_filtering_out_tests_by_max_cpu_cores(self):
+        ""
+        tcase1 = vtu.make_fake_TestCase()
+        tcase1.getSpec().setParameters( { 'np':'1' } )
+
+        tcase2 = vtu.make_fake_TestCase()
+        tcase2.getSpec().setParameters( { 'np':'4' } )
+
+        rtc = vtu.make_RuntimeConfig()
+        rtc.setMaxSize( (1,0) )
+        tf = TestFilter( rtc, None )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert not tf.checkMaxProcessors( tcase2 )
+
+        rtc.setMaxSize( (1,4) )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert not tf.checkMaxProcessors( tcase2 )
+
+        rtc.applyMaxSizeExpression( False )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert tf.checkMaxProcessors( tcase2 )
+
+    def test_filtering_out_tests_by_max_devices(self):
+        ""
+        tcase1 = vtu.make_fake_TestCase()
+        tcase1.getSpec().setParameters( { 'np':'1', 'ndevice':'0' } )
+
+        tcase2 = vtu.make_fake_TestCase()
+        tcase2.getSpec().setParameters( { 'np':'1', 'ndevice':'1' } )
+
+        tcase3 = vtu.make_fake_TestCase()
+        tcase3.getSpec().setParameters( { 'np':'1', 'ndevice':'4' } )
+
+        rtc = vtu.make_RuntimeConfig()
+        rtc.setMaxSize( (1,0) )
+        tf = TestFilter( rtc, None )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert not tf.checkMaxProcessors( tcase2 )
+        assert not tf.checkMaxProcessors( tcase3 )
+
+        rtc.applyMaxSizeExpression( False )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert tf.checkMaxProcessors( tcase2 )
+        assert tf.checkMaxProcessors( tcase3 )
+
+        rtc = vtu.make_RuntimeConfig()
+        rtc.setMaxSize( (1,1) )
+        tf = TestFilter( rtc, None )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert tf.checkMaxProcessors( tcase2 )
+        assert not tf.checkMaxProcessors( tcase3 )
+
+        rtc = vtu.make_RuntimeConfig()
+        rtc.setMaxSize( (1,4) )
+        tf = TestFilter( rtc, None )
+        assert tf.checkMaxProcessors( tcase1 )
+        assert tf.checkMaxProcessors( tcase2 )
+        assert tf.checkMaxProcessors( tcase3 )
 
     def test_run_a_test_using_two_devices(self):
         ""
@@ -37,7 +98,7 @@ class device_tests( vtu.vvtestTestCase ):
             """ )
 
         util.writefile( 'atest.vvt', """
-            #VVT: parameterize : ndevice = 2
+            #VVT: parameterize : ndevice = 2 8
             import vvtest_util as vvt
             print ( 'np_ids='+repr(vvt.RESOURCE_IDS_np) )
             print ( 'np_tot='+repr(vvt.RESOURCE_TOTAL_np) )

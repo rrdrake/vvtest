@@ -141,8 +141,7 @@ class TestFilter:
         ""
         tspec = tcase.getSpec()
 
-        np,nd = tcase.getSize()
-        ok = self.rtconfig.evaluate_maxprocs( np )
+        ok = self.rtconfig.evaluate_maxsize( tcase.getSize() )
         if not ok:
             tcase.getStat().markSkipByMaxProcessors()
 

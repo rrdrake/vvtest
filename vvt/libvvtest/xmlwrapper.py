@@ -250,20 +250,5 @@ def recurse_construct_ET_to_XmlNode( parent_wrapper_node, ET_node ):
 
 
 def print3( *args ):
-    "Python 2 & 3 compatible print function."
     sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + '\n' )
     sys.stdout.flush()
-
-
-#############################################################################
-
-if __name__ == "__main__":
-    
-    if len(sys.argv) < 2:
-      print3( "*** error: please specify a file to parse" )
-      sys.exit(1)
-    
-    doc = XmlDocReader()
-    
-    dom = doc.readDoc( sys.argv[1] )
-    printXmlNode(dom)
