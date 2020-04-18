@@ -24,7 +24,7 @@ class general_tests( vtu.vvtestTestCase ):
 
     def test_the_runcmd_function_which_lives_in_its_own_file(self):
         ""
-        from batch.runcmd import runcmd
+        from batch.helpers import runcmd
 
         x,out = runcmd( [ 'uname', '-a' ] )
 

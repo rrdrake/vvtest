@@ -9,7 +9,7 @@ import time
 import signal
 import subprocess
 
-from .runcmd import runcmd
+from .helpers import runcmd
 
 class ProcessBatch:
 

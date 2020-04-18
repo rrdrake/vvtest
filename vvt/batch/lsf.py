@@ -9,7 +9,7 @@ from os.path import basename
 import time
 import re
 
-from .runcmd import runcmd
+from .helpers import runcmd
 
 jobpat = re.compile( r'Job\s+<\d+>\s+is submitted to' ) #, re.MULTILINE )
 

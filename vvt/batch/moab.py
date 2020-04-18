@@ -12,7 +12,7 @@ This batch handler was written for Trinity, but it may also work for general
 MOAB systems.
 """
 
-from .runcmd import runcmd
+from .helpers import runcmd
 
 class BatchMOAB:
     """

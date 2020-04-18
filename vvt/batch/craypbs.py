@@ -12,7 +12,7 @@ This batch handler was used on the Cray XE machines.  Most commands are MOAB
 but it has aspects of PBS.
 """
 
-from .runcmd import runcmd
+from .helpers import runcmd
 
 class BatchCrayPBS:
     """
