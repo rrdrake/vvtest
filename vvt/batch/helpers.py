@@ -6,6 +6,34 @@
 
 import os, sys
 
+
+def compute_num_nodes( size, cores_per_node, devices_per_node ):
+    ""
+    np,ndevice = size
+
+    nnode1 = compute_node_count( np, cores_per_node )
+
+    if devices_per_node > 0 and ndevice != None:
+        nnode2 = compute_node_count( ndevice, devices_per_node )
+    else:
+        nnode2 = 0
+
+    return max( nnode1, nnode2 )
+
+
+def compute_node_count( num, numper ):
+    ""
+    num = max( 0, num )
+    if num > 0:
+        nnode = int( num/numper )
+        if (num%numper) != 0:
+            nnode += 1
+    else:
+        nnode = 0
+
+    return nnode
+
+
 def runcmd( cmdL, changedir=None ):
     """
     """
