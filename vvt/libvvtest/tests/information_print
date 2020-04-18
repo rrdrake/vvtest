@@ -25,7 +25,7 @@ import testutils as util
 import libvvtest.printinfo as printinfo
 from libvvtest.TestExec import TestExec
 import libvvtest.batchutils as batchutils
-import libvvtest.batching as batching
+import batch.batching as batching
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
 

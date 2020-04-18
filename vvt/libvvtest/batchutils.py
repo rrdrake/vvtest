@@ -14,7 +14,6 @@ from os.path import dirname
 from . import TestList
 from . import testlistio
 from . import pathutil
-from . import batching
 
 
 class Batcher:

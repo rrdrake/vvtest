@@ -17,14 +17,14 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.batching import BatchQueueInterface
+from batch.batching import BatchQueueInterface
 
 
 class general_tests( vtu.vvtestTestCase ):
 
     def test_the_runcmd_function_which_lives_in_its_own_file(self):
         ""
-        from libvvtest.runcmd import runcmd
+        from batch.runcmd import runcmd
 
         x,out = runcmd( [ 'uname', '-a' ] )
 
@@ -53,7 +53,7 @@ class procbatch_tests( vtu.vvtestTestCase ):
         outfile = abspath('out.txt')
         time.sleep(1)
 
-        from libvvtest.procbatch import ProcessBatch
+        from batch.procbatch import ProcessBatch
 
         obj = ProcessBatch( 8 )
 
@@ -98,7 +98,7 @@ class slurm_tests( vtu.vvtestTestCase ):
 
     def test_smoke_test(self):
         ""
-        from libvvtest.slurm import BatchSLURM
+        from batch.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
         obj.setRunCommand( self.mock_run_command )
@@ -118,7 +118,7 @@ class slurm_tests( vtu.vvtestTestCase ):
 
     def test_num_nodes_computation(self):
         ""
-        from libvvtest.slurm import BatchSLURM
+        from batch.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
         assert obj.computeNumNodes( (1,0) ) == 1
@@ -140,7 +140,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         """
         Make sure the header function can correctly include the --qos tag.
         """
-        from libvvtest.slurm import BatchSLURM
+        from batch.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
         obj.setRunCommand( self.mock_run_command )
@@ -151,7 +151,7 @@ class slurm_tests( vtu.vvtestTestCase ):
 
     def test_cancel_function(self):
         ""
-        from libvvtest.slurm import BatchSLURM
+        from batch.slurm import BatchSLURM
 
         obj = BatchSLURM( 16 )
         obj.setRunCommand( self.mock_run_command )
@@ -184,7 +184,7 @@ class lsf_tests( vtu.vvtestTestCase ):
 
     def test_smoke_test(self):
         ""
-        from libvvtest.lsf import BatchLSF
+        from batch.lsf import BatchLSF
 
         obj = BatchLSF( 44 )
         obj.setRunCommand( self.mock_run_command )
@@ -205,7 +205,7 @@ class lsf_tests( vtu.vvtestTestCase ):
 
     def test_num_nodes_computation(self):
         ""
-        from libvvtest.lsf import BatchLSF
+        from batch.lsf import BatchLSF
 
         obj = BatchLSF( 16 )
         assert obj.computeNumNodes( (1,0) ) == 1
@@ -225,7 +225,7 @@ class lsf_tests( vtu.vvtestTestCase ):
 
     def test_cancel_function(self):
         ""
-        from libvvtest.lsf import BatchLSF
+        from batch.lsf import BatchLSF
 
         obj = BatchLSF( 44 )
         obj.setRunCommand( self.mock_run_command )
@@ -251,7 +251,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
 
     def test_smoke_test(self):
         ""
-        from libvvtest.craypbs import BatchCrayPBS
+        from batch.craypbs import BatchCrayPBS
 
         obj = BatchCrayPBS( 16 )
         obj.setRunCommand( self.mock_run_command )
@@ -288,7 +288,7 @@ class pbs_tests( vtu.vvtestTestCase ):
 
     def test_smoke_test(self):
         ""
-        from libvvtest.pbs import BatchPBS
+        from batch.pbs import BatchPBS
 
         obj = BatchPBS( 16 )
         obj.setRunCommand( self.mock_run_command )

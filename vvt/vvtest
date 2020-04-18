@@ -508,7 +508,7 @@ def symlink_batch_files_in_tests( test_dir, tlist, batchid ):
 
 def create_batch_namer( test_dir ):
     ""
-    import libvvtest.batching as batching
+    import batch.batching as batching
     return batching.BatchFileNamer( test_dir )
 
 
@@ -939,7 +939,7 @@ def create_Batcher( opts, optD, rtdata,
                     tlist, xlist, test_dir, plat, perms ):
     ""
     import libvvtest.batchutils as batchutils
-    import libvvtest.batching as batching
+    import batch.batching as batching
 
     assert opts.qsub_id == None
 
