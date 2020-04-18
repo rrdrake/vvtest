@@ -147,11 +147,12 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
             tL.append( runtime_tuple(tcase) )
             print3( tL[-1] )
 
-        assert tL[:3] == [ ['testB.ndevice=4.np=4', (4, 4), None],
+        assert tL[:4] == [ ['testC.np=8', (8, 0), None],
+                           ['testB.ndevice=4.np=4', (4, 4), None],
                            ['testC.np=3', (3, 0), None],
                            ['testB.ndevice=2.np=2', (2, 2), None] ]
         # with same np and same runtime, the order is not guaranteed
-        tL2 = tL[3:]
+        tL2 = tL[4:]
         tL2.sort()
         assert tL2 == [ ['testA.ndevice=0', (1, 0), None],
                         ['testA.ndevice=2', (1, 2), None],
@@ -184,6 +185,9 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
         assert tL2 == [ ['testA.ndevice=0', (1, 0), None],
                         ['testA.ndevice=2', (1, 2), None] ]
 
+        tcase = xlist.popNext( (8,0) )
+        assert runtime_tuple(tcase) == ['testC.np=8', (8, 0), None]
+
 
 def write_np_and_ndevice_tests():
     ""
@@ -194,7 +198,7 @@ def write_np_and_ndevice_tests():
         #VVT: parameterize : np,ndevice = 2,2 4,4
         """ )
     util.writefile( 'testC.vvt', """
-        #VVT: parameterize : np = 3
+        #VVT: parameterize : np = 3 8
         """ )
 
 
