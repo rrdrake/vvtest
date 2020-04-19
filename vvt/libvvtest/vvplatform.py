@@ -103,6 +103,12 @@ class Platform:
 
         self.batchspec = ( batch, ppn, kwargs )
 
+        # magic: this is really just to turn off the max filtering
+        #           - want to turn off filtering unless maxproces
+        #             is specified in the platform_plugin.py
+        #           - want to separately turn off max device filtering too
+        #           - in fact, will this NOT filter out device tests on
+        #             TLCC2 right now ?!!
         if int( self.getattr( 'maxprocs', 0 ) ) < 1:
             self.setattr( 'maxprocs', 2**31 )
 
@@ -123,9 +129,7 @@ class Platform:
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
-    def initProcs(self, isbatched,
-                        num_procs, max_procs,
-                        num_devices, max_devices ):
+    def initProcs(self, num_procs, max_procs, num_devices, max_devices ):
         """
         Determines the number of processors and the maximum number for the
         current platform.
@@ -134,7 +138,7 @@ class Platform:
             1. Use 'max_procs' if not None
             2. The "maxprocs" attribute if set by the platform plugin
             3. Try to probe the system
-            4. The value one if all else fails
+            4. The value 4 if all else fails
 
         For num procs:
             1. Use 'num_procs' if not None
@@ -142,12 +146,10 @@ class Platform:
 
         This function should not be called for batch mode.
         """
-        maxnp = ( 2**31 if isbatched else None )
-
         np,maxnp = \
             determine_processor_cores( num_procs,
                                        max_procs,
-                                       self.attrs.get( 'maxprocs', maxnp ) )
+                                       self.attrs.get( 'maxprocs', None ) )
 
         nd,maxdev = \
             determine_device_count( num_devices,
@@ -157,6 +159,7 @@ class Platform:
         self.procpool = ResourcePool( np, maxnp )
 
         if nd != None:
+            assert maxdev != None
             self.devicepool = ResourcePool( nd, maxdev )
 
     def sizeAvailable(self):
@@ -226,9 +229,10 @@ class Platform:
 def determine_processor_cores( num_procs, max_procs, plugin_max ):
     ""
     if max_procs == None:
-        mx = plugin_max
-        if mx == None:
+        if plugin_max == None:
             mx = probe_max_processors( 4 )
+        else:
+            mx = plugin_max
     else:
         mx = max_procs
 
@@ -260,12 +264,12 @@ def determine_device_count( num_devices, max_devices, plugin_max ):
 
 class ResourcePool:
 
-    def __init__(self, total, maxavail=None):
+    def __init__(self, total, maxavail):
         ""
         self.total = total
         self.maxavail = maxavail
-        self.idx = 0
-        self.pool = []
+
+        self.pool = None  # maps hardware id to num available
 
     def maxAvailable(self):
         ""
@@ -277,44 +281,54 @@ class ResourcePool:
 
     def numAvailable(self):
         ""
-        n = len( self.pool )
-        n += ( self.total - self.idx )
-        return n
+        if self.pool == None:
+            num = self.total
+        else:
+            num = 0
+            for cnt in self.pool.values():
+                num += max( 0, cnt )
 
-    def isAvailable(self, num):
-        ""
-        assert num >= 0
-        avail = self.numAvailable()
-        return num <= avail
+        return num
 
     def get(self, num):
         ""
-        assert num >= 0
-
         items = []
 
-        while len(items) < num and len(self.pool) > 0:
-            items.append( self.pool.pop(0) )
+        if num > 0:
 
-        while len(items) < num and self.idx < self.total:
-            items.append( self.idx )
-            self.idx += 1
+            if self.pool == None:
+                self._initialize_pool()
 
-        if len(items) < num:
-            n = num-len(items)
-            for i in range(n):
-                items.append( i%self.total )
+            while len(items) < num:
+                self._get_most_available( items, num )
 
         return items
 
     def put(self, items):
         ""
-        pset = set( self.pool )
-        for i in items:
-            if i not in pset:
-                pset.add( i )
-                self.pool.append( i )
-        self.pool.sort()
+        for idx in items:
+            self.pool[idx] = ( self.pool[idx] + 1 )
+
+    def _get_most_available(self, items, num):
+        ""
+        # reverse the index in the sort list (want indexes to be ascending)
+        L = [ (cnt,self.maxavail-idx) for idx,cnt in self.pool.items() ]
+        L.sort( reverse=True )
+
+        for cnt,ridx in L:
+            idx = self.maxavail - ridx
+            items.append( idx )
+            self.pool[idx] = ( self.pool[idx] - 1 )
+            if len(items) == num:
+                break
+
+    def _initialize_pool(self):
+        ""
+        self.pool = {}
+
+        for i in range(self.total):
+            idx = i%(self.maxavail)
+            self.pool[idx] = self.pool.get( idx, 0 ) + 1
 
 
 def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
@@ -377,8 +391,7 @@ def construct_Platform( vvtestdir, optdict, **kwargs ):
 
     initialize_platform( plat )
 
-    plat.initProcs( isbatched,
-                    optdict.get( '-n', None ),
+    plat.initProcs( optdict.get( '-n', None ),
                     optdict.get( '-N', None ),
                     kwargs.get( 'devices', None ),
                     kwargs.get( 'max_devices', None ) )
@@ -520,7 +533,6 @@ def probe_max_processors( fail_value=4 ):
     """
     Tries to determine the number of processors on the current machine.  On
     Linux systems, it uses /proc/cpuinfo.  On OSX systems, it uses sysctl.
-    Returns the max, or None if the probe failed.
     """
     mx = None
     
@@ -531,7 +543,7 @@ def probe_max_processors( fail_value=4 ):
             s = fp.read().strip()
             fp.close()
             mx = int(s)
-        except:
+        except Exception:
             mx = None
     
     if mx == None and os.path.exists( '/proc/cpuinfo' ):
@@ -545,7 +557,7 @@ def probe_max_processors( fail_value=4 ):
                 if repat.match(line) != None:
                     mx += 1
             fp.close()
-        except:
+        except Exception:
             mx = None
 
     if not mx or mx < 1:
