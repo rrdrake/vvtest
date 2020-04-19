@@ -1,6 +1,17 @@
 
 Improvements:
 
+    - Add formal support for "devices", such as GPUs.  Tests can now specify
+      an "ndevice" parameter in test files (analogous to "np"):
+
+        #VVT: parameterize : ndevice = 0 2 4
+
+      By default, no devices are assumed on the platform.  Tell vvtest there
+      are devices with --max-devices <integer>, which is analogous to -N.
+      You can use --devices <integer> as well to specify how many devices to
+      actually use (analogous to -n).  To oversubscribe devices, use
+      --max-devices 4 --devices 8, for example.
+
     - The --search option now searches the test source file by default.
 
     - Add support for Kitware CDash.  The --cdash <file or URL> option will
