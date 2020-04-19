@@ -34,6 +34,7 @@ SKIP_REASON = {
         'tdd'                : 'TDD test',
         'search'             : 'excluded by file search expression',
         'maxprocs'           : 'exceeds max processors',
+        'maxdevices'         : 'exceeds max devices',
         'runtime'            : 'runtime too low or too high',
         'nobaseline'         : 'no rebaseline specification',
         'depskip'            : 'analyze dependency skipped',
@@ -123,6 +124,10 @@ class TestStatus:
     def markSkipByMaxProcessors(self):
         ""
         self.tspec.setAttr( 'skip', 'maxprocs' )
+
+    def markSkipByMaxDevices(self):
+        ""
+        self.tspec.setAttr( 'skip', 'maxdevices' )
 
     def markSkipByRuntime(self):
         ""

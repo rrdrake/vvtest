@@ -137,13 +137,17 @@ class TestFilter:
         self._record_skipped_tests( ok, tcase )
         return ok
 
-    def checkMaxProcessors(self, tcase):
+    def checkMaxSize(self, tcase):
         ""
         tspec = tcase.getSpec()
 
-        ok = self.rtconfig.evaluate_maxsize( tcase.getSize() )
+        ok = self.rtconfig.evaluate_maxprocs( tcase.getSize() )
         if not ok:
             tcase.getStat().markSkipByMaxProcessors()
+        else:
+            ok = self.rtconfig.evaluate_maxdevices( tcase.getSize() )
+            if not ok:
+                tcase.getStat().markSkipByMaxDevices()
 
         self._record_skipped_tests( ok, tcase )
         return ok
@@ -217,7 +221,7 @@ class TestFilter:
                 self.checkOptions( tcase ) and \
                 self.checkTDD( tcase ) and \
                 self.checkFileSearch( tcase ) and \
-                self.checkMaxProcessors( tcase ) and \
+                self.checkMaxSize( tcase ) and \
                 self.checkRuntime( tcase ) and \
                 self.userValidation( tcase )
 
@@ -237,7 +241,7 @@ class TestFilter:
                     self.checkKeywords( tcase, results_keywords=True ) and \
                     self.checkParameters( tcase, permanent=False ) and \
                     self.checkTDD( tcase ) and \
-                    self.checkMaxProcessors( tcase ) and \
+                    self.checkMaxSize( tcase ) and \
                     self.checkRuntime( tcase )
 
                 # these don't work in restart mode because they require

@@ -48,7 +48,8 @@ class RuntimeConfig:
         self.optlist = []
 
         self.maxsize = None
-        self.apply_maxsize = True
+        self.apply_maxprocs = True
+        self.apply_maxdevices = True
 
         self.include_tdd = False
         self.apply_tdd = True
@@ -210,16 +211,34 @@ class RuntimeConfig:
         ""
         self.maxsize = maxsize
 
-    def applyMaxSizeExpression(self, true_or_false):
+    def applyMaxProcsExpression(self, true_or_false):
         ""
-        self.apply_maxsize = true_or_false
+        self.apply_maxprocs = true_or_false
 
-    def evaluate_maxsize(self, test_size):
+    def applyMaxDevicesExpression(self, true_or_false):
         ""
-        if self.apply_maxsize and self.maxsize != None:
-            np,nd = test_size
+        self.apply_maxdevices = true_or_false
+
+    def evaluate_maxprocs(self, test_size):
+        ""
+        if self.maxsize != None:
+
             maxnp,maxnd = self.maxsize
-            if np > maxnp or nd > maxnd:
+            np,nd = test_size
+
+            if self.apply_maxprocs and np > maxnp:
+                return False
+
+        return True
+
+    def evaluate_maxdevices(self, test_size):
+        ""
+        if self.maxsize != None:
+
+            maxnp,maxnd = self.maxsize
+            np,nd = test_size
+
+            if self.apply_maxdevices and nd > maxnd:
                 return False
 
         return True

@@ -123,12 +123,12 @@ class filter_and_num_processors( vtu.vvtestTestCase ):
     def test_the_maxprocs_field_in_RuntimeConfig(self):
         ""
         rtconfig = RuntimeConfig()
-        assert rtconfig.evaluate_maxsize( (1,0) )
+        assert rtconfig.evaluate_maxprocs( (1,0) )
 
         rtconfig = RuntimeConfig()
         rtconfig.setMaxSize( (5,0) )
-        assert     rtconfig.evaluate_maxsize( (5,0) )
-        assert not rtconfig.evaluate_maxsize( (6,0) )
+        assert     rtconfig.evaluate_maxprocs( (5,0) )
+        assert not rtconfig.evaluate_maxprocs( (6,0) )
 
     def test_max_procs_filter_is_not_applied_in_restart_mode(self):
         ""
@@ -154,6 +154,20 @@ class filter_and_num_processors( vtu.vvtestTestCase ):
         vrun.assertCounts( total=2, npass=2 )
 
         vrun = vtu.runvvtest( "-R --config", abspath('config'), chdir=tdir )
+        vrun.assertCounts( total=2, npass=2 )
+
+    def test_max_procs_filter_is_not_applied_in_batch_mode(self):
+        ""
+        util.writefile( 'procs.vvt', """
+            #VVT: parameterize : np = 1 100000
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( batch=True )
+        vrun.assertCounts( total=2, npass=2 )
+        tdir = vrun.resultsDir()
+
+        vrun = vtu.runvvtest( '-R', batch=True, chdir=tdir )
         vrun.assertCounts( total=2, npass=2 )
 
 

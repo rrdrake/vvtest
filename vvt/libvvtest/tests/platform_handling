@@ -419,11 +419,6 @@ class resource_management( vtu.vvtestTestCase ):
         plat.returnResources( obj1 )
         assert plat.sizeAvailable() == (5,2)
 
-    def test_filtering_by_max_devices(self):
-        ""
-        # magic: a test with more devices than the max, will not get run
-        pass
-
 
 def overlapping_lists( L1, L2 ):
     ""

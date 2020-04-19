@@ -34,16 +34,16 @@ class device_tests( vtu.vvtestTestCase ):
         rtc = vtu.make_RuntimeConfig()
         rtc.setMaxSize( (1,0) )
         tf = TestFilter( rtc, None )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert not tf.checkMaxProcessors( tcase2 )
+        assert tf.checkMaxSize( tcase1 )
+        assert not tf.checkMaxSize( tcase2 )
 
         rtc.setMaxSize( (1,4) )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert not tf.checkMaxProcessors( tcase2 )
+        assert tf.checkMaxSize( tcase1 )
+        assert not tf.checkMaxSize( tcase2 )
 
-        rtc.applyMaxSizeExpression( False )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert tf.checkMaxProcessors( tcase2 )
+        rtc.applyMaxProcsExpression( False )
+        assert tf.checkMaxSize( tcase1 )
+        assert tf.checkMaxSize( tcase2 )
 
     def test_filtering_out_tests_by_max_devices(self):
         ""
@@ -59,28 +59,28 @@ class device_tests( vtu.vvtestTestCase ):
         rtc = vtu.make_RuntimeConfig()
         rtc.setMaxSize( (1,0) )
         tf = TestFilter( rtc, None )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert not tf.checkMaxProcessors( tcase2 )
-        assert not tf.checkMaxProcessors( tcase3 )
+        assert tf.checkMaxSize( tcase1 )
+        assert not tf.checkMaxSize( tcase2 )
+        assert not tf.checkMaxSize( tcase3 )
 
-        rtc.applyMaxSizeExpression( False )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert tf.checkMaxProcessors( tcase2 )
-        assert tf.checkMaxProcessors( tcase3 )
+        rtc.applyMaxDevicesExpression( False )
+        assert tf.checkMaxSize( tcase1 )
+        assert tf.checkMaxSize( tcase2 )
+        assert tf.checkMaxSize( tcase3 )
 
         rtc = vtu.make_RuntimeConfig()
         rtc.setMaxSize( (1,1) )
         tf = TestFilter( rtc, None )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert tf.checkMaxProcessors( tcase2 )
-        assert not tf.checkMaxProcessors( tcase3 )
+        assert tf.checkMaxSize( tcase1 )
+        assert tf.checkMaxSize( tcase2 )
+        assert not tf.checkMaxSize( tcase3 )
 
         rtc = vtu.make_RuntimeConfig()
         rtc.setMaxSize( (1,4) )
         tf = TestFilter( rtc, None )
-        assert tf.checkMaxProcessors( tcase1 )
-        assert tf.checkMaxProcessors( tcase2 )
-        assert tf.checkMaxProcessors( tcase3 )
+        assert tf.checkMaxSize( tcase1 )
+        assert tf.checkMaxSize( tcase2 )
+        assert tf.checkMaxSize( tcase3 )
 
     def test_run_a_test_using_two_devices(self):
         ""
@@ -111,11 +111,20 @@ class device_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
         self.check_resource_output( vrun )
 
-        vtu.remove_results()
-
-        vrun = vtu.runvvtest( '--plat GPUstacks --batch --config config' )
+        vrun = vtu.runvvtest( '-i -v', chdir=vrun.resultsDir() )
         vrun.assertCounts( total=1, npass=1 )
-        self.check_resource_output( vrun )
+
+        vrun = vtu.runvvtest( '-i --max-devices=1 -v', chdir=vrun.resultsDir() )
+        vrun.assertCounts( total=0 )
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--plat GPUstacks --batch --config config',
+                                  batch=batch )
+            vrun.assertCounts( total=1, npass=1 )
+            self.check_resource_output( vrun )
 
     def check_resource_output(self, vrun):
         ""

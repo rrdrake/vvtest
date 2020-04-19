@@ -385,8 +385,6 @@ class InformationMode:
         ""
         exitcode = 0
 
-        plat = self.rtdata.getPlatformObject()
-
         tlist = self.loadTestList( scan_dirs )
 
         test_dir = self.rtdata.getTestResultsDir()
@@ -411,6 +409,7 @@ class InformationMode:
         selector = self.rtdata.getTestSelector()
         scanner = self.rtdata.getTestScanner()
         rtconfig = self.rtdata.getRuntimeConfig()
+        plat = self.rtdata.getPlatformObject()
 
         tlist = make_TestList( self.rtdata )
 
@@ -421,8 +420,8 @@ class InformationMode:
             scanner.scanPaths( tlist, scan_dirs )
 
         elif have_cache:
-            if self.opts.dash_N == None:
-                rtconfig.applyMaxSizeExpression( False )
+            maybe_turn_off_max_size_filtering( False, True,
+                                               self.opts, plat, rtconfig )
             rtconfig.applyTDDExpression( False )
             self._read_test_list( tlist )
 
@@ -689,6 +688,7 @@ def runTests( opts, optD, rtdata, dirs ):
     selector = rtdata.getTestSelector()
     scanner = rtdata.getTestScanner()
     rtinfo = rtdata.getRuntimeInfo()
+    rtconfig = rtdata.getRuntimeConfig()
 
     rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
@@ -716,6 +716,7 @@ def runTests( opts, optD, rtdata, dirs ):
     timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
 
     # apply filters and save the test list in the TestResults directory
+    maybe_turn_off_max_size_filtering( opts.batch, False, opts, plat, rtconfig )
     selector.applyPermanentFilters( tlist )
     tlist.stringFileWrite( **rtinfo.asDict() )
     perms.set( tlist.getFilename() )
@@ -743,6 +744,30 @@ def runTests( opts, optD, rtdata, dirs ):
     call_user_epilogue( rtdata, tlist )
 
     return tlist.encodeIntegerWarning()
+
+
+def maybe_turn_off_max_size_filtering( isbatch, isrestart,
+                                       opts, plat, rtconfig ):
+    """
+    Platform sets max num processors (CPU cores):
+        - uses -N or a plugin value
+        - if neither of those, then it probes for a max
+        - if the probe fails, it defaults to the value 4
+
+    Platform sets max num devices (GPUs):
+        - uses --max-devices or a plugin value
+        - if neither of those, it uses the value of --devices
+        - otherwise it defaults to zero
+    """
+    if isrestart:
+        if opts.dash_N == None:
+            rtconfig.applyMaxProcsExpression( False )
+        if opts.max_devices == None:
+            rtconfig.applyMaxDevicesExpression( False )
+
+    elif isbatch:
+        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
+            rtconfig.applyMaxProcsExpression( False )
 
 
 def check_for_currently_running_vvtest( tlist, optforce ):
@@ -1042,9 +1067,8 @@ def restartTests( opts, optD, rtdata ):
     else:
         symlink_batch_files_in_tests( test_dir, tlist, batchid )
 
+    maybe_turn_off_max_size_filtering( opts.batch, True, opts, plat, rtconfig )
     rtconfig.applyTDDExpression( False )
-    if opts.dash_N == None:
-        rtconfig.applyMaxSizeExpression( False )
 
     selector.prepareActiveTests( tlist, apply_filters=( batchid == None ) )
 

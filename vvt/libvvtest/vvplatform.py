@@ -16,6 +16,7 @@ class Platform:
         self.vvtesthome = vvtesthome
         self.optdict = optdict
 
+        self.plugin_maxprocs = None
         self.procpool = ResourcePool( 1, 1 )
         self.devicepool = None
 
@@ -50,6 +51,10 @@ class Platform:
         else:
             nd = 0
         return (np,nd)
+
+    def getPluginMaxProcs(self):
+        ""
+        return self.plugin_maxprocs
 
     def display(self, isbatched=False):
         ""
@@ -103,15 +108,6 @@ class Platform:
 
         self.batchspec = ( batch, ppn, kwargs )
 
-        # magic: this is really just to turn off the max filtering
-        #           - want to turn off filtering unless maxproces
-        #             is specified in the platform_plugin.py
-        #           - want to separately turn off max device filtering too
-        #           - in fact, will this NOT filter out device tests on
-        #             TLCC2 right now ?!!
-        if int( self.getattr( 'maxprocs', 0 ) ) < 1:
-            self.setattr( 'maxprocs', 2**31 )
-
     def initializeBatchSystem(self, batchitf):
         ""
         if self.batchspec:
@@ -131,25 +127,20 @@ class Platform:
 
     def initProcs(self, num_procs, max_procs, num_devices, max_devices ):
         """
-        Determines the number of processors and the maximum number for the
-        current platform.
+        Determine and set the number of CPU cores and devices.  The arguments
+        are from the command line:
 
-        For max procs:
-            1. Use 'max_procs' if not None
-            2. The "maxprocs" attribute if set by the platform plugin
-            3. Try to probe the system
-            4. The value 4 if all else fails
-
-        For num procs:
-            1. Use 'num_procs' if not None
-            2. The value of max procs
-
-        This function should not be called for batch mode.
+            num_procs   is -n
+            num_devices is --devices
+            max_procs   is -N
+            max_devices is --max-devices
         """
+        self.plugin_maxprocs = self.attrs.get( 'maxprocs', None )
+
         np,maxnp = \
             determine_processor_cores( num_procs,
                                        max_procs,
-                                       self.attrs.get( 'maxprocs', None ) )
+                                       self.plugin_maxprocs )
 
         nd,maxdev = \
             determine_device_count( num_devices,
@@ -256,7 +247,7 @@ def determine_device_count( num_devices, max_devices, plugin_max ):
     else:
         nd = num_devices
         if mx == None:
-            # magic: probe for devices
+            # could probe for devices to get a better max
             mx = num_devices
 
     return nd,mx
