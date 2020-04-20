@@ -557,13 +557,13 @@ def create_parser( argvlist, vvtest_version ):
 
     # resources
     grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )
-    grp.add_argument( '-n', dest='dash_n', type=int,
+    grp.add_argument( '-n', metavar='NUM_CORES', dest='dash_n', type=int,
         help='The number of CPU cores to occupy at any one time. '
              'Tests taking more than this number are run last.' )
-    grp.add_argument( '-N', dest='dash_N', type=int,
+    grp.add_argument( '-N', metavar='MAX_CORES', dest='dash_N', type=int,
         help='The maximum number of available CPU cores.  Tests taking '
              'more than this value are not run.' )
-    grp.add_argument( '--devices', type=int,
+    grp.add_argument( '--devices', metavar='NUM_DEVICES', type=int,
         help='The number of devices (e.g. GPUs) to occupy at any one time. '
              'Tests taking more than this number are run last.' )
     grp.add_argument( '--max-devices', type=int,
