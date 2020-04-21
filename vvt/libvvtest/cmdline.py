@@ -559,16 +559,20 @@ def create_parser( argvlist, vvtest_version ):
     grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )
     grp.add_argument( '-n', metavar='NUM_CORES', dest='dash_n', type=int,
         help='The number of CPU cores to occupy at any one time. '
-             'Tests taking more than this number are run last.' )
+             'Tests taking more than this number are run last.  '
+             'Defaults to MAX_CORES.' )
     grp.add_argument( '-N', metavar='MAX_CORES', dest='dash_N', type=int,
         help='The maximum number of available CPU cores.  Tests taking '
-             'more than this value are not run.' )
+             'more than this value are not run.  Defaults to platform '
+             'plugin value if set, or system probe if not.' )
     grp.add_argument( '--devices', metavar='NUM_DEVICES', type=int,
         help='The number of devices (e.g. GPUs) to occupy at any one time. '
-             'Tests taking more than this number are run last.' )
+             'Tests taking more than this number are run last.  '
+             'Defaults to MAX_DEVICES.' )
     grp.add_argument( '--max-devices', type=int,
         help='The maximum number of available devices (e.g. GPUs).  Tests '
-             'taking more than this value are not run.' )
+             'taking more than this value are not run.  Defaults to '
+             'platform plugin value if set, or zero if not.' )
     grp.add_argument( '--plat',
         help='Use this platform name for defaults and plugins.' )
     grp.add_argument( '--platopt', action='append',
