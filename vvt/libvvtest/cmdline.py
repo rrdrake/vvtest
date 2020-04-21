@@ -257,9 +257,14 @@ Note that "-n 1" can be used with the -L option to send many test
 results to stdout/stderr without interleaving the output (the
 "-n 1" prevents multiple tests from being run simultaneously).
 
-The -a or --analyze option will only execute the analysis portions of the
-tests (and skip running the main code again).  This is only useful if the
-tests have already been run previously.
+The -a or --analyze option can be used to only run the analysis portions of
+each test, and is only useful if the tests have already been run previously.
+It causes the option --execute-analysis-sections to be given to each test
+invocation.  The test itself has to be written to check for this option and
+only execute the parts of the script that analyze the results, such as
+the logic that determines pass for diff.
+For XML test specifications, this option will only execute the sections
+marked with analyze="yes".
 
 The --encode-exit-status option will encode non-passing and not-run tests
 into the program exit status.  That is, the exit status integer is filled
@@ -275,39 +280,40 @@ like this
 help_resources = """
 
 By default, vvtest will try not to oversubscribe the current machine.
-It does this by limiting the tests in flight to use equal or fewer processors
-than are available.  Each test is assumed to need one CPU core, unless the
+It does this by limiting the tests in flight to use equal or fewer CPU cores
+than are available.  Each test is assumed to need one core, unless the
 test specifies a larger value.
 
-The -n option sets the number of CPU cores occupied at any one time.  Tests
-that take more than this number are run last and sequentially.  By default,
-this number is set to the maximum number of processors on the platform.
+The number of CPU cores to occupy at any one time is set by the -n value,
+and defaults to the max available on the platform (see below for the max).
+Tests that take more than this number are run last and run one at a time.
 
-The -N option will set the maximum number of processers available on the
-current platform, and causes tests taking more than this number to be filtered
-out.  By default, the system is probed to determine this value.
+The maximum number of CPU cores available on the platform is set by the
+-N option.  If not specified on the command line, the default value is set
+by the platform plugin "maxprocs" attribute, or if that is not set it will
+probe the system.  Tests that need more cores than this maximum will not
+be run (they are filtered out).
 
 The --plat option sets the platform name for use by plugins and default
-resource settings. This can be used to specify the platform name,
-thus overriding the default platform name.  For example, you could use
-"--plat Linux".
+resource settings.  Using --plat will override the default platform name,
+which is set in the config/idplatform.py file.
 
-The --platopt option specifies platform options.
-Some platform plugins understand special
-options.  Use this to send command line options into the platform
-plugin.  For example, use "--platopt ppn=4" to set the number
-of processors per node to an artificial value of 4.
+The --platopt option specifies platform options, which are understood by
+certain platform plugins.  The most common use is sending options into
+the batching system, such as "--platopt ppn=4" to set the number of
+processors per node to an artificial value of 4.
 
-The -T option will apply a timeout value in seconds to each test.  Zero means
-no timeout.  In batch mode, note that the time given to the batch
-queue for each batch job is the sum of the timeouts of each test.
+The -T option will apply a timeout value in seconds to each test.
+Zero means no timeout.  In batch mode, note that the time given to the
+batch queue for each batch job is the sum of the timeouts of each test
+in the batch job.
 
-The --timeout-multiplier option will
-apply a float multiplier to the timeout value for each test.
+The --timeout-multiplier option will apply a float multiplier to the
+timeout value for each test.
 
-The --max-timeout option will
-apply a maximum timeout value for each test and for batch jobs.
-It is the last operation performed when computing timeouts.
+The --max-timeout option will apply a maximum timeout value for each
+test and for batch jobs.  It is the last operation performed when computing
+timeouts.
 """
 
 
@@ -547,7 +553,8 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '-L', dest='dash_L', action='store_true',
         help='Do not redirect test output to log files.' )
     grp.add_argument( '-a', '--analyze', dest='analyze', action='store_true',
-        help='Pass option to tests to only execute sections marked analysis.' )
+        help='Causes the option --execute-analysis-sections to be given to '
+             'each test invocation.  Only makes sense in combination with -R.' )
     grp.add_argument( '--check', action='append',
         help='This option is deprecated (subhelp: deprecated).' )
     grp.add_argument( '--test-args', metavar='ARGS', action='append',
