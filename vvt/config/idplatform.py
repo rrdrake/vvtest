@@ -56,6 +56,10 @@ def platform( opts ):
         # Capacity Technology System, running TOSS
         return 'CTS1'
 
+    if base_match( [nodename,pbshost,cluster], ['astra','stria'] ):
+        # Vanguard System
+        return 'ASTRA'
+
     if base_match( [nodename,pbshost,cluster],
                    ['chama','uno','pecos','jemez','skybridge'] ) or \
        shell_match( [nodename], ['sb[0-9]*'] ):

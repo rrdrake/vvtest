@@ -36,6 +36,9 @@ def initialize( plat ):
     elif platname == "CTS1":
         plat.setBatchSystem( "slurm", 36 )
 
+    elif platname == "ASTRA":
+        plat.setBatchSystem( "slurm", 2 * 28 )
+
     elif platname == "Godzilla":
         plat.setBatchSystem( "slurm", 20 )
 
