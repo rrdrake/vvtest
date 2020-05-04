@@ -167,7 +167,7 @@ class SimpleAprepro:
                   " Encountered while processing '{0}'".format(txt))
 
         if "=" in txt:
-            name, expression = [_.strip() for _ in txt.split("=", 2)]
+            name, expression = [_.strip() for _ in txt.split("=", 1)]
 
             if self.immutable and name in self.eval_locals.keys():
                 raise Exception("Cannot change '{0}'".format(name)
