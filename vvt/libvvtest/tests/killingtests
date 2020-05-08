@@ -273,11 +273,8 @@ def run_script_using_group_exec_subprocess( scriptname,
     ""
     fname = os.path.abspath( scriptname )
 
-    redir = util.RedirectStdout( 'outfile', 'errfile' )
-    try:
+    with util.redirect_output( 'outfile', 'errfile' ):
         x = fork_and_run_script( fname, timeout, signum )
-    finally:
-        redir.close()
 
     time.sleep(1)
 

@@ -329,38 +329,6 @@ def run_redirect( cmd, redirect_filename ):
     return x == 0
 
 
-class RedirectStdout:
-    """
-    A convenience class to redirect the current process's stdout to a file.
-    Constructor initiates the redirection, close() stops it.
-    """
-
-    def __init__(self, filename, stderr_filename=None):
-        """
-        If 'stderr_filename' is not None, stderr goes to that filename.
-        """
-        self.filep = open( filename, 'w' )
-        self.save_stdout_fd = os.dup(1)
-        os.dup2( self.filep.fileno(), 1 )
-        self.filep2 = None
-        if stderr_filename:
-            self.filep2 = open( stderr_filename, 'w' )
-            self.save_stderr_fd = os.dup(2)
-            os.dup2( self.filep2.fileno(), 2 )
-
-    def close(self):
-        ""
-        sys.stdout.flush()
-        os.dup2( self.save_stdout_fd, 1 )
-        os.close( self.save_stdout_fd )
-        self.filep.close()
-        if self.filep2 != None:
-            sys.stderr.flush()
-            os.dup2( self.save_stderr_fd, 2 )
-            os.close( self.save_stderr_fd )
-            self.filep2.close()
-
-
 call_capture_id = 0
 
 def call_capture_output( func, *args, **kwargs ):
@@ -377,22 +345,18 @@ def call_capture_output( func, *args, **kwargs ):
     outid = call_capture_id
     call_capture_id += 1
 
+    rtn = None
     of = 'stdout'+str(outid)+'.log'
     ef = 'stderr'+str(outid)+'.log'
 
-    redir = RedirectStdout( of, ef )
-    rtn = None
-    try:
-        rtn = func( *args, **kwargs )
-    except Exception:
-        traceback.print_exc()
-    except SystemExit:
-        traceback.print_exc()
-    except:
-        redir.close()
-        raise
+    with redirect_output( of, ef ):
+        try:
+            rtn = func( *args, **kwargs )
+        except Exception:
+            traceback.print_exc()
+        except SystemExit:
+            traceback.print_exc()
 
-    redir.close()
     time.sleep(1)
 
     return rtn, readfile(of), readfile(ef)
@@ -787,6 +751,49 @@ class set_environ:
             for n,v in self.save_environ.items():
                 if n not in os.environ or os.environ[n] != v:
                     os.environ[n] = v
+
+
+class redirect_output:
+    """
+    both or either stdout & stderr can be a filename
+
+    with redirect_output( out_filename, err_filename ):
+        pass
+
+    with redirect_output( stderr=filename ):
+        pass
+    """
+
+    def __init__(self, stdout=None, stderr=None):
+        ""
+        self.stdout = stdout
+        self.stderr = stderr
+
+    def __enter__(self):
+        ""
+        if self.stdout != None:
+            self.filep = open( self.stdout, 'wt' )
+            self.save_stdout_fd = os.dup(1)
+            os.dup2( self.filep.fileno(), 1 )
+
+        if self.stderr != None:
+            self.filep2 = open( self.stderr, 'wt' )
+            self.save_stderr_fd = os.dup(2)
+            os.dup2( self.filep2.fileno(), 2 )
+
+    def __exit__(self, type, value, traceback):
+        ""
+        if self.stdout != None:
+            sys.stdout.flush()
+            os.dup2( self.save_stdout_fd, 1 )
+            os.close( self.save_stdout_fd )
+            self.filep.close()
+
+        if self.stderr != None:
+            sys.stderr.flush()
+            os.dup2( self.save_stderr_fd, 2 )
+            os.close( self.save_stderr_fd )
+            self.filep2.close()
 
 
 def has_owner_execute( path ):

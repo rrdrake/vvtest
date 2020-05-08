@@ -783,21 +783,12 @@ def run_echo( cmd_type, *logging_args, **kwargs ):
     ""
     cd = kwargs.get( 'chdir', None )
 
-    redir = util.RedirectStdout( 'stdout.log' )
-    try:
+    with util.redirect_output( 'stdout.log' ):
+        with util.change_directory( cd ):
 
-        if cd:
-            cwd = os.getcwd()
-            os.chdir( cd )
-
-        echo = cmd_type( *logging_args )
-        echo.preExecute()
-        echo.postExecute( kwargs.get( 'postexec', None ) )
-
-    finally:
-        redir.close()
-        if cd:
-            os.chdir( cwd )
+            echo = cmd_type( *logging_args )
+            echo.preExecute()
+            echo.postExecute( kwargs.get( 'postexec', None ) )
 
     time.sleep(1)
 

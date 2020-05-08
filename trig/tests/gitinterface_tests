@@ -1605,19 +1605,14 @@ def random_file_content( idx ):
 def call_expect_GitInterfaceError_capture_output( func, *args, **kwargs ):
     ""
     caught = False
-    redir = util.RedirectStdout( 'stdout.log', 'stderr.log' )
-    try:
-        func( *args, **kwargs )
-    except GitInterfaceError:
-        caught = True
-    except:
-        redir.close()
-        raise
-
-    redir.close()
-    time.sleep(1)
+    with util.redirect_output( 'stdout.log', 'stderr.log' ):
+        try:
+            func( *args, **kwargs )
+        except GitInterfaceError:
+            caught = True
 
     assert caught
+    time.sleep(1)
 
     return util.readfile('stdout.log'), util.readfile('stderr.log')
 
