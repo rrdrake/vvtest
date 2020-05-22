@@ -48,19 +48,31 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
 
         plug.callPrologue( ['foo','--bar'] )
 
-    def test_calling_epilogue_with_test_that_did_not_run(self):
+    def epilogue_func(self, result, runtime, timeout, skip):
         ""
-        plug = vtu.make_user_plugin( """
+        func = """
             def epilogue( tests ):
                 ""
                 assert len(tests) == 1
                 name,tD = list( tests.items() )[0]
                 assert name == 'sdir/atest.np=4'
                 assert tD['rundir'].endswith( 'sdir/atest.np=4' )
-                assert tD['result'] == 'notrun'
-                assert tD['runtime'] == None
+                assert tD['result'] == """+repr(result)+"""
+                assert tD['runtime'] == """+repr(runtime)+"""
+                assert tD['timeout'] == """+repr(timeout)
+        if skip:
+            func += """
+                assert """+repr(skip)+""" in tD['skip']"""
+        func += """
                 print ( 'done done done' )
-            """ )
+        """
+        return func
+
+    def test_calling_epilogue_with_test_that_did_not_run(self):
+        ""
+        func = self.epilogue_func( 'notrun', None, None, None )
+        plug = vtu.make_user_plugin( func )
+
         tcase = vtu.make_fake_TestCase( result='notrun', runtime=None )
 
         rtn,out,err = util.call_capture_output(
@@ -68,29 +80,33 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
 
         assert not err.strip()
         assert out.strip() == 'done done done'
-        assert not err.strip()
 
-    def test_calling_epilogue_with_test_that_ran(self):
+    def test_calling_epilogue_with_test_that_ran_but_timed_out(self):
         ""
-        plug = vtu.make_user_plugin( """
-            def epilogue( tests ):
-                ""
-                assert len(tests) == 1
-                name,tD = list( tests.items() )[0]
-                assert name == 'sdir/atest.np=4'
-                assert tD['rundir'].endswith( 'sdir/atest.np=4' )
-                assert tD['result'] == 'fail'
-                assert tD['runtime'] == 42
-                print ( 'done done done' )
-            """ )
+        func = self.epilogue_func( 'fail', 42, 40, None )
+        plug = vtu.make_user_plugin( func )
+
         tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
+        tcase.getSpec().setAttr( 'timeout', 40 )
 
         rtn,out,err = util.call_capture_output(
                         plug.callEpilogue, os.getcwd(), [tcase] )
 
         assert not err.strip()
         assert out.strip() == 'done done done'
+
+    def test_calling_epilogue_with_test_that_was_skipped(self):
+        ""
+        func = self.epilogue_func( 'notrun', None, None, 'excluded by platform' )
+        plug = vtu.make_user_plugin( func )
+
+        tcase = vtu.make_fake_TestCase( result='skip' )
+
+        rtn,out,err = util.call_capture_output(
+                        plug.callEpilogue, os.getcwd(), [tcase] )
+
         assert not err.strip()
+        assert out.strip() == 'done done done'
 
     def test_calling_epilogue_with_an_exception(self):
         ""
@@ -128,6 +144,7 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
                 assert os.path.exists( info['rundir']+'/execute.log' )
                 assert info['result'] == 'pass'
                 assert info['runtime'] > 0 and info['runtime'] < 5
+                assert info['timeout'] > 1
                 print ( 'EPILOGUE=foobar' )
             """ )
         adir = abspath( 'adir' )

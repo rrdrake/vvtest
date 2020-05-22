@@ -654,7 +654,7 @@ def make_fake_TestSpec( name='atest', keywords=['key1','key2'] ):
 
 
 def make_fake_TestCase( result=None, runtime=None, name='atest',
-                        keywords=['key1','key2'] ):
+                        keywords=['key1','key2'], timeout=None ):
     ""
     tspec = make_fake_TestSpec( name, keywords )
     tcase = testcase.TestCase( tspec )
@@ -698,6 +698,9 @@ def make_fake_TestCase( result=None, runtime=None, name='atest',
 
     if runtime != None:
         tstat.setRuntime( runtime )
+
+    if timeout != None:
+        tspec.setTimeout( timeout )
 
     return tcase
 

@@ -139,17 +139,18 @@ class UserPluginBridge:
 
             infoD = self._make_test_to_user_interface_dict( tcase )
 
+            tspec = tcase.getSpec()
             tstat = tcase.getStat()
-            res = tstat.getResultStatus()
-            tm = tstat.getRuntime( None )
-            infoD[ 'result' ] = res
-            infoD[ 'runtime' ] = tm
 
-            infoD[ 'rundir' ] = tcase.getSpec().getExecuteDirectory()
+            infoD[ 'result' ] = tstat.getResultStatus()
+            infoD[ 'runtime' ] = tstat.getRuntime( None )
+            infoD[ 'rundir' ] = tspec.getExecuteDirectory()
+            infoD[ 'timeout' ] = tspec.getAttr( 'timeout', None )
 
-            displ = tcase.getSpec().getDisplayString()
+            if tstat.skipTest():
+                infoD['skip'] = tstat.getReasonForSkipTest()
 
-            testD[ displ ] = infoD
+            testD[ tspec.getDisplayString() ] = infoD
 
         return testD
 
