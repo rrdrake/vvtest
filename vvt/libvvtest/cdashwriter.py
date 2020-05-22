@@ -131,28 +131,31 @@ def set_test_list( fmtr, atestlist, testdir ):
         tstat = tcase.getStat()
 
         vvstat = tstat.getResultStatus()
+        logdir = pjoin( testdir, tspec.getExecuteDirectory() )
+
+        kwargs = {}
 
         if vvstat == 'notrun':
-            fmtr.addTest( tspec.getDisplayString(),
-                          status='notrun' )
+            kwargs['status']    = 'notrun'
 
         elif vvstat == 'pass':
-            fmtr.addTest( tspec.getDisplayString(),
-                          status='passed',
-                          runtime=tstat.getRuntime( None ),
-                          exitvalue=tspec.getAttr( 'xvalue', None ) )
+            kwargs['status']    = 'passed'
+            kwargs['runtime']   = tstat.getRuntime( None )
+            kwargs['exitvalue'] = tspec.getAttr( 'xvalue', None )
+            kwargs['command']   = outpututils.get_test_command_line( logdir )
 
         else:
-
             file_max_KB = 100
             out = get_test_output( testdir, tspec, file_max_KB )
 
-            fmtr.addTest( tspec.getDisplayString(),
-                          status='failed',
-                          runtime=tstat.getRuntime( None ),
-                          detail=vvstat,
-                          output=out,
-                          exitvalue=tspec.getAttr( 'xvalue', None ) )
+            kwargs['status']    = 'failed'
+            kwargs['runtime']   = tstat.getRuntime( None )
+            kwargs['detail']    = vvstat
+            kwargs['output']    = out
+            kwargs['exitvalue'] = tspec.getAttr( 'xvalue', None )
+            kwargs['command']   = outpututils.get_test_command_line( logdir )
+
+        fmtr.addTest( tspec.getDisplayString(), **kwargs )
 
 
 def is_http_url( destination ):

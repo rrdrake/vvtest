@@ -41,9 +41,9 @@ class UserPluginBridge:
     def callEpilogue(self, rundir, tcaselist):
         ""
         if self.epilog != None and os.path.isdir(rundir):
-            testD = _convert_test_list_to_info_dict( self.rtconfig,
-                                                     rundir,
-                                                     tcaselist )
+            testD = convert_test_list_to_info_dict( self.rtconfig,
+                                                    rundir,
+                                                    tcaselist )
             try:
                 with change_directory( rundir ):
                     self.epilog( testD )
@@ -57,7 +57,7 @@ class UserPluginBridge:
         """
         rtn = None
         if self.validate != None:
-            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
+            specs = make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 rtn = self.validate( specs )
             except Exception:
@@ -73,7 +73,7 @@ class UserPluginBridge:
         """
         rtn = None
         if self.timeout != None:
-            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
+            specs = make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 rtn = self.timeout( specs )
                 if rtn != None:
@@ -93,7 +93,7 @@ class UserPluginBridge:
         pyexe = None
 
         if self.preload != None:
-            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
+            specs = make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 label = tcase.getSpec().getPreloadLabel()
                 if label:
@@ -135,13 +135,13 @@ class UserPluginBridge:
             self.exc_uniq.add( xs )
 
 
-def _convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
+def convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
     ""
     testD = {}
 
     for tcase in tcaselist:
 
-        infoD = _make_test_to_user_interface_dict( rtconfig, tcase )
+        infoD = make_test_to_user_interface_dict( rtconfig, tcase )
 
         tspec = tcase.getSpec()
         tstat = tcase.getStat()
@@ -165,7 +165,7 @@ def _convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
     return testD
 
 
-def _make_test_to_user_interface_dict( rtconfig, tcase ):
+def make_test_to_user_interface_dict( rtconfig, tcase ):
     ""
     tspec = tcase.getSpec()
 

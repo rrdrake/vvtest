@@ -205,7 +205,7 @@ class file_formatting( trigutil.trigTestCase ):
     def test_command_line(self):
         ""
         fmtr = cdashutil.TestResultsFormatter()
-        fmtr.addTest( 'atest', cmdline='/usr/bin/ugly -command line' )
+        fmtr.addTest( 'atest', command='/usr/bin/ugly -command line' )
         fmtr.writeToFile( 'file.xml' )
         time.sleep(1)
 
@@ -213,7 +213,7 @@ class file_formatting( trigutil.trigTestCase ):
         tests = extract_test_results( etree )
 
         atest = tests['./atest']
-        assert atest['cmdline'].strip() == '/usr/bin/ugly -command line'
+        assert atest['command'].strip() == '/usr/bin/ugly -command line'
 
     def test_elapsed_time(self):
         ""
@@ -257,7 +257,7 @@ def parse_test( nd ):
         elif nd1.tag == 'FullName':
             testinfo['fullname'] = nd1.text
         elif nd1.tag == 'FullCommandLine':
-            testinfo['cmdline'] = nd1.text
+            testinfo['command'] = nd1.text
         elif nd1.tag == 'Results':
             parse_results( nd1, testinfo )
 

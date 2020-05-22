@@ -303,11 +303,15 @@ class integration_tests( vtu.vvtestTestCase ):
         testinfo = extract_test_results( xml, 'good' )
         assert float(testinfo['Execution Time']) < 10
         assert int(testinfo['Exit Value']) == 0
+        assert sys.executable in testinfo['FullCommandLine']
+        assert 'good.vvt' in testinfo['FullCommandLine']
 
         testinfo = extract_test_results( xml, 'bad' )
         assert testinfo['Completion Status'] == 'diff'
         assert float(testinfo['Execution Time']) < 10
         assert int(testinfo['Exit Value']) > 0
+        assert sys.executable in testinfo['FullCommandLine']
+        assert 'bad.vvt' in testinfo['FullCommandLine']
 
         assert extract_test_results( xml, 'ugly' ) == None
 
@@ -358,6 +362,10 @@ def extract_test_results( xmlroot, testname ):
 
             testinfo = {}
             testinfo['status'] = nd0.get( 'Status' )
+
+            nd1 = nd0.find( 'FullCommandLine' )
+            if nd1 != None:
+                testinfo[ 'FullCommandLine' ] = nd1.text
 
             for nd1 in nd0.findall( 'Results/NamedMeasurement' ):
                 testinfo[ nd1.get('name') ] = nd1.find('Value').text

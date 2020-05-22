@@ -45,7 +45,7 @@ class TestResultsFormatter:
             name      : name of the test
             prefix    : the "Path" value in the submission; thats all I know
             status    : "passed" or "failed" or "notrun"
-            cmdline   : the test command line, but can be anything
+            command   : the test command line, but can be anything
             runtime   : number of seconds
             output    : multi-line test output
             exitcode  : something like "Completed" or "Failed"
@@ -55,7 +55,7 @@ class TestResultsFormatter:
                  'name' : name,
                'prefix' : attrs.pop( 'prefix'    , '.' ),
                'status' : attrs.pop( 'status'    , 'passed' ),
-              'cmdline' : attrs.pop( 'cmdline'   , '' ),
+              'command' : attrs.pop( 'command'   , '' ),
               'runtime' : attrs.pop( 'runtime'   , None ),
                'detail' : attrs.pop( 'detail'    , '' ),
                'output' : attrs.pop( 'output'    , '' ),
@@ -169,8 +169,8 @@ def write_test_result( fp, results ):
     simple_element( fp, 'Name', results['name'] )
     simple_element( fp, 'Path', results['prefix'] )
     simple_element( fp, 'FullName', results['prefix']+'/'+results['name'] )
-    if results['cmdline']:
-        simple_element( fp, 'FullCommandLine', results['cmdline'] )
+    if results['command']:
+        simple_element( fp, 'FullCommandLine', results['command'] )
 
     start_element( fp, 'Results' )
 

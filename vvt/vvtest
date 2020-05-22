@@ -1010,7 +1010,7 @@ def determine_job_check_intervals():
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     ""
-    cmd = vvtestpath
+    cmd = sys.executable + ' ' + vvtestpath
 
     if opts.dash_e: cmd += ' -e'
     if opts.dash_m: cmd += ' -m'
