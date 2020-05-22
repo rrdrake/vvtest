@@ -1,6 +1,13 @@
 
 Improvements:
 
+    - Add the command line for each test to the CDash report file & submission.
+
+    - Add the command line to the test information sent into the user plugin
+      epilogue() function. Also, make the 'timeout' value reflect the vvtest
+      computed timeout rather than the test specified timeout. Lastly, add
+      a 'skip' entry for tests that were skipped.
+
     - Add formal support for "devices", such as GPUs.  Tests can now specify
       an "ndevice" parameter in test files (analogous to "np"):
 
