@@ -5,10 +5,10 @@
 # Government retains certain rights in this software.
 
 import os, sys
+from os.path import join as pjoin
 import time
 import traceback
 
-from . import TestExec
 from . import pathutil
 
 
@@ -39,6 +39,28 @@ def XstatusString( tcase, test_dir, cwd ):
         s += ' skip_reason="'+skipreason+'"'
 
     return s
+
+
+def get_test_command_line( test_exec_dir ):
+    ""
+    log = pjoin( test_exec_dir, 'execute.log' )
+
+    cmdmark = 'Command      : '
+
+    if os.path.isfile( log ):
+        cmd = '*** could not get command line from log file: '+log
+        try:
+            with open( log, 'rt' ) as fp:
+                for line in fp:
+                    if line.startswith( cmdmark ):
+                        cmd = line.split( cmdmark, 1 )[1].strip()
+                        break
+        except Exception:
+            pass
+    else:
+        cmd = '*** log file missing: '+log
+
+    return cmd
 
 
 def file_read_with_limit( filename, max_KB ):
@@ -151,14 +173,6 @@ def pretty_time( nseconds ):
     if h > 0: return sh+' '+sm+' '+ss
     if m > 0: return sm+' '+ss
     return ss
-
-
-def ensure_TestSpec( testobj ):
-    ""
-    if isinstance( testobj, TestExec.TestExec ):
-        return testobj.atest
-    else:
-        return testobj
 
 
 def print3( *args ):

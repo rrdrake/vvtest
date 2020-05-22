@@ -145,7 +145,7 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
                 assert info['result'] == 'pass'
                 assert info['runtime'] > 0 and info['runtime'] < 5
                 assert info['timeout'] > 1
-                print ( 'EPILOGUE=foobar' )
+                print ( 'EPILOGUE='+repr(info['command']) )
             """ )
         adir = abspath( 'adir' )
         time.sleep(1)
@@ -157,14 +157,20 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '-vv --config', adir, batch=batch )
             vrun.assertCounts( total=1, npass=1 )
 
+            def check_cmdline( out ):
+                lines = util.greplines( 'EPILOGUE=', out )
+                assert len( lines ) == 1
+                cmd = eval( lines[0].split( 'EPILOGUE=', 1 )[1] )
+                assert sys.executable in cmd and 'testA.vvt' in cmd
+
             assert 'CMDLINE=' in vrun.out and '-vv --config' in vrun.out
-            assert 'EPILOGUE=foobar' in vrun.out
+            check_cmdline( vrun.out )
 
             vrun = vtu.runvvtest( '-i -v --config', adir )
             vrun.assertCounts( total=1, npass=1 )
 
             assert 'CMDLINE=' not in vrun.out
-            assert 'EPILOGUE=foobar' in vrun.out
+            check_cmdline( vrun.out )
 
     def test_calling_epilogue_when_test_directory_does_not_exist(self):
         ""

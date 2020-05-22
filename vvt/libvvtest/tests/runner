@@ -12,12 +12,14 @@ sys.excepthook = sys.__excepthook__
 import os
 from os.path import abspath
 import time
+import shlex
 
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
 import libvvtest.testrunner as testrunner
+import libvvtest.outpututils as outpututils
 
 
 class testrunner_free_functions( vtu.vvtestTestCase ):
@@ -285,6 +287,20 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         assert not os.path.exists( 'xdir/old.exo' )
         assert     os.path.exists( 'xdir/alink' )
         assert not os.path.exists( 'xdir/subdir' )
+
+    def test_writing_and_reading_the_execute_log_header(self):
+        ""
+        cmdL = [ sys.executable, '--longopt', 'foo bar', 'myarg' ]
+
+        rtn,out,err = util.call_capture_output(
+            testrunner.echo_test_execution_info, 'atest', cmdL, 60 )
+
+        with open( 'execute.log', 'wt' ) as fp:
+            fp.write( out+'\nblah blah blah\n' )
+        time.sleep(1)
+
+        cmd2 = outpututils.get_test_command_line( '.' )
+        assert shlex.split(cmd2) == cmdL
 
 
 ############################################################################

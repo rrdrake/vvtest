@@ -10,6 +10,7 @@ import glob
 import fnmatch
 from os.path import normpath, dirname
 from os.path import join as pjoin
+import pipes
 
 from . import CommonSpec
 from . import cshScriptWriter
@@ -399,7 +400,8 @@ def echo_test_execution_info( testname, cmd_list, timeout ):
     print3( "Directory    : "+os.getcwd() )
 
     if cmd_list != None:
-        print3( "Command      : "+' '.join( cmd_list ) )
+        cmd = ' '.join( [ pipes.quote(arg) for arg in cmd_list ] )
+        print3( "Command      : "+cmd )
 
     print3( "Timeout      : "+str(timeout) )
 

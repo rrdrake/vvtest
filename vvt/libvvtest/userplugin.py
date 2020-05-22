@@ -5,8 +5,9 @@
 # Government retains certain rights in this software.
 
 import os, sys
+from os.path import join as pjoin
 
-from .outpututils import capture_traceback
+from .outpututils import capture_traceback, get_test_command_line
 from .pathutil import change_directory
 
 
@@ -40,7 +41,9 @@ class UserPluginBridge:
     def callEpilogue(self, rundir, tcaselist):
         ""
         if self.epilog != None and os.path.isdir(rundir):
-            testD = self._convert_test_list_to_info_dict( tcaselist )
+            testD = _convert_test_list_to_info_dict( self.rtconfig,
+                                                     rundir,
+                                                     tcaselist )
             try:
                 with change_directory( rundir ):
                     self.epilog( testD )
@@ -54,7 +57,7 @@ class UserPluginBridge:
         """
         rtn = None
         if self.validate != None:
-            specs = self._make_test_to_user_interface_dict( tcase )
+            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 rtn = self.validate( specs )
             except Exception:
@@ -70,7 +73,7 @@ class UserPluginBridge:
         """
         rtn = None
         if self.timeout != None:
-            specs = self._make_test_to_user_interface_dict( tcase )
+            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 rtn = self.timeout( specs )
                 if rtn != None:
@@ -90,7 +93,7 @@ class UserPluginBridge:
         pyexe = None
 
         if self.preload != None:
-            specs = self._make_test_to_user_interface_dict( tcase )
+            specs = _make_test_to_user_interface_dict( self.rtconfig, tcase )
             try:
                 label = tcase.getSpec().getPreloadLabel()
                 if label:
@@ -131,40 +134,48 @@ class UserPluginBridge:
             sys.stdout.write( '\n' + tb + '\n' )
             self.exc_uniq.add( xs )
 
-    def _convert_test_list_to_info_dict(self, tcaselist):
-        ""
-        testD = {}
 
-        for tcase in tcaselist:
+def _convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
+    ""
+    testD = {}
 
-            infoD = self._make_test_to_user_interface_dict( tcase )
+    for tcase in tcaselist:
 
-            tspec = tcase.getSpec()
-            tstat = tcase.getStat()
+        infoD = _make_test_to_user_interface_dict( rtconfig, tcase )
 
-            infoD[ 'result' ] = tstat.getResultStatus()
-            infoD[ 'runtime' ] = tstat.getRuntime( None )
-            infoD[ 'rundir' ] = tspec.getExecuteDirectory()
-            infoD[ 'timeout' ] = tspec.getAttr( 'timeout', None )
-
-            if tstat.skipTest():
-                infoD['skip'] = tstat.getReasonForSkipTest()
-
-            testD[ tspec.getDisplayString() ] = infoD
-
-        return testD
-
-    def _make_test_to_user_interface_dict(self, tcase):
-        ""
         tspec = tcase.getSpec()
+        tstat = tcase.getStat()
 
-        specs = { 'name'       : tspec.getName(),
-                  'keywords'   : tspec.getKeywords( include_implicit=False ),
-                  'parameters' : tspec.getParameters(),
-                  'timeout'    : tspec.getTimeout(),
-                  'platform'   : self.rtconfig.getPlatformName(),
-                  'options'    : self.rtconfig.getOptionList() }
-        return specs
+        result = tstat.getResultStatus()
+        xdir = tspec.getExecuteDirectory()
+
+        infoD[ 'result'  ] = result
+        infoD[ 'runtime' ] = tstat.getRuntime( None )
+        infoD[ 'rundir'  ] = xdir
+        infoD[ 'timeout' ] = tspec.getAttr( 'timeout', None )
+
+        if tstat.skipTest():
+            infoD['skip'] = tstat.getReasonForSkipTest()
+        elif result not in ['notrun','skip']:
+            logdir = pjoin( rundir, xdir )
+            infoD['command'] = get_test_command_line( logdir )
+
+        testD[ tspec.getDisplayString() ] = infoD
+
+    return testD
+
+
+def _make_test_to_user_interface_dict( rtconfig, tcase ):
+    ""
+    tspec = tcase.getSpec()
+
+    specs = { 'name'       : tspec.getName(),
+              'keywords'   : tspec.getKeywords( include_implicit=False ),
+              'parameters' : tspec.getParameters(),
+              'timeout'    : tspec.getTimeout(),
+              'platform'   : rtconfig.getPlatformName(),
+              'options'    : rtconfig.getOptionList() }
+    return specs
 
 
 def import_module_by_name( modulename ):
