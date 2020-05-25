@@ -1,0 +1,447 @@
+#!/usr/bin/env python
+
+#RUNTEST:
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import abspath
+import time
+import unittest
+
+try:
+  from StringIO import StringIO
+except Exception:
+  from io import StringIO
+
+import trigtestutils as trigutil
+import testutils as util
+from testutils import print3
+
+import remotepython
+from remotepython import RemotePython
+
+
+rpy = sys.executable
+#rpy='/home/rrdrake/bin/Linux/py266/bin/python'
+#rpy='/home/rrdrake/bin/Linux/py365/bin/python'
+
+
+class TestTimeoutError( Exception ):
+    pass
+
+
+class the_tests( unittest.TestCase ):
+
+    def setUp(self):
+        util.setup_test()
+
+    def test_connect_and_print_hello_world(self):
+        ""
+        rem = RemotePython( remotepython=rpy )
+        try:
+            ok = rem.start()
+            assert ok
+            rem.execute( 'print ( "hello world" )' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        assert out.strip() == 'hello world'
+        assert err == None
+
+    def test_timing_out_waiting_on_a_command(self):
+        ""
+        rem = RemotePython( remotepython=rpy )
+        try:
+            rem.start()
+            rem.execute( 'import time',
+                         'time.sleep(10)' )
+            get_line_from_remote( rem, timeout=5 )
+        except TestTimeoutError:
+            rem.close()
+        else:
+            rem.close()
+            raise Exception( 'expected a timeout' )
+
+    def test_connect_and_write_to_stderr(self):
+        ""
+        rem = RemotePython( remotepython=rpy )
+        try:
+            rem.start()
+            rem.execute( 'import os, sys',
+                         'sys.stderr.write( "hello stderr"+os.linesep )',
+                         'sys.stderr.flush()' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        assert out == None
+        assert err.strip() == 'hello stderr'
+
+    def test_check_if_subprocess_is_alive(self):
+        ""
+        rem = RemotePython( remotepython=rpy )
+        try:
+            rem.start()
+            chk1 = rem.isAlive()
+            rem.execute( 'import time',
+                         'time.sleep(2)',
+                         'print ( "foobar" )' )
+            chk2 = rem.isAlive()
+            out1,err1 = get_line_from_remote( rem )
+            chk3 = rem.isAlive()
+            rem.execute( 'raise Exception("fake failure")' )
+            time.sleep(1)
+            chk4 = rem.isAlive()
+            out2,err2 = flush_lines_from_remote( rem )
+        finally:
+            rem.close()
+        chk5 = rem.isAlive()
+
+        assert chk1 == True
+        assert chk2 == True
+        assert chk3 == True
+        assert chk4 == False
+        assert chk5 == False
+        assert out1.strip() == 'foobar' and not err1
+        assert not out2 and 'fake failure' in err2
+
+    def test_connecting_with_ssh_but_using_a_fake_ssh_script(self):
+        ""
+        fakessh = write_fake_ssh_script()
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', remotepython=rpy, sshexe=fakessh )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ("hello")' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        assert out.strip() == 'hello' and not err
+
+    def test_that_output_during_connection_is_available(self):
+        ""
+        fakessh = write_fake_ssh_script( to_stdout='outval1\\n outval2',
+                                         to_stderr='errval1\\n errval2' )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', remotepython=rpy, sshexe=fakessh )
+        try:
+            rem.start()
+            rem.execute( 'print ("hello")' )
+            out,err = get_line_from_remote( rem )
+            conn = rem.getStartupOutput()
+        finally:
+            rem.close()
+        assert out.strip() == 'hello'
+        assert not err
+        assert 'outval1' in conn and 'outval2' in conn
+        assert 'errval1' in conn and 'errval2' in conn
+        assert len( util.greplines( 'out*', conn ) ) == 2
+        assert len( util.greplines( 'err*', conn ) ) == 2
+
+    def test_when_ssh_immediately_crashes(self):
+        ""
+        fakessh = write_fake_ssh_script( die_fast=True,
+                                         to_stdout='junkout',
+                                         to_stderr='junkerr' )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', remotepython=rpy, sshexe=fakessh )
+        ok = rem.start()
+        assert not ok
+        conn = rem.getStartupOutput()
+        assert conn and "connection failed" in conn
+        assert "fake crash" in conn
+        assert "junkout" in conn
+        assert "junkerr" in conn
+        assert not rem.isAlive()
+
+    def test_when_ssh_connection_times_out(self):
+        ""
+        fakessh = write_fake_ssh_script( fake_pause=10 )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', remotepython=rpy, sshexe=fakessh )
+        ok = rem.start( timeout=5.5 )
+        assert not ok
+        conn = rem.getStartupOutput()
+        assert conn and "timed out" in conn
+        assert "5.5" in conn
+        assert not rem.isAlive()
+
+    def test_logging_all_output_traffic(self):
+        ""
+        fakessh = write_fake_ssh_script( to_stdout='connect output data',
+                                         to_stderr='connect error data' )
+        time.sleep(1)
+
+        fp = open( 'logfile', 'wt' )
+        rem = RemotePython( 'sparky',
+                            remotepython=rpy,
+                            sshexe=fakessh,
+                            logfile=fp )
+        try:
+            rem.start()
+            rem.execute( 'print ( "hello 10-4" )',
+                         'import os, sys',
+                         'sys.stderr.write( "some error output 357"+os.linesep )',
+                         'sys.stderr.flush()',
+                         'raise Exception( "fake exception" )' )
+            while rem.isAlive():
+                time.sleep(0.5)
+        finally:
+            rem.close()
+            fp.close()
+
+        assert len( util.grepfiles( 'CMD:*fakessh', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'SND:*RemotePython', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'OUT: connect output data', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'ERR: connect error data', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'OUT: RemotePython', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'SND: *hello 10-4', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'OUT: hello 10-4', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'ERR: some error output 357', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'ERR: Traceback', 'logfile' ) ) > 0
+        assert len( util.grepfiles( 'ERR: Exception*fake exception', 'logfile' ) ) == 1
+
+    def test_giving_a_filename_for_the_logfile(self):
+        ""
+        fakessh = write_fake_ssh_script()
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky',
+                            remotepython=rpy,
+                            sshexe=fakessh,
+                            logfile='logfile' )
+        try:
+            rem.start()
+            rem.execute( 'print ( "hello good buddy" )' )
+        finally:
+            rem.close()
+
+        assert len( util.grepfiles( 'SND: *hello good buddy', 'logfile' ) ) == 1
+        assert len( util.grepfiles( 'OUT: hello good buddy', 'logfile' ) ) == 1
+
+    def test_logging_code_lines_sent_to_remote(self):
+        ""
+        sio = StringIO()
+        inp = remotepython.InputHandler( logfp=sio )
+        inp._write_data_to_log( 'import os, sys' )
+        assert sio.getvalue() == 'SND: import os, sys\n'
+
+        sio = StringIO()
+        inp = remotepython.InputHandler( logfp=sio )
+        inp._write_data_to_log( 'import os, sys\n' )
+        assert sio.getvalue() == 'SND: import os, sys\n'
+
+        sio = StringIO()
+        inp = remotepython.InputHandler( logfp=sio )
+        inp._write_data_to_log( '\n'.join( [
+                'import os, sys',
+                'def func(arg):',
+                '    raise Exception( "fake exception "+arg )'
+            ] ) )
+        assert sio.getvalue() == '\n'.join( [
+                'SND: import os, sys',
+                '  2: def func(arg):',
+                '  3:     raise Exception( "fake exception "+arg )\n'
+            ] )
+
+    def test_that_remote_traceback_includes_code_lines(self):
+        ""
+        fakessh = write_fake_ssh_script()
+        time.sleep(1)
+
+        fp = open( 'logfile', 'wt' )
+        rem = RemotePython( 'sparky',
+                            remotepython=rpy,
+                            sshexe=fakessh,
+                            logfile=fp )
+        try:
+            rem.start()
+            rem.execute( 'import os, sys',
+                         'def func1(arg):',
+                         '    func2(arg)',
+                         'def func2(arg):',
+                         '    raise Exception( "fake exception "+arg )' )
+            rem.execute( 'if True:',
+                         '    func1( "foobar" )' )
+            while rem.isAlive():
+                time.sleep(0.5)
+        finally:
+            rem.close()
+            fp.close()
+
+        with open( 'logfile', 'rt' ) as fp:
+            for line in fp:
+                print3( 'logfile:', line.rstrip() )
+
+        # Traceback (most recent call last):
+        #   File "<bootstrap>", line 26, in <module>
+        #   File "<remotecode3>", line 2, in <module>
+        #     func1( "foobar" )
+        #   File "<remotecode2>", line 3, in func1
+        #     func2(arg)
+        #   File "<remotecode2>", line 5, in func2
+        #     raise Exception( "fake exception "+arg )
+        # Exception: fake exception foobar
+        exc0 = extract_exception_from_logfile(0)
+        # print3( exc0 )
+        assert len( util.greplines( 'File ', exc0 ) ) == 4
+        assert 'func1( "foobar" )' in exc0
+        assert 'func2(arg)' in exc0
+        assert len( util.greplines( 'File *line 5, in func2', exc0 ) ) == 1
+        assert 'raise Exception( "fake exception "+arg )' in exc0
+        assert 'fake exception foobar' in exc0.splitlines()[-1]
+
+        # Traceback (most recent call last):
+        #   File "/scratch/rrdrake/temp/tmpdir_remotepython_tests/fakessh", line 7, in <module>
+        #     subprocess.check_call( cmdL )
+        #   File "/usr/lib64/python2.6/subprocess.py", line 505, in check_call
+        #     raise CalledProcessError(retcode, cmd)
+        # subprocess.CalledProcessError: Command '['/usr/bin/python', '-u', '-E', '-c', 'import sys; eval( compile( eval( sys.stdin.readline() ), "<bootstrap>", "exec" ) )']' returned non-zero exit status 1
+        exc1 = extract_exception_from_logfile(1)
+        # print3( exc1 )
+        assert len( util.greplines( 'File ', exc0 ) ) > 0
+        assert 'returned non-zero exit status' in exc1.splitlines()[-1]
+
+    def test_using_real_ssh(self):
+        ""
+        return  # magic: make execution of "real ssh" tests an option
+
+        rem = RemotePython( os.uname()[1], remotepython=rpy )
+        #rem = RemotePython( 'chama' )
+        try:
+            ok = rem.start( timeout=5 )
+            if ok:
+                rem.execute( 'print ( "hello world" )' )
+                out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        print3( 'startup output\n', rem.getStartupOutput() )
+        assert ok
+        assert out.strip() == 'hello world'
+        assert err == None
+
+    def test_stressing_get_lines_and_many_sequential_connections(self):
+        ""
+        return  # magic: make execution of performance testing an option
+
+        count = 10000
+        for i in range(count):
+            rem = RemotePython( remotepython=rpy )
+            try:
+                rem.start()
+                rem.execute( 'import time',
+                             'print ( "hello" )',
+                             '#time.sleep(0.3)',
+                             'print ( "world" )' )
+                out = rem.getOutputLine()
+                while out == None or out.strip() != 'world':
+                    out = rem.getOutputLine()
+            finally:
+                rem.close()
+            print ( 'i='+str(i) )
+
+
+def extract_exception_from_logfile( exc_index=0 ):
+    ""
+    cnt = -1
+    exc = ''
+    with open( 'logfile', 'rt' ) as fp:
+        for line in fp:
+            if cnt == exc_index:
+                exc += line.split( 'ERR: ', 1 )[1]
+                if not line.startswith( 'ERR:   ' ):
+                    break
+            elif line.startswith( 'ERR: Traceback' ):
+                cnt += 1
+                if cnt == exc_index:
+                    exc += line.split( 'ERR: ', 1 )[1]
+
+    return exc
+
+
+def get_line_from_remote( rem, timeout=5 ):
+    ""
+    out = None
+    err = None
+    tstart = time.time()
+    while out == None and err == None:
+
+        line = rem.getOutputLine()
+        if line != None:
+            out = line
+
+        line = rem.getErrorLine()
+        if line != None:
+            err = line
+
+        if time.time()-tstart > timeout:
+            raise TestTimeoutError( 'timeout waiting for output' )
+
+        time.sleep(0.5)
+
+    return out, err
+
+
+def flush_lines_from_remote( rem ):
+    ""
+    outbuf = None
+    errbuf = None
+
+    while True:
+        out = rem.getOutputLine()
+        err = rem.getErrorLine()
+        if out:
+            if outbuf == None:
+                outbuf = out
+            else:
+                outbuf += out
+        if err:
+            if errbuf == None:
+                errbuf = err
+            else:
+                errbuf += err
+
+        if not out and not err:
+            break
+
+    return outbuf, errbuf
+
+
+def write_fake_ssh_script( die_fast=False, fake_pause=None,
+                           to_stdout=None, to_stderr=None ):
+    ""
+    lineL = [ '#!'+sys.executable,
+              'import sys, os, subprocess, shlex, time' ]
+
+    if to_stdout:
+        lineL.append( 'sys.stdout.write( "'+to_stdout+'"+os.linesep )' )
+        lineL.append( 'sys.stdout.flush()' )
+
+    if to_stderr:
+        lineL.append( 'sys.stderr.write( "'+to_stderr+'"+os.linesep )' )
+        lineL.append( 'sys.stderr.flush()' )
+
+    if die_fast:
+        lineL.append( 'raise Exception( "fake crash" )' )
+
+    if fake_pause and fake_pause > 0:
+        lineL.append( 'time.sleep( '+str(fake_pause)+' )' )
+
+    lineL.extend( [ 'cmdL = []',
+                    'for arg in sys.argv[2:]:  # exclude the machine name',
+                    '    cmdL.extend( shlex.split( arg ) )',
+                    'subprocess.check_call( cmdL )' ] )
+
+    util.writescript( 'fakessh', '\n'.join( lineL ) )
+
+    return abspath( 'fakessh' )
+
+
+###########################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
