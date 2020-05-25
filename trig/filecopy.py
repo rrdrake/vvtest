@@ -15,8 +15,7 @@ import pipes
 import subprocess
 import traceback
 
-import remotepython as rpy
-print3 = rpy.print3
+import pythonproxy as rpy
 
 import perms
 
@@ -152,19 +151,18 @@ def copy_files( files, to_dir,
     if rm != None or wm != None:
         m = rm
         if wm != None: m = wm
-        rmt = rpy.RemotePython( m, sshexe=sshexe )
-        rmt.addRemoteContent( remote_functions )
-        # include the permissions module in the remote content
-        assert perms.get_filename() != None, "file perms.py not found"
-        rmt.addRemoteContent( filename=perms.get_filename() )
+        rmt = rpy.RemotePythonProxy( m, sshexe=sshexe )
         if echo: print3( 'Connecting to "'+m+'"' )
-        if timeout: rmt.timeout(timeout)
-        rmt.connect()
+        rmt.start()
+        rmt.execute( remote_functions )
+        # include the permissions module in the remote content
+        rmt.send( perms )
+        if timeout: rmt.setRemoteTimeout(timeout)
 
     try:
         # check destination directory
         if wm == None: wdL = check_dir( wd )
-        else:          wdL = rmt.x_check_dir( wd )
+        else:          wdL = rmt.call( 'check_dir', wd )
         if not wdL[0]:
             raise Exception( "destination directory does not exist: "+to_dir )
         if not wdL[1]:
@@ -176,7 +174,7 @@ def copy_files( files, to_dir,
 
         # list source files
         if rm == None: rL,nL = glob_paths( fL )
-        else:          rL,nL = rmt.x_glob_paths( fL )
+        else:          rL,nL = rmt.call( 'glob_paths', fL )
         if len(nL) > 0:
             p = nL[0]
             if rm != None: p = rm+':'+p
@@ -208,8 +206,8 @@ def copy_files( files, to_dir,
 
     finally:
         if rmt != None:
-            if timeout: rmt.timeout(timeout)
-            rmt.shutdown()
+            if timeout: rmt.setRemoteTimeout(timeout)
+            rmt.close()
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )
@@ -228,6 +226,7 @@ def splitmach( path ):
 # the follwoing functions are defined and available in the current module
 remote_functions = \
 '''
+import time
 import stat
 import glob
 from shutil import rmtree as shutil_rmtree
@@ -453,7 +452,7 @@ def local_to_remote_copy( mach, rmtpy, readL, destdir,
         dD[dirn] = dD.get(dirn,[]) + [basn]
 
     # create remote temporary directory
-    tmpd = rmtpy.x_make_temp_dir( destdir, time.time() )
+    tmpd = rmtpy.call( 'make_temp_dir', destdir, time.time() )
 
     for dirn,bfL in dD.items():
         # use tar sending output through a pipe to ssh on the remote machine
@@ -468,12 +467,17 @@ def local_to_remote_copy( mach, rmtpy, readL, destdir,
         assert x == 0, "Command failed: "+str(cmd)
 
     # apply permissions for the files in the remote temporary directory
-    rmtpy.x_apply_permissions( tmpd, tmpL, fperms, dperms, group )
+    rmtpy.call( 'apply_permissions', tmpd, tmpL, fperms, dperms, group )
 
-    rmtpy.x_swap_paths( readL, tmpd, destdir )
+    rmtpy.call( 'swap_paths', readL, tmpd, destdir )
 
     print3( 'rm -r '+mach+':'+tmpd )
-    rmtpy.x_shutil_rmtree( tmpd )
+    rmtpy.call( 'shutil_rmtree', tmpd )
+
+
+def print3( *args ):
+    sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + os.linesep )
+    sys.stdout.flush()
 
 
 ##########################################################################

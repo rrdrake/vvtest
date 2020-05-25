@@ -9,7 +9,6 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 import time
-import subprocess
 import threading
 import pipes
 import traceback
@@ -463,11 +462,12 @@ class Job:
             remotelogf = self.logpath()
 
         mydir = os.path.dirname( os.path.abspath( __file__ ) )
-        rfile = os.path.join( mydir, 'runjob_remote.py' )
 
-        from remotepython import RemotePython
-        rmt = RemotePython( mach, sshexe=sshexe )
-        rmt.addRemoteContent( filename=rfile )
+        from pythonproxy import RemotePythonProxy
+        if sshexe:
+            rmt = RemotePythonProxy( mach, sshexe=sshexe )
+        else:
+            rmt = RemotePythonProxy( mach )
 
         tprint( 'Connect machine:', mach )
         tprint( 'Remote command:', shcmd )
@@ -491,20 +491,20 @@ class Job:
                 raise Exception( "Could not connect to "+mach )
 
             try:
-                inf = rmt.timeout(30).x_get_machine_info()
+                rmt.setRemoteTimeout(30)
+                inf = rmt.call( 'get_machine_info' )
                 tprint( 'Remote info:', inf )
 
-                rusr = rmt.timeout(30).x_evaluate( 'return os.getuid()' )
+                rusr = rmt.call( 'os.getuid' )
 
-                rmt.timeout(30)
-                rpid = rmt.x_background_command( pycmd, remotelogf,
-                                                 chdir=chd,
-                                                 timeout=timeout )
+                rpid = rmt.call( 'background_command', pycmd, remotelogf,
+                                                       chdir=chd,
+                                                       timeout=timeout )
 
                 self._monitor( rmt, rusr, rpid, timeout )
 
             finally:
-                rmt.shutdown()
+                rmt.close()
 
     def _connect(self, rmtpy, limit=10):
         """
@@ -520,9 +520,11 @@ class Job:
                 time.sleep( 2**i )
             rtn = None
             try:
-                rmtpy.timeout(30).connect()
+                rmtpy.setRemoteTimeout( 30 )
+                rmtpy.start()
+                rmtpy.execute( remote_side_code )
             except:
-                #raise  # uncomment this when debugging connections
+                # raise  # uncomment this when debugging connections
                 rtn = capture_traceback( sys.exc_info() )
             else:
                 break
@@ -555,49 +557,38 @@ class Job:
         pause = 2
         while True:
 
-            if not rmtpy.isConnected():
-                T = self._connect( rmtpy, 1 )
+            elapsed = True
+            try:
+
+                if not sharedlog:
+                    self.updateFile( rmtpy, logf, logn )
+
+                rmtpy.setRemoteTimeout(30)
+                s = rmtpy.call( 'processes', pid=rpid, user=rusr,
+                                             fields='etime' )
+                elapsed = s.strip()
+
+                # TODO: add a check that the elapsed time agrees
+                #       approximately with the expected elapsed time
+                #       since the job was launched
+
+            except:
+                # raise  # uncomment to debug
+                xs,tb = capture_traceback( sys.exc_info() )
                 t = time.time()
-                if T != None and t - texc1 > xinterval:
+                if t - texc2 > xinterval:
                     sys.stderr.write( '[' + time.ctime() + '] ' + \
-                            'Warning: remote connection failed for jobid ' + \
-                            str( self.jobid() ) + '\n' + T[1] + \
-                            'Exception ignored; continuing to monitor...\n' )
+                        'Warning: exception monitoring jobid ' + \
+                        str( self.jobid() ) + '\n' + tb + \
+                        'Exception ignored; continuing to monitor...\n' )
                     sys.stderr.flush()
-                    texc1 = t
+                    texc2 = t
 
-            if rmtpy.isConnected():
+            self.scanExitStatus( logn )
 
-                elapsed = True
-                try:
-
-                    if not sharedlog:
-                        self.updateFile( rmtpy, logf, logn )
-
-                    s = rmtpy.timeout(30).x_processes( pid=rpid, user=rusr,
-                                                       fields='etime' )
-                    elapsed = s.strip()
-
-                    # TODO: add a check that the elapsed time agrees
-                    #       approximately with the expected elapsed time
-                    #       since the job was launched
-
-                except:
-                    xs,tb = capture_traceback( sys.exc_info() )
-                    t = time.time()
-                    if t - texc2 > xinterval:
-                        sys.stderr.write( '[' + time.ctime() + '] ' + \
-                            'Warning: exception monitoring jobid ' + \
-                            str( self.jobid() ) + '\n' + tb + \
-                            'Exception ignored; continuing to monitor...\n' )
-                        sys.stderr.flush()
-                        texc2 = t
-
-                self.scanExitStatus( logn )
-
-                if not elapsed:
-                    # remote process id not found - assume it is done
-                    break
+            if not elapsed:
+                # remote process id not found - assume it is done
+                break
 
             if timeout != None and time.time()-tstart > timeout:
                 sys.stderr.write( 'Monitor process timed out at ' + \
@@ -614,9 +605,8 @@ class Job:
         """
         As 'logfile' on the remote side grows, the new part of the file is
         transferred back to the local side and appended to 'logname'.
-        """
-        from remotepython import _BYTES_
-        
+        [May 2020] The incremental transfer algorithm has been removed.
+        """        
         small = int( self.get( 'getlog_small_file_size',
                         JobRunner.getDefault( 'getlog_small_file_size' ) ) )
         chunksize = int( self.get( 'getlog_chunk_size',
@@ -626,41 +616,12 @@ class Job:
         if os.path.exists( logname ):
             lcl_sz = os.path.getsize( logname )
 
-        rmt_sz = rmtpy.timeout(30).x_file_size( logfile )
+        rmtpy.setRemoteTimeout(30)
+        rmt_sz = rmtpy.call( 'file_size', logfile )
 
         if lcl_sz != rmt_sz and rmt_sz >= 0:
-            if rmt_sz < small or lcl_sz > rmt_sz or lcl_sz < 0.2*rmt_sz:
-                # for small files, or if somehow the local file is larger than
-                # the remote, or if not much of the file has been transferred
-                # yet, just do a complete file transfer
-                rmtpy.timeout(10*60).getFile( logfile, logname, preserve=True )
-
-            else:
-                # only transfer the end of the remote file that has not
-                # been obtained yet (the first part of the file is assumed
-                # to be the same between local and remote)
-                off = lcl_sz
-                fp = open( logname, 'ab' )
-                rfp = None
-                try:
-                    # open the remote file
-                    rmtpy.timeout(30)
-                    mt, at, fm, rfp = rmtpy.x_open_file_read( logfile, off )
-
-                    # get the tail of the file in chunks
-                    while off < rmt_sz:
-                        off2 = min( off + chunksize, rmt_sz )
-                        buf = rmtpy.timeout(30).x_file_read( rfp, off2-off )
-                        fp.write( _BYTES_( buf ) )
-                        off = off2
-                
-                finally:
-                    fp.close()
-                    rmtpy.timeout(30).x_close_file( rfp )
-                
-                # match the date stamp and file mode
-                os.utime( logname, (at,mt) )
-                os.chmod( logname, fm )
+            rmtpy.setRemoteTimeout(10*60)
+            recv_file( rmtpy, logfile, logname )
 
     def scanExitStatus(self, logname):
         """
@@ -967,6 +928,269 @@ class JobRunner:
 JobRunner.inst = JobRunner()
 
 
+def recv_file( rmt, rf, wf ):
+    ""
+    stats = rmt.call( 'get_file_stats', rf )
+    fp = open( wf, 'wt' )
+    fp.write( rmt.call( 'readfile', rf ) )
+    fp.close()
+    set_file_stats( wf, stats )
+
+
+def set_file_stats( filename, stats ):
+    ""
+    mtime,atime,fmode = stats
+    os.utime( filename, (atime,mtime) )
+    os.chmod( filename, fmode )
+
+
+remote_side_code = """
+
+import os, sys
+import traceback
+import stat
+import subprocess
+import time
+
+#############################################################################
+
+_background_template = '''
+
+import os, sys, time, subprocess, signal
+
+cmd = COMMAND
+timeout = TIMEOUT_VALUE
+
+nl=os.linesep
+ofp=sys.stdout
+ofp.write( "Start Date: " + time.ctime() + nl )
+ofp.write( "Parent PID: " + str(os.getpid()) + nl )
+ofp.write( "Subcommand: " + str(cmd) + nl )
+ofp.write( "Directory : " + os.getcwd() + nl+nl )
+ofp.flush()
+
+argD = {}
+
+if type(cmd) == type(''):
+  argD['shell'] = True
+
+if sys.platform.lower().startswith('win'):
+  def kill_process( po ):
+    po.terminate()
+
+else:
+  # use preexec_fn to put the child into its own process group
+  # (to more easily kill it and all its children)
+  argD['preexec_fn'] = lambda: os.setpgid( os.getpid(), os.getpid() )
+
+  def kill_process( po ):
+    # send all processes in the process group a SIGTERM
+    os.kill( -po.pid, signal.SIGTERM )
+    # wait for child process to complete
+    for i in range(10):
+      x = po.poll()
+      if x != None:
+        break
+      time.sleep(1)
+    if x == None:
+      # child did not die - try to force it
+      os.kill( po.pid, signal.SIGKILL )
+      time.sleep(1)
+      po.poll()
+
+t0=time.time()
+
+p = subprocess.Popen( cmd, **argD )
+
+try:
+  if timeout != None:
+    while True:
+      x = p.poll()
+      if x != None:
+        break
+      if time.time() - t0 > timeout:
+        kill_process(p)
+        x = None  # mark as timed out
+        break
+      time.sleep(5)
+  else:
+    x = p.wait()
+
+except:
+  kill_process(p)
+  raise
+
+ofp.write( nl + "Subcommand exit: " + str(x) + nl )
+ofp.write( "Finish Date: " + time.ctime() + nl )
+ofp.flush()
+'''.lstrip()
+
+
+def background_command( cmd, redirect, timeout=None, chdir=None ):
+    "Run command (list or string) in the background and redirect to a file."
+    pycode = _background_template.replace( 'COMMAND', repr(cmd) )
+    pycode = pycode.replace( 'TIMEOUT_VALUE', repr(timeout) )
+    cmdL = [ sys.executable, '-c', pycode ]
+
+    if chdir != None:
+        cwd = os.getcwd()
+        os.chdir( os.path.expanduser(chdir) )
+
+    try:
+        fpout = open( os.path.expanduser(redirect), 'w' )
+        try:
+            fpin = open( os.devnull, 'r' )
+        except:
+            fpout.close()
+            raise
+
+        try:
+            argD = { 'stdin':  fpin.fileno(),
+                     'stdout': fpout.fileno(),
+                     'stderr': subprocess.STDOUT }
+            if not sys.platform.lower().startswith('win'):
+                # place child in its own process group to help avoid getting
+                # killed when the parent process exits
+                argD['preexec_fn'] = lambda: os.setpgid( os.getpid(), os.getpid() )
+            p = subprocess.Popen( cmdL, **argD )
+        except:
+            fpout.close()
+            fpin.close()
+            raise
+
+    finally:
+        if chdir != None:
+            os.chdir( cwd )
+
+    fpout.close()
+    fpin.close()
+
+    return p.pid
+
+#############################################################################
+
+def readfile( filename ):
+    ""
+    with open( filename, 'rt' ) as fp:
+        content = fp.read()
+
+    return content
+
+
+def get_file_stats( filename ):
+    ""
+    mtime = os.path.getmtime( filename )
+    atime = os.path.getatime( filename )
+    fmode = stat.S_IMODE( os.stat(filename)[stat.ST_MODE] )
+    return mtime,atime,fmode
+
+
+def get_machine_info():
+    "Return user name, system name, network name, and uptime as a string."
+    usr = os.getuid()
+    try:
+        import getpass
+        usr = getpass.getuser()
+    except:
+        pass
+    rtn = 'user='+usr
+
+    L = os.uname()
+    rtn += ' sysname='+L[0]+' nodename='+L[1]
+
+    upt = '?'
+    try:
+        x,out = runout( 'uptime' )
+        upt = out.strip()
+    except:
+        pass
+    rtn += ' uptime='+upt
+
+    return rtn
+
+
+def runout( cmd, include_stderr=False ):
+    "Run a command and return the exit status & output as a pair."
+    
+    argD = {}
+
+    if type(cmd) == type(''):
+        argD['shell'] = True
+
+    fp = None
+    argD['stdout'] = subprocess.PIPE
+    if include_stderr:
+        argD['stderr'] = subprocess.STDOUT
+    else:
+        fp = open( os.devnull, 'w' )
+        argD['stderr'] = fp.fileno()
+
+    try:
+        p = subprocess.Popen( cmd, **argD )
+        out,err = p.communicate()
+    except:
+        fp.close()
+        raise
+    
+    if fp != None:
+        fp.close()
+
+    x = p.returncode
+
+    if type(out) != type(''):
+        out = out.decode()  # convert bytes to a string
+
+    return x, out
+
+
+def processes( pid=None, user=None, showall=False, fields=None, noheader=True ):
+    "The 'fields' defaults to 'user,pid,ppid,etime,pcpu,vsz,args'."
+    
+    plat = sys.platform.lower()
+    if fields == None:
+        fields = 'user,pid,ppid,etime,pcpu,vsz,args'
+    if plat.startswith( 'darwin' ):
+        cmd = 'ps -o ' + fields.replace( 'args', 'command' )
+    elif plat.startswith( 'sunos' ):
+        cmd = '/usr/bin/ps -o ' + fields
+    else:
+        cmd = 'ps -o ' + fields
+    
+    if pid != None:
+        cmd += ' -p '+str(pid)
+    elif user:
+        cmd += ' -u '+user
+    elif showall:
+        cmd += ' -e'
+
+    x,out = runout( cmd )
+
+    if noheader:
+        # strip off first non-empty line
+        out = out.strip() + os.linesep
+        i = 0
+        while i < len(out):
+            if out[i:].startswith( os.linesep ):
+                out = out[i:].lstrip()
+                break
+            i += 1
+    
+    out = out.strip()
+    if out:
+        out += os.linesep
+
+    return out
+
+
+def file_size( filename ):
+    "Returns the number of bytes in the given file name, or -1 if the file does not exist."
+    filename = os.path.expanduser( filename )
+    if os.path.exists( filename ):
+        return os.path.getsize( filename )
+    return -1
+
+"""
+
 def capture_traceback( excinfo ):
     """
     This should be called in an except block of a try/except, and the argument
@@ -990,6 +1214,7 @@ def print3( *args ):
     sys.stdout.write( s + '\n' )
     sys.stdout.flush()
 
+
 def tprint( *args ):
     """
     Same as print3 but prefixes with the date.
@@ -997,3 +1222,15 @@ def tprint( *args ):
     s = ' '.join( [ str(x) for x in args ] )
     sys.stdout.write( '['+time.ctime()+'] ' + s + '\n' )
     sys.stdout.flush()
+
+
+if sys.version_info[0] < 3:
+    def _BYTES_(s): return s
+
+else:
+    bytes_type = type( ''.encode() )
+
+    def _BYTES_(s):
+        if type(s) == bytes_type:
+            return s
+        return s.encode( 'ascii' )

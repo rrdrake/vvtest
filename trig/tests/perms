@@ -392,20 +392,6 @@ class catchall( unittest.TestCase ):
         time.sleep(1)
         perms.change_group( 'afile', os.stat( 'afile' ).st_gid )
 
-    def test_get_filename_using_import(self):
-        ""
-        util.writefile( 'lcl.py', """
-            import os, sys
-            sys.path.insert( 0, '"""+srcdir+"""' )
-            import perms
-            assert perms.get_filename() == '"""+srcdir+'/perms.py'+"""'
-            sys.stdout.write( 'success'+os.linesep )
-            """ )
-
-        x,out = util.runcmd( sys.executable+' lcl.py' )
-
-        assert len( util.greplines( 'success', out ) ) == 1
-
     def test_chmod_recurse_with_subdir_and_some_files(self):
         ""
         util.writefile( 'subdir/afile', 'contents' )

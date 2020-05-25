@@ -459,19 +459,5 @@ def print3( *args ):
 
 ######################################################################
 
-filename = None
-for p in sys.path:
-    f = os.path.join( p, 'perms.py' )
-    if os.path.exists(f) and os.access( f, os.R_OK ):
-        filename = f
-        break
-
-def get_filename():
-    """
-    Returns the file name of the current file, or None if it cannot be found
-    in sys.path.
-    """
-    return filename
-
 if __name__ == "__main__":
     main()

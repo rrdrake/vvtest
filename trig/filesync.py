@@ -12,8 +12,7 @@ import time
 import re
 import shutil
 
-import remotepython as rpy
-print3 = rpy.print3
+import pythonproxy as rpy
 
 import perms
 
@@ -126,27 +125,26 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
     if rm == None:
         rL = long_list_files( rd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePython( rm, sshexe=sshexe )
-        rmt.addRemoteContent( remote_functions )
+        rmt = rpy.RemotePythonProxy( rm, sshexe=sshexe )
         if echo: print3( 'Connect to "'+rm+'"' )
-        if timeout: rmt.timeout(timeout)
-        rmt.connect()
-        rL = rmt.x_long_list_files( rd, glob=glob, age=age )
+        rmt.start()
+        rmt.execute( remote_functions )
+        if timeout: rmt.setRemoteTimeout(timeout)
+        rL = rmt.call( 'long_list_files', rd, glob=glob, age=age )
 
     # list target files
     if wm == None:
         wL = long_list_files( wd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePython( wm, sshexe=sshexe )
-        rmt.addRemoteContent( remote_functions )
+        rmt = rpy.RemotePythonProxy( wm, sshexe=sshexe )
+        if echo: print3( 'Connect to "'+wm+'"' )
+        rmt.start()
+        rmt.execute( remote_functions )
         if permissions:
             # include the permissions module in the remote content
-            assert perms.get_filename() != None, "file perms.py not found"
-            rmt.addRemoteContent( filename=perms.get_filename() )
-        if echo: print3( 'Connect to "'+wm+'"' )
-        if timeout: rmt.timeout(timeout)
-        rmt.connect()
-        wL = rmt.x_long_list_files( wd, glob=glob, age=age )
+            rmt.send( perms )
+        if timeout: rmt.setRemoteTimeout(timeout)
+        wL = rmt.call( 'long_list_files', wd, glob=glob, age=age )
 
     try:
         wD = {}
@@ -175,8 +173,8 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
             # copy files from remote machine to local
             for f,rf,wf in cpL:
                 if echo: print3( 'copy -p '+read_dir+'/'+f+' '+wf )
-                if timeout: rmt.timeout(timeout)
-                rmt.getFile( rf, wf, preserve=True )
+                if timeout: rmt.setRemoteTimeout(timeout)
+                recv_file( rmt, rf, wf )
                 if permissions:
                     file_perms( wf, permissions )
 
@@ -185,15 +183,15 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
             # copy files from local to remote machine
             for f,rf,wf in cpL:
                 if echo: print3( 'copy -p '+rf+' '+write_dir+'/'+f )
-                if timeout: rmt.timeout(timeout)
-                rmt.putFile( rf, wf, preserve=True )
+                if timeout: rmt.setRemoteTimeout(timeout)
+                send_file( rmt, rf, wf )
                 if permissions:
                     file_perms( wf, permissions, remote=rmt )
 
     finally:
         if rmt != None:
-            if timeout: rmt.timeout(timeout)
-            rmt.shutdown()
+            if timeout: rmt.setRemoteTimeout(timeout)
+            rmt.close()
 
     return [ T[0] for T in cpL ]
 
@@ -214,12 +212,12 @@ def file_perms( fname, permissions, remote=None ):
                 # assume 'permissions' is a tuple or list
                 perms.apply_chmod( fname, *permissions )
     else:
-        if remote.x_i_own( fname ):
+        if remote.call( 'i_own', fname ):
             if type(permissions) == type(''):
                 remote.x_apply_chmod( fname, permissions )
             else:
                 # assume 'permissions' is a tuple or list
-                remote.x_apply_chmod( fname, *permissions )
+                remote.call( 'apply_chmod', fname, *permissions )
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )
@@ -235,10 +233,30 @@ def splitmach( path ):
     return path[:m.end()-1], path[m.end():]
 
 
+def send_file( rmt, rf, wf ):
+    ""
+    stats = get_file_stats( rf )
+    rfp = rmt.construct( 'open', wf, 'wt' )
+    rfp.write( readfile( rf ) )
+    rfp.close()
+    rmt.call( 'set_file_stats', wf, stats )
+
+
+def recv_file( rmt, rf, wf ):
+    ""
+    stats = rmt.call( 'get_file_stats', rf )
+    fp = open( wf, 'wt' )
+    fp.write( rmt.call( 'readfile', rf ) )
+    fp.close()
+    set_file_stats( wf, stats )
+
+
 # the follwoing functions are defined and available in the current module
 remote_functions = \
 '''
 import fnmatch
+import stat
+import time
 
 def list_files( directory, glob='*', age=None ):
     "Returns a list of files matching the given pattern no older than 'age'."
@@ -274,6 +292,29 @@ def long_list_files( directory, glob='*', age=None ):
         df = directory+'/'+f
         fL.append( ( f, os.path.getmtime(df), os.path.getsize(df), filesha1(df) ) )
     return fL
+
+
+def get_file_stats( filename ):
+    ""
+    mtime = os.path.getmtime( filename )
+    atime = os.path.getatime( filename )
+    fmode = stat.S_IMODE( os.stat(filename)[stat.ST_MODE] )
+    return mtime,atime,fmode
+
+
+def set_file_stats( filename, stats ):
+    ""
+    mtime,atime,fmode = stats
+    os.utime( filename, (atime,mtime) )
+    os.chmod( filename, fmode )
+
+
+def readfile( filename ):
+    ""
+    with open( filename, 'rt' ) as fp:
+        content = fp.read()
+
+    return content
 
 
 # Returns the SHA-1 hex digest of the contents of the given filename
@@ -312,6 +353,11 @@ else:
 # this makes the remote function code available in the current namespace
 cobj = compile( remote_functions, "<string>", "exec" )
 eval( cobj, globals() )
+
+
+def print3( *args ):
+    sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + os.linesep )
+    sys.stdout.flush()
 
 
 ##########################################################################
