@@ -6,7 +6,6 @@
 
 import os, sys
 import getopt
-import re
 import tempfile
 import shutil
 import filecmp
@@ -1422,7 +1421,7 @@ def _parse_config_section_line( section, line, cfg ):
 def _parse_config_section_name( line ):
     ""
     val = line.strip('[').split(']',1)[0].strip()
-    valL = re.split( r'\s*', val, 1 )
+    valL = val.split( None, 1 )
     if len(valL) == 1:
         valL.append( '' )
     return valL
