@@ -11,7 +11,7 @@ import collections
 class RemotePython:
 
     def __init__(self, machine=None,
-                       remotepython='python',
+                       pythonexe='python',
                        sshexe='ssh',
                        logfile=None ):
         ""
@@ -23,7 +23,7 @@ class RemotePython:
         self.out = OutputHandler( logfp, 'OUT' )
         self.err = OutputHandler( logfp, 'ERR' )
 
-        self.cmdL = bootstrap_command( remotepython, machine, sshexe, None )
+        self.cmdL = bootstrap_command( pythonexe, machine, sshexe, None )
 
         if logfp != None:
             logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
@@ -265,10 +265,10 @@ else:
         os.write( fd, buf )
 
 
-def bootstrap_command( remotepython, machine, sshexe, sshopts ):
+def bootstrap_command( pythonexe, machine, sshexe, sshopts ):
     ""
     cmdL = [
-        remotepython, '-u', '-E', '-c',
+        pythonexe, '-u', '-E', '-c',
         'import sys; '
             'eval( '
                 'compile( '
