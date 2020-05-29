@@ -285,7 +285,7 @@ class startup_RemotePythonProxy( unittest.TestCase ):
         sshexe = write_fake_ssh_script()
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshexe=sshexe )
+        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         remote.start()
 
     def test_when_startup_fails(self):
@@ -293,7 +293,7 @@ class startup_RemotePythonProxy( unittest.TestCase ):
         sshexe = write_fake_ssh_script( fake_crash=True )
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshexe=sshexe )
+        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         try:
             remote.start()
         except pythonproxy.FailedConnectionError as e:
@@ -441,7 +441,7 @@ class using_the_context_manager( unittest.TestCase ):
 
         with pythonproxy.python_proxy( 'sparky',
                                         pythonexe=rpy,
-                                        sshexe=sshexe) as proxy:
+                                        sshcmd=sshexe) as proxy:
             proxy.call( 'os.chdir', abspath('adir') )
             rd = proxy.call( 'os.getcwd' )
 

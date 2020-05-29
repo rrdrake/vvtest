@@ -465,7 +465,7 @@ class Job:
 
         from pythonproxy import RemotePythonProxy
         if sshexe:
-            rmt = RemotePythonProxy( mach, sshexe=sshexe )
+            rmt = RemotePythonProxy( mach, sshcmd=sshexe )
         else:
             rmt = RemotePythonProxy( mach )
 

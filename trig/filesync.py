@@ -125,7 +125,7 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
     if rm == None:
         rL = long_list_files( rd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePythonProxy( rm, sshexe=sshexe )
+        rmt = rpy.RemotePythonProxy( rm, sshcmd=sshexe )
         if echo: print3( 'Connect to "'+rm+'"' )
         rmt.start()
         rmt.execute( remote_functions )
@@ -136,7 +136,7 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
     if wm == None:
         wL = long_list_files( wd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePythonProxy( wm, sshexe=sshexe )
+        rmt = rpy.RemotePythonProxy( wm, sshcmd=sshexe )
         if echo: print3( 'Connect to "'+wm+'"' )
         rmt.start()
         rmt.execute( remote_functions )

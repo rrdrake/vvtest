@@ -111,7 +111,19 @@ class the_tests( unittest.TestCase ):
         fakessh = write_fake_ssh_script()
         time.sleep(1)
 
-        rem = RemotePython( 'sparky', pythonexe=rpy, sshexe=fakessh )
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               None,
+                                               'foobar' )
+        assert 'foobar' not in ''.join( cmdL )
+        assert cmdL[0] == '/opt/super py'
+
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               'sparky',
+                                               '/opt/foobar -o baz' )
+        assert cmdL[:4] == [ '/opt/foobar', '-o', 'baz', 'sparky' ]
+        assert '/opt/super py' in ''.join( cmdL )
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
         try:
             rem.start( timeout=5 )
             rem.execute( 'print ("hello")' )
@@ -126,7 +138,7 @@ class the_tests( unittest.TestCase ):
                                          to_stderr='errval1\\n errval2' )
         time.sleep(1)
 
-        rem = RemotePython( 'sparky', pythonexe=rpy, sshexe=fakessh )
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
         try:
             rem.start()
             rem.execute( 'print ("hello")' )
@@ -148,7 +160,7 @@ class the_tests( unittest.TestCase ):
                                          to_stderr='junkerr' )
         time.sleep(1)
 
-        rem = RemotePython( 'sparky', pythonexe=rpy, sshexe=fakessh )
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
         ok = rem.start()
         assert not ok
         conn = rem.getStartupOutput()
@@ -163,7 +175,7 @@ class the_tests( unittest.TestCase ):
         fakessh = write_fake_ssh_script( fake_pause=10 )
         time.sleep(1)
 
-        rem = RemotePython( 'sparky', pythonexe=rpy, sshexe=fakessh )
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
         ok = rem.start( timeout=5.5 )
         assert not ok
         conn = rem.getStartupOutput()
@@ -180,7 +192,7 @@ class the_tests( unittest.TestCase ):
         fp = open( 'logfile', 'wt' )
         rem = RemotePython( 'sparky',
                             pythonexe=rpy,
-                            sshexe=fakessh,
+                            sshcmd=fakessh,
                             logfile=fp )
         try:
             rem.start()
@@ -213,7 +225,7 @@ class the_tests( unittest.TestCase ):
 
         rem = RemotePython( 'sparky',
                             pythonexe=rpy,
-                            sshexe=fakessh,
+                            sshcmd=fakessh,
                             logfile='logfile' )
         try:
             rem.start()
@@ -257,7 +269,7 @@ class the_tests( unittest.TestCase ):
         fp = open( 'logfile', 'wt' )
         rem = RemotePython( 'sparky',
                             pythonexe=rpy,
-                            sshexe=fakessh,
+                            sshcmd=fakessh,
                             logfile=fp )
         try:
             rem.start()

@@ -32,11 +32,11 @@ class RemotePythonProxy:
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshexe='ssh',
+                       sshcmd='ssh',
                        logfile=None ):
         ""
         self.timeout = None
-        self.remote = RemotePython( machine, pythonexe, sshexe, logfile )
+        self.remote = RemotePython( machine, pythonexe, sshcmd, logfile )
 
     def start(self, timeout=30):
         """
@@ -137,12 +137,12 @@ class python_proxy:
     def __init__(self, machname,
                        startup_timeout=30,
                        pythonexe='python',
-                       sshexe='ssh',
+                       sshcmd='ssh',
                        logfile=None ):
         ""
         self.proxy = RemotePythonProxy( machname,
                                         pythonexe=pythonexe,
-                                        sshexe=sshexe,
+                                        sshcmd=sshcmd,
                                         logfile=logfile )
         self.proxy.start( startup_timeout )
 

@@ -151,7 +151,7 @@ def copy_files( files, to_dir,
     if rm != None or wm != None:
         m = rm
         if wm != None: m = wm
-        rmt = rpy.RemotePythonProxy( m, sshexe=sshexe )
+        rmt = rpy.RemotePythonProxy( m, sshcmd=sshexe )
         if echo: print3( 'Connecting to "'+m+'"' )
         rmt.start()
         rmt.execute( remote_functions )

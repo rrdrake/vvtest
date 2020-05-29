@@ -6,13 +6,14 @@ import subprocess
 import inspect
 import time
 import collections
+import shlex
 
 
 class RemotePython:
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshexe='ssh',
+                       sshcmd='ssh',
                        logfile=None ):
         ""
         self.started = False
@@ -23,7 +24,7 @@ class RemotePython:
         self.out = OutputHandler( logfp, 'OUT' )
         self.err = OutputHandler( logfp, 'ERR' )
 
-        self.cmdL = bootstrap_command( pythonexe, machine, sshexe, None )
+        self.cmdL = bootstrap_command( pythonexe, machine, sshcmd )
 
         if logfp != None:
             logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
@@ -265,7 +266,7 @@ else:
         os.write( fd, buf )
 
 
-def bootstrap_command( pythonexe, machine, sshexe, sshopts ):
+def bootstrap_command( pythonexe, machine, sshcmd ):
     ""
     cmdL = [
         pythonexe, '-u', '-E', '-c',
@@ -277,9 +278,7 @@ def bootstrap_command( pythonexe, machine, sshexe, sshopts ):
 
     if machine:
         remote_cmd = ' '.join( [ pipes.quote( arg ) for arg in cmdL ] )
-        cmdL = [ sshexe ]
-        if sshopts:
-            cmdL.extend( shlex.split( sshopts ) )
+        cmdL = shlex.split( sshcmd )
         cmdL.extend( [ machine, remote_cmd ] )
 
     return cmdL
