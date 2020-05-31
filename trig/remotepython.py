@@ -167,11 +167,18 @@ class OutputHandler( threading.Thread ):
     def run(self):
         ""
         while True:
-            data = self.fp.readline()
+            try:
+                data = self.fp.readline()
+            except Exception:
+                break
+
             if data:
                 if self.logfp != None:
-                    self.logfp.write( self.logprefix+': '+data )
-                    self.logfp.flush()
+                    try:
+                        self.logfp.write( self.logprefix+': '+data )
+                        self.logfp.flush()
+                    except Exception:
+                        pass
                 with self.lck:
                     self.lines.append( data )
             else:
