@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -20,18 +20,18 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
-rmold_dir = os.path.dirname( trigutil.testsrcdir )
-rmold_file = os.path.join( rmold_dir, 'rmold' )
+rmold_file = os.path.join( trigutil.trigdir, 'rmold' )
+rmold_cmd = sys.executable + ' ' + rmold_file
 
 
 class help_message( trigutil.trigTestCase ):
 
     def test_exercise_printing_of_help_message(self):
         ""
-        x,out = util.runcmd( rmold_file+' -h' )
+        x,out = util.runcmd( rmold_cmd+' -h' )
         assert 'SYNOPSIS' in out
 
-        x,out = util.runcmd( rmold_file+' --help' )
+        x,out = util.runcmd( rmold_cmd+' --help' )
         assert 'SYNOPSIS' in out
 
 
@@ -57,7 +57,7 @@ class functional_tests( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        util.runcmd( rmold_file+" -d 1 -- 'fi*'" )
+        util.runcmd( rmold_cmd+" -d 1 -- 'fi*'" )
 
         assert not os.path.exists( 'file.txt' )
         assert     os.path.exists( 'donttouchme.txt' )
@@ -80,7 +80,7 @@ class functional_tests( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        util.runcmd( rmold_file+" -d 5 'fi*'" )
+        util.runcmd( rmold_cmd+" -d 5 'fi*'" )
 
         assert not os.path.exists( 'file1.txt' )
         assert not os.path.exists( 'file2.txt' )
@@ -102,7 +102,7 @@ class functional_tests( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        util.runcmd( rmold_file+" -d 0.75 'fi*'" )
+        util.runcmd( rmold_cmd+" -d 0.75 'fi*'" )
 
         assert not os.path.exists( 'file1.txt' )
         assert     os.path.exists( 'file2.txt' )
@@ -116,7 +116,7 @@ class functional_tests( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        x,out = util.runcmd( rmold_file+" -v -d 2 '"+abspath('*')+"'" )
+        x,out = util.runcmd( rmold_cmd+" -v -d 2 '"+abspath('*')+"'" )
 
         assert not os.path.exists( 'file.txt' )
         assert 'rm ' in out and '/file.txt' in out
@@ -130,7 +130,7 @@ class functional_tests( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        x,out = util.runcmd( rmold_file+" -v '"+abspath('*')+"'" )
+        x,out = util.runcmd( rmold_cmd+" -v '"+abspath('*')+"'" )
 
         assert os.path.exists( 'file.txt' )
 

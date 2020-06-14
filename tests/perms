@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -22,8 +22,7 @@ from testutils import print3
 # this is the module we are testing
 import perms
 
-srcdir = dirname( trigutil.testsrcdir )
-permscmd = sys.executable+' '+srcdir+'/perms.py'
+permscmd = sys.executable+' '+trigutil.trigdir+'/perms.py'
 
 
 #######################################################################

@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -17,7 +17,7 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
-bashexec = os.path.join( os.path.dirname(trigutil.testsrcdir), 'bashexec' )
+bashexec = os.path.join( trigutil.trigdir, 'bashexec' )
 
 
 #######################################################################

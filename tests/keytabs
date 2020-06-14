@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -23,7 +23,7 @@ from testutils import print3
 # the module being tested
 import keytab
 
-ktfile = pjoin( dirname(trigutil.testsrcdir), 'keytab.py' )
+ktfile = pjoin( trigutil.trigdir, 'keytab.py' )
 
 
 class catchall( unittest.TestCase ):

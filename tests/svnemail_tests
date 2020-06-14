@@ -4,12 +4,13 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import join as pjoin
 import time
 import xml.etree.ElementTree as ET
 import unittest
@@ -20,7 +21,7 @@ from testutils import print3
 
 import svnemail
 
-svnpoll_file = os.path.join( os.path.dirname( trigutil.testsrcdir ), 'svnpoll' )
+svnpoll_file = pjoin( trigutil.trigdir, 'svnpoll' )
 svnpoll_mod = util.create_module_from_filename( svnpoll_file )
 
 

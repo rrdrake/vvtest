@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 #OPTION: realssh
 
 import sys
@@ -36,8 +36,6 @@ localpy = sys.executable
 # By default, a "fake" ssh script is used that acts like ssh.  To use
 # an actual ssh, add the -s option to the unit test command line.  In this
 # case, make sure you can ssh to the current machine without a password.
-
-srcdir = os.path.dirname( trigutil.testsrcdir )
 
 
 #######################################################################
@@ -359,7 +357,7 @@ class catchall( unittest.TestCase ):
         util.writescript( 'scr', """
             #!/usr/bin/env python
             import os, sys, time
-            sys.path.insert( 0, '"""+srcdir+"""' )
+            sys.path.insert( 0, '"""+trigutil.trigdir+"""' )
             import runjob
             x = runjob.run_wait( 'echo hello', poll_interval=2 )
             assert x == 0
@@ -1058,7 +1056,7 @@ class catchall( unittest.TestCase ):
         util.writescript( 'scr', """
             #!/usr/bin/env python
             import os, sys, time
-            sys.path.insert( 0, '"""+srcdir+"""' )
+            sys.path.insert( 0, '"""+trigutil.trigdir+"""' )
             import runjob
             jid1 = runjob.run_job( 'echo hello ; sleep 8', poll_interval=2 )
             runjob.run_job( 'sleep 1', waitforjobid=jid1, poll_interval=2 )
@@ -1090,7 +1088,7 @@ class catchall( unittest.TestCase ):
         util.writescript( 'scr', """
             #!/usr/bin/env python
             import os, sys, time
-            sys.path.insert( 0, '"""+srcdir+"""' )
+            sys.path.insert( 0, '"""+trigutil.trigdir+"""' )
             import runjob
             jid1 = runjob.run_job( 'echo hello ; sleep 8', poll_interval=2 )
             jid2 = runjob.run_job( 'sleep 1', waitforjobid=jid1, poll_interval=2 )

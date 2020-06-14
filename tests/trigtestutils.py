@@ -18,8 +18,8 @@ import unittest
 import testutils as util
 
 testsrcdir = dirname( abspath( sys.argv[0] ) )
-trigdir = dirname( testsrcdir )
-topdir = dirname( trigdir )
+topdir = dirname( testsrcdir )
+trigdir = pjoin( topdir, 'trig' )
 vvtdir = pjoin( topdir, 'vvt' )
 
 sys.path.insert( 0, trigdir )

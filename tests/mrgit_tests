@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -30,8 +30,8 @@ from testutils import print3
 from mrgitlib import MRGitExitError
 import mrgitlib as mrlib
 
-mrgit_dir = os.path.dirname( trigutil.testsrcdir )
-mrgit_file = os.path.join( mrgit_dir, 'mrgit' )
+mrgit_file = os.path.join( trigutil.trigdir, 'mrgit' )
+mrgit_cmd = sys.executable + ' ' + mrgit_file
 
 
 from gitinterface import GitRepo
@@ -42,13 +42,13 @@ class help_message( trigutil.trigTestCase ):
 
     def test_exercise_printing_of_help_message(self):
         ""
-        x,out = util.runcmd( mrgit_file+' help', verbose=2 )
+        x,out = util.runcmd( mrgit_cmd+' help', verbose=2 )
         assert 'SYNOPSIS' in out
 
-        x,out = util.runcmd( mrgit_file+' -h' )
+        x,out = util.runcmd( mrgit_cmd+' -h' )
         assert 'SYNOPSIS' in out
 
-        x,out = util.runcmd( mrgit_file+' --help' )
+        x,out = util.runcmd( mrgit_cmd+' --help' )
         assert 'SYNOPSIS' in out
 
 
@@ -78,7 +78,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         src_url = util.create_bare_repo_with_file_and_branch( 'cool' )
 
-        x,out = util.runcmd( mrgit_file+' clone '+src_url+' myclone' )
+        x,out = util.runcmd( mrgit_cmd+' clone '+src_url+' myclone' )
         assert x == 0
         self.assert_single_clone( 'myclone' )
 
@@ -101,7 +101,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        x,out = util.runcmd( mrgit_file+' -v clone '+cool_url+' '+ness_url )
+        x,out = util.runcmd( mrgit_cmd+' -v clone '+cool_url+' '+ness_url )
         assert x == 0
         self.assert_dual_clone( '.' )
 
@@ -116,7 +116,7 @@ class cloning( trigutil.trigTestCase ):
         ""
         cool_url, ness_url = make_coolness_repositories()
 
-        x,out = util.runcmd( mrgit_file+' clone '+cool_url+' '+ness_url+' adir' )
+        x,out = util.runcmd( mrgit_cmd+' clone '+cool_url+' '+ness_url+' adir' )
         assert x == 0
         self.assert_dual_clone( 'adir' )
 
@@ -209,7 +209,7 @@ class cloning( trigutil.trigTestCase ):
     #         """ )
     #     time.sleep(1)
 
-    #     util.runcmd( mrgit_file, 'clone -m repos/mymanifest' )
+    #     util.runcmd( mrgit_cmd, 'clone -m repos/mymanifest' )
 
     # def test_clone_a_specific_group(self):
     #     ""
@@ -223,7 +223,7 @@ class cloning( trigutil.trigTestCase ):
     #         """ )
     #     time.sleep(1)
 
-    #     util.runcmd( mrgit_file, 'clone -m repos/mymanifest tests' )
+    #     util.runcmd( mrgit_cmd, 'clone -m repos/mymanifest tests' )
 
 
 def create_example_genesis_repo():
@@ -329,18 +329,18 @@ class startup_logic( trigutil.trigTestCase ):
 
     def test_a_failed_clone_will_not_leave_around_temporary_files(self):
         ""
-        x,out = util.runcmd( mrgit_file+' clone foobar', raise_on_error=False )
+        x,out = util.runcmd( mrgit_cmd+' clone foobar', raise_on_error=False )
 
         assert x != 0
         assert len( os.listdir( '.' ) ) == 0
 
-        x,out = util.runcmd( mrgit_file+' clone file:///foo462/bar296/baz72',
+        x,out = util.runcmd( mrgit_cmd+' clone file:///foo462/bar296/baz72',
                              raise_on_error=False )
 
         assert x != 0
         assert len( os.listdir( '.' ) ) == 0
 
-        x,out = util.runcmd( mrgit_file + ' clone' + \
+        x,out = util.runcmd( mrgit_cmd + ' clone' + \
                                  ' file:///foo462/bar296/baz72' + \
                                  ' file:///foo462/bar296/buz83',
                              raise_on_error=False )
@@ -360,27 +360,27 @@ class startup_logic( trigutil.trigTestCase ):
 
         time.sleep(1)
 
-        x,out = util.runcmd( mrgit_file+' clone '+url1+' adir',
+        x,out = util.runcmd( mrgit_cmd+' clone '+url1+' adir',
                              raise_on_error=False )
         assert 'Traceback' not in out
         assert 'mrgit error' in out and 'exists and is not empty' in out
 
         with util.change_directory( 'wrk1' ):
-            x,out = util.runcmd( mrgit_file+' clone '+url1 )
+            x,out = util.runcmd( mrgit_cmd+' clone '+url1 )
             print3( out )
             assert os.path.isdir( '.mrgit' ) and os.path.isdir( 'example1' )
 
-            x,out = util.runcmd( mrgit_file+' clone '+url1, raise_on_error=False )
+            x,out = util.runcmd( mrgit_cmd+' clone '+url1, raise_on_error=False )
             assert 'Traceback' not in out
             assert 'mrgit error' in out and 'mrgit exists' in out
 
         with util.change_directory( 'wrk2' ):
-            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2 )
+            x,out = util.runcmd( mrgit_cmd+' clone '+url1+' '+url2 )
             print3( out )
             assert os.path.isdir( '.mrgit' )
             assert os.path.isdir( 'example1' ) and os.path.isdir( 'example2' )
 
-            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2,
+            x,out = util.runcmd( mrgit_cmd+' clone '+url1+' '+url2,
                                  raise_on_error=False )
             assert 'Traceback' not in out
             assert 'mrgit error' in out and 'mrgit exists' in out
@@ -390,7 +390,7 @@ class startup_logic( trigutil.trigTestCase ):
         with util.change_directory( 'wrk3' ):
             clone_repo( url2, verbose=1 )
 
-            x,out = util.runcmd( mrgit_file+' clone '+url1+' '+url2,
+            x,out = util.runcmd( mrgit_cmd+' clone '+url1+' '+url2,
                                  raise_on_error=False )
             assert 'Traceback' not in out
             assert 'mrgit error' in out and 'path already exists' in out
@@ -400,7 +400,7 @@ class startup_logic( trigutil.trigTestCase ):
     def test_error_message_when_no_mrgit_repo_found(self):
         ""
         for cmd in ['status','fetch','pull','add','push','commit']:
-            x,out = util.runcmd( mrgit_file+' '+cmd, chdir='/usr',
+            x,out = util.runcmd( mrgit_cmd+' '+cmd, chdir='/usr',
                                                      raise_on_error=False )
             assert x != 0 and 'mrgit error' in out
 
@@ -411,14 +411,14 @@ class startup_logic( trigutil.trigTestCase ):
         mrlib.clone_cmd( [ '-v', src_url ] )
 
         with util.change_directory( 'cool' ):
-            util.runcmd( mrgit_file+' pull -v', verbose=3 )
-            util.runcmd( mrgit_file+' pull -vv', verbose=3 )
-            util.runcmd( mrgit_file+' add -v .', verbose=3 )
-            util.runcmd( mrgit_file+' add -vv .', verbose=3 )
-            util.runcmd( mrgit_file+' status -v', verbose=3 )
-            util.runcmd( mrgit_file+' status -vv', verbose=3 )
-            util.runcmd( mrgit_file+' fetch -v', verbose=3 )
-            util.runcmd( mrgit_file+' fetch -vv', verbose=3 )
+            util.runcmd( mrgit_cmd+' pull -v', verbose=3 )
+            util.runcmd( mrgit_cmd+' pull -vv', verbose=3 )
+            util.runcmd( mrgit_cmd+' add -v .', verbose=3 )
+            util.runcmd( mrgit_cmd+' add -vv .', verbose=3 )
+            util.runcmd( mrgit_cmd+' status -v', verbose=3 )
+            util.runcmd( mrgit_cmd+' status -vv', verbose=3 )
+            util.runcmd( mrgit_cmd+' fetch -v', verbose=3 )
+            util.runcmd( mrgit_cmd+' fetch -vv', verbose=3 )
 
 
 class mrgit_configuration_tests( trigutil.trigTestCase ):
@@ -781,11 +781,11 @@ class google_repo_manifests( trigutil.trigTestCase ):
         ""
         man_url = create_google_repo_set()
 
-        x,out = util.runcmd( mrgit_file+' clone', raise_on_error=False )
+        x,out = util.runcmd( mrgit_cmd+' clone', raise_on_error=False )
         assert x != 0
 
         with util.set_environ( REPO_MANIFEST_URL=man_url ):
-            x,out = util.runcmd( mrgit_file+' clone' )
+            x,out = util.runcmd( mrgit_cmd+' clone' )
             assert x == 0
 
         assert 'service' in util.readfile( 'code/file.txt' )
@@ -799,9 +799,9 @@ class google_repo_manifests( trigutil.trigTestCase ):
         url1 = util.create_bare_repo_with_file_and_branch( 'example1' )
         url2 = util.create_bare_repo_with_file_and_branch( 'example2' )
 
-        util.runcmd( mrgit_file+' clone '+url1+' '+url2 )
+        util.runcmd( mrgit_cmd+' clone '+url1+' '+url2 )
 
-        util.runcmd( mrgit_file+' clone -G '+man_url )
+        util.runcmd( mrgit_cmd+' clone -G '+man_url )
 
         assert os.path.isdir( 'code/airforce' )
         assert os.path.isdir( 'code/navy' )
@@ -823,7 +823,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
 
         checkout_by_actually_using_google_repo( repocmd, 'chkout' )
 
-        x,out = util.runcmd( mrgit_file+' -v status', chdir='chkout/airforce',
+        x,out = util.runcmd( mrgit_cmd+' -v status', chdir='chkout/airforce',
                                                       verbose=3 )
 
         assert len( util.greplines( 'changed*untracked*commits', out ) ) == 1
@@ -835,7 +835,7 @@ class google_repo_manifests( trigutil.trigTestCase ):
         checkout_by_actually_using_google_repo( repocmd, 'checkman',
                                                 manifest='air.xml' )
 
-        x,out = util.runcmd( mrgit_file+' -v status', chdir='checkman',
+        x,out = util.runcmd( mrgit_cmd+' -v status', chdir='checkman',
                                                       verbose=3 )
 
         assert len( util.greplines( 'changed*untracked*commits', out ) ) == 1
@@ -1103,10 +1103,10 @@ class mrgit_init( trigutil.trigTestCase ):
         os.mkdir( 'bdir' )
         time.sleep(1)
 
-        x,out = util.runcmd( mrgit_file+' init', chdir='adir' )
+        x,out = util.runcmd( mrgit_cmd+' init', chdir='adir' )
         assert x == 0
 
-        x,out = util.runcmd( mrgit_file+' clone ../adir', chdir='bdir' )
+        x,out = util.runcmd( mrgit_cmd+' clone ../adir', chdir='bdir' )
         assert x == 0
         assert os.path.isdir( 'bdir/adir/.mrgit' )
 
@@ -1124,7 +1124,7 @@ class updating( trigutil.trigTestCase ):
         assert not os.path.exists( 'cool/.git/FETCH_HEAD' )
 
         with util.change_directory( 'cool' ):
-            util.runcmd( mrgit_file+' fetch', verbose=3 )
+            util.runcmd( mrgit_cmd+' fetch', verbose=3 )
 
         x,out = util.runcmd( 'git branch -rv', chdir='cool' )
         assert x == 0
@@ -1152,7 +1152,7 @@ class updating( trigutil.trigTestCase ):
         util.push_file_to_repo( abspath('central/navy.git'),
                                 'newfile.txt', "anything\n" )
 
-        x,out = util.runcmd( mrgit_file+' pull', chdir='code' )
+        x,out = util.runcmd( mrgit_cmd+' pull', chdir='code' )
         assert x == 0
 
         assert util.readfile( 'code/navy/newfile.txt' ).strip() == 'anything'
@@ -1165,7 +1165,7 @@ class updating( trigutil.trigTestCase ):
 
         util.push_file_to_repo( sub_url, 'newfile.txt', "anything\n" )
 
-        x,out = util.runcmd( mrgit_file+' pull', chdir='code' )
+        x,out = util.runcmd( mrgit_cmd+' pull', chdir='code' )
         assert x == 0
 
         assert util.readfile( 'code/ness/newfile.txt' ).strip() == 'anything'
@@ -1182,8 +1182,8 @@ class commit_and_push( trigutil.trigTestCase ):
         with util.change_directory( 'cool' ):
             util.writefile( 'newfile.txt', 'foo bar\n' )
             mrlib.add_cmd( [ '.' ] )
-            util.runcmd( mrgit_file+' commit -m "add new file"', verbose=3 )
-            util.runcmd( mrgit_file+' push', verbose=3 )
+            util.runcmd( mrgit_cmd+' commit -m "add new file"', verbose=3 )
+            util.runcmd( mrgit_cmd+' push', verbose=3 )
 
         clone_repo( src_url, directory='check', verbose=3 )
         assert len( util.grepfiles( 'foo bar', 'check/newfile.txt' ) ) == 1
@@ -1226,25 +1226,25 @@ class getting_status( trigutil.trigTestCase ):
         mrlib.clone_cmd( [ cool_url, ness_url, 'sub' ] )
         util.writefile( 'sub/cool/file.txt', 'some new contents' )
 
-        x,out = util.runcmd( mrgit_file+' -vv status', chdir='sub' )
+        x,out = util.runcmd( mrgit_cmd+' -vv status', chdir='sub' )
         print3( out )
         assert x == 0
         self.check_status_output( out )
         assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
 
-        x,out = util.runcmd( mrgit_file+' -v status', chdir='sub' )
+        x,out = util.runcmd( mrgit_cmd+' -v status', chdir='sub' )
         print3( out )
         assert x == 0
         self.check_status_output( out )
         assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
 
-        x,out = util.runcmd( mrgit_file+' status -v', chdir='sub' )
+        x,out = util.runcmd( mrgit_cmd+' status -v', chdir='sub' )
         print3( out )
         assert x == 0
         self.check_status_output( out )
         assert len( util.greplines( 'changed* cool/file.txt', out ) ) == 1
 
-        x,out = util.runcmd( mrgit_file+' status', chdir='sub' )
+        x,out = util.runcmd( mrgit_cmd+' status', chdir='sub' )
         print3( out )
         assert x == 0
         self.check_status_output( out )

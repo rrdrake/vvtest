@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -20,7 +20,7 @@ from testutils import print3
 
 import dirsync
 
-dsynccmd = sys.executable+' '+os.path.dirname(trigutil.testsrcdir)+'/dirsync.py'
+dsynccmd = sys.executable+' '+trigutil.trigdir+'/dirsync.py'
 
 class function_interface( unittest.TestCase ):
 

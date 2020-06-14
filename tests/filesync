@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 #OPTION: realssh
 
 import sys
@@ -33,7 +33,7 @@ import filesync
 # case, make sure you can ssh to the current machine without a password.
 
 
-fsynccmd = sys.executable+' '+os.path.dirname(trigutil.testsrcdir)+'/filesync.py'
+fsynccmd = sys.executable+' '+trigutil.trigdir+'/filesync.py'
 
 
 #######################################################################

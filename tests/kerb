@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-#RUNTEST:
+#RUNTEST: trig
 
 import sys
 sys.dont_write_bytecode = True
@@ -22,7 +22,8 @@ import kerberos
 
 from command import Command
 
-kerbfile = os.path.join( os.path.dirname(trigutil.testsrcdir), 'kerberos.py' )
+kerbfile = os.path.join( trigutil.trigdir, 'kerberos.py' )
+kerbcmd = sys.executable + ' ' + kerbfile
 
 
 ######################################################################
@@ -63,8 +64,8 @@ class catchall( unittest.TestCase ):
     def test_man_page(self):
         ""
         os.environ.pop( 'COMMAND_DRYRUN' )
-        Command( '$kerbfile -h' ).run( raise_on_error=True )
-        Command( '$kerbfile --help' ).run( raise_on_error=True )
+        util.runcmd( kerbcmd+' -h', raise_on_error=True )
+        util.runcmd( kerbcmd+' --help', raise_on_error=True )
 
 
 ######################################################################
