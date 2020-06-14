@@ -22,9 +22,9 @@ from testutils import print3
 
 
 testsrcdir = dirname( abspath( sys.argv[0] ) )
-vvtdir = dirname( dirname( testsrcdir ) )
-scidevdir = dirname( vvtdir )
-trigdir = pjoin( scidevdir, 'trig' )
+topdir = dirname( testsrcdir )
+vvtdir = pjoin( topdir, 'vvt' )
+trigdir = pjoin( topdir, 'trig' )
 
 # imports for core vvtest modules are relative to the "vvt" directory
 sys.path.insert( 0, vvtdir )
