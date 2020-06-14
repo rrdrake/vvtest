@@ -29,6 +29,8 @@ working directory.  Without any arguments, all the test scripts are run.
 OPTIONS
     -h, --help  : this help
     -j <int>    : max concurrent tests (default is one)
+    -k <keyword>: only run tests with this keyword; may be repeated;
+                  common keywords are "vvtest" and "trig"
     -s          : pass -s to the unit tests that take the option (use real ssh)
     -p <directory> : python version test; this triggers a loop over python
                      installations under the given directory, and runs each
@@ -46,7 +48,7 @@ OPTIONS
 
 def main():
 
-    optL,argL = getopt.getopt( sys.argv[1:], 'hsp:v:rj:',
+    optL,argL = getopt.getopt( sys.argv[1:], 'hsp:v:rj:k:',
                                longopts=['help','coverage'] )
 
     iterpy = ''
@@ -55,6 +57,7 @@ def main():
     remotepy = False
     numconcurrent = 1
     coverage = False
+    keywords = None
 
     for n,v in optL:
         if n == '-h' or n == '--help':
@@ -73,6 +76,11 @@ def main():
             assert numconcurrent >= 1
         elif n == '--coverage':
             coverage = True
+        elif n == '-k':
+            if not keywords:
+                keywords = [v]
+            else:
+                keywords.append( v )
 
     if iterpy:
         pyL = []
@@ -95,7 +103,7 @@ def main():
     cmdD = {}
     for fname in glob.glob( mydir+'/*' ):
 
-        if is_test_file( fname ):
+        if run_file( fname, keywords ):
 
             tname = os.path.basename( fname )
             if len(argL) == 0 or tname in argL:
@@ -313,21 +321,38 @@ def print3( *args ):
     sys.stdout.flush()
 
 
-def is_test_file( fname ):
+def run_file( fname, keywords ):
     """
     Looks at the first few lines of the file to determine if it is a test file.
+    If so and keyword filtering is satisfied, then True is returned.
     """
     rtn = False
+
     if not os.path.islink(fname) and os.path.isfile(fname):
         lines = read_first_lines( fname, 10 )
         for line in lines:
             line = line.strip()
             if len(line) > 0 and line[0] != '#':
                 break
-            if line.strip().startswith( '#RUNTEST:' ):
-                rtn = True
+            elif line.startswith( '#RUNTEST:' ):
+                if satisfies_keywords( keywords, line ):
+                    rtn = True
                 break
+
     return rtn
+
+
+def satisfies_keywords( keywords, line ):
+    ""
+    if keywords:
+
+        words = line.split('#RUNTEST:')[1].split()
+
+        for kw in keywords:
+            if kw not in words:
+                return False
+
+    return True
 
 
 def read_first_lines( fname, numlines ):
