@@ -1200,30 +1200,14 @@ def get_vvtest_directory():
 
 def adjust_sys_path_for_shared_modules( vvtestdir ):
     ""
-    trigdir = get_trig_directory( vvtestdir )
+    trigdir = normpath( pjoin( vvtestdir, 'trig' ) )
 
-    if trigdir:
+    if os.path.isdir( trigdir ):
         if trigdir not in sys.path:
             sys.path.insert( 1, trigdir )
     else:
         raise FatalError( '*** vvtest error: '
                           'failed to find "trig" directory for imports' )
-
-
-def get_trig_directory( vvtestdir ):
-    """
-    the trig directory is a sibling directory in the scidev repository, but
-    a subdirectory when vvtest is installed with the 'install_vvtest' script
-    """
-    trigdir = normpath( pjoin( vvtestdir, 'trig' ) )
-
-    if not os.path.isdir( trigdir ):
-        trigdir = normpath( pjoin( vvtestdir, '..', 'trig' ) )
-
-        if not os.path.isdir( trigdir ):
-            trigdir = None
-
-    return trigdir
 
 
 def main():
