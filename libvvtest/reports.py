@@ -7,7 +7,10 @@
 import os, sys
 import time
 
-from . import fmtresults
+try:
+    import fmtresults
+except ImportError:
+    from . import fmtresults
 
 
 class ResultsMatrix:

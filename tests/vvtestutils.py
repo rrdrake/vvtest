@@ -23,7 +23,7 @@ from testutils import print3
 
 testsrcdir = dirname( abspath( sys.argv[0] ) )
 topdir = dirname( testsrcdir )
-vvtdir = pjoin( topdir, 'vvt' )
+vvtdir = topdir
 trigdir = pjoin( topdir, 'trig' )
 
 # imports for core vvtest modules are relative to the "vvt" directory
@@ -35,7 +35,7 @@ sys.path.insert( 1, trigdir )
 cfgdir = os.path.join( vvtdir, 'config' )
 
 vvtest_file = pjoin( vvtdir, 'vvtest' )
-resultspy = pjoin( vvtdir, 'results.py' )
+resultspy = pjoin( vvtdir, 'libvvtest', 'results.py' )
 
 import libvvtest.TestSpec as TestSpec
 import libvvtest.testcase as testcase
@@ -81,10 +81,6 @@ def copy_vvtest_into_directory( dest_dir ):
         if fn != 'vvtest':
             os.symlink( vvtdir+'/'+fn, dest_dir+'/'+fn )
 
-    os.symlink( trigdir, dest_dir+'/trig' )
-
-
-nonqueued_platform_names = [ 'ceelan', 'Linux', 'iDarwin', 'Darwin' ]
 
 def core_platform_name():
     """

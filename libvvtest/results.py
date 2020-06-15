@@ -11,8 +11,12 @@ import os
 import time
 import glob
 
-import libvvtest.fmtresults as fmtresults
-import libvvtest.reports as reports
+try:
+    import fmtresults
+    import reports
+except ImportError:
+    from . import fmtresults
+    from . import reports
 
 
 usage_string = """

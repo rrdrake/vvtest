@@ -18,12 +18,16 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.reports as reports
+try:
+    import reports
+    import fmtresults
+    import testcase
+except ImportError:
+    from libvvtest import reports
+    from libvvtest import fmtresults
+    from libvvtest import testcase
 
 import results_util as ru
-
-import libvvtest.fmtresults as fmtresults
-import libvvtest.testcase as testcase
 
 timesfname = fmtresults.runtimes_filename
 multifname = fmtresults.multiruntimes_filename

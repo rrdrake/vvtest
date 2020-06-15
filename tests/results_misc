@@ -20,7 +20,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import results
+import libvvtest.results as results
 
 import results_util as ru
 

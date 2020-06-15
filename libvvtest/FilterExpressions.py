@@ -12,9 +12,9 @@ import re
 import fnmatch
 
 try:
-  from teststatus import RESULTS_KEYWORDS
+    from teststatus import RESULTS_KEYWORDS
 except ImportError:
-  from .teststatus import RESULTS_KEYWORDS
+    from .teststatus import RESULTS_KEYWORDS
 
 
 class WordExpression:

@@ -29,7 +29,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     assert tdir
     vvtlib = pjoin( tdir, 'libvvtest' )
 
-    trigdir = normpath( pjoin( tdir, '..', 'trig' ) )
+    trigdir = pjoin( tdir, 'trig' )
 
     projdir = rtconfig.getAttr('exepath')
     if not projdir: projdir = ''
