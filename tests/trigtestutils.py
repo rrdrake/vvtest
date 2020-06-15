@@ -20,12 +20,10 @@ import testutils as util
 testsrcdir = dirname( abspath( sys.argv[0] ) )
 topdir = dirname( testsrcdir )
 trigdir = pjoin( topdir, 'trig' )
-vvtdir = pjoin( topdir, 'vvt' )
 
 sys.path.insert( 0, trigdir )
 
-vvtest_file = pjoin( vvtdir, 'vvtest' )
-
+vvtest_file = pjoin( topdir, 'vvtest' )
 dasher_file = pjoin( trigdir, 'dasher' )
 
 

@@ -375,7 +375,7 @@ class cmd_line_word_expression_tests( vtu.vvtestTestCase ):
             import sys, subprocess
 
             cmd = '"""+sys.executable +"""'
-            cmd += ' """+vtu.vvtdir+"""/libvvtest/FilterExpressions.py'
+            cmd += ' """+vtu.topdir+"""/libvvtest/FilterExpressions.py'
             cmd_true = cmd + ' """+args_true+"""'
             cmd_false = cmd + ' """+args_false+"""'
 

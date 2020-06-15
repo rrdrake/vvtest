@@ -48,7 +48,7 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        fn = os.path.join( vtu.vvtdir, 'libvvtest', 'exeDB.xml' )
+        fn = os.path.join( vtu.topdir, 'libvvtest', 'exeDB.xml' )
         xreader = xmlwrapper.XmlDocReader()
         xdoc = xreader.readDoc( fn )
 
@@ -61,7 +61,7 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
 
         plat = FakePlatform()
         cshScriptWriter.writeScript( TestCase( tL[0] ), xdb, plat,
-                                     vtu.vvtdir, os.getcwd(), testdir,
+                                     vtu.topdir, os.getcwd(), testdir,
                                      [], [], 'runscript' )
         time.sleep(1)
 

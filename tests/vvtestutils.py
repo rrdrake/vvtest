@@ -23,19 +23,18 @@ from testutils import print3
 
 testsrcdir = dirname( abspath( sys.argv[0] ) )
 topdir = dirname( testsrcdir )
-vvtdir = topdir
 trigdir = pjoin( topdir, 'trig' )
 
 # imports for core vvtest modules are relative to the "vvt" directory
-sys.path.insert( 0, vvtdir )
+sys.path.insert( 0, topdir )
 
 # import paths for shared modules
 sys.path.insert( 1, trigdir )
 
-cfgdir = os.path.join( vvtdir, 'config' )
+cfgdir = os.path.join( topdir, 'config' )
 
-vvtest_file = pjoin( vvtdir, 'vvtest' )
-resultspy = pjoin( vvtdir, 'libvvtest', 'results.py' )
+vvtest_file = pjoin( topdir, 'vvtest' )
+resultspy = pjoin( topdir, 'libvvtest', 'results.py' )
 
 import libvvtest.TestSpec as TestSpec
 import libvvtest.testcase as testcase
@@ -77,9 +76,9 @@ def copy_vvtest_into_directory( dest_dir ):
     """
     shutil.copy( vvtest_file, dest_dir+'/vvtest' )
 
-    for fn in os.listdir( vvtdir ):
+    for fn in os.listdir( topdir ):
         if fn != 'vvtest':
-            os.symlink( vvtdir+'/'+fn, dest_dir+'/'+fn )
+            os.symlink( topdir+'/'+fn, dest_dir+'/'+fn )
 
 
 def core_platform_name():
