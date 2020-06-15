@@ -97,6 +97,10 @@ Fixes:
 
 Changes:
 
+    - The Git repository directory structure changed a bit. Effectively,
+      the contents of the vvt directory is now at the top level. However,
+      the install_vvtest still installs vvtest the same as before.
+
     - The -s option is now deprecated in favor of --search, which is a
       synomym.
 
