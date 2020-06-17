@@ -58,6 +58,26 @@ class SimpleAprepro:
                  evaluated while processing src_f.
     """
 
+    def read_file(self, filename):
+
+        # Make it so that files get read in relative the the file that
+        # they are currently reading in.
+        cwd = os.getcwd()
+        if os.path.dirname(self.src_f) != "":
+            os.chdir(os.path.dirname(self.src_f))
+
+        processor = SimpleAprepro(filename, None,
+                                  chatty=self.chatty,
+                                  override=self.override,
+                                  immutable=self.immutable)
+        processor.load_file()
+        processor.eval_locals.update(self.eval_locals)
+        eval_locals = processor.process()
+        self.eval_locals.update(eval_locals)
+        os.chdir(cwd)
+
+        return "".join(processor.dst_txt)#, eval_locals
+
 
     def __init__(self, src_f, dst_f,
                        chatty=True,
@@ -73,10 +93,6 @@ class SimpleAprepro:
         self.immutable = immutable
         self.src_txt = []
         self.dst_txt = []
-
-        def read_file(filename):
-            with open(filename, "r") as fin:
-                return fin.read()
 
         # These are defined here so that each time process() is called
         # it gets a new version of the locals and globals so that there
@@ -150,7 +166,7 @@ class SimpleAprepro:
                              "PHI": (math.sqrt(5.0) + 1.0) / 2.0,
 
                              # Predefined Variables from Aprepro
-                             "include": read_file,
+                             "include": self.read_file,
                             }
         self.eval_locals = {}
 
