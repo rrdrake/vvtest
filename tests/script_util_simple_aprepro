@@ -227,10 +227,59 @@ class Simple_Aprepro( vtu.vvtestTestCase ):
         time.sleep(1)
 
         for batch in [False,True]:
-
             vtu.remove_results()
-
             vtu.runvvtest( batch=batch ).assertCounts( total=1, npass=1 )
+
+    def test_nested_include(self):
+        """
+        This test makes sure that we can include files and that those files
+        include other files relative to those files' locations. This test
+        includes like this:
+
+        level0.aprepro
+        -> level1.txt
+          -> tmpdir/level2.txt
+            -> tmpdir/level3.txt
+              -> level4.txt
+                -> level5.txt
+        (remainder of level0.aprepro)
+        """
+
+        util.writefile( 'nested_include.py.vvt', """
+            import os
+            import script_util as util
+
+            os.mkdir('tmpdir')
+            with open('level0.aprepro', 'w') as f:
+                f.write('level0 a=2={a=2}\\n{include("level1.txt")}\\nlevel0 a={a}')
+            with open('level1.txt', 'w') as f:
+                f.write('level1 a={fac}*a={a=fac*a}\\n{include("tmpdir/level2.txt")}')
+            with open('tmpdir/level2.txt', 'w') as f:
+                f.write('level2 a={fac}*a={a=fac*a}\\n{include("level3.txt")}')
+            with open('tmpdir/level3.txt', 'w') as f:
+                f.write('level3 a={fac}*a={a=fac*a}\\n{include("../level4.txt")}')
+            with open('level4.txt', 'w') as f:
+                f.write('level4 a={fac}*a={a=fac*a}\\n{include("level5.txt")}')
+            with open('level5.txt', 'w') as f:
+                f.write('level5 a={fac}*a={a=fac*a}')
+
+            apr = util.simple_aprepro("level0.aprepro", "foo.comp", override={'fac': 2})
+
+            with open("foo.comp", "r") as F:
+                comp = F.read()
+
+            gold = 'level0 a=2=2\\nlevel1 a=2*a=4\\nlevel2 a=2*a=8\\nlevel3 a=2*a=16\\nlevel4 a=2*a=32\\nlevel5 a=2*a=64\\nlevel0 a=64'
+
+            print(repr(comp))
+            print(repr(gold))
+            assert comp == gold
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+            vtu.remove_results()
+            vtu.runvvtest( batch=batch ).assertCounts( total=1, npass=1 )
+
 
 
 
