@@ -74,6 +74,10 @@ class SimpleAprepro:
         self.src_txt = []
         self.dst_txt = []
 
+        def read_file(filename):
+            with open(filename, "r") as fin:
+                return fin.read()
+
         # These are defined here so that each time process() is called
         # it gets a new version of the locals and globals so that there
         # isn't cross-call contamination. Commented entries are present
@@ -144,6 +148,9 @@ class SimpleAprepro:
                              "E": math.e,
                              "GAMMA": 0.57721566490153286060651209008240243,
                              "PHI": (math.sqrt(5.0) + 1.0) / 2.0,
+
+                             # Predefined Variables from Aprepro
+                             "include": read_file,
                             }
         self.eval_locals = {}
 

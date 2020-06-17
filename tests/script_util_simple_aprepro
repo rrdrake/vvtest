@@ -200,6 +200,40 @@ class Simple_Aprepro( vtu.vvtestTestCase ):
 
             vtu.runvvtest( batch=batch ).assertCounts( total=1, npass=1 )
 
+    def test_include(self):
+        """
+        This test makes sure that we can include files
+        """
+        util.writefile( 'foo.aprepro', """pre-foo\n{include("baz.txt")}\npost-foo""" )
+        util.writefile( 'baz.txt', """This is baz.""" )
+        util.writefile( 'foo.gold', """pre-foo\nThis is baz.\n\npost-foo""" )
+
+        util.writefile( 'testinclude.py.vvt', """
+            #VVT: copy : foo.aprepro baz.txt foo.gold
+            import script_util as util
+
+            apr = util.simple_aprepro("foo.aprepro", "foo.comp")
+
+            with open("foo.comp", "r") as F:
+                comp = F.read()
+
+            with open("foo.gold", "r") as F:
+                gold = F.read()
+
+            print(repr(comp))
+            print(repr(gold))
+            assert comp == gold
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vtu.runvvtest( batch=batch ).assertCounts( total=1, npass=1 )
+
+
+
 
 class Simple_Aprepro_Main( vtu.vvtestTestCase ):
 
