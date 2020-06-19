@@ -20,6 +20,7 @@ from libvvtest.testcreator import TestCreator
 from libvvtest.testcase import TestCase
 from libvvtest.TestSpec import TestSpec
 from libvvtest.TestExec import TestExec
+from libvvtest.FilterExpressions import WordExpression
 
 from libvvtest import depend
 find_tests_by_pattern = depend.find_tests_by_pattern
@@ -175,6 +176,92 @@ def get_depencency_expr( tspec, dep_name ):
 
 
 #######################################
+
+class tests_for_TestDependency_class( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        ""
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_satisfiesResult(self):
+        ""
+        tcase = vtu.make_fake_TestCase()
+
+        dep = depend.TestDependency( tcase, None, None )
+
+        assert dep.satisfiesResult( 'pass' )
+        assert dep.satisfiesResult( 'diff' )
+        assert not dep.satisfiesResult( 'fail' )
+        assert not dep.satisfiesResult( 'notrun' )
+        assert not dep.satisfiesResult( 'notdone' )
+        assert not dep.satisfiesResult( 'timeout' )
+
+        wx = WordExpression()  # no expr is always True
+        dep = depend.TestDependency( tcase, None, wx )
+        assert dep.satisfiesResult( 'pass' )
+        assert dep.satisfiesResult( 'fail' )
+
+        wx = WordExpression( '' )  # an empty expr is always False
+        dep = depend.TestDependency( tcase, None, wx )
+        assert not dep.satisfiesResult( 'pass' )
+        assert not dep.satisfiesResult( 'fail' )
+
+        wx = WordExpression( 'pass or fail' )
+        dep = depend.TestDependency( tcase, None, wx )
+        assert dep.satisfiesResult( 'pass' )
+        assert dep.satisfiesResult( 'fail' )
+        assert not dep.satisfiesResult( 'diff' )
+
+    def test_will_never_run_logic(self):
+        ""
+        tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'fail' )
+        assert tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'fail', '*' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'skip' )
+        assert tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'skip', '*' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'skippass' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'skipfail' )
+        assert tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'notdone' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'notdone', '*' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'notrun' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'notrun', '*' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency(
+                            'notrun',
+                            second_level_result='fail' )
+        assert tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency(
+                            'notrun', '*',
+                            second_level_result='fail' )
+        assert not tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency(
+                            'notrun',
+                            second_level_result='pass' )
+        assert not tcase.willNeverRun()
+
 
 class Function_find_tests_by_execute_directory_match( vtu.vvtestTestCase ):
 

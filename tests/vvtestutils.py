@@ -46,6 +46,7 @@ from libvvtest.TestList import TestList
 from libvvtest.execlist import TestExecList
 from libvvtest.testcreator import TestCreator
 from libvvtest.scanner import TestFileScanner
+from libvvtest.FilterExpressions import WordExpression
 
 
 ##########################################################################
@@ -698,6 +699,42 @@ def make_fake_TestCase( result=None, runtime=None, name='atest',
         tspec.setTimeout( timeout )
 
     return tcase
+
+
+def make_TestCase_with_a_dependency( test_result, result_expr=None,
+                                     second_level_result=None ):
+    ""
+    src_tcase = make_fake_TestCase( name='srctest' )
+    tcase = make_fake_TestCase( test_result )
+
+    wordexpr = make_dependency_word_expression( result_expr )
+
+    src_tcase.addDependency( tcase, None, wordexpr )
+
+    if second_level_result:
+        tcase2 = make_fake_TestCase( second_level_result, name='btest' )
+        wordexpr2 = make_dependency_word_expression( None )
+        tcase.addDependency( tcase2, None, wordexpr2 )
+
+    return src_tcase
+
+
+def add_dependency( tcase, test_result ):
+    ""
+    dep_tcase = make_fake_TestCase( test_result )
+    tcase.addDependency( dep_tcase, None, None )
+
+
+def make_dependency_word_expression( string_expr ):
+    ""
+    if string_expr == None:
+        wx = None
+    elif string_expr == '*':
+        wx = WordExpression()
+    else:
+        wx = WordExpression( string_expr )
+
+    return wx
 
 
 def make_fake_staged_TestCase( stage_index=0 ):

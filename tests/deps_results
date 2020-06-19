@@ -19,8 +19,6 @@ from testutils import print3
 
 import libvvtest.depend as depend
 
-import libvvtest.FilterExpressions as FilterExpressions
-
 
 class dependency_result_expressions( vtu.vvtestTestCase ):
 
@@ -100,121 +98,71 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
 
     def test_get_blocking_dependencies_that_are_done(self):
         ""
-        tcase = make_TestCase_with_a_dependency( 'pass' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
         assert tcase.getBlockingDependency() == None
 
-        tcase = make_TestCase_with_a_dependency( 'fail' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'fail' )
         assert tcase.getBlockingDependency() != None
 
-        tcase = make_TestCase_with_a_dependency( 'fail', '*' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'fail', '*' )
         assert tcase.getBlockingDependency() == None
 
-        tcase = make_TestCase_with_a_dependency( 'fail', 'pass or fail' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'fail', 'pass or fail' )
         assert tcase.getBlockingDependency() == None
 
     def test_get_blocking_dependencies_that_are_running(self):
         ""
-        tcase = make_TestCase_with_a_dependency( 'running' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'running' )
         assert tcase.getBlockingDependency() != None
 
-        tcase = make_TestCase_with_a_dependency( 'pass' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
         assert tcase.getBlockingDependency() == None
-        add_dependency( tcase, 'running' )
+        vtu.add_dependency( tcase, 'running' )
         assert tcase.getBlockingDependency() != None
 
     def test_get_blocking_dependencies_that_are_skipped(self):
         ""
-        tcase = make_TestCase_with_a_dependency( 'skip' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'skip' )
         assert tcase.getBlockingDependency() != None
 
-        tcase = make_TestCase_with_a_dependency( 'skip', '*' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'skip', '*' )
         assert tcase.getBlockingDependency() == None
 
     def test_get_blocking_dependencies_that_have_not_run_yet(self):
         ""
-        tcase = make_TestCase_with_a_dependency( 'pass' )
+        tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
         assert tcase.getBlockingDependency() == None
-        add_dependency( tcase, 'notrun' )
+        vtu.add_dependency( tcase, 'notrun' )
         assert tcase.getBlockingDependency() != None
-
-    def test_will_never_run_logic(self):
-        ""
-        tcase = make_TestCase_with_a_dependency( 'pass' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'fail' )
-        assert tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'fail', '*' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'skip' )
-        assert tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'skip', '*' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'skippass' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'skipfail' )
-        assert tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'notdone' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'notdone', '*' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'notrun' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency( 'notrun', '*' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency(
-                            'notrun',
-                            second_level_result='fail' )
-        assert tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency(
-                            'notrun', '*',
-                            second_level_result='fail' )
-        assert not tcase.willNeverRun()
-
-        tcase = make_TestCase_with_a_dependency(
-                            'notrun',
-                            second_level_result='pass' )
-        assert not tcase.willNeverRun()
 
     def test_get_blocking_dependencies_that_will_never_run(self):
         ""
         # a dep which has to be run, but will never run
-        tcase = make_TestCase_with_a_dependency(
+        tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun',
                             second_level_result='fail' )
         assert tcase.getBlockingDependency() != None
 
         # a dep which does NOT have to be run, and will never run
-        tcase = make_TestCase_with_a_dependency(
+        tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='fail' )
         assert tcase.getBlockingDependency() == None
 
         # a dep which does not have to be run, but not known yet if it will run
-        tcase = make_TestCase_with_a_dependency(
+        tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='notrun' )
         assert tcase.getBlockingDependency() != None
 
         # a dep which does not have to be run, and will never run due to skip
-        tcase = make_TestCase_with_a_dependency(
+        tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='skip' )
         assert tcase.getBlockingDependency() == None
 
         # a dep which does not have to be run, but must wait to run
-        tcase = make_TestCase_with_a_dependency(
+        tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='skippass' )
         assert tcase.getBlockingDependency() != None
@@ -253,42 +201,6 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( '-vv -k testA/testB', batch=batch )
             vrun.assertCounts( total=3, npass=2, skip=1 )
-
-
-def make_TestCase_with_a_dependency( test_result, result_expr=None,
-                                     second_level_result=None ):
-    ""
-    src_tcase = vtu.make_fake_TestCase( name='srctest' )
-    tcase = vtu.make_fake_TestCase( test_result )
-
-    wordexpr = make_word_expression( result_expr )
-
-    src_tcase.addDependency( tcase, None, wordexpr )
-
-    if second_level_result:
-        tcase2 = vtu.make_fake_TestCase( second_level_result, name='btest' )
-        wordexpr2 = make_word_expression( None )
-        tcase.addDependency( tcase2, None, wordexpr2 )
-
-    return src_tcase
-
-
-def add_dependency( tcase, test_result ):
-    ""
-    dep_tcase = vtu.make_fake_TestCase( test_result )
-    tcase.addDependency( dep_tcase, None, None )
-
-
-def make_word_expression( string_expr ):
-    ""
-    if string_expr == None:
-        wx = None
-    elif string_expr == '*':
-        wx = FilterExpressions.WordExpression()
-    else:
-        wx = FilterExpressions.WordExpression( string_expr )
-
-    return wx
 
 
 ############################################################################

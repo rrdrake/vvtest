@@ -33,6 +33,8 @@ class TestDependency:
 
     def satisfiesResult(self, result):
         ""
+        # magic: change 'result' argument to 'tstat' (or just use self.tcase ?)
+
         if self.wordexpr == None:
             if result not in ['pass','diff']:
                 return False
