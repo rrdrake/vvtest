@@ -101,17 +101,20 @@ def run_batch( batch, tlist, xlist, perms, rtinfo, results_writer, test_dir ):
     if len(NS)+len(NF)+len(nrL) > 0:
         print3()
     if len(NS) > 0:
-      print3( "*** Warning: these batch numbers did not seem to start:",
-              ' '.join(NS) )
+        print3( "*** Warning: these batch numbers did not seem to start:",
+                ' '.join(NS) )
     if len(NF) > 0:
-      print3( "*** Warning: these batch numbers did not seem to finish:",
-              ' '.join(NF) )
-    for tcase0,tcase1 in nrL:
-        assert tcase0.numDependencies() > 0 and tcase1 != None
-        xdir0 = tcase0.getSpec().getDisplayString()
-        xdir1 = tcase1.getSpec().getDisplayString()
-        print3( '*** Warning: test "'+xdir0+'"',
-                'notrun due to dependency "' + xdir1 + '"' )
+        print3( "*** Warning: these batch numbers did not seem to finish:",
+                ' '.join(NF) )
+    print_notrun_reasons( nrL )
+
+
+def print_notrun_reasons( notrunlist ):
+    ""
+    for tcase,reason in notrunlist:
+        xdir = tcase.getSpec().getDisplayString()
+        print3( '*** Warning: test "'+xdir+'"',
+                'notrun due to "' + reason + '"' )
 
 
 def get_batch_info( batch ):
@@ -203,16 +206,22 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
         tlist.writeFinished()
 
     # any remaining tests cannot run, so print warnings
-    tcaseL = xlist.popRemaining()
-    if len(tcaseL) > 0:
+
+    nrL = getReasonForNotRun( xlist.popRemaining() )
+    if len(nrL) > 0:
         print3()
-    for tcase in tcaseL:
+    print_notrun_reasons( nrL )
+
+
+def getReasonForNotRun( notruntests ):
+    ""
+    notrunL = []
+    for tcase in notruntests:
         deptx = tcase.getBlockingDependency()
         assert tcase.numDependencies() > 0 and deptx != None
-        xdir = tcase.getSpec().getDisplayString()
-        depxdir = deptx.getSpec().getDisplayString()
-        print3( '*** Warning: test "'+xdir+'"',
-                'notrun due to dependency "' + depxdir + '"' )
+        notrunL.append( (tcase,deptx.getSpec().getDisplayString()) )
+
+    return notrunL
 
 
 def exec_path( testspec, test_dir ):

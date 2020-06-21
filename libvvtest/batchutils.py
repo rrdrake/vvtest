@@ -85,7 +85,7 @@ class Batcher:
         """
         if self.jobhandler.numSubmitted() < self.maxjobs:
             for bjob in self.jobhandler.getNotStarted():
-                if self.results.getBlockingDependency( bjob ) == None:
+                if not self.results.hasBlockingDependency( bjob ):
                     self._start_job( bjob )
                     return bjob.getBatchID()
         return None
@@ -128,7 +128,7 @@ class Batcher:
 
         notrunL = []
         for bjob in jobL:
-            notrunL.extend( self.results.getFailedDependencies( bjob ) )
+            notrunL.extend( self.results.getReasonForNotRun( bjob ) )
 
         notrun,notdone = self.jobhandler.getUnfinishedJobIDs()
 
@@ -462,28 +462,30 @@ class ResultsHandler:
                 if tcase and tcase.getStat().isDone():
                     donetests.append( tcase )
 
-    def getFailedDependencies(self, bjob):
+    def getReasonForNotRun(self, bjob):
         ""
-        depL = []
+        notrunL = []
+        reason = 'batch number '+str(bjob.getJobID())+' did not run'
 
-        tcase1 = self.getBlockingDependency( bjob )
-        assert tcase1 != None  # otherwise the job should have run
         for tcase0 in bjob.getAttr('testlist').getTests():
-            depL.append( (tcase0,tcase1) )
+            tcase1 = tcase0.getBlockingDependency()
+            if tcase1 == None:
+                notrunL.append( (tcase0,reason) )
+            else:
+                notrunL.append( (tcase0,tcase1.getSpec().getDisplayString()) )
 
-        return depL
+        return notrunL
 
-    def getBlockingDependency(self, bjob):
+    def hasBlockingDependency(self, bjob):
         """
-        If a dependency of any of the tests in the current list have not run or
-        ran but did not pass or diff, then that dependency test is returned.
-        Otherwise None is returned.
+        If any of the tests in the job list have blocking dependencies
+        then True is returned, otherwise False.
         """
         for tcase in bjob.getAttr('testlist').getTests():
             deptx = tcase.getBlockingDependency()
             if deptx != None:
-                return deptx
-        return None
+                return True
+        return False
 
     def finalize(self):
         ""
