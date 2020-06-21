@@ -31,9 +31,9 @@ class TestDependency:
 
         return tid1 == tid2
 
-    def satisfiesResult(self, result):
+    def satisfiesResult(self):
         ""
-        # magic: change 'result' argument to 'tstat' (or just use self.tcase ?)
+        result = self.tcase.getStat().getResultStatus()
 
         if self.wordexpr == None:
             if result not in ['pass','diff']:
@@ -50,12 +50,10 @@ class TestDependency:
 
     def isBlocking(self):
         ""
-        tcase = self.getTestCase()
-        tstat = tcase.getStat()
+        tstat = self.tcase.getStat()
 
         if tstat.isDone() or tstat.skipTest():
-            result = tstat.getResultStatus()
-            if not self.satisfiesResult( result ):
+            if not self.satisfiesResult():
                 return True
 
         elif tstat.isNotDone():
@@ -64,9 +62,8 @@ class TestDependency:
         else:
             assert tstat.isNotrun()
 
-            if tcase.willNeverRun():
-                result = tstat.getResultStatus()
-                if not self.satisfiesResult( result ):
+            if self.tcase.willNeverRun():
+                if not self.satisfiesResult():
                     return True
             else:
                 return True
@@ -75,19 +72,15 @@ class TestDependency:
 
     def willNeverRun(self):
         ""
-        tcase = self.getTestCase()
-        tstat = tcase.getStat()
+        tstat = self.tcase.getStat()
 
         if tstat.isDone() or tstat.skipTest():
-            result = tstat.getResultStatus()
-            if not self.satisfiesResult( result ):
+            if not self.satisfiesResult():
                 return True
 
-        elif tstat.isNotrun():
-            if tcase.willNeverRun():
-                result = tstat.getResultStatus()
-                if not self.satisfiesResult( result ):
-                    return True
+        elif tstat.isNotrun() and self.tcase.willNeverRun():
+            if not self.satisfiesResult():
+                return True
 
         return False
 

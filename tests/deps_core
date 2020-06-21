@@ -185,32 +185,47 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
 
     def test_satisfiesResult(self):
         ""
-        tcase = vtu.make_fake_TestCase()
+        def maketestdep( result, expr=None ):
+            tcase = vtu.make_fake_TestCase( result )
+            return depend.TestDependency( tcase, None, expr )
 
-        dep = depend.TestDependency( tcase, None, None )
+        dep = maketestdep( 'pass' )
+        assert dep.satisfiesResult()
 
-        assert dep.satisfiesResult( 'pass' )
-        assert dep.satisfiesResult( 'diff' )
-        assert not dep.satisfiesResult( 'fail' )
-        assert not dep.satisfiesResult( 'notrun' )
-        assert not dep.satisfiesResult( 'notdone' )
-        assert not dep.satisfiesResult( 'timeout' )
+        dep = maketestdep( 'diff' )
+        assert dep.satisfiesResult()
+
+        dep = maketestdep( 'fail' )
+        assert not dep.satisfiesResult()
+
+        dep = maketestdep( 'notrun' )
+        assert not dep.satisfiesResult()
+
+        dep = maketestdep( 'notdone' )
+        assert not dep.satisfiesResult()
+
+        dep = maketestdep( 'timeout' )
+        assert not dep.satisfiesResult()
 
         wx = WordExpression()  # no expr is always True
-        dep = depend.TestDependency( tcase, None, wx )
-        assert dep.satisfiesResult( 'pass' )
-        assert dep.satisfiesResult( 'fail' )
+        dep = maketestdep( 'pass', wx )
+        assert dep.satisfiesResult()
+        dep = maketestdep( 'fail', wx )
+        assert dep.satisfiesResult()
 
         wx = WordExpression( '' )  # an empty expr is always False
-        dep = depend.TestDependency( tcase, None, wx )
-        assert not dep.satisfiesResult( 'pass' )
-        assert not dep.satisfiesResult( 'fail' )
+        dep = maketestdep( 'pass', wx )
+        assert not dep.satisfiesResult()
+        dep = maketestdep( 'fail', wx )
+        assert not dep.satisfiesResult()
 
         wx = WordExpression( 'pass or fail' )
-        dep = depend.TestDependency( tcase, None, wx )
-        assert dep.satisfiesResult( 'pass' )
-        assert dep.satisfiesResult( 'fail' )
-        assert not dep.satisfiesResult( 'diff' )
+        dep = maketestdep( 'pass', wx )
+        assert dep.satisfiesResult()
+        dep = maketestdep( 'fail', wx )
+        assert dep.satisfiesResult()
+        dep = maketestdep( 'diff', wx )
+        assert not dep.satisfiesResult()
 
     def test_will_never_run_logic(self):
         ""

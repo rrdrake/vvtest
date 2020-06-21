@@ -64,7 +64,8 @@ class TestCase:
 
         if append:
             self.deps.append( testdep )
-            self.addDepDirectory( *testdep.getMatchDirectory() )
+            pat,depdir = testdep.getMatchDirectory()
+            self.addDepDirectory( pat, depdir )
 
     def numDependencies(self):
         ""
@@ -72,6 +73,11 @@ class TestCase:
 
     def getBlockingDependency(self):
         ""
+        # magic: change this to isBlocked (or something)
+        #   - in those places that want the testcase doing the blocking,
+        #     provide information instead (a string)
+        #   - add new function blockingReason() or something
+
         for tdep in self.deps:
             if tdep.isBlocking():
                 return tdep.getTestCase()
@@ -92,5 +98,7 @@ class TestCase:
 
     def getDepDirectories(self):
         ""
-        matchL = [ (T[1],T[0]) for T in self.depdirs.items() ]
-        return matchL
+        dirlist = []
+        for dep_dir,match_pattern in self.depdirs.items():
+            dirlist.append( (match_pattern,dep_dir) )
+        return dirlist
