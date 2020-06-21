@@ -56,6 +56,7 @@ def run_batch( batch, tlist, xlist, perms, rtinfo, results_writer, test_dir ):
     uthook = utesthooks.construct_unit_testing_hook( 'batch' )
 
     rfile = tlist.initializeResultsFile( **rtinfo.asDict() )
+    perms.set( os.path.abspath( rfile ) )
 
     info = TestInformationPrinter( sys.stdout, tlist, batch )
 
@@ -90,13 +91,11 @@ def run_batch( batch, tlist, xlist, perms, rtinfo, results_writer, test_dir ):
                        'time = '+pretty_time( time.time() - starttime ) ]
                 print3( "Progress:", ', '.join( sL )  )
 
-        # any remaining tests cannot be run; flush then print warnings
+        # any remaining tests cannot be run, so flush them
         NS, NF, nrL = batch.flush()
 
     finally:
         batch.shutdown()
-
-    perms.set( os.path.abspath( rfile ) )
 
     if len(NS)+len(NF)+len(nrL) > 0:
         print3()
@@ -152,14 +151,13 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
     uthook = utesthooks.construct_unit_testing_hook( 'run', qsub_id )
 
     rfile = tlist.initializeResultsFile( **rtinfo.asDict() )
+    perms.set( os.path.abspath( rfile ) )
+
+    info = TestInformationPrinter( sys.stdout, xlist )
 
     try:
 
-        info = TestInformationPrinter( sys.stdout, xlist )
-
         # execute tests
-
-        perms.set( os.path.abspath( rfile ) )
 
         cwd = os.getcwd()
 
@@ -202,24 +200,14 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
                 dt = pretty_time( time.time() - starttime )
                 print3( "Progress: " + div+" = %%%.1f"%pct + ', time = '+dt )
 
+        nrL = xlist.popRemaining()  # these tests cannot be run
+
     finally:
         tlist.writeFinished()
 
-    # any remaining tests cannot run, so print warnings
-
-    nrL = getReasonForNotRun( xlist.popRemaining() )
     if len(nrL) > 0:
         print3()
     print_notrun_reasons( nrL )
-
-
-def getReasonForNotRun( notruntests ):
-    ""
-    notrunL = []
-    for tcase in notruntests:
-        notrunL.append( (tcase,tcase.getBlockedReason()) )
-
-    return notrunL
 
 
 def exec_path( testspec, test_dir ):

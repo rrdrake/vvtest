@@ -37,13 +37,13 @@ class TestExecList:
     def popNext(self, maxsize):
         """
         Finds a test to execute.  Returns a TestExec object, or None if no
-        test can run.  In this case, one of the following is true
+        test can run.  In this latter case, one of the following is true
 
             1. there are not enough free processors to run another test
             2. the only tests left have a dependency with a bad result (like
                a fail) preventing the test from running
 
-        In the latter case, numRunning() will be zero.
+        For case #2, numRunning() will be zero.
         """
         # find longest runtime test with size constraint
         tcase = self._pop_next_test( maxsize )
@@ -65,9 +65,13 @@ class TestExecList:
 
     def popRemaining(self):
         """
-        All remaining tests are removed from the backlog and returned.
+        All remaining tests are removed from the backlog and returned as a
+        list of (testcase,blocked_reason).
         """
-        return [ tcase for tcase in self.backlog.consume() ]
+        tL = []
+        for tcase in self.backlog.consume():
+            tL.append( (tcase,tcase.getBlockedReason()) )
+        return tL
 
     def getRunning(self):
         """
