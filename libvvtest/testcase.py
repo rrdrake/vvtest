@@ -71,18 +71,19 @@ class TestCase:
         ""
         return len( self.deps )
 
-    def getBlockingDependency(self):
+    def isBlocked(self):
         ""
-        # magic: change this to isBlocked (or something)
-        #   - in those places that want the testcase doing the blocking,
-        #     provide information instead (a string)
-        #   - add new function blockingReason() or something
-
         for tdep in self.deps:
             if tdep.isBlocking():
-                return tdep.getTestCase()
+                return True
+        return False
 
-        return None
+    def getBlockedReason(self):
+        ""
+        for tdep in self.deps:
+            if tdep.isBlocking():
+                return tdep.getTestCase().getSpec().getDisplayString()
+        return ''
 
     def willNeverRun(self):
         ""

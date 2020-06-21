@@ -204,7 +204,7 @@ class TestConstraint:
             if np > maxnp or nd > maxnd:
                 return False
 
-        if tcase.getBlockingDependency() != None:
+        if tcase.isBlocked():
             return False
 
         return True

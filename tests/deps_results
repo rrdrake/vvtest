@@ -89,41 +89,42 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
     def test_get_blocking_dependencies_that_are_done(self):
         ""
         tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
         tcase = vtu.make_TestCase_with_a_dependency( 'fail' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
+        assert tcase.getBlockedReason() == 'sdir/atest.np=4'
 
         tcase = vtu.make_TestCase_with_a_dependency( 'fail', '*' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
         tcase = vtu.make_TestCase_with_a_dependency( 'fail', 'pass or fail' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
     def test_get_blocking_dependencies_that_are_running(self):
         ""
         tcase = vtu.make_TestCase_with_a_dependency( 'running' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
         tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
         vtu.add_dependency( tcase, 'running' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
     def test_get_blocking_dependencies_that_are_skipped(self):
         ""
         tcase = vtu.make_TestCase_with_a_dependency( 'skip' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
         tcase = vtu.make_TestCase_with_a_dependency( 'skip', '*' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
     def test_get_blocking_dependencies_that_have_not_run_yet(self):
         ""
         tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
         vtu.add_dependency( tcase, 'notrun' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
     def test_get_blocking_dependencies_that_will_never_run(self):
         ""
@@ -131,31 +132,31 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
         tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun',
                             second_level_result='fail' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
         # a dep which does NOT have to be run, and will never run
         tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='fail' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
         # a dep which does not have to be run, but not known yet if it will run
         tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='notrun' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
         # a dep which does not have to be run, and will never run due to skip
         tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='skip' )
-        assert tcase.getBlockingDependency() == None
+        assert not tcase.isBlocked()
 
         # a dep which does not have to be run, but must wait to run
         tcase = vtu.make_TestCase_with_a_dependency(
                             'notrun', result_expr='*',
                             second_level_result='skippass' )
-        assert tcase.getBlockingDependency() != None
+        assert tcase.isBlocked()
 
     def test_a_result_wildcard_will_ignore_a_skipped_dependency(self):
         ""

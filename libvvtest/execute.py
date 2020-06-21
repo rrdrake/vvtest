@@ -217,9 +217,7 @@ def getReasonForNotRun( notruntests ):
     ""
     notrunL = []
     for tcase in notruntests:
-        deptx = tcase.getBlockingDependency()
-        assert tcase.numDependencies() > 0 and deptx != None
-        notrunL.append( (tcase,deptx.getSpec().getDisplayString()) )
+        notrunL.append( (tcase,tcase.getBlockedReason()) )
 
     return notrunL
 

@@ -465,25 +465,21 @@ class ResultsHandler:
     def getReasonForNotRun(self, bjob):
         ""
         notrunL = []
-        reason = 'batch number '+str(bjob.getJobID())+' did not run'
+        fallback_reason = 'batch number '+str(bjob.getJobID())+' did not run'
 
-        for tcase0 in bjob.getAttr('testlist').getTests():
-            tcase1 = tcase0.getBlockingDependency()
-            if tcase1 == None:
-                notrunL.append( (tcase0,reason) )
+        for tcase in bjob.getAttr('testlist').getTests():
+            reason = tcase.getBlockedReason()
+            if reason:
+                notrunL.append( (tcase,reason) )
             else:
-                notrunL.append( (tcase0,tcase1.getSpec().getDisplayString()) )
+                notrunL.append( (tcase,fallback_reason) )
 
         return notrunL
 
     def hasBlockingDependency(self, bjob):
-        """
-        If any of the tests in the job list have blocking dependencies
-        then True is returned, otherwise False.
-        """
+        ""
         for tcase in bjob.getAttr('testlist').getTests():
-            deptx = tcase.getBlockingDependency()
-            if deptx != None:
+            if tcase.isBlocked():
                 return True
         return False
 

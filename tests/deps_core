@@ -413,7 +413,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         tcase.addDependency( dep2 )
 
         assert tcase.numDependencies() == 1
-        assert tcase.getBlockingDependency().getExec() != None
+        assert id( tcase.deps[0].getTestCase() ) == id(dep2)
 
     def test_addDependency_uniquifies_TestExec_then_TestSpec(self):
         ""
@@ -426,7 +426,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         tcase.addDependency( dep2 )
 
         assert tcase.numDependencies() == 1
-        assert tcase.getBlockingDependency().getExec() != None
+        assert id( tcase.deps[0].getTestCase() ) == id(dep1)
 
     def test_add_dep_with_match_pattern(self):
         ""
