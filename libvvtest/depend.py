@@ -16,10 +16,6 @@ class TestDependency:
         self.matchpat = matchpat
         self.wordexpr = wordexpr
 
-    def getTestCase(self):
-        ""
-        return self.tcase
-
     def hasTestExec(self):
         ""
         return self.tcase.getExec() != None
@@ -70,6 +66,10 @@ class TestDependency:
 
         return False
 
+    def blockedReason(self):
+        ""
+        return self.tcase.getSpec().getDisplayString()
+
     def willNeverRun(self):
         ""
         tstat = self.tcase.getStat()
@@ -85,14 +85,19 @@ class TestDependency:
         return False
 
 
-def connect_dependency( from_tcase, to_tcase, pattrn=None, expr=None ):
-    ""
-    assert from_tcase.getExec() != None
-
-    from_tcase.addDependency( to_tcase, pattrn, expr )
-
-    if to_tcase.getExec() != None:
-        to_tcase.setHasDependent()
+class FailedTestDependency:
+    """
+    For test dependencies that will never be satisfied, such as when a
+    'depends on' globbing match criterion is not satisfied.
+    """
+    def __init__(self, reason): self.reason = reason
+    def hasTestExec(self): return False
+    def hasSameTestID(self, testdep): return False
+    def satisfiesResult(self): return False
+    def getMatchDirectory(self): return None,None
+    def isBlocking(self): return True
+    def blockedReason(self): return self.reason
+    def willNeverRun(self): return True
 
 
 def find_tests_by_pattern( xdir, pattern, testcasemap ):
@@ -239,3 +244,11 @@ def check_connect_dependencies( tcase, testcasemap ):
             dep_obj = testcasemap.get( dep_id, None )
             if dep_obj != None:
                 connect_dependency( tcase, dep_obj, dep_pat, expr )
+
+
+def connect_dependency( from_tcase, to_tcase, pattrn=None, expr=None ):
+    ""
+    testdep = TestDependency( to_tcase, pattrn, expr )
+    from_tcase.addDependency( testdep )
+
+    to_tcase.setHasDependent()

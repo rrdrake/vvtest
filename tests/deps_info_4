@@ -75,6 +75,27 @@ class dependency_information( vtu.vvtestTestCase ):
             vrun.assertCounts( total=1, fail=1 )
             assert vrun.countGrepLogs( 'always fail', 'testX' ) > 0
 
+    def test_analyze_deps_are_not_in_the_depdir_map(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : np = 1
+            #VVT: analyze : --analyze
+
+            import sys
+            import vvtest_util as vvt
+
+            if "--analyze" in sys.argv[1:]:
+                print ( 'DEPDIRMAP='+repr(vvt.DEPDIRMAP) )
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+
+        lineL = vrun.greplogs( 'DEPDIRMAP=' )
+        assert len(lineL) == 1
+        dmap = eval( lineL[0].strip().split( 'DEPDIRMAP=', 1 )[1] )
+        assert len(dmap) == 0
 
 
 ############################################################################

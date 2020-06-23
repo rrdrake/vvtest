@@ -36,9 +36,9 @@ class TestCase:
 
     def getSize(self):
         ""
-        tspec = self.getSpec()
-        np = max( 1, int( tspec.getParameters().get( 'np', 1 ) ) )
-        nd = max( 0, int( tspec.getParameters().get( 'ndevice', 0 ) ) )
+        params = self.getSpec().getParameters()
+        np = max( 1, int( params.get( 'np', 1 ) ) )
+        nd = max( 0, int( params.get( 'ndevice', 0 ) ) )
         return np,nd
 
     def setHasDependent(self):
@@ -49,10 +49,8 @@ class TestCase:
         ""
         return self.has_dependent
 
-    def addDependency(self, testcase, match_pattern=None, result_expr=None):
+    def addDependency(self, testdep):
         ""
-        testdep = depend.TestDependency( testcase, match_pattern, result_expr )
-
         append = True
         for i,tdep in enumerate( self.deps ):
             if tdep.hasSameTestID( testdep ):
@@ -64,6 +62,7 @@ class TestCase:
 
         if append:
             self.deps.append( testdep )
+
             pat,depdir = testdep.getMatchDirectory()
             self.addDepDirectory( pat, depdir )
 
@@ -82,7 +81,7 @@ class TestCase:
         ""
         for tdep in self.deps:
             if tdep.isBlocking():
-                return tdep.getTestCase().getSpec().getDisplayString()
+                return tdep.blockedReason()
         return ''
 
     def willNeverRun(self):
@@ -95,7 +94,8 @@ class TestCase:
 
     def addDepDirectory(self, match_pattern, exec_dir):
         ""
-        self.depdirs[ exec_dir ] = match_pattern
+        if exec_dir:
+            self.depdirs[ exec_dir ] = match_pattern
 
     def getDepDirectories(self):
         ""

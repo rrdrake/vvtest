@@ -227,6 +227,31 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
         dep = maketestdep( 'diff', wx )
         assert not dep.satisfiesResult()
 
+    def test_a_dependency_that_fails_to_satisfy_glob_criteria(self):
+        ""
+        reason = "failed 'depends on' matching criteria"
+
+        dep = depend.FailedTestDependency( reason )
+
+        assert dep.isBlocking()
+        assert dep.willNeverRun()
+
+        tcase = vtu.make_fake_TestCase( 'notrun' )
+        tcase.addDependency( dep )
+
+        assert tcase.isBlocked()
+        assert tcase.willNeverRun()
+        assert tcase.getBlockedReason() == reason
+
+        tcase1 = vtu.make_fake_TestCase( 'notrun', name='atest' )
+        tcase2 = vtu.make_fake_TestCase( 'pass', name='btest' )
+        tcase1.addDependency( dep )
+        tcase1.addDependency( depend.TestDependency( tcase2, None, None ) )
+
+        assert tcase1.isBlocked()
+        assert tcase1.willNeverRun()
+        assert tcase1.getBlockedReason() == reason
+
     def test_will_never_run_logic(self):
         ""
         tcase = vtu.make_TestCase_with_a_dependency( 'pass' )
@@ -378,62 +403,63 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         ""
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-    def test_addDependency_uniquifies_multiple_TestSpec(self):
+    def test_add_dependency_uniquifies_multiple_TestSpec(self):
         ""
         tcase = make_TestSpec_test_case( 'testA' )
 
         dep1 = make_TestSpec_test_case( 'atest' )
-        tcase.addDependency( dep1 )
+        depend.connect_dependency( tcase, dep1 )
 
         dep2 = make_TestSpec_test_case( 'atest' )
-        tcase.addDependency( dep2 )
+        depend.connect_dependency( tcase, dep2 )
 
         assert tcase.numDependencies() == 1
 
-    def test_addDependency_uniquifies_multiple_TestExec(self):
+    def test_add_dependency_uniquifies_multiple_TestExec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
         dep1 = make_TestExec_test_case( 'atest' )
-        tcase.addDependency( dep1 )
+        depend.connect_dependency( tcase, dep1 )
 
         dep2 = make_TestExec_test_case( 'atest' )
-        tcase.addDependency( dep2 )
+        depend.connect_dependency( tcase, dep2 )
 
         assert tcase.numDependencies() == 1
 
-    def test_addDependency_uniquifies_TestSpec_then_TestExec(self):
+    def test_add_dependency_uniquifies_TestSpec_then_TestExec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
         dep1 = make_TestSpec_test_case( 'atest' )
-        tcase.addDependency( dep1 )
+        depend.connect_dependency( tcase, dep1 )
 
         dep2 = make_TestExec_test_case( 'atest' )
-        tcase.addDependency( dep2 )
+        depend.connect_dependency( tcase, dep2 )
 
-        assert tcase.numDependencies() == 1
-        assert id( tcase.deps[0].getTestCase() ) == id(dep2)
+        assert len( tcase.deps ) == 1
+        assert id( tcase.deps[0].tcase ) == id(dep2)
 
-    def test_addDependency_uniquifies_TestExec_then_TestSpec(self):
+    def test_add_dependency_uniquifies_TestExec_then_TestSpec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
         dep1 = make_TestExec_test_case( 'atest' )
-        tcase.addDependency( dep1 )
+        depend.connect_dependency( tcase, dep1 )
 
         dep2 = make_TestSpec_test_case( 'atest' )
-        tcase.addDependency( dep2 )
+        depend.connect_dependency( tcase, dep2 )
 
         assert tcase.numDependencies() == 1
-        assert id( tcase.deps[0].getTestCase() ) == id(dep1)
+        assert len( tcase.deps ) == 1
+        assert id( tcase.deps[0].tcase ) == id(dep1)
 
     def test_add_dep_with_match_pattern(self):
         ""
         tcase1 = make_TestSpec_test_case( 'atest' )
         tcase2 = make_TestSpec_test_case( 'btest' )
 
-        tcase1.addDependency( tcase2, 'btest*' )
+        depend.connect_dependency( tcase1, tcase2, 'btest*' )
 
         matchL = tcase1.getDepDirectories()
         assert len( matchL ) == 1
@@ -457,7 +483,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         tA.addDepDirectory( 'B*', 'sdir/Btest.np=4' )
 
         tB = vtu.make_fake_TestCase( name='Btest' )
-        tA.addDependency( tB, 'Bt*' )
+        depend.connect_dependency( tA, tB, 'Bt*' )
 
         matchL = tA.getDepDirectories()
         assert len( matchL ) == 1

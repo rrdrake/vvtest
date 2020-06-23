@@ -97,6 +97,13 @@ Fixes:
 
 Changes:
 
+    - The vvtest_util.py file contains the variables DEPDIRS and DEPDIRMAP.
+      For parameterize/analyze test groups, the analyze test no longer
+      contains the dependency test directory in the DEPDIRMAP. It is still
+      in the DEPDIRS, however. The reason is that the DEPDIRMAP is meant to
+      map the "depends on" glob pattern to the resulting directory(ies), but
+      parameterize/analyze tests do not have a glob pattern.
+
     - The Git repository directory structure changed a bit. Effectively,
       the contents of the vvt directory is now at the top level. However,
       the install_vvtest still installs vvtest the same as before.

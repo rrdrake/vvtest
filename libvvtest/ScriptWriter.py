@@ -279,12 +279,13 @@ def generate_dependency_map( dep_list, test_dir ):
     ""
     D = {}
 
-    for T in dep_list:
-        S = D.get( T[0], None )
-        if S == None:
-            S = set()
-            D[ T[0] ] = S
-        S.add( pjoin( test_dir, T[1] ) )
+    for pat,depdir in dep_list:
+        if pat:
+            S = D.get( pat, None )
+            if S == None:
+                S = set()
+                D[ pat ] = S
+            S.add( pjoin( test_dir, depdir ) )
 
     for k,S in D.items():
         D[ k ] = list( S )

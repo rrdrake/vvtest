@@ -47,6 +47,7 @@ from libvvtest.execlist import TestExecList
 from libvvtest.testcreator import TestCreator
 from libvvtest.scanner import TestFileScanner
 from libvvtest.FilterExpressions import WordExpression
+from libvvtest.depend import connect_dependency
 
 
 ##########################################################################
@@ -709,12 +710,12 @@ def make_TestCase_with_a_dependency( test_result, result_expr=None,
 
     wordexpr = make_dependency_word_expression( result_expr )
 
-    src_tcase.addDependency( tcase, None, wordexpr )
+    connect_dependency( src_tcase, tcase, None, wordexpr )
 
     if second_level_result:
         tcase2 = make_fake_TestCase( second_level_result, name='btest' )
         wordexpr2 = make_dependency_word_expression( None )
-        tcase.addDependency( tcase2, None, wordexpr2 )
+        connect_dependency( tcase, tcase2, None, wordexpr2 )
 
     return src_tcase
 
@@ -722,7 +723,7 @@ def make_TestCase_with_a_dependency( test_result, result_expr=None,
 def add_dependency( tcase, test_result ):
     ""
     dep_tcase = make_fake_TestCase( test_result )
-    tcase.addDependency( dep_tcase, None, None )
+    connect_dependency( tcase, dep_tcase, None, None )
 
 
 def make_dependency_word_expression( string_expr ):
