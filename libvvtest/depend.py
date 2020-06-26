@@ -233,17 +233,31 @@ def connect_analyze_dependencies( analyze, tcaseL, testcasemap ):
                 gxt.setHasDependent()
 
 
-def check_connect_dependencies( tcase, testcasemap ):
+def check_connect_dependencies( tcase, testcasemap, strict=True ):
     ""
     tspec = tcase.getSpec()
 
     for dep_pat,expr in tspec.getDependencies():
+
         xdir = tspec.getExecuteDirectory()
         depL = find_tests_by_pattern( xdir, dep_pat, testcasemap )
-        for dep_id in depL:
-            dep_obj = testcasemap.get( dep_id, None )
-            if dep_obj != None:
-                connect_dependency( tcase, dep_obj, dep_pat, expr )
+
+        if match_criteria_satisfied( depL, strict ):
+            for dep_id in depL:
+                dep_obj = testcasemap.get( dep_id, None )
+                if dep_obj != None:
+                    connect_dependency( tcase, dep_obj, dep_pat, expr )
+        else:
+            connect_failed_dependency( tcase )
+
+
+def match_criteria_satisfied( depL, strict ):
+    ""
+    if strict:
+        if len( depL ) == 0:
+            return False
+
+    return True
 
 
 def connect_dependency( from_tcase, to_tcase, pattrn=None, expr=None ):
@@ -252,3 +266,9 @@ def connect_dependency( from_tcase, to_tcase, pattrn=None, expr=None ):
     from_tcase.addDependency( testdep )
 
     to_tcase.setHasDependent()
+
+
+def connect_failed_dependency( from_tcase ):
+    ""
+    testdep = FailedTestDependency( "failed 'depends on' matching criteria" )
+    from_tcase.addDependency( testdep )

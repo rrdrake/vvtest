@@ -97,6 +97,10 @@ Fixes:
 
 Changes:
 
+    - If no tests are found with a "depends on" directive, then the test
+      will not be run. Previously, the test would run even though no
+      dependency tests were found.
+
     - The vvtest_util.py file contains the variables DEPDIRS and DEPDIRMAP.
       For parameterize/analyze test groups, the analyze test no longer
       contains the dependency test directory in the DEPDIRMAP. It is still

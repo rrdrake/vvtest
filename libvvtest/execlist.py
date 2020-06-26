@@ -23,13 +23,13 @@ class TestExecList:
         self.started = {}  # TestSpec ID -> TestCase object
         self.stopped = {}  # TestSpec ID -> TestCase object
 
-    def createTestExecs(self):
+    def createTestExecs(self, check_dependencies=True):
         """
         Creates the set of TestExec objects from the active test list.
         """
         self._generate_backlog_from_testlist()
         self._sort_by_size_and_runtime()
-        self._connect_execute_dependencies()
+        self._connect_execute_dependencies( check_dependencies )
 
         for tcase in self.backlog.iterate():
             self.runner.initialize_for_execution( tcase )
@@ -160,7 +160,7 @@ class TestExecList:
         """
         self.backlog.sort()
 
-    def _connect_execute_dependencies(self):
+    def _connect_execute_dependencies(self, strict):
         ""
         tmap = self.tlist.getTestMap()
         groups = self.tlist.getGroupMap()
@@ -171,7 +171,7 @@ class TestExecList:
                 grpL = groups.getGroup( tcase )
                 depend.connect_analyze_dependencies( tcase, grpL, tmap )
 
-            depend.check_connect_dependencies( tcase, tmap )
+            depend.check_connect_dependencies( tcase, tmap, strict )
 
     def _pop_next_test(self, maxsize):
         ""

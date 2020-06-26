@@ -946,7 +946,7 @@ def run_test_exec_list( opts, optD, rtdata,
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
     xlist = TestExecList( tlist, runner )
-    xlist.createTestExecs()
+    xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
 
     tlrun = execute.TestListRunner( test_dir, tlist, xlist, perms,
                                     rtinfo, results_writer, plat )

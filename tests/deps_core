@@ -25,6 +25,8 @@ from libvvtest.FilterExpressions import WordExpression
 from libvvtest import depend
 find_tests_by_pattern = depend.find_tests_by_pattern
 
+failed_match_reason = "failed 'depends on' matching criteria"
+
 
 class Parse_Dependencies( vtu.vvtestTestCase ):
 
@@ -229,9 +231,7 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
 
     def test_a_dependency_that_fails_to_satisfy_glob_criteria(self):
         ""
-        reason = "failed 'depends on' matching criteria"
-
-        dep = depend.FailedTestDependency( reason )
+        dep = depend.FailedTestDependency( failed_match_reason )
 
         assert dep.isBlocking()
         assert dep.willNeverRun()
@@ -241,7 +241,7 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
 
         assert tcase.isBlocked()
         assert tcase.willNeverRun()
-        assert tcase.getBlockedReason() == reason
+        assert tcase.getBlockedReason() == failed_match_reason
 
         tcase1 = vtu.make_fake_TestCase( 'notrun', name='atest' )
         tcase2 = vtu.make_fake_TestCase( 'pass', name='btest' )
@@ -250,7 +250,7 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
 
         assert tcase1.isBlocked()
         assert tcase1.willNeverRun()
-        assert tcase1.getBlockedReason() == reason
+        assert tcase1.getBlockedReason() == failed_match_reason
 
     def test_will_never_run_logic(self):
         ""
@@ -490,6 +490,26 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         pat,xdir = matchL[0]
         assert pat == 'Bt*' and xdir == 'sdir/Btest.np=4'
 
+    def test_find_and_connect_dependencies(self):
+        ""
+        xD = make_tspec_map( 'testA', 'testB' )
+        tA = find_test( xD, 'testA' )
+        tB = find_test( xD, 'testB' )
+
+        tA.getSpec().addDependency( 'testB', None )
+
+        assert tA.numDependencies() == 0
+        depend.check_connect_dependencies( tA, xD )
+        assert tA.numDependencies() == 1
+
+        tB.getSpec().addDependency( 'testC', None )
+
+        assert tB.numDependencies() == 0
+        depend.check_connect_dependencies( tB, xD )
+        assert tB.numDependencies() == 1
+        assert tB.isBlocked()
+        assert tB.getBlockedReason() == failed_match_reason
+
 
 #######################################
 
@@ -502,6 +522,14 @@ def make_tspec_map( *dirlist ):
         D[ tcase.getSpec().getID() ] = tcase
 
     return D
+
+
+def find_test( tcasemap, testname ):
+    ""
+    for tid,tcase in tcasemap.items():
+        if tcase.getSpec().getName() == testname:
+            return tcase
+    return None
 
 
 def assert_test_id_set( id2tcase, idset, *testdirs ):
