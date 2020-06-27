@@ -121,8 +121,8 @@ class unit_tests( vtu.vvtestTestCase ):
         assert len( records ) == 0
 
         wr = make_CDashWriter( 'http://localhost/cdash',
-                               subclass_submitter=OverrideFileSubmitter )
-        wr.setProjectName( 'CoolProj' )
+                               subclass_submitter=OverrideFileSubmitter,
+                               project='CoolProj' )
         wr.postrun( testlist, RuntimeInfo() )
 
         assert len( records ) == 1
@@ -336,12 +336,30 @@ class integration_tests( vtu.vvtestTestCase ):
         t2 = extract_elapsed_time( xml2 )
         assert abs( t1-t2 ) <= 1
 
+    def test_cdash_url_without_a_project_is_an_error(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            pass
+            """ )
+        time.sleep(1)
 
-def make_CDashWriter( destination, subclass_submitter=None ):
+        vrun = vtu.runvvtest( '--cdash http://a.cdash.server/foo837',
+                              raise_on_error=False )
+        assert vrun.x != 0
+        lines = vrun.grepLines( 'project must be specified for an '
+                                'http URL CDash destination' )
+        assert len( lines ) == 1
+
+
+def make_CDashWriter( destination, subclass_submitter=None, project=None ):
     ""
     perms = PermissionSetter( os.getcwd(), [] )
 
-    wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms )
+    if project:
+        wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms,
+                                      project=project )
+    else:
+        wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms )
 
     if subclass_submitter:
         wr.setCDashFormatter( cdashutil.TestResultsFormatter,

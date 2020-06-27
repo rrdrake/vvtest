@@ -10,13 +10,14 @@ from os.path import join as pjoin
 from os.path import basename
 import stat
 
+from .errors import FatalError
 from . import outpututils
 print3 = outpututils.print3
 
 
 class CDashWriter:
 
-    def __init__(self, destination, results_test_dir, permsetter):
+    def __init__(self, destination, results_test_dir, permsetter, project=None):
         ""
         self.dest = destination
         self.testdir = results_test_dir
@@ -26,7 +27,11 @@ class CDashWriter:
         self.submitter = None
 
         self.datestamp = None
-        self.proj = None
+        self.proj = project
+
+        if is_http_url( destination ) and not project:
+            raise FatalError( 'The project must be specified for an '
+                              'http URL CDash destination' )
 
     def setCDashFormatter(self, formatter_type, submitter_type):
         ""
@@ -36,10 +41,6 @@ class CDashWriter:
     def setResultsDate(self, datestamp):
         ""
         self.datestamp = datestamp
-
-    def setProjectName(self, proj):
-        ""
-        self.proj = proj
 
     def prerun(self, atestlist, rtinfo, verbosity):
         ""
@@ -370,6 +371,7 @@ def read_symlink( path ):
     try:
         if os.path.islink( path ):
             return os.readlink( path )
-        return None
     except Exception:
         return ''
+
+    return None

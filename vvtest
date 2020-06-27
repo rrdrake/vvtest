@@ -888,18 +888,14 @@ def construct_cdash_writer( test_dir, opts, optD, perms ):
     import libvvtest.cdashwriter as cdashwriter
     import cdashutil
 
-    cdashobj = cdashwriter.CDashWriter( opts.cdash, test_dir, perms )
+    cdashobj = cdashwriter.CDashWriter( opts.cdash, test_dir, perms,
+                                        opts.cdash_project )
+
     cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
                                 cdashutil.FileSubmitter )
 
     cdashobj.setResultsDate( opts.results_date )
     # cdashobj.setNamingTags( optD['onopts'], opts.results_tag )
-
-    if opts.cdash_project:
-        cdashobj.setProjectName( opts.cdash_project )
-    elif cdashwriter.is_http_url( opts.cdash ):
-        raise FatalError( 'Must provide --cdash-project option when '
-                          '--cdash value is an http URL' )
 
     return cdashobj
 
