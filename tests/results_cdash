@@ -129,14 +129,73 @@ class unit_tests( vtu.vvtestTestCase ):
         assert records[0][1].startswith( 'http://localhost/cdash/' )
         assert records[0][1].endswith( 'project=CoolProj' )
 
+    def test_parse_destination_specifications(self):
+        ""
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile.xml' )
+        assert dspecs.url == None and dspecs.file == 'afile.xml'
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                                    'http://localhost/cdash',
+                                    project='HotProj' )
+        assert dspecs.url == 'http://localhost/cdash' and dspecs.file == None
+        assert dspecs.project == 'HotProj'
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                                    'http://localhost/cdash,project=CoolProj',
+                                    project='HotProj' )
+        assert dspecs.url == 'http://localhost/cdash'
+        assert dspecs.project == 'CoolProj'
+
+        dspecs,err = cdashwriter.construct_destination_specs( "" )
+        assert err and 'missing or invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( " " )
+        assert err and 'missing or invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( ",a=b" )
+        assert err and 'missing or invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( " ,a=b" )
+        assert err and 'missing or invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo, n=v" )
+        assert not err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo,n=v" )
+        assert not err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo,n=" )
+        assert err and 'invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo,n=,a=b" )
+        assert err and 'invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo,n=v,a=b" )
+        assert not err
+
+        dspecs,err = cdashwriter.construct_destination_specs( "foo,=v,a=b" )
+        assert err and 'invalid' in err
+
+    def test_a_URL_without_a_project_name_is_an_error(self):
+        ""
+        wr = cdashwriter.CDashWriter( os.getcwd(), None )
+
+        err = wr.initialize( 'http://localhost/cdash' )
+        assert err
+
+        err = wr.initialize( 'http://localhost/cdash', project='CoolProj' )
+        assert not err
+
+        err = wr.initialize( 'http://localhost/cdash,project=CoolProj' )
+        assert not err
+
     def test_results_date_forms_cdash_build_stamp(self):
         ""
-        wr = make_CDashWriter( 'file.xml' )
-
         rdate  = 1512812080.2058824  # Sat Dec  9 02:34:40 2017 MDT
         tstart = 1584832080.0295939  # Sat Mar 21 17:08:00 2020 MDT
 
-        wr.setResultsDate( rdate )
+        wr = make_CDashWriter( 'file.xml', datestamp=rdate )
+
         rtinfo = RuntimeInfo( startepoch=tstart )
 
         testlist = TestList()
@@ -346,20 +405,17 @@ class integration_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '--cdash http://a.cdash.server/foo837',
                               raise_on_error=False )
         assert vrun.x != 0
-        lines = vrun.grepLines( 'project must be specified for an '
-                                'http URL CDash destination' )
+        lines = vrun.grepLines( 'project must be specified when the CDash '
+                                'destination is an http URL' )
         assert len( lines ) == 1
 
 
-def make_CDashWriter( destination, subclass_submitter=None, project=None ):
+def make_CDashWriter( destination, subclass_submitter=None,
+                      project=None, datestamp=None ):
     ""
     perms = PermissionSetter( os.getcwd(), [] )
 
-    if project:
-        wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms,
-                                      project=project )
-    else:
-        wr = cdashwriter.CDashWriter( destination, os.getcwd(), perms )
+    wr = cdashwriter.CDashWriter( os.getcwd(), perms )
 
     if subclass_submitter:
         wr.setCDashFormatter( cdashutil.TestResultsFormatter,
@@ -367,6 +423,8 @@ def make_CDashWriter( destination, subclass_submitter=None, project=None ):
     else:
         wr.setCDashFormatter( cdashutil.TestResultsFormatter,
                               cdashutil.FileSubmitter )
+
+    wr.initialize( destination, project=project, datestamp=datestamp )
 
     return wr
 

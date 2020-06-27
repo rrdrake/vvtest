@@ -888,14 +888,19 @@ def construct_cdash_writer( test_dir, opts, optD, perms ):
     import libvvtest.cdashwriter as cdashwriter
     import cdashutil
 
-    cdashobj = cdashwriter.CDashWriter( opts.cdash, test_dir, perms,
-                                        opts.cdash_project )
+    cdashobj = cdashwriter.CDashWriter( test_dir, perms )
 
     cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
                                 cdashutil.FileSubmitter )
 
-    cdashobj.setResultsDate( opts.results_date )
-    # cdashobj.setNamingTags( optD['onopts'], opts.results_tag )
+    err = cdashobj.initialize( opts.cdash,
+                               project=opts.cdash_project,
+                               datestamp=opts.results_date,
+                               options=optD['onopts'],
+                               tag=opts.results_tag )
+
+    if err:
+        raise FatalError( err )
 
     return cdashobj
 

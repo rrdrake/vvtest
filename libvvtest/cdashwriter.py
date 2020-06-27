@@ -10,37 +10,43 @@ from os.path import join as pjoin
 from os.path import basename
 import stat
 
-from .errors import FatalError
 from . import outpututils
 print3 = outpututils.print3
 
 
 class CDashWriter:
 
-    def __init__(self, destination, results_test_dir, permsetter, project=None):
+    def __init__(self, results_test_dir, permsetter):
         ""
-        self.dest = destination
-        self.testdir = results_test_dir
-        self.permsetter = permsetter
-
         self.formatter = None
         self.submitter = None
 
-        self.datestamp = None
-        self.proj = project
+        self.testdir = results_test_dir
+        self.permsetter = permsetter
 
-        if is_http_url( destination ) and not project:
-            raise FatalError( 'The project must be specified for an '
-                              'http URL CDash destination' )
+        self.dspecs = None
 
     def setCDashFormatter(self, formatter_type, submitter_type):
         ""
         self.formatter = formatter_type
         self.submitter = submitter_type
 
-    def setResultsDate(self, datestamp):
+    def initialize(self, destination, project=None,
+                                      datestamp=None,
+                                      options=[],
+                                      tag=None ):
         ""
-        self.datestamp = datestamp
+        self.dspecs,err = construct_destination_specs( destination,
+                                                       project=project,
+                                                       datestamp=datestamp,
+                                                       options=options,
+                                                       tag=tag )
+
+        if not err and self.dspecs.url and not self.dspecs.project:
+            err = 'The project must be specified when the CDash ' + \
+                  'destination is an http URL'
+
+        return err
 
     def prerun(self, atestlist, rtinfo, verbosity):
         ""
@@ -65,13 +71,13 @@ class CDashWriter:
         print3( '\nComposing CDash submission data...' )
 
         fmtr = self.formatter()
-        set_global_data( fmtr, self.datestamp, rtinfo )
+        set_global_data( fmtr, self.dspecs.datestamp, rtinfo )
         set_test_list( fmtr, atestlist, self.testdir )
         return fmtr
 
     def _write_data(self, fmtr, rtinfo):
         ""
-        if is_http_url( self.dest ):
+        if self.dspecs.url:
 
             fname = pjoin( self.testdir, 'vvtest_cdash_submit.xml' )
 
@@ -79,10 +85,10 @@ class CDashWriter:
                 print3( 'Writing CDash submission file:', fname )
                 self._write_file( fmtr, fname )
 
-                assert self.proj, 'CDash project name not set'
-                sub = self.submitter( self.dest, self.proj )
-                print3( 'Sending CDash file to:', self.dest + ',',
-                        'project='+self.proj )
+                assert self.dspecs.project, 'CDash project name not set'
+                sub = self.submitter( self.dspecs.url, self.dspecs.project )
+                print3( 'Sending CDash file to:', self.dspecs.url + ',',
+                        'project='+self.dspecs.project )
                 sub.send( fname )
 
                 print3()
@@ -92,14 +98,73 @@ class CDashWriter:
                         str(e), '\n' )
 
         else:
-            print3( 'Writing CDash submission file:', self.dest )
-            self._write_file( fmtr, self.dest )
+            print3( 'Writing CDash submission file:', self.dspecs.file )
+            self._write_file( fmtr, self.dspecs.file )
             print3()
 
     def _write_file(self, fmtr, filename):
         ""
         fmtr.writeToFile( filename )
         self.permsetter.set( filename )
+
+
+class DestinationSpecs:
+    def __init__(self):
+        ""
+        self.url = None
+        self.file = None
+        self.datestamp = None
+        self.project = None
+
+
+def parse_destination_string( destination ):
+    ""
+    tokens = destination.split(',')
+
+    if len( tokens ) > 0 and tokens[0].strip():
+        dest = tokens[0].strip()
+    else:
+        dest = None
+
+    err = ''
+    if not dest:
+        err = 'missing or invalid CDash URL or filename'
+
+    specs = {}
+
+    for tok in tokens[1:]:
+        tok = tok.strip()
+        if tok:
+            nvL = tok.split('=',1)
+            if len(nvL) == 2 and nvL[0].strip() and nvL[1].strip():
+                specs[ nvL[0].strip() ] = nvL[1].strip()
+            else:
+                err = 'invalid CDash attribute specification'
+
+    return dest,specs,err
+
+
+def construct_destination_specs( destination, project=None,
+                                              datestamp=None,
+                                              options=[],
+                                              tag=None ):
+    ""
+    dspecs = DestinationSpecs()
+
+    dest,specs,err = parse_destination_string( destination )
+
+    if not err:
+
+        if is_http_url( dest ):
+            dspecs.url = dest
+        else:
+            dspecs.file = dest
+
+        dspecs.project = specs.get( 'project', project )
+
+        dspecs.datestamp = datestamp
+
+    return dspecs,err
 
 
 def set_global_data( fmtr, date_stamp, rtinfo ):
