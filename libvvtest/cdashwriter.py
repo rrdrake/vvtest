@@ -71,7 +71,7 @@ class CDashWriter:
         print3( '\nComposing CDash submission data...' )
 
         fmtr = self.formatter()
-        set_global_data( fmtr, self.dspecs.datestamp, rtinfo )
+        set_global_data( fmtr, self.dspecs, rtinfo )
         set_test_list( fmtr, atestlist, self.testdir )
         return fmtr
 
@@ -106,15 +106,6 @@ class CDashWriter:
         ""
         fmtr.writeToFile( filename )
         self.permsetter.set( filename )
-
-
-class DestinationSpecs:
-    def __init__(self):
-        ""
-        self.url = None
-        self.file = None
-        self.datestamp = None
-        self.project = None
 
 
 def parse_destination_string( destination ):
@@ -162,27 +153,77 @@ def construct_destination_specs( destination, project=None,
 
         dspecs.project = specs.get( 'project', project )
 
-        dspecs.datestamp = datestamp
+        ds = specs.get( 'date', datestamp )
+        dspecs.date = attempt_int_conversion( ds )
+
+        dspecs.group = specs.get( 'group', None )
+        dspecs.site  = specs.get( 'site', None )
+        dspecs.name  = specs.get( 'name', None )
 
     return dspecs,err
 
 
-def set_global_data( fmtr, date_stamp, rtinfo ):
+def attempt_int_conversion( datestring ):
     ""
-    if date_stamp:
-        bdate = date_stamp
+    if datestring != None:
+        try:
+            idate = int( datestring )
+            return idate
+        except Exception:
+            pass
+
+        try:
+            idate = int( float( datestring ) )
+            return idate
+        except Exception:
+            pass
+
+    return datestring
+
+
+class DestinationSpecs:
+    def __init__(self):
+        ""
+        self.url = None
+        self.file = None
+        self.date = None
+        self.project = None
+        self.group = None
+        self.site = None
+        self.name = None
+
+
+def set_global_data( fmtr, dspecs, rtinfo ):
+    ""
+    if dspecs.date:
+        bdate = dspecs.date
         tstart = rtinfo.getInfo( 'startepoch', bdate )
     else:
         bdate = rtinfo.getInfo( 'startepoch', time.time() )
         tstart = bdate
 
-    rdir = rtinfo.getInfo( 'rundir', None )
-    if rdir:
-        rdir = basename( rdir )
+    if dspecs.group:
+        grp = dspecs.group
+    else:
+        grp = None
+
+    if dspecs.site:
+        site = dspecs.site
+    else:
+        site = rtinfo.getInfo( 'hostname', None )
+
+    if dspecs.name:
+        bname = dspecs.name
+    else:
+        rdir = rtinfo.getInfo( 'rundir', None )
+        if rdir:
+            rdir = basename( rdir )
+        bname = rdir
 
     fmtr.setBuildID( build_date=bdate,
-                     site_name=rtinfo.getInfo( 'hostname', None ),
-                     build_name=rdir )
+                     build_group=grp,
+                     site_name=site,
+                     build_name=bname )
 
     fmtr.setTime( tstart, rtinfo.getInfo( 'finishepoch', None ) )
 

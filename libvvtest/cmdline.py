@@ -371,7 +371,7 @@ option.  The testing directory is determined by the platform
 plugins, but can be overridden by defining the environment
 variable TESTING_DIRECTORY to the desired absolute path name.
 
-If used without the -i option, this causes an empty results
+If --save-results is used without the -i option, this causes an empty results
 file to be written at the start of the testing sequence, and a
 final results file to be written when the test sequence finishes.
 
@@ -381,6 +381,18 @@ a string to the results file name within the testing directory.
 The --junit=<filename> option will write a test summary to a file in the
 JUnit XML format.  Should be compatible with Jenkins JUnit test results plugin.
 Can be used as part of the vvtest run, or given with the -i option.
+
+The --cdash=<specifications> option will either write an XML file in CDash
+format, or write and send that file to an http URL. The "specifications"
+string must start with either a filename or a URL, such as
+http://sparky.com/cdash. Additional name=value attributes can follow delineated
+with commas, such as "https://sparky.com/cdash, project=Proj, group=Important".
+The possible attributes are:
+>   project : the project name on the CDash server
+>   group   : the name of the group of build lines
+>   site    : the name of the host site
+>   name    : the name of the build line
+>   date    : the date of the build line
 """
 
 
@@ -652,12 +664,12 @@ def create_parser( argvlist, vvtest_version ):
         help='Write test summary as a set of files in the GitLab '
              'Flavored Markdown format.  If LOCATION is a Git repository '
              'URL, then push results files to branches there.' )
-    grp.add_argument( '--cdash', metavar='LOCATION',
-        help='Write test results in XML format suitable for CDash.  If '
-             'LOCATION is a URL, then submit the results to the URL.' )
+    grp.add_argument( '--cdash', metavar='SPECS',
+        help='Write test results for CDash, where SPECS is of the form '
+             '"location, project=*, date=*, group=*, site=*, name=*" '
+             'and location is either a file name or an http URL.' )
     grp.add_argument( '--cdash-project', metavar='NAME', action='store',
-        help='CDash URL submissions will be sent to this project name. '
-             'Required if the --cdash option value is an http URL.' )
+        help='Alternate way to specify the CDash project name.' )
 
     grp = psr.add_argument_group( 'Other operating modes' )
     grp.add_argument( '-b', dest='dash_b', action='store_true',

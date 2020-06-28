@@ -1,6 +1,15 @@
 
 Improvements:
 
+    - Add additional CDash specifications. You can now say, for example,
+
+        --cdash "https://sparky.com/cdash,project=Proj,group=Big Deal"
+
+      The specification must start with a file name or a URL, then follow
+      with name=value attributes separated by commas. The attributes are
+      project, group, site, name, and date. The "date" must be seconds
+      since epoch.
+
     - Add the command line for each test to the CDash report file & submission.
 
     - Add the command line to the test information sent into the user plugin

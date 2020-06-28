@@ -133,19 +133,62 @@ class unit_tests( vtu.vvtestTestCase ):
         ""
         dspecs,err = cdashwriter.construct_destination_specs( 'afile.xml' )
         assert dspecs.url == None and dspecs.file == 'afile.xml'
+        assert not err
 
         dspecs,err = cdashwriter.construct_destination_specs(
                                     'http://localhost/cdash',
                                     project='HotProj' )
         assert dspecs.url == 'http://localhost/cdash' and dspecs.file == None
         assert dspecs.project == 'HotProj'
+        assert not err
 
         dspecs,err = cdashwriter.construct_destination_specs(
                                     'http://localhost/cdash,project=CoolProj',
                                     project='HotProj' )
         assert dspecs.url == 'http://localhost/cdash'
         assert dspecs.project == 'CoolProj'
+        assert not err
 
+        dspecs,err = cdashwriter.construct_destination_specs(
+                                    'afile, group=Production CTS-1' )
+        assert not err
+        assert dspecs.group == 'Production CTS-1'
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, group=Production CTS-1, project=MyProj' )
+        assert not err
+        assert dspecs.group == 'Production CTS-1'
+        assert dspecs.project == 'MyProj'
+
+        tm = 1593303125.556993  # Sat Jun 27 18:12:05 2020
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, date='+str(tm) )
+        assert not err
+        assert dspecs.date == int(tm)
+
+        tm2 = tm+605
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, date='+str(tm), datestamp=tm2 )
+        assert not err
+        assert dspecs.date == int(tm)
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, project=Proj', datestamp=tm2 )
+        assert not err
+        assert dspecs.date == int(tm2)
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, site=eclipse' )
+        assert not err
+        assert dspecs.site == 'eclipse'
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                        'afile, name=gcc_results' )
+        assert not err
+        assert dspecs.name == 'gcc_results'
+
+    def test_destination_specification_errors(self):
+        ""
         dspecs,err = cdashwriter.construct_destination_specs( "" )
         assert err and 'missing or invalid' in err
 
@@ -189,6 +232,26 @@ class unit_tests( vtu.vvtestTestCase ):
         err = wr.initialize( 'http://localhost/cdash,project=CoolProj' )
         assert not err
 
+    def test_cdash_specification_data_flow(self):
+        ""
+        bdate = 1512812080.2058824  # Sat Dec  9 02:34:40 2017 MDT
+
+        wr = make_CDashWriter( 'file.xml' + \
+                               ',date='+str(bdate) + \
+                               ',group=Must Pass' + \
+                               ',site=redstorm' + \
+                               ',name=smoke_tests' )
+
+        rtinfo = RuntimeInfo()
+        testlist = TestList()
+        wr.postrun( testlist, rtinfo )
+
+        xml = util.read_xml_file( 'file.xml' )
+        assert extract_build_stamp( xml ).startswith( '2017' )
+        assert extract_build_stamp( xml ).endswith( '-Must Pass' )
+        assert extract_site_name( xml ) == 'redstorm'
+        assert extract_build_name( xml ) == 'smoke_tests'
+
     def test_results_date_forms_cdash_build_stamp(self):
         ""
         rdate  = 1512812080.2058824  # Sat Dec  9 02:34:40 2017 MDT
@@ -197,9 +260,7 @@ class unit_tests( vtu.vvtestTestCase ):
         wr = make_CDashWriter( 'file.xml', datestamp=rdate )
 
         rtinfo = RuntimeInfo( startepoch=tstart )
-
         testlist = TestList()
-
         wr.postrun( testlist, rtinfo )
 
         xml = util.read_xml_file( 'file.xml' )
