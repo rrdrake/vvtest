@@ -1,0 +1,20 @@
+{
+	"folders":
+	[
+		{
+			"path": "tests"
+		},
+		{
+			"path": "libvvtest"
+		},
+		{
+			"path": "config"
+		},
+		{
+			"path": "batch"
+		},
+		{
+			"path": "trig"
+		}
+	]
+}
