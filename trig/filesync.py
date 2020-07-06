@@ -11,6 +11,9 @@ import os
 import time
 import re
 import shutil
+import hashlib
+import fnmatch
+import stat
 
 import pythonproxy as rpy
 
@@ -125,25 +128,14 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
     if rm == None:
         rL = long_list_files( rd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePythonProxy( rm, sshcmd=sshexe )
-        if echo: print3( 'Connect to "'+rm+'"' )
-        rmt.start()
-        rmt.execute( remote_functions )
-        if timeout: rmt.setRemoteTimeout(timeout)
+        rmt = create_remote_proxy( rm, sshexe, timeout, echo )
         rL = rmt.call( 'long_list_files', rd, glob=glob, age=age )
 
     # list target files
     if wm == None:
         wL = long_list_files( wd, glob=glob, age=age )
     else:
-        rmt = rpy.RemotePythonProxy( wm, sshcmd=sshexe )
-        if echo: print3( 'Connect to "'+wm+'"' )
-        rmt.start()
-        rmt.execute( remote_functions )
-        if permissions:
-            # include the permissions module in the remote content
-            rmt.send( perms )
-        if timeout: rmt.setRemoteTimeout(timeout)
+        rmt = create_remote_proxy( wm, sshexe, timeout, echo )
         wL = rmt.call( 'long_list_files', wd, glob=glob, age=age )
 
     try:
@@ -196,6 +188,36 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
     return [ T[0] for T in cpL ]
 
 
+def create_remote_proxy( mach, sshexe, timeout, echo ):
+    ""
+    rmt = rpy.RemotePythonProxy( mach, sshcmd=sshexe )
+
+    if echo:
+        print3( 'Connecting to "'+mach+'"' )
+    rmt.start()
+
+    rmt.execute( 'import glob',
+                 'import stat',
+                 'import shutil',
+                 'import time',
+                 'import hashlib',
+                 'import fnmatch' )
+    rmt.send( perms,
+              list_files,
+              long_list_files,
+              get_file_stats,
+              set_file_stats,
+              readfile,
+              filesha1,
+              print3 )
+    rmt.execute( 'import perms' )
+
+    if timeout:
+        rmt.setRemoteTimeout(timeout)
+
+    return rmt
+
+
 def file_perms( fname, permissions, remote=None ):
     """
     Sets file permissions on file 'fname' given a python list of (string)
@@ -212,12 +234,12 @@ def file_perms( fname, permissions, remote=None ):
                 # assume 'permissions' is a tuple or list
                 perms.apply_chmod( fname, *permissions )
     else:
-        if remote.call( 'i_own', fname ):
+        if remote.call( 'perms.i_own', fname ):
             if type(permissions) == type(''):
-                remote.x_apply_chmod( fname, permissions )
+                remote.call( 'perms.apply_chmod', fname, permissions )
             else:
                 # assume 'permissions' is a tuple or list
-                remote.call( 'apply_chmod', fname, *permissions )
+                remote.call( 'perms.apply_chmod', fname, *permissions )
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )
@@ -250,13 +272,6 @@ def recv_file( rmt, rf, wf ):
     fp.close()
     set_file_stats( wf, stats )
 
-
-# the follwoing functions are defined and available in the current module
-remote_functions = \
-'''
-import fnmatch
-import stat
-import time
 
 def list_files( directory, glob='*', age=None ):
     "Returns a list of files matching the given pattern no older than 'age'."
@@ -317,42 +332,21 @@ def readfile( filename ):
     return content
 
 
-# Returns the SHA-1 hex digest of the contents of the given filename
-if sys.version_info[0] == 2 and sys.version_info[1] < 5:
-    import sha
-    def filesha1( filename ):
-        dig = sha.new()
-        fp = open( filename )
-        try:
+def filesha1( filename ):
+    """
+    Returns the SHA-1 hex digest of the contents of the given filename
+    """
+    dig = hashlib.sha1()
+    fp = open( filename )
+    try:
+        if sys.version_info[0] < 3:
             dig.update( fp.read() )
-        finally:
-            fp.close()
-        return dig.hexdigest()
-elif sys.version_info[0] < 3:
-    import hashlib
-    def filesha1( filename ):
-        dig = hashlib.sha1()
-        fp = open( filename )
-        try:
-            dig.update( fp.read() )
-        finally:
-            fp.close()
-        return dig.hexdigest()
-else:
-    import hashlib
-    def filesha1( filename ):
-        dig = hashlib.sha1()
-        fp = open( filename )
-        try:
+        else:
             dig.update( fp.read().encode() )
-        finally:
-            fp.close()
-        return dig.hexdigest()
-'''
+    finally:
+        fp.close()
 
-# this makes the remote function code available in the current namespace
-cobj = compile( remote_functions, "<string>", "exec" )
-eval( cobj, globals() )
+    return dig.hexdigest()
 
 
 def print3( *args ):

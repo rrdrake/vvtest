@@ -62,6 +62,13 @@ class RemotePython:
         if lines:
             self.inp.write( '\n'.join(lines) )
 
+    def addModule(self, modname, *lines):
+        ""
+        assert self.started, "connection not started"
+        self.inp.write( '_remotepython_add_module( ' + \
+                                repr(modname)+',' + \
+                                repr('\n'.join(lines))+' )' )
+
     def getOutputLine(self):
         ""
         return self.out.getLine()
@@ -295,7 +302,7 @@ bootstrap_code = \
 """import sys, traceback, linecache
 
 _remotepython_eval_count = 0
-_remotepython_eval_code = {}
+_remotepython_linecache = {}
 
 _original_linecache_getline = linecache.getline
 
@@ -303,19 +310,33 @@ def _replacement_linecache_getline( filename, lineno, module_globals=None ):
     ln = _original_linecache_getline( filename, lineno, module_globals )
     if not ln:
         try:
-            ln = _remotepython_eval_code[ filename ][lineno-1]
+            ln = _remotepython_linecache[ filename ][lineno-1]
         except Exception:
             ln = ''
     return ln
 
 linecache.getline = _replacement_linecache_getline
 
+def _remotepython_add_module( modname, srclines ):
+    filename = "<remotemodule_"+modname+">"
+    _remotepython_linecache[ filename ] = srclines.splitlines()
+    if sys.version_info[0] < 3 or sys.version_info[1] < 5:
+        import imp
+        mod = imp.new_module( modname )
+    else:
+        import importlib
+        import importlib.util as imputil
+        spec = imputil.spec_from_loader( modname, loader=None )
+        mod = imputil.module_from_spec(spec)
+    eval( compile( srclines, filename, 'exec' ), mod.__dict__ )
+    sys.modules[modname] = mod
+
 line = sys.stdin.readline()
 while line:
     lines = eval( line.strip() )
     _remotepython_eval_count += 1
     filename = "<remotecode"+str(_remotepython_eval_count)+">"
-    _remotepython_eval_code[ filename ] = lines.splitlines()
+    _remotepython_linecache[ filename ] = lines.splitlines()
     try:
         eval( compile( lines, filename, "exec" ) )
     except Exception:

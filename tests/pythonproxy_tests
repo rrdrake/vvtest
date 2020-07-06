@@ -316,7 +316,7 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
         ""
         util.setup_test()
 
-        self.remote = RemotePythonProxy( pythonexe=rpy )
+        self.remote = RemotePythonProxy( pythonexe=rpy, logfile='logfile' )
         self.remote.start()
 
     def tearDown(self):
@@ -386,6 +386,33 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
         ""
         obj = self.remote.module( 'os' )
         rtn = obj.path.exists( '/some/file/path' )
+
+    def test_sending_modules_and_importing_them(self):
+        ""
+        util.writefile( 'subdir/modA.py', """
+            def afunc():
+                return 'AFUNC RETURN'
+            """ )
+        util.writefile( 'subdir/modB.py', """
+            import modA
+            def bfunc():
+                return modA.afunc()
+            """ )
+        time.sleep(1)
+
+        sys.path.insert( 0, abspath('subdir') )
+        try:
+            import modA as mA
+            import modB as mB
+            print3( 'names', mA.__name__, mB.__name__ )
+            self.remote.send( mA )
+            self.remote.send( mB )
+            mod = self.remote.module( 'modB' )
+            rtn = mod.bfunc()
+        finally:
+            sys.path.pop( 0 )
+
+        assert rtn == 'AFUNC RETURN'
 
     def test_for_lost_remote_process(self):
         ""

@@ -14,6 +14,7 @@ import shutil
 import pipes
 import subprocess
 import traceback
+import glob
 
 import pythonproxy as rpy
 
@@ -151,13 +152,7 @@ def copy_files( files, to_dir,
     if rm != None or wm != None:
         m = rm
         if wm != None: m = wm
-        rmt = rpy.RemotePythonProxy( m, sshcmd=sshexe )
-        if echo: print3( 'Connecting to "'+m+'"' )
-        rmt.start()
-        rmt.execute( remote_functions )
-        # include the permissions module in the remote content
-        rmt.send( perms )
-        if timeout: rmt.setRemoteTimeout(timeout)
+        rmt = create_remote_proxy( m, sshexe, timeout, echo )
 
     try:
         # check destination directory
@@ -223,13 +218,32 @@ def splitmach( path ):
     return path[:m.end()-1], path[m.end():]
 
 
-# the follwoing functions are defined and available in the current module
-remote_functions = \
-'''
-import time
-import stat
-import glob
-from shutil import rmtree as shutil_rmtree
+def create_remote_proxy( mach, sshexe, timeout, echo ):
+    ""
+    rmt = rpy.RemotePythonProxy( mach, sshcmd=sshexe )
+
+    if echo:
+        print3( 'Connecting to "'+mach+'"' )
+    rmt.start()
+
+    rmt.execute( 'import glob',
+                 'import shutil',
+                 'import time' )
+    rmt.send( perms,
+              check_dir,
+              glob_paths,
+              follow_link,
+              make_temp_dir,
+              swap_paths,
+              apply_permissions,
+              print3 )
+    rmt.execute( 'import perms' )
+
+    if timeout:
+        rmt.setRemoteTimeout(timeout)
+
+    return rmt
+
 
 def check_dir( directory ):
     # Returns python list:
@@ -297,7 +311,7 @@ def make_temp_dir( parent_dir, itime ):
     sd = os.path.join( parent_dir, 'filecopy_'+dt+'_p'+pid )
     print3( 'mkdir '+os.uname()[1]+':'+sd )
     os.mkdir( sd )
-    apply_chmod( sd, 'u=rwx', 'g=---', 'o=---' )
+    perms.apply_chmod( sd, 'u=rwx', 'g=---', 'o=---' )
     return sd
 
 
@@ -326,19 +340,10 @@ def apply_permissions( directory, fileL, fperms, dperms, group ):
         if os.path.islink(wf):
             pass
         elif os.path.isdir(wf):
-            chmod_recurse( wf, fperms, dperms, group )
+            perms.chmod_recurse( wf, fperms, dperms, group )
         else:
-            if fperms: apply_chmod( wf, *fperms )
-            if group: apply_chmod( wf, group )
-'''
-
-# this makes the remote function code available in the current namespace
-cobj = compile( remote_functions, "<string>", "exec" )
-eval( cobj, globals() )
-
-# inject this into the namespace so it will be available locally and on
-# the remote end
-from perms import apply_chmod, chmod_recurse
+            if fperms: perms.apply_chmod( wf, *fperms )
+            if group: perms.apply_chmod( wf, group )
 
 
 def check_unique( readmach, readL, writemach, writedir ):
@@ -382,12 +387,12 @@ def local_copy( readL, destdir, fperms=[], dperms=[], group=None ):
         elif os.path.isdir(rf):
             print3( 'cp -r', rf, wf )
             shutil.copytree( rf, wf, symlinks=True )
-            chmod_recurse( wf, fperms, dperms, group )
+            perms.chmod_recurse( wf, fperms, dperms, group )
         else:
             print3( 'cp -p', rf, wf )
             shutil.copy2( rf, wf )
-            if fperms: apply_chmod( wf, *fperms )
-            if group: apply_chmod( wf, group )
+            if fperms: perms.apply_chmod( wf, *fperms )
+            if group: perms.apply_chmod( wf, group )
 
     swap_paths( readL, tmpd, destdir )
 
@@ -472,7 +477,7 @@ def local_to_remote_copy( mach, rmtpy, readL, destdir,
     rmtpy.call( 'swap_paths', readL, tmpd, destdir )
 
     print3( 'rm -r '+mach+':'+tmpd )
-    rmtpy.call( 'shutil_rmtree', tmpd )
+    rmtpy.call( 'shutil.rmtree', tmpd )
 
 
 def print3( *args ):

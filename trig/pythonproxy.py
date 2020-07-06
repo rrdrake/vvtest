@@ -3,6 +3,7 @@ import sys, os
 import inspect
 import traceback
 import time
+import types
 
 from remotepython import RemotePython
 
@@ -25,9 +26,9 @@ class RemotePythonProxy:
     Uses the remotepython.RemotePython class to send python commands to a
     Python interpreter on a remote machine and return their output.
 
-    To debug an interaction, provide a logfile.  All messages to and from
-    the remote python will be logged, including any print statements being
-    written by remote code.
+    To debug an interaction, provide a logfile to the constructor.  All
+    messages to and from the remote python will be logged, including print
+    statements being written by remote code.
     """
 
     def __init__(self, machine=None,
@@ -71,17 +72,23 @@ class RemotePythonProxy:
 
     def send(self, *objects):
         """
-        The source code for Python modules, classes, and functions can be
-        sent to the remote by specifying objects.  For example,
+        Send the source code for an object to the remote. Function objects
+        and class types are added to the remote namespace. Module objects
+        are made available but must still be imported on the remote side.
+        An example,
 
             def afunc( arg ):
                 print ( arg )
             proxy.send( afunc )
+            proxy.call( 'afunc', 42 )
         """
         for obj in objects:
             pycode = get_source_code(obj)
             assert pycode != None, 'could not find source code for '+str(obj)
-            self.execute( pycode )
+            if type(obj) == types.ModuleType:
+                self.remote.addModule( obj.__name__, pycode )
+            else:
+                self.execute( pycode )
 
     def call(self, funcname, *args, **kwargs):
         ""

@@ -234,6 +234,9 @@ class the_tests( unittest.TestCase ):
         try:
             rem.start()
             rem.execute( 'print ( "hello good buddy" )' )
+            rem.execute( 'sys.exit(0)' )
+            while rem.isAlive():
+                time.sleep(0.5)
         finally:
             rem.close()
 
@@ -290,10 +293,6 @@ class the_tests( unittest.TestCase ):
             rem.close()
             fp.close()
 
-        with open( 'logfile', 'rt' ) as fp:
-            for line in fp:
-                print3( 'logfile:', line.rstrip() )
-
         # Traceback (most recent call last):
         #   File "<bootstrap>", line 26, in <module>
         #   File "<remotecode3>", line 2, in <module>
@@ -322,6 +321,75 @@ class the_tests( unittest.TestCase ):
         # print3( exc1 )
         assert len( util.greplines( 'File ', exc0 ) ) > 0
         assert 'returned non-zero exit status' in exc1.splitlines()[-1]
+
+    def test_adding_a_module_then_importing_it(self):
+        ""
+        util.writefile( 'subdir/afile.txt', 'some contents' )
+        time.sleep(1)
+
+        cwd = os.getcwd()
+
+        rem = RemotePython( pythonexe=rpy )
+        try:
+            ok = rem.start()
+            assert ok
+            rem.addModule( 'mymod',
+                    'import os, sys',
+                    'def myfunc( arg ):',
+                    '    os.chdir( "'+abspath('subdir')+'" )',
+                    '    print ( "LISTDIR="+repr(os.listdir(".")) )' )
+            rem.execute( 'import mymod' )
+            rem.execute( 'mymod.myfunc(42)' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        assert err == None
+        fL = eval( out.strip().split( 'LISTDIR=', 1 )[1] )
+        assert fL == ['afile.txt']
+
+        assert os.path.samefile( cwd, os.getcwd() )
+
+    def test_remote_module_traceback_should_have_code_lines(self):
+        ""
+        rem = RemotePython( pythonexe=rpy, logfile='logfile' )
+        try:
+            ok = rem.start()
+            assert ok
+            rem.addModule( 'mymod1',
+                    'import os, sys',
+                    'def myfunc( arg ):',
+                    '    if arg:',
+                    '        raise Exception( "fake exception" )' )
+            rem.addModule( 'mymod2',
+                    'import os',
+                    'import sys',
+                    'import mymod1',
+                    'def myfunc():',
+                    '    mymod1.myfunc( 42 )' )
+            rem.execute( 'import mymod2',
+                         'mymod2.myfunc()' )
+            while rem.isAlive():
+                time.sleep(0.5)
+        finally:
+            rem.close()
+
+        # Traceback (most recent call last):
+        #   File "<bootstrap>", line 42, in <module>
+        #   File "<remotecode4>", line 2, in <module>
+        #     mymod2.myfunc()
+        #   File "<remotemodule_mymod2>", line 5, in myfunc
+        #     mymod1.myfunc( 42 )
+        #   File "<remotemodule_mymod1>", line 4, in myfunc
+        #     raise Exception( "fake exception" )
+        # Exception: fake exception
+        exc = extract_exception_from_logfile(0)
+        # print3( exc )
+        assert len( util.greplines( 'File ', exc ) ) == 4
+        assert 'mymod2.myfunc()' in exc
+        assert 'mymod1.myfunc( 42 )' in exc
+        assert 'raise Exception( "fake exception" )' in exc
+        assert len( util.greplines( 'File *mymod2*line 5, in myfunc', exc ) ) == 1
+        assert 'fake exception' in exc.splitlines()[-1]
 
     def test_using_real_ssh(self):
         ""
