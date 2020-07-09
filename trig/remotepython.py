@@ -26,14 +26,11 @@ class RemotePython:
 
         self.cmdL = bootstrap_command( pythonexe, machine, sshcmd )
 
-        if logfp != None:
-            logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
-            logfp.flush()
-
         self.sub = launch_bootstrap( self.cmdL,
                                      self.inp.getReadFileDescriptor(),
                                      self.out.getWriteFileDescriptor(),
-                                     self.err.getWriteFileDescriptor() )
+                                     self.err.getWriteFileDescriptor(),
+                                     logfp )
 
         self.inp.begin()
         self.out.begin()
@@ -48,7 +45,7 @@ class RemotePython:
         getStartupOutput().
         """
         self.started = True
-        self.execute( bootstrap_code )
+        self.execute( bootstrap_preamble+bootstrap_waitloop )
         ok = self._verify_connection( timeout )
         return ok
 
@@ -140,9 +137,17 @@ class RemotePython:
         return ok, buf
 
 
+def _check_open_logfile( logfile ):
+    ""
+    if logfile != None and type(logfile) == type(''):
+        return open( logfile, 'wt' )
+
+    return logfile
+
+
 class OutputHandler( threading.Thread ):
 
-    def __init__(self, logfp=None, logprefix='OUT'):
+    def __init__(self, logfp, logprefix):
         ""
         threading.Thread.__init__(self)
         self.daemon = True
@@ -175,21 +180,25 @@ class OutputHandler( threading.Thread ):
         ""
         while True:
             try:
-                data = self.fp.readline()
+                line = self.fp.readline()
             except Exception:
                 break
 
-            if data:
+            if line:
                 if self.logfp != None:
-                    try:
-                        self.logfp.write( self.logprefix+': '+data )
-                        self.logfp.flush()
-                    except Exception:
-                        pass
+                    self._write_to_log( line )
                 with self.lck:
-                    self.lines.append( data )
+                    self.lines.append( line )
             else:
                 break
+
+    def _write_to_log(self, line):
+        ""
+        try:
+            self.logfp.write( self.logprefix+': '+line )
+            self.logfp.flush()
+        except Exception:
+            pass
 
     def getLine(self):
         ""
@@ -231,10 +240,10 @@ class InputHandler:
     def write(self, data):
         ""
         if self.logfp != None:
-            self._write_data_to_log( data )
+            self._write_to_log( data )
         write_to_fd( self.fdw, repr(data)+'\n' )
 
-    def _write_data_to_log(self, data):
+    def _write_to_log(self, data):
         ""
         self.logfp.write( 'SND: ' )
         for idx,line in enumerate( data.splitlines() ):
@@ -257,14 +266,6 @@ class InputHandler:
             pass
 
 
-def _check_open_logfile( logfile ):
-    ""
-    if logfile != None and type(logfile) == type(''):
-        return open( logfile, 'wt' )
-
-    return logfile
-
-
 if sys.version_info[0] < 3:
     def write_to_fd( fd, buf ):
         ""
@@ -285,9 +286,11 @@ def bootstrap_command( pythonexe, machine, sshcmd ):
     cmdL = [
         pythonexe, '-u', '-E', '-c',
         'import sys; '
-            'eval( '
-                'compile( '
-                    'eval( sys.stdin.readline() ), "<bootstrap>", "exec" ) )'
+        'eval( '
+            'compile( '
+                'eval( sys.stdin.readline() ), '
+                       '"<remotepython_from_'+os.uname()[1]+'>", '
+                       '"exec" ) )'
     ]
 
     if machine:
@@ -298,16 +301,19 @@ def bootstrap_command( pythonexe, machine, sshcmd ):
     return cmdL
 
 
-bootstrap_code = \
-"""import sys, traceback, linecache
+bootstrap_preamble = """\
+import sys
+sys.dont_write_bytecode = True
+import traceback, linecache
 
 _remotepython_eval_count = 0
 _remotepython_linecache = {}
 
-_original_linecache_getline = linecache.getline
+_remotepython_linecache_getline = linecache.getline
 
 def _replacement_linecache_getline( filename, lineno, module_globals=None ):
-    ln = _original_linecache_getline( filename, lineno, module_globals )
+    ""
+    ln = _remotepython_linecache_getline( filename, lineno, module_globals )
     if not ln:
         try:
             ln = _remotepython_linecache[ filename ][lineno-1]
@@ -318,6 +324,7 @@ def _replacement_linecache_getline( filename, lineno, module_globals=None ):
 linecache.getline = _replacement_linecache_getline
 
 def _remotepython_add_module( modname, srclines ):
+    ""
     filename = "<remotemodule_"+modname+">"
     _remotepython_linecache[ filename ] = srclines.splitlines()
     if sys.version_info[0] < 3 or sys.version_info[1] < 5:
@@ -331,12 +338,20 @@ def _remotepython_add_module( modname, srclines ):
     eval( compile( srclines, filename, 'exec' ), mod.__dict__ )
     sys.modules[modname] = mod
 
-line = sys.stdin.readline()
-while line:
-    lines = eval( line.strip() )
+def _remotepython_add_eval_linecache( lines ):
+    ""
+    global _remotepython_eval_count
     _remotepython_eval_count += 1
     filename = "<remotecode"+str(_remotepython_eval_count)+">"
     _remotepython_linecache[ filename ] = lines.splitlines()
+    return filename
+"""
+
+bootstrap_waitloop = """
+line = sys.stdin.readline()
+while line:
+    lines = eval( line.strip() )
+    filename = _remotepython_add_eval_linecache( lines )
     try:
         eval( compile( lines, filename, "exec" ) )
     except Exception:
@@ -348,11 +363,15 @@ while line:
 
 popen_thread_lock = threading.Lock()
 
-def launch_bootstrap( cmdL, in_r, out_w, err_w ):
+def launch_bootstrap( cmdL, in_r, out_w, err_w, logfp ):
     """
     Older subprocess modules are known to have thread safety problems.  Use a
     thread lock on the Popen call to avoid most issues.
     """
+    if logfp != None:
+        logfp.write( 'CMD: '+str(cmdL)+'\n' )
+        logfp.flush()
+
     with popen_thread_lock:
         proc = subprocess.Popen( cmdL, stdin=in_r, stdout=out_w,
                                        stderr=err_w, bufsize=0 )

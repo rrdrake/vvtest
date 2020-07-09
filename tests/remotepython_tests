@@ -13,6 +13,7 @@ import os
 from os.path import abspath
 import time
 import unittest
+from textwrap import dedent
 
 try:
   from StringIO import StringIO
@@ -34,6 +35,141 @@ rpy = sys.executable
 
 class TestTimeoutError( Exception ):
     pass
+
+
+class bootstrap_functions( trigutil.trigTestCase ):
+
+    def test_adding_lines_to_local_linecache(self):
+        ""
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                fn1 = _remotepython_add_eval_linecache( "line one" )
+                fn2 = _remotepython_add_eval_linecache( "line two" )
+                assert fn1 != fn2
+                assert _remotepython_linecache[fn1] == [ "line one" ]
+                assert _remotepython_linecache[fn2] == [ "line two" ]
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+
+    def test_replacement_linecache_getline_function(self):
+        ""
+        util.writefile( 'mymod.py', """\
+            import os, sys
+            def myfunc():
+                pass
+            """ )
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                import mymod
+
+                fn1 = _remotepython_add_eval_linecache( "line one" )
+                fn2 = _remotepython_add_eval_linecache( "line two" )
+                assert linecache.getline( fn1, 1 ) == "line one"
+
+                # if filename does not exist in cache or line number is
+                # out of bounds somehow, return an empty string
+                assert linecache.getline( 'somefakename', 5 ) == ""
+                assert linecache.getline( fn1, 5 ) == ""
+
+                assert linecache.getline( mymod.__file__, 2 ).strip() == "def myfunc():"
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+
+    def test_add_a_module_from_a_string(self):
+        ""
+        mymod = dedent( """
+            import sys
+            def myfunc():
+                return sys.version_info
+            """ )
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                _remotepython_add_module( 'mymod', """+repr(mymod)+""" )
+                import sys
+                import mymod
+                assert mymod.myfunc() == sys.version_info
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+
+    def test_the_traceback_module_will_use_a_replacement_getline(self):
+        """
+        The traceback module uses the linecache module to get line information
+        for printing tracebacks (such as for exceptions). Thus, the getline()
+        function of linecache can be replaced to serve line info for code
+        compiled from a string.
+
+        Note that this does not work with an uncaught exception.
+        """
+        util.writefile( 'extmod.py', """\
+            import os, sys
+            def afunc():
+                raise Exception( "fake exception" )
+            """ )
+        mymod = dedent( """
+            import extmod
+            def myfunc():
+                extmod.afunc()
+            """ )
+        mycode = dedent( """
+            def entryfunc():
+                mymod.myfunc()
+            """ )
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                _remotepython_add_module( 'mymod', """+repr(mymod)+""" )
+
+                import mymod
+
+                fn = _remotepython_add_eval_linecache( """+repr(mycode)+""" )
+                eval( compile( """+repr(mycode)+""", fn, "exec" ) )
+
+                try:
+                    entryfunc()
+                except Exception:
+                    traceback.print_exc()
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+
+        excL = extract_exception_from_output( out )
+
+        assert excL[0] == 'Traceback (most recent call last):'
+        assert excL[1].startswith('  File ') and '/scr.py' in excL[1]
+        assert excL[2] == '    entryfunc()'
+        assert excL[3] == '  File "<remotecode1>", line 3, in entryfunc'
+        assert excL[4] == '    mymod.myfunc()'
+        assert excL[5] == '  File "<remotemodule_mymod>", line 4, in myfunc'
+        assert excL[6] == '    extmod.afunc()'
+        assert excL[7].startswith('  File ') and \
+               excL[7].endswith('extmod.py", line 3, in afunc')
+        assert excL[8] == '    raise Exception( "fake exception" )'
+        assert excL[9] == 'Exception: fake exception'
+
+
+# class SubprocessWriter_tests( trigutil.trigTestCase ):
+
+#     def test_magic(self):
+#         ""
+#         wr = SubprocessWriter()
+#         sp = subprocess.Popen( foo, stdin=wr.getReadEnd() )
+#         wr.begin()
+#         wr.write( 'some data\n' )
+#         wr.close()
 
 
 class the_tests( unittest.TestCase ):
@@ -247,17 +383,17 @@ class the_tests( unittest.TestCase ):
         ""
         sio = StringIO()
         inp = remotepython.InputHandler( logfp=sio )
-        inp._write_data_to_log( 'import os, sys' )
+        inp._write_to_log( 'import os, sys' )
         assert sio.getvalue() == 'SND: import os, sys\n'
 
         sio = StringIO()
         inp = remotepython.InputHandler( logfp=sio )
-        inp._write_data_to_log( 'import os, sys\n' )
+        inp._write_to_log( 'import os, sys\n' )
         assert sio.getvalue() == 'SND: import os, sys\n'
 
         sio = StringIO()
         inp = remotepython.InputHandler( logfp=sio )
-        inp._write_data_to_log( '\n'.join( [
+        inp._write_to_log( '\n'.join( [
                 'import os, sys',
                 'def func(arg):',
                 '    raise Exception( "fake exception "+arg )'
@@ -444,6 +580,26 @@ def extract_exception_from_logfile( exc_index=0 ):
                 cnt += 1
                 if cnt == exc_index:
                     exc += line.split( 'ERR: ', 1 )[1]
+
+    return exc
+
+
+def extract_exception_from_output( output, exc_index=0 ):
+    ""
+    cnt = -1
+    exc = None
+    for line in output.splitlines():
+        if not exc:
+            if line.startswith( 'Traceback ' ):
+                exc = [ line.rstrip() ]
+                cnt += 1
+        elif line.startswith( 'Exception: ' ):
+            exc.append( line.rstrip() )
+            if cnt == exc_index:
+                break
+            exc = None
+        else:
+            exc.append( line.rstrip() )
 
     return exc
 
