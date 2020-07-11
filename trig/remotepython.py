@@ -20,21 +20,17 @@ class RemotePython:
 
         logfp = _check_open_logfile( logfile )
 
-        self.inp = InputHandler( logfp )
-        self.out = OutputHandler( logfp, 'OUT' )
-        self.err = OutputHandler( logfp, 'ERR' )
-
         self.cmdL = bootstrap_command( pythonexe, machine, sshcmd )
 
-        self.sub = launch_bootstrap( self.cmdL,
-                                     self.inp.getReadFileDescriptor(),
-                                     self.out.getWriteFileDescriptor(),
-                                     self.err.getWriteFileDescriptor(),
-                                     logfp )
+        if logfp != None:
+            logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
+            logfp.flush()
 
-        self.inp.begin()
-        self.out.begin()
-        self.err.begin()
+        self.sub = RemoteProcess( self.cmdL)
+
+        self.inp = ReprWriter( self.sub.getStdIn(), logfp )
+        self.out = AsynchronousReader( self.sub.getStdOut(), logfp, 'OUT' )
+        self.err = AsynchronousReader( self.sub.getStdErr(), logfp, 'ERR' )
 
         self.connbuf = ''
 
@@ -62,6 +58,7 @@ class RemotePython:
     def addModule(self, modname, *lines):
         ""
         assert self.started, "connection not started"
+        assert modname and len(lines) > 0
         self.inp.write( '_remotepython_add_module( ' + \
                                 repr(modname)+',' + \
                                 repr('\n'.join(lines))+' )' )
@@ -77,18 +74,13 @@ class RemotePython:
     def isAlive(self):
         ""
         if self.sub != None:
-            return self.sub.poll() == None
+            return self.sub.isAlive()
         return False
 
     def close(self):
         ""
         if self.sub != None:
-
-            self.inp.close()
-
-            if self.sub.poll() == None:
-                self.sub.terminate()
-
+            self.sub.close()
             self.inp = None
             self.sub = None
 
@@ -145,9 +137,49 @@ def _check_open_logfile( logfile ):
     return logfile
 
 
-class OutputHandler( threading.Thread ):
+def flush_lines( handler ):
+    ""
+    buf = ''
+    while True:
+        out = handler.getLine()
+        if out:
+            buf += out
+        else:
+            break
+    return buf
 
-    def __init__(self, logfp, logprefix):
+
+class ReprWriter:
+
+    def __init__(self, outfp, logfp=None):
+        ""
+        self.outfp = outfp
+        self.logfp = logfp
+
+    def write(self, data):
+        ""
+        if self.logfp != None:
+            self._write_to_log( data )
+
+        self.outfp.write( make_bytes( repr(data)+'\n' ) )
+        self.outfp.flush()
+
+    def _write_to_log(self, data):
+        ""
+        self.logfp.write( 'SND: ' )
+
+        for idx,line in enumerate( data.splitlines() ):
+            if idx > 0:
+                self.logfp.write( '%3d: '%(idx+1) )
+            self.logfp.write( line )
+            self.logfp.write( '\n' )
+
+        self.logfp.flush()
+
+
+class AsynchronousReader( threading.Thread ):
+
+    def __init__(self, srcfp, logfp=None, logprefix='LOG'):
         ""
         threading.Thread.__init__(self)
         self.daemon = True
@@ -161,20 +193,31 @@ class OutputHandler( threading.Thread ):
         self.lck = threading.Lock()
         self.lines = collections.deque()
 
-        fdr, self.fdw = os.pipe()
-        self.fp = os.fdopen( fdr )
+        self.fp = srcfp
 
         self.logfp = logfp
         self.logprefix = logprefix
 
-    def getWriteFileDescriptor(self):
-        ""
-        return self.fdw
-
-    def begin(self):
-        ""
-        os.close( self.fdw )
         self.start()
+
+    def getLine(self):
+        ""
+        val = None
+        with self.lck:
+            if len( self.lines ) > 0:
+                val = self.lines.popleft()
+        return val
+
+    def flushLines(self):
+        ""
+        buf = ''
+
+        out = self.getLine()
+        while out:
+            buf += out
+            out = self.getLine()
+
+        return buf
 
     def run(self):
         ""
@@ -185,8 +228,11 @@ class OutputHandler( threading.Thread ):
                 break
 
             if line:
+                line = make_string( line )
+
                 if self.logfp != None:
                     self._write_to_log( line )
+
                 with self.lck:
                     self.lines.append( line )
             else:
@@ -200,85 +246,13 @@ class OutputHandler( threading.Thread ):
         except Exception:
             pass
 
-    def getLine(self):
-        ""
-        val = None
-        with self.lck:
-            if len( self.lines ) > 0:
-                val = self.lines.popleft()
-        return val
-
-
-def flush_lines( handler ):
-    ""
-    buf = ''
-    while True:
-        out = handler.getLine()
-        if out:
-            buf += out
-        else:
-            break
-    return buf
-
-
-class InputHandler:
-
-    def __init__(self, logfp=None):
-        ""
-        self.fdr, self.fdw = os.pipe()
-
-        self.logfp = logfp
-
-    def getReadFileDescriptor(self):
-        ""
-        return self.fdr
-
-    def begin(self):
-        ""
-        os.close( self.fdr )
-
-    def write(self, data):
-        ""
-        if self.logfp != None:
-            self._write_to_log( data )
-        write_to_fd( self.fdw, repr(data)+'\n' )
-
-    def _write_to_log(self, data):
-        ""
-        self.logfp.write( 'SND: ' )
-        for idx,line in enumerate( data.splitlines() ):
-            if idx > 0:
-                self.logfp.write( '%3d: '%(idx+1) )
-            self.logfp.write( line )
-            self.logfp.write( '\n' )
-        self.logfp.flush()
-
-    def close(self):
-        ""
-        try:
-            write_to_fd( self.fdw, repr('raise SystemExit()')+'\n' )
-        except Exception:
-            pass
-
-        try:
-            os.close( self.fdw )
-        except Exception:
-            pass
-
 
 if sys.version_info[0] < 3:
-    def write_to_fd( fd, buf ):
-        ""
-        os.write( fd, buf )
-
+    def make_bytes( buf ): return buf
+    def make_string( buf ): return buf
 else:
-    bytes_type = type( ''.encode() )
-
-    def write_to_fd( fd, buf ):
-        ""
-        if type(buf) != bytes_type:
-            buf = buf.encode( 'utf-8' )
-        os.write( fd, buf )
+    def make_bytes( buf ): return buf.encode()
+    def make_string( buf ): return buf.decode()
 
 
 def bootstrap_command( pythonexe, machine, sshcmd ):
@@ -363,17 +337,28 @@ while line:
 
 popen_thread_lock = threading.Lock()
 
-def launch_bootstrap( cmdL, in_r, out_w, err_w, logfp ):
-    """
-    Older subprocess modules are known to have thread safety problems.  Use a
-    thread lock on the Popen call to avoid most issues.
-    """
-    if logfp != None:
-        logfp.write( 'CMD: '+str(cmdL)+'\n' )
-        logfp.flush()
+class RemoteProcess:
 
-    with popen_thread_lock:
-        proc = subprocess.Popen( cmdL, stdin=in_r, stdout=out_w,
-                                       stderr=err_w, bufsize=0 )
+    def __init__(self, command):
+        ""
+        with popen_thread_lock:
+            self.subproc = subprocess.Popen( command,
+                                             stdin=subprocess.PIPE,
+                                             stdout=subprocess.PIPE,
+                                             stderr=subprocess.PIPE )
 
-    return proc
+    def getStdIn (self): return self.subproc.stdin
+    def getStdOut(self): return self.subproc.stdout
+    def getStdErr(self): return self.subproc.stderr
+
+    def isAlive(self):
+        ""
+        if self.subproc != None:
+            return self.subproc.poll() == None
+        return False
+
+    def close(self):
+        ""
+        if self.isAlive():
+            self.subproc.terminate()
+            self.subproc = None

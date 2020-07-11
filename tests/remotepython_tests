@@ -14,6 +14,7 @@ from os.path import abspath
 import time
 import unittest
 from textwrap import dedent
+import subprocess
 
 try:
   from StringIO import StringIO
@@ -35,6 +36,194 @@ rpy = sys.executable
 
 class TestTimeoutError( Exception ):
     pass
+
+
+class remote_process_tests( trigutil.trigTestCase ):
+
+    def test_communicating_with_a_subprocess(self):
+        ""
+        util.writefile( 'repeater', """
+            import sys 
+
+            while True:
+                next_line = sys.stdin.readline()
+                if not next_line:
+                    break
+                sys.stdout.write( 'RCV: '+next_line )
+                sys.stdout.flush()
+            """ )
+        time.sleep(1)
+
+        proc = subprocess.Popen( sys.executable+' repeater', 
+                                 shell=True,
+                                 stdin=subprocess.PIPE,
+                                 stdout=subprocess.PIPE )
+
+        for i in range(10):
+            proc.stdin.write( remotepython.make_bytes( '%d\n' % i ) )
+            proc.stdin.flush()
+            output = remotepython.make_string( proc.stdout.readline() )
+            print ( 'OUT='+repr(output.rstrip()) )
+
+        proc.terminate()
+
+    def test_send_and_recv_data_with_a_subprocess(self):
+        ""
+        util.writefile( 'repeater', """
+            import sys 
+
+            while True:
+                next_line = sys.stdin.readline()
+                if not next_line:
+                    break
+                sys.stdout.write( 'OUT: '+next_line )
+                sys.stdout.flush()
+                sys.stderr.write( 'ERR: '+next_line )
+                sys.stderr.flush()
+            """ )
+        time.sleep(1)
+
+        rp = remotepython.RemoteProcess( [ sys.executable, abspath('repeater') ]) 
+
+        assert rp.isAlive()
+
+        inp = rp.getStdIn()
+        out = rp.getStdOut()
+        err = rp.getStdErr()
+
+        outL = []
+        errL = []
+        for word in [ 'hello', 'world' ]:
+            inp.write( remotepython.make_bytes( word+'\n' ) )
+            inp.flush()
+            outL.append( remotepython.make_string( out.readline() ) )
+            errL.append( remotepython.make_string( err.readline() ) )
+
+        assert outL == [ 'OUT: hello\n', 'OUT: world\n' ]
+        assert errL == [ 'ERR: hello\n', 'ERR: world\n' ]
+
+        assert rp.isAlive()
+        rp.close()
+        assert not rp.isAlive()
+
+
+class fd_writer_tests( trigutil.trigTestCase ):
+
+    def write_to_file(self, logfp=None):
+        ""
+        with open( 'ofile', 'wb' ) as fp:
+            rw = remotepython.ReprWriter( fp, logfp )
+            rw.write( ' some\ndata ' )
+            rw.write( 'more data\n' )
+
+        time.sleep(1)
+
+        lines = util.readfile( 'ofile' ).splitlines()
+        assert len( lines ) == 2
+        assert eval( lines[0] ) == ' some\ndata '
+        assert eval( lines[1] ) == 'more data\n'
+
+    def test_writer_sends_repr_strings_plus_newline(self):
+        ""
+        self.write_to_file()
+
+    def test_writer_logging_to_file(self):
+        ""
+        with open( 'logfile', 'wt' ) as logfp:
+            self.write_to_file( logfp )
+
+        time.sleep(1)
+
+        lines = util.readfile( 'logfile' ).splitlines()
+        assert len( lines ) == 3
+        assert lines[0] == 'SND:  some'
+        assert lines[1] == '  2: data '
+        assert lines[2] == 'SND: more data'
+
+
+class async_reader_tests( trigutil.trigTestCase ):
+
+    def make_pipe(self):
+        ""
+        fdr,fdw = os.pipe()
+
+        if sys.version_info[0] > 2:
+            readfp = os.fdopen( fdr, 'rb', closefd=False )
+        else:
+            readfp = os.fdopen( os.dup( fdr ), 'rb' )
+
+        return fdr, fdw, readfp
+
+    def test_reading_lines_from_a_file_descriptor(self):
+        ""
+        fdr,fdw,readfp = self.make_pipe()
+
+        try:
+            ar = remotepython.AsynchronousReader( readfp )
+            write_to_fd( fdw, 'line of data\n' )
+            write_to_fd( fdw, 'line two\n' )
+            line1 = get_line_from_reader( ar )
+            line2 = get_line_from_reader( ar )
+        finally:
+            force_close_fd( fdw )
+            force_close_fd( fdr )
+            # readfp.close()  # generates error messages with Python 2
+
+        assert line1 == 'line of data\n'
+        assert line2 == 'line two\n'
+
+    def test_flushing_lines_from_reader(self):
+        ""
+        fdr,fdw,readfp = self.make_pipe()
+
+        try:
+            ar = remotepython.AsynchronousReader( readfp )
+            write_to_fd( fdw, 'line of data\n' )
+            write_to_fd( fdw, 'line two\n' )
+            time.sleep(1)
+            lines = ar.flushLines()
+            ar = None
+        finally:
+            force_close_fd( fdw )
+            force_close_fd( fdr )
+
+        # print3( lines )
+        assert lines.splitlines() == [ 'line of data', 'line two' ]
+
+    def run_logfile(self, prefix=None):
+        ""
+        fdr,fdw,readfp = self.make_pipe()
+
+        try:
+            with open( 'logfile', 'wt' ) as logfp:
+                if prefix:
+                    ar = remotepython.AsynchronousReader( readfp, logfp, prefix )
+                else:
+                    ar = remotepython.AsynchronousReader( readfp, logfp )
+                write_to_fd( fdw, 'line of data\n' )
+                write_to_fd( fdw, 'line two\n' )
+                time.sleep(1)
+        finally:
+            force_close_fd( fdw )
+            force_close_fd( fdr )
+
+    def test_logging_lines_to_a_file(self):
+        ""
+        self.run_logfile()
+        time.sleep(1)
+
+        log = util.readfile( 'logfile' )
+        # print3( log )
+        assert log.splitlines() == [ 'LOG: line of data', 'LOG: line two' ]
+
+    def test_logging_lines_to_a_file_with_prefix(self):
+        ""
+        self.run_logfile( 'ABC' )
+        time.sleep(1)
+
+        log = util.readfile( 'logfile' )
+        # print3( log )
+        assert log.splitlines() == [ 'ABC: line of data', 'ABC: line two' ]
 
 
 class bootstrap_functions( trigutil.trigTestCase ):
@@ -161,34 +350,29 @@ class bootstrap_functions( trigutil.trigTestCase ):
         assert excL[9] == 'Exception: fake exception'
 
 
-# class SubprocessWriter_tests( trigutil.trigTestCase ):
-
-#     def test_magic(self):
-#         ""
-#         wr = SubprocessWriter()
-#         sp = subprocess.Popen( foo, stdin=wr.getReadEnd() )
-#         wr.begin()
-#         wr.write( 'some data\n' )
-#         wr.close()
-
-
-class the_tests( unittest.TestCase ):
+class integration_tests( unittest.TestCase ):
 
     def setUp(self):
         util.setup_test()
 
-    def test_connect_and_print_hello_world(self):
+    def test_connect_and_print_hello(self):
         ""
         rem = RemotePython( pythonexe=rpy )
         try:
-            ok = rem.start()
+            ok = rem.start(5)
             assert ok
-            rem.execute( 'print ( "hello world" )' )
-            out,err = get_line_from_remote( rem )
+            rem.execute( 'import os, sys',
+                         'print ( "hello stdout" )',
+                         'sys.stderr.write( "hello stderr"+os.linesep )',
+                         'sys.stderr.flush()' )
+            out1,err1 = get_line_from_remote( rem )
+            out2,err2 = get_line_from_remote( rem )
         finally:
             rem.close()
-        assert out.strip() == 'hello world'
-        assert err == None
+
+        assert out1 != out2 and err1 != err2
+        assert out1 == 'hello stdout\n' or out2 == 'hello stdout\n'
+        assert err1 == 'hello stderr\n' or err2 == 'hello stderr\n'
 
     def test_timing_out_waiting_on_a_command(self):
         ""
@@ -203,20 +387,6 @@ class the_tests( unittest.TestCase ):
         else:
             rem.close()
             raise Exception( 'expected a timeout' )
-
-    def test_connect_and_write_to_stderr(self):
-        ""
-        rem = RemotePython( pythonexe=rpy )
-        try:
-            rem.start()
-            rem.execute( 'import os, sys',
-                         'sys.stderr.write( "hello stderr"+os.linesep )',
-                         'sys.stderr.flush()' )
-            out,err = get_line_from_remote( rem )
-        finally:
-            rem.close()
-        assert out == None
-        assert err.strip() == 'hello stderr'
 
     def test_check_if_subprocess_is_alive(self):
         ""
@@ -323,7 +493,7 @@ class the_tests( unittest.TestCase ):
         assert "5.5" in conn
         assert not rem.isAlive()
 
-    def test_logging_all_output_traffic(self):
+    def test_logging_all_traffic(self):
         ""
         fakessh = write_fake_ssh_script( to_stdout='connect output data',
                                          to_stderr='connect error data' )
@@ -378,31 +548,6 @@ class the_tests( unittest.TestCase ):
 
         assert len( util.grepfiles( 'SND: *hello good buddy', 'logfile' ) ) == 1
         assert len( util.grepfiles( 'OUT: hello good buddy', 'logfile' ) ) == 1
-
-    def test_logging_code_lines_sent_to_remote(self):
-        ""
-        sio = StringIO()
-        inp = remotepython.InputHandler( logfp=sio )
-        inp._write_to_log( 'import os, sys' )
-        assert sio.getvalue() == 'SND: import os, sys\n'
-
-        sio = StringIO()
-        inp = remotepython.InputHandler( logfp=sio )
-        inp._write_to_log( 'import os, sys\n' )
-        assert sio.getvalue() == 'SND: import os, sys\n'
-
-        sio = StringIO()
-        inp = remotepython.InputHandler( logfp=sio )
-        inp._write_to_log( '\n'.join( [
-                'import os, sys',
-                'def func(arg):',
-                '    raise Exception( "fake exception "+arg )'
-            ] ) )
-        assert sio.getvalue() == '\n'.join( [
-                'SND: import os, sys',
-                '  2: def func(arg):',
-                '  3:     raise Exception( "fake exception "+arg )\n'
-            ] )
 
     def test_that_remote_traceback_includes_code_lines(self):
         ""
@@ -566,6 +711,35 @@ class the_tests( unittest.TestCase ):
             print ( 'i='+str(i) )
 
 
+def write_to_fd( fd, data ):
+    ""
+    if sys.version_info[0] < 3:
+        os.write( fd, data )
+    else:
+        os.write( fd, data.encode() )
+
+
+def force_close_fd( fd ):
+    ""
+    try:
+        os.close( fd )
+    except Exception:
+        pass
+
+
+def list_fds():
+    """
+    for linux OS, this can be used to debug file descriptor leaks
+    """
+    fddir = '/proc/self/fd'
+    for fn in os.listdir(fddir):
+        pn = os.path.join( fddir, fn )
+        if os.path.islink(pn):
+            print3( pn, '->', os.readlink(pn) )
+        else:
+            print3( pn )
+
+
 def extract_exception_from_logfile( exc_index=0 ):
     ""
     cnt = -1
@@ -604,27 +778,41 @@ def extract_exception_from_output( output, exc_index=0 ):
     return exc
 
 
+def get_line_from_reader( rdr, timeout=5 ):
+    ""
+    tstart = time.time()
+
+    while True:
+
+        line = rdr.getLine()
+
+        if line != None:
+            break
+        elif time.time()-tstart > timeout:
+            raise TestTimeoutError( 'timeout waiting for output' )
+        else:
+            time.sleep( 0.5 )
+
+    return line
+
+
 def get_line_from_remote( rem, timeout=5 ):
     ""
-    out = None
-    err = None
     tstart = time.time()
-    while out == None and err == None:
+    while True:
 
         line = rem.getOutputLine()
         if line != None:
-            out = line
+            return line, None
 
         line = rem.getErrorLine()
         if line != None:
-            err = line
+            return None, line
 
         if time.time()-tstart > timeout:
             raise TestTimeoutError( 'timeout waiting for output' )
 
         time.sleep(0.5)
-
-    return out, err
 
 
 def flush_lines_from_remote( rem ):
