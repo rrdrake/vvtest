@@ -26,6 +26,7 @@ import glob
 import traceback
 import unittest
 import gzip
+from textwrap import dedent
 
 
 working_directory = None
@@ -180,52 +181,43 @@ def print3( *args ):
     sys.stdout.flush()
 
 
-def writefile( fname, content, header=None ):
+def writefile( fname, content ):
     """
     Open and write 'content' to file 'fname'.  The content is modified to
-    remove leading spaces on each line.  The first non-empty line is used
-    to determine how many spaces to remove.
+    remove common leading spaces from each line. See textwrap.dedent doc.
     """
-    # determine indent pad of the given content
-    pad = None
-    lineL = []
-    for line in content.split( '\n' ):
-        line = line.strip( '\r' )
-        lineL.append( line )
-        if pad == None and line.strip():
-            for i in range(len(line)):
-                if line[i] != ' ':
-                    pad = i
-                    break
     # make the directory to contain the file, if not already exist
     d = dirname( fname )
     if normpath(d) not in ['','.']:
         if not os.path.exists(d):
-          os.makedirs(d)
+            os.makedirs(d)
 
-    # open and write contents
-    fp = open( fname, 'w' )
-    if header != None:
-        fp.write( header.strip() + os.linesep + os.linesep )
-    for line in lineL:
-        if pad != None: fp.write( line[pad:] + os.linesep )
-        else:           fp.write( line + os.linesep )
-    fp.close()
+    with open( fname, 'wt' ) as fp:
+        fp.write( dedent( content ) )
 
     return abspath( fname )
 
 
+pat_empty_line = re.compile( '[ \t]*\n' )
+
 def writescript( fname, content ):
     """
+    same as writefile except the first line is removed if empty and the
+    resulting file is made executable to the owner
     """
-    if content[0] == '\n':
-        # remove the first line if it is empty
-        content = content[1:]
+    m = pat_empty_line.match( content )
+    if m:
+        content = content[ m.end(): ]
+
     writefile( fname, content )
+
     perm = stat.S_IMODE( os.stat(fname)[stat.ST_MODE] )
     perm = perm | stat.S_IXUSR
-    try: os.chmod(fname, perm)
-    except Exception: pass
+
+    try:
+        os.chmod( fname, perm )
+    except Exception:
+        pass
 
 
 def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):

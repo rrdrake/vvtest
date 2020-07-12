@@ -108,7 +108,7 @@ class dependency_information( vtu.vvtestTestCase ):
                 fp = open( 'Y.out', 'w' )
                 fp.write( 'testY does not say the right thing'+os.linesep )
                 fp.close()
-            sys.exit( vvt.diff_exit_status )
+                sys.exit( vvt.diff_exit_status )
                 """ )
             vtu.remove_results()
             time.sleep(1)

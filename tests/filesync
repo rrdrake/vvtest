@@ -48,7 +48,7 @@ class catchall( unittest.TestCase ):
         ""
         util.writefile( 'file.txt', """
             my file
-            """ )
+            \n""" )
         fn = os.path.abspath( 'file.txt' )
         time.sleep(1)
 
@@ -84,9 +84,9 @@ class catchall( unittest.TestCase ):
 
     def test_long_list_files(self):
         ""
-        util.writefile( 'subdir/file.txt', "my file\n" )
-        util.writefile( 'subdir/file2.txt', "my file2\n" )
-        util.writefile( 'subdir/file.csv', "my,csv\n" )
+        util.writefile( 'subdir/file.txt', "my file\n\n" )
+        util.writefile( 'subdir/file2.txt', "my file2\n\n" )
+        util.writefile( 'subdir/file.csv', "my,csv\n\n" )
         sdir = os.path.abspath( 'subdir' )
         t = time.time() - 600  # make modification & access time 10 minutes ago
         os.utime( 'subdir/file2.txt', (t,t) )

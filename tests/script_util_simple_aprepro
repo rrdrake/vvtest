@@ -204,9 +204,9 @@ class Simple_Aprepro( vtu.vvtestTestCase ):
         """
         This test makes sure that we can include files
         """
-        util.writefile( 'foo.aprepro', """pre-foo\n{include("baz.txt")}\npost-foo""" )
-        util.writefile( 'baz.txt', """This is baz.""" )
-        util.writefile( 'foo.gold', """pre-foo\nThis is baz.\n\npost-foo""" )
+        util.writefile( 'foo.aprepro', """pre-foo\n{include("baz.txt")}\npost-foo\n""" )
+        util.writefile( 'baz.txt', """This is baz.\n""" )
+        util.writefile( 'foo.gold', """pre-foo\nThis is baz.\n\npost-foo\n""" )
 
         util.writefile( 'testinclude.py.vvt', """
             #VVT: copy : foo.aprepro baz.txt foo.gold
@@ -291,10 +291,10 @@ class Simple_Aprepro_Main( vtu.vvtestTestCase ):
 
         util.writefile('params.jsonl',
          """{"foo": "abc", "bar": 2}
-            {"foo": "xyz", "bar": 5}"""
+            {"foo": "xyz", "bar": 5}\n"""
             )
 
-        util.writefile('template.txt', "this is foo {foo}\nthis is 2*bar {2 * bar}")
+        util.writefile('template.txt', "this is foo {foo}\nthis is 2*bar {2 * bar}\n")
 
         su.simple_aprepro_main(["--chatty", "--params", "params.jsonl", "template.txt", "output.dat"])
 

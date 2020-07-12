@@ -134,14 +134,14 @@ class script_utils_tests( vtu.vvtestTestCase ):
         ""
         util.writefile( 'baseline.txt',
                    'the quick brown fox jumps\n' + \
-                   'over the lazy dog' )
+                   'over the lazy dog\n' )
         util.writescript( 'pypass.vvt', """
             #!"""+sys.executable+"""
             #VVT: link = baseline.txt
             import os
             import script_util as util
             fp = open( 'genfile.txt', 'w' )
-            fp.write( 'the quick brown fox jumps\\n' + \
+            fp.write( 'the quick brown fox jumps\\n'
                       'over the lazy dog\\n' )
             fp.close()
             util.unixdiff( 'baseline.txt', 'genfile.txt' )
@@ -153,7 +153,7 @@ class script_utils_tests( vtu.vvtestTestCase ):
             import os
             import script_util as util
             fp = open( 'genfile.txt', 'w' )
-            fp.write( 'the quick brown fox jumps\\n' + \
+            fp.write( 'the quick brown fox jumps\\n'
                       'over the super lazy dog\\n' )
             fp.close()
             util.unixdiff( 'baseline.txt', 'genfile.txt' )
