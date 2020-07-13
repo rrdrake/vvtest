@@ -16,7 +16,11 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.testcreator import TestCreator
+import libvvtest.testcreator as testcreator
+from libvvtest.ScriptReader import ScriptReader
+import libvvtest.parsevvt as parsevvt
+from libvvtest.errors import TestSpecError
+
 from libvvtest.testcase import TestCase
 from libvvtest.TestSpec import TestSpec
 from libvvtest.TestExec import TestExec
@@ -158,7 +162,7 @@ def assert_dependencies( tspec, *check_names ):
     depL = tspec.getDependencies()
 
     nameL = []
-    for name,expr in depL:
+    for name,expr,expect in depL:
         nameL.append( name )
     nameL.sort()
 
@@ -170,7 +174,7 @@ def assert_dependencies( tspec, *check_names ):
 
 def get_depencency_expr( tspec, dep_name ):
     ""
-    for name,expr in tspec.getDependencies():
+    for name,expr,expect in tspec.getDependencies():
         if name == dep_name:
             return expr
 
@@ -492,23 +496,123 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
     def test_find_and_connect_dependencies(self):
         ""
-        xD = make_tspec_map( 'testA', 'testB' )
-        tA = find_test( xD, 'testA' )
-        tB = find_test( xD, 'testB' )
+        xD = make_tspec_map( 'testA', 'testB', 'testD' )
 
-        tA.getSpec().addDependency( 'testB', None )
+        tA = find_test( xD, 'testA' )
+        tA.getSpec().addDependency( 'testB' )
 
         assert tA.numDependencies() == 0
         depend.check_connect_dependencies( tA, xD )
         assert tA.numDependencies() == 1
 
-        tB.getSpec().addDependency( 'testC', None )
+        tB = find_test( xD, 'testB' )
+        tB.getSpec().addDependency( 'testC' )
 
         assert tB.numDependencies() == 0
         depend.check_connect_dependencies( tB, xD )
         assert tB.numDependencies() == 1
         assert tB.isBlocked()
         assert tB.getBlockedReason() == failed_match_reason
+
+    def parse_vvt_file_dependencies(self, filename):
+        ""
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+
+        tspec = vtu.make_fake_TestSpec()
+        vspecs = ScriptReader( filename )
+        parsevvt.parse_dependencies( tspec, vspecs, evaluator )
+
+        return tspec
+
+    def test_parsing_the_expect_attribute_of_a_depends_on_directive(self):
+        ""
+        util.writefile( 'blue.vvt', """
+            #VVT: depends on : green
+            """ )
+        util.writefile( 'green.vvt', """
+            #VVT: depends on (expect=+): red
+            """ )
+        util.writefile( 'red.vvt', """
+            #VVT: depends on (expect=*): pink
+            """ )
+        util.writefile( 'pink.vvt', """
+            #VVT: depends on (expect=?): silver
+            """ )
+        util.writefile( 'silver.vvt', """
+            #VVT: depends on (expect=2): oran*
+            """ )
+        util.writefile( 'bad1.vvt', """
+            #VVT: depends on (expect=2.0): oran*
+            """ )
+        util.writefile( 'bad2.vvt', """
+            #VVT: depends on (expect=-1): oran*
+            """ )
+        util.writefile( 'multi.vvt', """
+            # the expect criterion applies to each glob pattern separately
+            #VVT: depends on (expect=2): red pink
+            """ )
+        time.sleep(1)
+
+        tspec = self.parse_vvt_file_dependencies( 'blue.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 1 and deps[0][0] == 'green' and deps[0][2] == '+'
+
+        tspec = self.parse_vvt_file_dependencies( 'green.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 1 and deps[0][0] == 'red' and deps[0][2] == '+'
+
+        tspec = self.parse_vvt_file_dependencies( 'red.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 1 and deps[0][0] == 'pink' and deps[0][2] == '*'
+
+        tspec = self.parse_vvt_file_dependencies( 'pink.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 1 and deps[0][0] == 'silver' and deps[0][2] == '?'
+
+        tspec = self.parse_vvt_file_dependencies( 'silver.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 1 and deps[0][0] == 'oran*' and deps[0][2] == '2'
+
+        self.assertRaises( TestSpecError,
+                           self.parse_vvt_file_dependencies, 'bad1.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           self.parse_vvt_file_dependencies, 'bad2.vvt' )
+
+        tspec = self.parse_vvt_file_dependencies( 'multi.vvt' )
+        deps = tspec.getDependencies()
+        assert len(deps) == 2
+        assert deps[0][0] == 'red' and deps[0][2] == '2'
+        assert deps[1][0] == 'pink' and deps[0][2] == '2'
+
+    def test_depends_on_match_criterion(self):
+        ""
+        depL = []
+        assert not depend.match_criteria_satisfied( True, depL, None, '+'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '*'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '?'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '0'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '1'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '2'  )
+
+        tA = vtu.make_fake_TestCase( name='Atest' )
+        depL = [ tA.getSpec().getID() ]
+        assert     depend.match_criteria_satisfied( True, depL, None, '+'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '*'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '?'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '0'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '1'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '2'  )
+
+        tA = vtu.make_fake_TestCase( name='Atest' )
+        tB = vtu.make_fake_TestCase( name='Btest' )
+        depL = [ tA.getSpec().getID(), tB.getSpec().getID() ]
+        assert     depend.match_criteria_satisfied( True, depL, None, '+'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '*'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '?'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '0'  )
+        assert not depend.match_criteria_satisfied( True, depL, None, '1'  )
+        assert     depend.match_criteria_satisfied( True, depL, None, '2'  )
 
 
 #######################################
@@ -562,7 +666,7 @@ def make_TestExec_test_case( name ):
 
 def create_tests( relpath, platname=None ):
     ""
-    creator = TestCreator( platname, [] )
+    creator = testcreator.TestCreator( platname, [] )
     tL = creator.fromFile( '.', relpath, None )
 
     return tL

@@ -543,9 +543,9 @@ class TestSpec:
         """
         self.src_files = [] + files
 
-    def addDependency(self, xdir_pattern, result_word_expr):
+    def addDependency(self, xdir_pattern, result_word_expr=None, expect='+'):
         ""
-        self.deps.append( (xdir_pattern, result_word_expr) )
+        self.deps.append( (xdir_pattern, result_word_expr, expect) )
 
     def makeParent(self):
         """

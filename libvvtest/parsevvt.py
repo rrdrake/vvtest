@@ -585,9 +585,10 @@ def parse_dependencies( t, vspecs, evaluator ):
         if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
 
             wx = create_dependency_result_expression( spec.attrs )
+            exp = parse_expect_criterion( spec.attrs, spec.lineno )
 
             for val in spec.value.strip().split():
-                t.addDependency( val, wx )
+                t.addDependency( val, wx, exp )
 
     specL = vspecs.getSpecList("testname") + vspecs.getSpecList("name")
     for spec in specL:
@@ -596,9 +597,31 @@ def parse_dependencies( t, vspecs, evaluator ):
         if name == tname:
 
             wx = create_dependency_result_expression( attrD )
+            exp = parse_expect_criterion( spec.attrs, spec.lineno )
 
             for depname in attrD.get( 'depends on', '' ).split():
-                t.addDependency( depname, wx )
+                t.addDependency( depname, wx, exp )
+
+
+def parse_expect_criterion( attrs, lineno ):
+    ""
+    exp = '+'
+
+    if attrs:
+        exp = attrs.get( 'expect', '+' ).strip("'")
+
+    if exp not in ['+','*','?']:
+        try:
+            ival = int( exp )
+            ok = True
+        except Exception:
+            ok = False
+
+        if not ok or ival < 0:
+            raise TestSpecError( "invalid 'expect' value, \""+str(exp) + \
+                                 "\", line " + str(lineno) )
+
+    return exp
 
 
 def parse_preload_label( tspec, vspecs, evaluator ):

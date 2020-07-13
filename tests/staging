@@ -616,7 +616,7 @@ def find_single_dependency( tspec, testL ):
 
     depL = tspec.getDependencies()
     assert len( depL ) == 1
-    pat,expr = depL[0]
+    pat,expr,expect = depL[0]
 
     xdir = tspec.getExecuteDirectory()
 

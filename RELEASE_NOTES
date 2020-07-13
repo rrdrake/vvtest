@@ -1,6 +1,16 @@
 
 Improvements:
 
+    - Add "expect" attribute to the "depends on" directive. A test with
+      directive
+
+        #VVT: depends on (expect=2) : foo*bar
+
+      will only run if the number of tests that match the shell expression
+      "foo*bar" is exactly two. Possible values for "expect" are '+' for
+      one or more (this is the default), '?' for zero or one, '*' for zero
+      or more, and a non-negative integer.
+
     - Add additional CDash specifications. You can now say, for example,
 
         --cdash "https://sparky.com/cdash,project=Proj,group=Big Deal"

@@ -237,12 +237,12 @@ def check_connect_dependencies( tcase, testcasemap, strict=True ):
     ""
     tspec = tcase.getSpec()
 
-    for dep_pat,expr in tspec.getDependencies():
+    for dep_pat,expr,expect in tspec.getDependencies():
 
         xdir = tspec.getExecuteDirectory()
         depL = find_tests_by_pattern( xdir, dep_pat, testcasemap )
 
-        if match_criteria_satisfied( depL, strict ):
+        if match_criteria_satisfied( strict, depL, expr, expect ):
             for dep_id in depL:
                 dep_obj = testcasemap.get( dep_id, None )
                 if dep_obj != None:
@@ -251,11 +251,18 @@ def check_connect_dependencies( tcase, testcasemap, strict=True ):
             connect_failed_dependency( tcase )
 
 
-def match_criteria_satisfied( depL, strict ):
+def match_criteria_satisfied( strict, depL, expr, expect ):
     ""
     if strict:
-        if len( depL ) == 0:
-            return False
+        if expect == '*':
+            return True
+        elif expect == '?':
+            return len( depL ) in [0,1]
+        elif expect == '+':
+            return len( depL ) > 0
+        else:
+            ival = int( expect )
+            return len( depL ) == ival
 
     return True
 

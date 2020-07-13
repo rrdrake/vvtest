@@ -202,6 +202,22 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
         util.writefile( 'testC.vvt', """
             pass
             """ )
+        util.writefile( 'testD.vvt', """
+            #VVT: depends on (expect=*): testB
+            pass
+            """ )
+        util.writefile( 'testE.vvt', """
+            #VVT: depends on (expect='?'): testB
+            pass
+            """ )
+        util.writefile( 'testF.vvt', """
+            #VVT: depends on (expect=2): test[CD]
+            pass
+            """ )
+        util.writefile( 'testG.vvt', """
+            #VVT: depends on (expect=?): test[CD]
+            pass
+            """ )
         time.sleep(1)
 
         for batch in [False,True]:
@@ -209,7 +225,13 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
             vtu.remove_results()
 
             vrun = vtu.runvvtest( '-vv', batch=batch )
-            vrun.assertCounts( total=2, npass=1, notrun=1 )
+            vrun.assertCounts( total=6, npass=4, notrun=2 )
+            assert len( glob.glob( 'TestResults*/testA/execute.log' ) ) == 0
+            assert len( glob.glob( 'TestResults*/testC/execute.log' ) ) == 1
+            assert len( glob.glob( 'TestResults*/testD/execute.log' ) ) == 1
+            assert len( glob.glob( 'TestResults*/testE/execute.log' ) ) == 1
+            assert len( glob.glob( 'TestResults*/testF/execute.log' ) ) == 1
+            assert len( glob.glob( 'TestResults*/testG/execute.log' ) ) == 0
 
 
 ############################################################################
