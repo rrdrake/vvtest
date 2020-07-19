@@ -296,8 +296,7 @@ class BatchTestGrouper:
         qtime = 0
 
         for tcase in tlist.getTests():
-            tspec = tcase.getSpec()
-            qtime += int( tspec.getAttr('timeout') )
+            qtime += int( tcase.getStat().getAttr('timeout') )
 
         if qtime == 0:
             qtime = self.Tzero  # give it the "no timeout" length of time
@@ -319,7 +318,7 @@ class BatchTestGrouper:
             tcase = self.xlist.getNextTest()
             if tcase != None:
                 size = tcase.getSize()
-                tm = tcase.getSpec().getAttr('timeout')
+                tm = tcase.getStat().getAttr('timeout')
                 self._add_test_case( size, tm, tcase )
             else:
                 break
@@ -332,12 +331,13 @@ class BatchTestGrouper:
     def _add_test_case(self, size, timeval, tcase):
         ""
         tspec = tcase.getSpec()
+        tstat = tcase.getStat()
 
         if tcase.numDependencies() > 0:
             # tests with dependencies (like analyze tests) get their own group
             self.batches.append( BatchGroup( size, timeval, [tcase] ) )
 
-        elif tspec.getAttr('timeout') < 1:
+        elif tstat.getAttr('timeout') < 1:
             # zero timeout means no limit, so give it the max time value
             self.batches.append( BatchGroup( size, self.Tzero, [tcase] ) )
 

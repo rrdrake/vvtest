@@ -87,7 +87,7 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
         plug = vtu.make_user_plugin( func )
 
         tcase = vtu.make_fake_TestCase( result='fail', runtime=42 )
-        tcase.getSpec().setAttr( 'timeout', 40 )
+        tcase.getStat().setAttr( 'timeout', 40 )
 
         rtn,out,err = util.call_capture_output(
                         plug.callEpilogue, os.getcwd(), [tcase] )

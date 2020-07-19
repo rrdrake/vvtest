@@ -38,8 +38,8 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 281
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 281
 
     def test_a_timeout_maximum(self):
         ""
@@ -48,8 +48,8 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 200
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 200
 
     def test_a_timeout_multiplier(self):
         ""
@@ -58,8 +58,8 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert abs( tspec.getAttr( 'timeout' ) - 11*2.5 ) < 2
+        tstat = tlist.getTests()[0].getStat()
+        assert abs( tstat.getAttr( 'timeout' ) - 11*2.5 ) < 2
 
     def test_a_command_line_timeout(self):
         ""
@@ -68,8 +68,8 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 42
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 42
 
     def test_that_max_timeout_takes_precedence(self):
         ""
@@ -78,8 +78,8 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 31
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 31
 
     def test_default_timeout_is_one_hour_or_5_hours_for_long(self):
         ""
@@ -88,14 +88,14 @@ class the_tests( vtu.vvtestTestCase ):
 
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 60*60
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 60*60
 
         tlist = make_test_list( keyword='long' )
         th.load( make_lookup_cache(), tlist )
 
-        tspec = tlist.getTests()[0].getSpec()
-        assert tspec.getAttr( 'timeout' ) == 5*60*60
+        tstat = tlist.getTests()[0].getStat()
+        assert tstat.getAttr( 'timeout' ) == 5*60*60
 
     def test_the_timeout_table_from_a_previous_runtime(self):
         ""
@@ -158,7 +158,7 @@ def make_test_list( timeout=None, keyword=None ):
 def add_keyword_to_test( tspec, keyword ):
     ""
     kwL = tspec.getKeywords( include_implicit=False ) + [ keyword ]
-    tspec.setKeywords( kwL )
+    tspec.setKeywordList( kwL )
 
 
 class MockTestList:

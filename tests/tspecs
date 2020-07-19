@@ -1175,10 +1175,10 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         util.writefile( 'ok51.xml', """
             <rtest name="glob">
               <parameterize np="1"/>
-              <glob_copy> glob*.txt </glob_copy>
-              <glob_link> link*_${NAME}.txt </glob_link>
-              <glob_link parameters="np=1"> conditional*_glob.txt </glob_link>
-              <glob_link parameters="np=4"> notme*_glob.txt </glob_link>
+              <copy_files> glob*.txt </copy_files>
+              <link_files> link*_${NAME}.txt </link_files>
+              <link_files parameters="np=1"> conditional*_glob.txt </link_files>
+              <link_files parameters="np=4"> notme*_glob.txt </link_files>
             </rtest>""" )
 
         tL = create_tests( 'ok51.xml' )
@@ -1196,7 +1196,7 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         util.writefile( 'ok52.xml', """
             <rtest name="srcfiles">
               <parameterize np="1"/>
-              <glob_copy> glob*.txt </glob_copy>
+              <copy_files> glob*.txt </copy_files>
               <copy_files> link_glob.txt </copy_files>
               <link_files> globfile2.txt </link_files>
               <baseline file="baseline_glob.txt" destination="baseline_glob.base_txt"/>

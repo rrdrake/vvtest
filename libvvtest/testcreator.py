@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os, sys
+from os.path import join as pjoin
 
 from . import TestSpec
 from . import FilterExpressions
@@ -17,6 +18,7 @@ from .parseutil import create_dependency_result_expression
 from . import parsexml
 from . import parsevvt
 from . import parseutil
+from .paramset import ParameterSet
 
 
 class TestCreator:
@@ -32,26 +34,42 @@ class TestCreator:
         absolute path).  If 'force_params' is not None, then any parameters in
         the test that are in the 'force_params' dictionary have their values
         replaced for that parameter name.
-        
+
         Returns a list of TestSpec objects, including a "parent" test if needed.
         """
-        tests = create_test_list( self.evaluator,
-                                  rootpath,
-                                  relpath,
-                                  force_params )
+        assert not os.path.isabs( relpath )
+
+        form = map_extension_to_spec_form( relpath )
+
+        ctor = create_test_constructor( form, rootpath, relpath,
+                                        self.evaluator, force_params )
+
+        ctor.readFile()
+        tests = ctor.createTests()
 
         return tests
 
     def reparse(self, tspec):
         """
         Parses the test source file and resets the settings for the given test.
-        The test name is not changed.  The parameters in the test XML file are
-        not considered; instead, the parameters already defined in the test
+        The test name is not changed.  The parameters in the test source file
+        are not considered; instead, the parameters already defined in the test
         object are used.
 
-        If the test XML contains bad syntax, a TestSpecError is raised.
+        A TestSpecError is raised if the file has an invalid specification.
         """
-        reparse_test_object( self.evaluator, tspec )
+        if not tspec.constructionCompleted():
+
+            form = tspec.getSpecificationForm()
+
+            ctor = create_test_constructor( form, tspec.getRootpath(),
+                                                  tspec.getFilepath(),
+                                                  self.evaluator, None )
+
+            ctor.readFile( strict=True )
+            ctor.reparseTest( tspec )
+
+            tspec.setConstructionCompleted()
 
 
 class ExpressionEvaluator:
@@ -90,191 +108,204 @@ class ExpressionEvaluator:
         return word_expr.evaluate( self.option_list.count )
 
 
-def create_test_list( evaluator, rootpath, relpath, force_params ):
-    """
-    Can use a (nested) rtest element to cause another test to be defined.
-        
-        <rtest name="mytest">
-          <rtest name="mytest_fast"/>
-          ...
-        </rtest>
+class TestConstructor:
 
-    then use the testname="..." attribute to filter XML elements.
+    def __init__(self, rootpath, relpath, evaluator, force_params={}):
+        ""
+        self.root = rootpath
+        self.fpath = relpath
+        self.force = force_params
+        self.evaluator = evaluator
 
-        <keywords testname="mytest_fast"> fast </keywords>
-        <keywords testname="mytest"> long </keywords>
+        self.source = None
 
-        <parameters testname="mytest" np="1 2 4 8 16 32 64 128 256 512"/>
-        <parameters testname="mytest_fast" np="1 2 4 8"/>
-        
-        <execute testname="mytest_fast" name="exodiff"> ... </execute>
+    def createTests(self):
+        ""
+        nameL = self.parseTestNames()
 
-        <analyze testname="mytest">
-          ...
-        </analyze>
-        <analyze testname="mytest_fast">
-          ...
-        </analyze>
-    """
-    assert not os.path.isabs( relpath )
-
-    fname = os.path.join( rootpath, relpath )
-    ext = os.path.splitext( relpath )[1]
-
-    if ext == '.xml':
-
-        filedoc = parsexml.read_xml_file( fname )
-
-        nameL = parsexml.parse_test_names( filedoc )
-
-        tL = []
+        self.tests = []
         for tname in nameL:
-            L = create_xml_test( tname, filedoc, rootpath, relpath,
-                                 force_params, evaluator )
-            tL.extend( L )
+            L = self.create_test_list( tname )
+            self.tests.extend( L )
 
-    elif ext == '.vvt':
+        return self.tests
 
-        vspecs = ScriptReader( fname )
-        nameL = parsevvt.parse_test_names( vspecs )
-        tL = []
-        for tname in nameL:
-            L = create_script_test( tname, vspecs, rootpath, relpath,
-                                    force_params, evaluator )
-            tL.extend( L )
+    def reparseTest(self, tspec):
+        ""
+        # run through the test name logic to check validity
+        self.parseTestNames()
 
-    else:
-        raise Exception( "invalid file extension: "+ext )
+        tname = tspec.getName()
 
-    for tspec in tL:
-        tspec.setConstructionCompleted()
+        old_pset = tspec.getParameterSet()
+        new_pset = self.parseParameterSet( tname )
+        new_pset.intersectionFilter( old_pset.getInstances() )
+        tspec.setParameterSet( new_pset )
 
-    return tL
+        if new_pset.getStagedGroup():
+            parseutil.mark_staged_tests( new_pset, [ tspec ] )
 
+        if tspec.isAnalyze():
+            analyze_spec = self.parseAnalyzeSpec( tname )
+            tspec.setAnalyzeScript( analyze_spec )
 
-def create_xml_test( tname, filedoc, rootpath, relpath, force_params, evaluator ):
-    ""
-    pset = parsexml.parse_parameterize( filedoc, tname, evaluator, force_params )
-    numparams = len( pset.getParameters() )
+        inst = self.make_parsing_instance( tspec )
+        self.parseTestInstance( inst )
 
-    testL = generate_test_objects( tname, rootpath, relpath, pset )
+    def create_test_list(self, tname):
+        ""
+        pset = self.parseParameterSet( tname )
 
-    if len(testL) > 0:
-        # check for parameterize/analyze
+        testL = self.generate_test_objects( tname, pset )
 
-        t = testL[0]
+        parseutil.mark_staged_tests( pset, testL )
 
-        analyze_spec = parsexml.parse_analyze( t, filedoc, evaluator )
+        analyze_spec = self.parseAnalyzeSpec( tname )
+        self.check_add_analyze_test( analyze_spec, tname, pset, testL )
 
+        for t in testL:
+            inst = self.make_parsing_instance( t )
+            self.parseTestInstance( inst )
+
+        return testL
+
+    def check_add_analyze_test(self, analyze_spec, tname, pset, testL):
+        ""
         if analyze_spec:
-            if numparams == 0:
-                raise TestSpecError( 'an analyze requires at least one ' + \
-                                     'parameter to be defined' )
-
-            # create an analyze test
-            parent = t.makeParent()
-            parent.setParameterSet( pset )
+            parent = self.make_analyze_test( analyze_spec, tname, pset )
             testL.append( parent )
 
-            parent.setAnalyzeScript( analyze_spec )
+    def make_analyze_test(self, analyze_spec, testname, paramset):
+        ""
+        if len( paramset.getParameters() ) == 0:
+            raise TestSpecError( 'an analyze requires at least one ' + \
+                                 'parameter to be defined' )
 
-    # parse and set the rest of the XML file for each test
-    for t in testL:
-        parsexml.parse_xml_test( t, filedoc, evaluator )
+        parent = TestSpec.TestSpec( testname, self.root, self.fpath )
 
-    return testL
+        parent.setIsAnalyze()
+        parent.setParameterSet( paramset )
+        parent.setAnalyzeScript( analyze_spec )
 
+        return parent
 
-def create_script_test( tname, vspecs, rootpath, relpath,
-                        force_params, evaluator ):
-    ""
-    pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, force_params )
+    def make_parsing_instance(self, tspec):
+        ""
+        inst = ParsingInstance( testname=tspec.getName(),
+                                params=tspec.getParameters(),
+                                tfile=tspec,
+                                source=self.source,
+                                evaluator=self.evaluator )
 
-    testL = generate_test_objects( tname, rootpath, relpath, pset )
+        return inst
 
-    parseutil.mark_staged_tests( pset, testL )
+    def generate_test_objects(self, tname, pset):
+        ""
+        testL = []
 
-    parsevvt.check_add_analyze_test( pset, testL, vspecs, evaluator )
-
-    for t in testL:
-        parsevvt.parse_vvt_test( t, vspecs, evaluator )
-
-    return testL
-
-
-def generate_test_objects( tname, rootpath, relpath, pset ):
-    ""
-    testL = []
-
-    numparams = len( pset.getParameters() )
-    if numparams == 0:
-        t = TestSpec.TestSpec( tname, rootpath, relpath )
-        testL.append(t)
-
-    else:
-        # take a cartesian product of all the parameter values
-        for pdict in pset.getInstances():
-            # create the test and add to test list
-            t = TestSpec.TestSpec( tname, rootpath, relpath )
-            t.setParameters( pdict )
-            t.setParameterTypes( pset.getParameterTypeMap() )
+        if len( pset.getParameters() ) == 0:
+            t = TestSpec.TestSpec( tname, self.root, self.fpath )
             testL.append(t)
 
-    return testL
+        else:
+            # take a cartesian product of all the parameter values
+            for pdict in pset.getInstances():
+                # create the test and add to test list
+                t = TestSpec.TestSpec( tname, self.root, self.fpath )
+                t.setParameters( pdict )
+                t.setParameterSet( pset )
+                testL.append(t)
+
+        return testL
 
 
-def reparse_test_object( evaluator, testobj ):
-    """
-    Given a TestSpec object, this function opens the original test file,
-    parses, and overwrite the test contents.
-    """
-    if testobj.constructionCompleted():
-        return
+class ParsingInstance:
 
-    fname = testobj.getFilename()
-    ext = os.path.splitext( fname )[1]
+    def __init__(self, testname='',
+                       params={},
+                       tfile=None,
+                       source=None,
+                       evaluator=None ):
+        ""
+        self.testname = testname
+        self.params = params
+        self.tfile = tfile
+        self.source = source
+        self.evaluator = evaluator
 
-    if ext == '.xml':
 
-        filedoc = parsexml.read_xml_file( fname, strict=True )
+class XMLTestConstructor( TestConstructor ):
 
-        # run through the test name logic to check XML validity
-        nameL = parsexml.parse_test_names(filedoc)
+    def readFile(self, strict=False):
+        ""
+        fname = pjoin( self.root, self.fpath )
+        self.source = parsexml.read_xml_file( fname, strict )
 
-        if testobj.isAnalyze():
-            analyze_spec = parsexml.parse_analyze( testobj, filedoc, evaluator )
-            testobj.setAnalyzeScript( analyze_spec )
+    def parseTestNames(self):
+        ""
+        return parsexml.parse_test_names( self.source )
 
-        parsexml.parse_xml_test( testobj, filedoc, evaluator )
+    def parseParameterSet(self, tname):
+        ""
+        pset = ParameterSet()
+        parsexml.parse_parameterize( pset, self.source, tname,
+                                     self.evaluator, self.force )
+        return pset
 
-    elif ext == '.vvt':
+    def parseAnalyzeSpec(self, tname):
+        ""
+        return parsexml.parse_analyze( tname, self.source, self.evaluator )
 
-        vspecs = ScriptReader( fname )
+    def parseTestInstance(self, inst):
+        ""
+        parsexml.parse_xml_test( inst )
 
-        # run through the test name logic to check validity
-        nameL = parsevvt.parse_test_names( vspecs )
 
-        tname = testobj.getName()
+class ScriptTestConstructor( TestConstructor ):
 
-        pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, None )
+    def readFile(self, strict=False):
+        ""
+        fname = pjoin( self.root, self.fpath )
+        self.source = ScriptReader( fname )
 
-        type_map = pset.getParameterTypeMap()
-        testobj.setParameterTypes( type_map )
+    def parseTestNames(self):
+        ""
+        return parsevvt.parse_test_names( self.source )
 
-        if pset.getStagedGroup():
-            parseutil.mark_staged_tests( pset, [ testobj ] )
+    def parseParameterSet(self, tname):
+        ""
+        pset = ParameterSet()
+        parsevvt.parse_parameterize( pset, self.source, tname,
+                                     self.evaluator, self.force )
+        return pset
 
-        if testobj.isAnalyze():
-            testobj.getParameterSet().setParameterTypeMap( type_map )
+    def parseAnalyzeSpec(self, tname):
+        ""
+        return parsevvt.parse_analyze( tname, self.source, self.evaluator )
 
-            analyze_spec = parsevvt.parse_analyze( testobj, vspecs, evaluator )
-            testobj.setAnalyzeScript( analyze_spec )
-            if not analyze_spec.startswith('-'):
-                testobj.addLinkFile( analyze_spec )
+    def parseTestInstance(self, inst):
+        ""
+        parsevvt.parse_vvt_test( inst )
 
-        parsevvt.parse_vvt_test( testobj, vspecs, evaluator )
+
+def map_extension_to_spec_form( filepath ):
+    ""
+    if os.path.splitext( filepath )[1] == '.xml':
+        return 'xml'
+    else:
+        return 'script'
+
+
+def create_test_constructor( spec_form, rootpath, relpath,
+                             evaluator, force_params ):
+    ""
+    if spec_form == 'xml':
+        ctor = XMLTestConstructor( rootpath, relpath, evaluator, force_params )
+
+    elif spec_form == 'script':
+        ctor = ScriptTestConstructor( rootpath, relpath, evaluator, force_params )
 
     else:
-        raise Exception( "invalid file extension: "+ext )
+        raise Exception( "invalid test specification form: "+form )
 
-    testobj.setConstructionCompleted()
+    return ctor

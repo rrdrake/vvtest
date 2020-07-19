@@ -11,8 +11,6 @@ from .errors import TestSpecError
 from . import xmlwrapper
 from . import FilterExpressions
 
-from .paramset import ParameterSet
-
 from .parseutil import variable_expansion
 from .parseutil import evauate_testname_expr
 from .parseutil import allowable_variable, allowable_string
@@ -47,14 +45,40 @@ def appears_to_be_a_test_file( filename ):
     return False
 
 
-def parse_xml_test( testobj, filedoc, evaluator ):
-    ""
-    parse_include_platform ( testobj, filedoc )
-    parse_keywords         ( testobj, filedoc )
-    parse_working_files    ( testobj, filedoc, evaluator )
-    parse_timeouts         ( testobj, filedoc, evaluator )
-    parse_execute_list     ( testobj, filedoc, evaluator )
-    parse_baseline         ( testobj, filedoc, evaluator )
+def parse_xml_test( inst ):
+    """
+    Can use a (nested) rtest element to cause another test to be defined.
+        
+        <rtest name="mytest">
+          <rtest name="mytest_fast"/>
+          ...
+        </rtest>
+
+    then use the testname="..." attribute to filter XML elements.
+
+        <keywords testname="mytest_fast"> fast </keywords>
+        <keywords testname="mytest"> long </keywords>
+
+        <parameters testname="mytest" np="1 2 4 8 16 32 64 128 256 512"/>
+        <parameters testname="mytest_fast" np="1 2 4 8"/>
+        
+        <execute testname="mytest_fast" name="exodiff"> ... </execute>
+
+        <analyze testname="mytest">
+          ...
+        </analyze>
+        <analyze testname="mytest_fast">
+          ...
+        </analyze>
+    """
+    parse_include_platform ( inst )
+    parse_keywords         ( inst )
+    parse_working_files    ( inst )
+    parse_timeouts         ( inst )
+    parse_execute_list     ( inst )
+    parse_baseline         ( inst )
+
+    inst.tfile.setConstructionCompleted()
 
 
 def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
@@ -97,7 +121,7 @@ def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
     return False, False
 
 
-def parse_baseline( t, filedoc, evaluator ):
+def parse_baseline( inst ):
     """
     Parse the baseline files and scripts for the test XML file.
 
@@ -114,12 +138,12 @@ def parse_baseline( t, filedoc, evaluator ):
     """
     scriptfrag = ''
 
-    for nd in filedoc.matchNodes(['baseline$']):
+    for nd in inst.source.matchNodes(['baseline$']):
 
         skip = 0
         for n,v in nd.getAttrs().items():
-            isfa, istrue = attr_filter( n, v, t.getName(), t.getParameters(),
-                                        evaluator, str(nd.getLineNumber()) )
+            isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
+                                        inst.evaluator, str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -148,21 +172,23 @@ def parse_baseline( t, filedoc, evaluator ):
                     for i in range(len(fname)):
                         fL.append( [str(fname[i]), str(fdest[i])] )
 
-            variable_expansion( t.getName(), evaluator.getPlatformName(),
-                                t.getParameters(), fL )
+            variable_expansion( inst.testname,
+                                inst.evaluator.getPlatformName(),
+                                inst.params,
+                                fL )
 
             for f,d in fL:
-                t.addBaselineFile( str(f), str(d) )
+                inst.tfile.addBaselineFile( str(f), str(d) )
 
             script = nd.getContent().strip()
             if script:
                 scriptfrag += '\n' + script
 
     if scriptfrag:
-        t.setBaselineScript( scriptfrag )
+        inst.tfile.setBaselineScript( scriptfrag )
 
 
-def collect_filenames( nd, flist, tname, paramD, evaluator ):
+def collect_filenames( nd, flist, inst ):
     """
     Helper function that parses file names in content with optional linkname
     attribute:
@@ -182,8 +208,8 @@ def collect_filenames( nd, flist, tname, paramD, evaluator ):
 
         skip = 0
         for n,v in nd.getAttrs().items():
-            isfa, istrue = attr_filter( n, v, tname, paramD,
-                                        evaluator, str(nd.getLineNumber()) )
+            isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
+                                        inst.evaluator, str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -215,7 +241,10 @@ def collect_filenames( nd, flist, tname, paramD, evaluator ):
                                              'line ' + str(nd.getLineNumber()) )
                     fL.append( [str(f), None] )
 
-            variable_expansion( tname, evaluator.getPlatformName(), paramD, fL )
+            variable_expansion( inst.testname,
+                                inst.evaluator.getPlatformName(),
+                                inst.params,
+                                fL )
 
             flist.extend(fL)
 
@@ -224,46 +253,37 @@ def collect_filenames( nd, flist, tname, paramD, evaluator ):
                              ', line ' + str(nd.getLineNumber()) )
 
 
-def glob_filenames( nd, flist, t, evaluator, nofilter=0 ):
+def parse_source_files( nd, flist, inst ):
     """
-    Queries the file system for file names.  Syntax is
+      <source_files> ${NAME}_*.base_exo </source_files>
 
-      <glob_copy parameters="..."> ${NAME}_*.base_exo </glob_copy>
-      <glob_link platforms="..." > ${NAME}.*exo       </glob_link>
-
-    Returns a list of (source filename, test filename).
+    Appends (source filename, None) to the given 'flist'.
     """
-    tname = t.getName()
-    paramD = t.getParameters()
-    homedir = t.getDirectory()
-
     globL = nd.getContent().strip().split()
     if len(globL) > 0:
 
-        skip = 0
         for n,v in nd.getAttrs().items():
-            isfa, istrue = attr_filter( n, v, tname, paramD,
-                                        evaluator, str(nd.getLineNumber()) )
-            if nofilter and isfa:
+            isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
+                                        inst.evaluator, str(nd.getLineNumber()) )
+            if isfa:
                 raise TestSpecError( 'filter attributes not allowed here' + \
                                      ', line ' + str(nd.getLineNumber()) )
-            if isfa and not istrue:
-                skip = 1
-                break
 
-        if not skip:
-            # first, substitute variables into the file names
-            variable_expansion( tname, evaluator.getPlatformName(), paramD, globL )
+        # first, substitute variables into the file names
+        variable_expansion( inst.testname,
+                            inst.evaluator.getPlatformName(),
+                            inst.params,
+                            globL )
 
-            for fn in globL:
-                flist.append( [str(fn),None] )
+        for fn in globL:
+            flist.append( [str(fn),None] )
 
     else:
-      raise TestSpecError( 'expected a list of file names as content' + \
-                           ', line ' + str(nd.getLineNumber()) )
+        raise TestSpecError( 'expected a list of file names as content' + \
+                           '  , line ' + str(nd.getLineNumber()) )
 
 
-def parse_working_files( t, filedoc, evaluator ):
+def parse_working_files( inst ):
     """
     Parse the files to copy and soft link for the test XML file.
 
@@ -289,36 +309,37 @@ def parse_working_files( t, filedoc, evaluator ):
     cpfiles = []
     lnfiles = []
 
-    for nd in filedoc.matchNodes(["copy_files$"]):
-        collect_filenames( nd, cpfiles, t.getName(), t.getParameters(), evaluator )
+    for nd in inst.source.matchNodes(["copy_files$"]):
+        collect_filenames( nd, cpfiles, inst )
 
-    for nd in filedoc.matchNodes(["link_files$"]):
-        collect_filenames( nd, lnfiles, t.getName(), t.getParameters(), evaluator )
+    for nd in inst.source.matchNodes(["link_files$"]):
+        collect_filenames( nd, lnfiles, inst )
 
     # include mirror_files for backward compatibility
-    for nd in filedoc.matchNodes(["mirror_files$"]):
-        collect_filenames( nd, lnfiles, t.getName(), t.getParameters(), evaluator )
+    for nd in inst.source.matchNodes(["mirror_files$"]):
+        collect_filenames( nd, lnfiles, inst )
 
-    for nd in filedoc.matchNodes(["glob_link$"]):
-        # This construct is deprecated [April 2016].
-        glob_filenames( nd, lnfiles, t, evaluator )
+    for nd in inst.source.matchNodes(["glob_link$"]):
+        raise TestSpecError( "'glob_link' has been replaced by 'link_files'"
+                             " , line "+str(nd.getLineNumber()) )
 
-    for nd in filedoc.matchNodes(["glob_copy$"]):
-        # This construct is deprecated [April 2016].
-        glob_filenames( nd, cpfiles, t, evaluator )
+    for nd in inst.source.matchNodes(["glob_copy$"]):
+        raise TestSpecError( "'glob_copy' has been replaced by 'copy_files'"
+                             " , line "+str(nd.getLineNumber()) )
 
     for src,dst in lnfiles:
-        t.addLinkFile( src, dst )
+        inst.tfile.addLinkFile( src, dst )
     for src,dst in cpfiles:
-        t.addCopyFile( src, dst )
+        inst.tfile.addCopyFile( src, dst )
 
     fL = []
-    for nd in filedoc.matchNodes(["source_files$"]):
-        glob_filenames( nd, fL, t, evaluator, 1 )
-    t.setSourceFiles( list( T[0] for T in fL ) )
+    for nd in inst.source.matchNodes(["source_files$"]):
+        parse_source_files( nd, fL, inst )
+
+    inst.tfile.setSourceFiles( list( T[0] for T in fL ) )
 
 
-def parse_execute_list( t, filedoc, evaluator ):
+def parse_execute_list( inst ):
     """
     Parse the execute list for the test XML file.
 
@@ -331,12 +352,12 @@ def parse_execute_list( t, filedoc, evaluator ):
     If a name is given, the content is arguments to the named executable.
     Otherwise, the content is a script fragment.
     """
-    for nd in filedoc.matchNodes(["execute$"]):
+    for nd in inst.source.matchNodes(["execute$"]):
 
         skip = 0
         for n,v in nd.getAttrs().items():
-            isfa, istrue = attr_filter( n, v, t.getName(), t.getParameters(),
-                                        evaluator, str(nd.getLineNumber()) )
+            isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
+                                        inst.evaluator, str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -372,12 +393,12 @@ def parse_execute_list( t, filedoc, evaluator ):
             else:               content = content.strip()
 
             if xname == None:
-                t.appendExecutionFragment( content, xstatus, analyze )
+                inst.tfile.appendExecutionFragment( content, xstatus, analyze )
             else:
-                t.appendNamedExecutionFragment( xname, content, xstatus )
+                inst.tfile.appendNamedExecutionFragment( xname, content, xstatus )
 
 
-def parse_timeouts( t, filedoc, evaluator ):
+def parse_timeouts( inst ):
     """
     Parse test timeouts for the test XML file.
 
@@ -387,12 +408,12 @@ def parse_timeouts( t, filedoc, evaluator ):
     """
     specL = []
 
-    for nd in filedoc.matchNodes(['timeout$']):
+    for nd in inst.source.matchNodes(['timeout$']):
 
         skip = 0
         for n,v in nd.getAttrs().items():
-            isfa, istrue = attr_filter( n, v, t.getName(), t.getParameters(),
-                                        evaluator, str(nd.getLineNumber()) )
+            isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
+                                        inst.evaluator, str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -411,10 +432,10 @@ def parse_timeouts( t, filedoc, evaluator ):
                                          val + '", line ' + str(nd.getLineNumber()) )
 
             if to != None:
-                t.setTimeout( to )
+                inst.tfile.setTimeout( to )
 
 
-def parse_analyze( t, filedoc, evaluator ):
+def parse_analyze( tname, filedoc, evaluator ):
     """
     Parse analyze scripts that get run after all parameterized tests complete.
 
@@ -438,7 +459,7 @@ def parse_analyze( t, filedoc, evaluator ):
                                    '"parameters=..." attribute: ' + \
                                    ', line ' + str(nd.getLineNumber()) )
 
-          isfa, istrue = attr_filter( n, v, t.getName(), None,
+          isfa, istrue = attr_filter( n, v, tname, None,
                                       evaluator, str(nd.getLineNumber()) )
           if isfa and not istrue:
               skip = 1
@@ -466,7 +487,7 @@ def testname_ok( xmlnode, tname ):
     return True
 
 
-def parse_include_platform( testobj, xmldoc ):
+def parse_include_platform( inst ):
     """
     Parse syntax that will filter out this test by platform or build option.
 
@@ -484,15 +505,13 @@ def parse_include_platform( testobj, xmldoc ):
 
        <include platforms="SunOS Linux"/>
     """
-    tname = testobj.getName()
-
-    for nd in xmldoc.matchNodes(['include$']):
+    for nd in inst.source.matchNodes(['include$']):
 
         if nd.hasAttr( 'parameters' ) or nd.hasAttr( 'parameter' ):
             raise TestSpecError( 'the "parameters" attribute not allowed '
                                  'here, line ' + str(nd.getLineNumber()) )
 
-        if not testname_ok( nd, tname ):
+        if not testname_ok( nd, inst.testname ):
             # the <include> does not apply to this test name
             continue
 
@@ -505,17 +524,17 @@ def parse_include_platform( testobj, xmldoc ):
                                      ', line ' + str(nd.getLineNumber()) )
 
             wx = FilterExpressions.WordExpression( platexpr )
-            testobj.addEnablePlatformExpression( wx )
+            inst.tfile.addEnablePlatformExpression( wx )
 
         opexpr = nd.getAttr( 'options', nd.getAttr( 'option', None ) )
         if opexpr != None:
             opexpr = opexpr.strip()
             if opexpr:
                 wx = FilterExpressions.WordExpression( opexpr )
-                testobj.addEnableOptionExpression( wx )
+                inst.tfile.addEnableOptionExpression( wx )
 
 
-def parse_keywords( tspec, filedoc ):
+def parse_keywords( inst ):
     """
     Parse the test keywords for the test XML file.
 
@@ -526,10 +545,9 @@ def parse_keywords( tspec, filedoc ):
     in <parameterize> blocks.
     """
     keys = []
-    tname = tspec.getName()
 
-    for nd in filedoc.matchNodes(['keywords$']):
-        if testname_ok( nd, tname ):
+    for nd in inst.source.matchNodes(['keywords$']):
+        if testname_ok( nd, inst.testname ):
             for key in nd.getContent().split():
                 if allowable_string(key):
                     keys.append( key )
@@ -537,10 +555,10 @@ def parse_keywords( tspec, filedoc ):
                     raise TestSpecError( 'invalid keyword: "' + key + \
                                          '", line ' + str(nd.getLineNumber()) )
 
-    tspec.setKeywords( keys )
+    inst.tfile.setKeywordList( keys )
 
 
-def parse_parameterize( filedoc, tname, evaluator, force_params ):
+def parse_parameterize( pset, filedoc, tname, evaluator, force_params ):
     """
     Parses the parameter settings for a test XML file.
 
@@ -555,36 +573,7 @@ def parse_parameterize( filedoc, tname, evaluator, force_params ):
     parameters where the values are "zipped" together.  That is, paramA=A1
     and paramB=B1 then paramA=A2 and paramB=B2.  A separate test will NOT
     be created for the combination paramA=A1, paramB=B2, for example.
-
-    Returns a dictionary mapping combined parameter names to lists of the
-    combined values.  For example,
-
-        <parameterize pA="value1 value2"/>
-
-    would return the dict
-
-        { (pA,) : [ (value1,), (value2,) ] }
-
-    And this
-
-        <parameterize pA="value1 value2"/>
-        <parameterize pB="val1 val2"/>
-
-    would return
-
-        { (pA,) : [ (value1,), (value2,) ],
-          (pB,) : [ (val1,), (val2,) ] }
-
-    And this
-
-        <parameterize pA="value1 value2" pB="val1 val2"/>
-
-    would return
-
-        { (pA,pB) : [ (value1,val1), (value2,val2) ] }
     """
-    pset = ParameterSet()
-
     if force_params == None:
         force_params = {}
 
@@ -648,8 +637,6 @@ def parse_parameterize( filedoc, tname, evaluator, force_params ):
                   L = [ list(T) for T in zip( *pL ) ]
                   check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
                   pset.addParameterGroup( L[0], L[1:] )
-
-    return pset
 
 
 def parse_test_names( filedoc ):

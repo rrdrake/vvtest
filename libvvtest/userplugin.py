@@ -152,7 +152,7 @@ def convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
         infoD[ 'result'  ] = result
         infoD[ 'runtime' ] = tstat.getRuntime( None )
         infoD[ 'rundir'  ] = xdir
-        infoD[ 'timeout' ] = tspec.getAttr( 'timeout', None )
+        infoD[ 'timeout' ] = tstat.getAttr( 'timeout', None )
 
         if tstat.skipTest():
             infoD['skip'] = tstat.getReasonForSkipTest()

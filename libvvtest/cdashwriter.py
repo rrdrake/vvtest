@@ -248,7 +248,7 @@ def set_test_list( fmtr, atestlist, testdir ):
         elif vvstat == 'pass':
             kwargs['status']    = 'passed'
             kwargs['runtime']   = tstat.getRuntime( None )
-            kwargs['exitvalue'] = tspec.getAttr( 'xvalue', None )
+            kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
             kwargs['command']   = outpututils.get_test_command_line( logdir )
 
         else:
@@ -259,7 +259,7 @@ def set_test_list( fmtr, atestlist, testdir ):
             kwargs['runtime']   = tstat.getRuntime( None )
             kwargs['detail']    = vvstat
             kwargs['output']    = out
-            kwargs['exitvalue'] = tspec.getAttr( 'xvalue', None )
+            kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
             kwargs['command']   = outpututils.get_test_command_line( logdir )
 
         fmtr.addTest( tspec.getDisplayString(), **kwargs )

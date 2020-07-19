@@ -59,19 +59,19 @@ class unit_tests( vtu.vvtestTestCase ):
         now = time.time()
 
         t1 = make_testcase_started_at_time( 'atest', 10 )
-        tr.addTest( t1.getSpec(), 'myroot' )
+        tr.addTest( t1, 'myroot' )
         mn,mx = tr.dateRange()
         assert abs( now-10*60 - mn ) < 5
         assert abs( now-10*60 - mx ) < 5
 
         t2 = make_testcase_started_at_time( 'btest', 20 )
-        tr.addTest( t2.getSpec(), 'myroot' )
+        tr.addTest( t2, 'myroot' )
         mn,mx = tr.dateRange()
         assert abs( now-20*60 - mn ) < 5
         assert abs( now-10*60 - mx ) < 5
 
         t3 = make_testcase_started_at_time( 'ctest', 15 )
-        tr.addTest( t3.getSpec(), 'myroot' )
+        tr.addTest( t3, 'myroot' )
         mn,mx = tr.dateRange()
         assert abs( now-20*60 - mn ) < 5
         assert abs( now-10*60 - mx ) < 5

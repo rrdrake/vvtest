@@ -516,13 +516,9 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
     def parse_vvt_file_dependencies(self, filename):
         ""
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
-
-        tspec = vtu.make_fake_TestSpec()
-        vspecs = ScriptReader( filename )
-        parsevvt.parse_dependencies( tspec, vspecs, evaluator )
-
-        return tspec
+        inst = vtu.make_simple_script_parse_instance( filename )
+        parsevvt.parse_dependencies( inst )
+        return inst.tfile
 
     def test_parsing_the_expect_attribute_of_a_depends_on_directive(self):
         ""
@@ -654,14 +650,15 @@ def make_TestSpec_test_case( name, subdir=None ):
 
     ts = TestSpec( name, os.getcwd(), subdir+name+'.vvt' )
 
-    return TestCase( ts, None )
+    return TestCase( ts )
 
 
 def make_TestExec_test_case( name ):
     ""
     ts = TestSpec( name, os.getcwd(), name+'.vvt' )
-    tx = TestExec()
-    return TestCase( ts, tx )
+    tcase = TestCase( ts )
+    tcase.setExec( TestExec() )
+    return tcase
 
 
 def create_tests( relpath, platname=None ):

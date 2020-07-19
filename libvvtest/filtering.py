@@ -199,7 +199,8 @@ class TestFilter:
                 analyze_tcase.getStat().markSkipByAnalyzeDependency()
             self._record_skipped_tests( False, analyze_tcase )
         else:
-            filter_analyze_parameter_set( analyze_tcase, paramsets )
+            pset = analyze_tcase.getSpec().getParameterSet()
+            pset.intersectionFilter( paramsets )
 
     def applyBaselineSkips(self, tcase_map):
         ""
@@ -294,18 +295,6 @@ class TestFilter:
         ""
         for tid,tcase in self.skipped.items():
             tcasemap.pop( tid )
-
-
-def filter_analyze_parameter_set( analyze_tcase, paramsets ):
-    ""
-    def evalfunc( paramD ):
-        for D in paramsets:
-            if paramD == D:
-                return True
-        return False
-
-    pset = analyze_tcase.getSpec().getParameterSet()
-    pset.applyParamFilter( evalfunc )
 
 
 def normalize_filter_directory( filter_dir ):

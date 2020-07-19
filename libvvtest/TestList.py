@@ -188,7 +188,7 @@ class TestList:
                 if t != None:
                     copy_test_results( t, tcase )
                     if not preserve_skips:
-                        t.getSpec().attrs.pop( 'skip', None )
+                        t.getStat().removeAttr( 'skip' )
 
         return file_attrs
 

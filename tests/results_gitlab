@@ -517,13 +517,14 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         tL = creator.fromFile( '.', 'DiffTest.xml', None )
         tst = tL[0]
 
-        tstat = TestStatus( tst )
+        tcase = TestCase( tst )
+        tstat = tcase.getStat()
         tstat.markStarted( time.time() )
         tstat.markDone( DIFF_EXIT_STATUS )
         tstat.setRuntime( 3 )
 
         conv = gitlabwriter.GitLabMarkDownConverter( vrun.resultsDir(), '.' )
-        conv.createTestFile( TestCase( tst ) )
+        conv.createTestFile( tcase )
         time.sleep(1)
 
         mdfile = util.globfile( 'DiffTest.*.md' )

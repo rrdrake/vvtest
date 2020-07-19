@@ -44,25 +44,56 @@ SKIP_REASON = {
 
 class TestStatus:
 
-    def __init__(self, testspec):
+    def __init__(self):
         ""
-        self.tspec = testspec
+        self.attrs = {}
+
+    def setAttr(self, name, value):
+        """
+        Set a name to value pair.  The name can only contain a-zA-Z0-9 and _.
+        """
+        check_valid_attr_name( name )
+        self.attrs[name] = value
+
+    def hasAttr(self, name):
+        return name in self.attrs
+
+    def getAttr(self, name, *args):
+        """
+        Returns the attribute value corresponding to the attribute name.
+        If the attribute name does not exist, an exception is thrown.  If
+        the attribute name does not exist and a default value is given, the
+        default value is returned.
+        """
+        if len(args) > 0:
+            return self.attrs.get( name, args[0] )
+        return self.attrs[name]
+
+    def removeAttr(self, name):
+        ""
+        self.attrs.pop( name, None )
+
+    def getAttrs(self):
+        """
+        Returns a copy of the test attributes (a name->value dictionary).
+        """
+        return dict( self.attrs )
 
     def resetResults(self):
         ""
-        self.tspec.setAttr( 'state', 'notrun' )
-        self.tspec.removeAttr( 'xtime' )
-        self.tspec.removeAttr( 'xdate' )
+        self.attrs['state'] = 'notrun'
+        self.removeAttr( 'xtime' )
+        self.removeAttr( 'xdate' )
 
     def getResultsKeywords(self):
         ""
         kL = []
 
-        skip = self.tspec.getAttr( 'skip', None )
+        skip = self.attrs.get( 'skip', None )
         if skip != None:
             kL.append( 'skip' )
 
-        state = self.tspec.getAttr('state',None)
+        state = self.attrs.get('state',None)
         if state == None:
             kL.append( 'notrun' )
         else:
@@ -71,7 +102,7 @@ class TestStatus:
             elif state == "notdone":
                 kL.extend( ['notdone', 'running'] )
 
-        result = self.tspec.getAttr('result',None)
+        result = self.attrs.get('result',None)
         if result != None:
             if result == 'timeout':
                 kL.append( 'fail' )
@@ -82,78 +113,78 @@ class TestStatus:
     def markSkipByParameter(self, permanent=True):
         ""
         if permanent:
-            self.tspec.setAttr( 'skip', PARAM_SKIP )
+            self.attrs['skip'] = PARAM_SKIP
         else:
-            self.tspec.setAttr( 'skip', RESTART_PARAM_SKIP )
+            self.attrs['skip'] = RESTART_PARAM_SKIP
 
     def skipTestByParameter(self):
         ""
-        return self.tspec.getAttr( 'skip', None ) == PARAM_SKIP
+        return self.attrs.get( 'skip', None ) == PARAM_SKIP
 
     def markSkipByKeyword(self, with_results=False):
         ""
         if with_results:
-            self.tspec.setAttr( 'skip', RESULTS_KEYWORD_SKIP )
+            self.attrs['skip'] = RESULTS_KEYWORD_SKIP
         else:
-            self.tspec.setAttr( 'skip', KEYWORD_SKIP )
+            self.attrs['skip'] = KEYWORD_SKIP
 
     def markSkipBySubdirectoryFilter(self):
         ""
-        self.tspec.setAttr( 'skip', SUBDIR_SKIP )
+        self.attrs['skip'] = SUBDIR_SKIP
 
     def markSkipByEnabled(self):
         ""
-        self.tspec.setAttr( 'skip', 'enabled' )
+        self.attrs['skip'] = 'enabled'
 
     def markSkipByPlatform(self):
         ""
-        self.tspec.setAttr( 'skip', 'platform' )
+        self.attrs['skip'] = 'platform'
 
     def markSkipByOption(self):
         ""
-        self.tspec.setAttr( 'skip', 'option' )
+        self.attrs['skip'] = 'option'
 
     def markSkipByTDD(self):
         ""
-        self.tspec.setAttr( 'skip', 'tdd' )
+        self.attrs['skip'] = 'tdd'
 
     def markSkipByFileSearch(self):
         ""
-        self.tspec.setAttr( 'skip', 'search' )
+        self.attrs['skip'] = 'search'
 
     def markSkipByMaxProcessors(self):
         ""
-        self.tspec.setAttr( 'skip', 'maxprocs' )
+        self.attrs['skip'] = 'maxprocs'
 
     def markSkipByMaxDevices(self):
         ""
-        self.tspec.setAttr( 'skip', 'maxdevices' )
+        self.attrs['skip'] = 'maxdevices'
 
     def markSkipByRuntime(self):
         ""
-        self.tspec.setAttr( 'skip', 'runtime' )
+        self.attrs['skip'] = 'runtime'
 
     def markSkipByBaselineHandling(self):
         ""
-        self.tspec.setAttr( 'skip', 'nobaseline' )
+        self.attrs['skip'] = 'nobaseline'
 
     def markSkipByAnalyzeDependency(self):
         ""
-        self.tspec.setAttr( 'skip', 'depskip' )
+        self.attrs['skip'] = 'depskip'
 
     def markSkipByCummulativeRuntime(self):
         ""
-        self.tspec.setAttr( 'skip', 'tsum' )
+        self.attrs['skip'] = 'tsum'
 
     def markSkipByUserValidation(self, reason):
         ""
-        self.tspec.setAttr( 'skip', reason )
+        self.attrs['skip'] = reason
 
     def skipTestCausingAnalyzeSkip(self):
         ""
         skipit = False
 
-        skp = self.tspec.getAttr( 'skip', None )
+        skp = self.attrs.get( 'skip', None )
         if skp != None:
             if skp.startswith( PARAM_SKIP ) or \
                skp.startswith( RESTART_PARAM_SKIP ) or \
@@ -167,7 +198,7 @@ class TestStatus:
 
     def skipTest(self):
         ""
-        return self.tspec.getAttr( 'skip', False )
+        return self.attrs.get( 'skip', False )
 
     def getReasonForSkipTest(self):
         ""
@@ -180,49 +211,49 @@ class TestStatus:
     def isNotrun(self):
         ""
         # a test without a state is assumed to not have been run
-        return self.tspec.getAttr( 'state', 'notrun' ) == 'notrun'
+        return self.attrs.get( 'state', 'notrun' ) == 'notrun'
 
     def isDone(self):
         ""
-        return self.tspec.getAttr( 'state', None ) == 'done'
+        return self.attrs.get( 'state', None ) == 'done'
 
     def isNotDone(self):
         ""
-        return self.tspec.getAttr( 'state', None ) == 'notdone'
+        return self.attrs.get( 'state', None ) == 'notdone'
 
     def passed(self):
         ""
         return self.isDone() and \
-               self.tspec.getAttr( 'result', None ) == 'pass'
+               self.attrs.get( 'result', None ) == 'pass'
 
     def getResultStatus(self):
         ""
-        st = self.tspec.getAttr( 'state', 'notrun' )
+        st = self.attrs.get( 'state', 'notrun' )
 
         if st == 'notrun':
             return 'notrun'
 
         elif st == 'done':
-            return self.tspec.getAttr( 'result', 'fail' )
+            return self.attrs.get( 'result', 'fail' )
 
         else:
             return 'notdone'
 
     def markStarted(self, start_time):
         ""
-        self.tspec.setAttr( 'state', 'notdone' )
-        self.tspec.setAttr( 'xtime', -1 )
-        self.tspec.setAttr( 'xdate', int( 100 * start_time ) * 0.01 )
+        self.attrs['state'] = 'notdone'
+        self.attrs['xtime'] = -1
+        self.attrs['xdate'] = int( 100 * start_time ) * 0.01
 
     def getStartDate(self, *default):
         ""
         if len( default ) > 0:
-            return self.tspec.getAttr( 'xdate', default[0] )
-        return self.tspec.getAttr( 'xdate' )
+            return self.attrs.get( 'xdate', default[0] )
+        return self.attrs.get( 'xdate' )
 
     def getRuntime(self, *default):
         ""
-        xt = self.tspec.getAttr( 'xtime', None )
+        xt = self.attrs.get( 'xtime', None )
         if xt == None or xt < 0:
             if len( default ) > 0:
                 return default[0]
@@ -231,31 +262,40 @@ class TestStatus:
 
     def setRuntime(self, num_seconds):
         ""
-        self.tspec.setAttr( 'xtime', num_seconds )
+        self.attrs['xtime'] = num_seconds
 
     def markDone(self, exit_status):
         ""
         tzero = self.getStartDate()
 
-        self.tspec.setAttr( 'state', 'done' )
+        self.attrs['state'] = 'done'
         self.setRuntime( int(time.time()-tzero) )
 
-        self.tspec.setAttr( 'xvalue', exit_status )
+        self.attrs['xvalue'] = exit_status
 
         result = translate_exit_status_to_result_string( exit_status )
-        self.tspec.setAttr( 'result', result )
+        self.attrs['result'] = result
 
     def markTimedOut(self):
         ""
         self.markDone( 1 )
-        self.tspec.setAttr( 'result', 'timeout' )
+        self.attrs['result'] = 'timeout'
+
+
+valid_varname_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+
+def check_valid_attr_name( name ):
+    ""
+    for c in name:
+        if c not in valid_varname_chars:
+            raise ValueError( "character '" + c + "' not allowed in name" )
 
 
 def copy_test_results( to_tcase, from_tcase ):
     ""
-    for k,v in from_tcase.getSpec().getAttrs().items():
+    for k,v in from_tcase.getStat().getAttrs().items():
         if k in ['state','xtime','xdate','xvalue','result']:
-            to_tcase.getSpec().setAttr( k, v )
+            to_tcase.getStat().setAttr( k, v )
 
 
 def translate_exit_status_to_result_string( exit_status ):

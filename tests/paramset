@@ -291,6 +291,21 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
         assert {'A':'a', 'B':'y'} in instL
         assert {'A':'b', 'B':'y'} in instL
 
+    def test_intersection_filter(self):
+        ""
+        pset = ParameterSet.ParameterSet()
+        pset.addParameter( 'A', ['a','b'] )
+        pset.addParameter( 'B', ['x','y'] )
+        assert len( pset.getInstances() ) == 4
+
+        params_list = [ {'A':'b','B':'x'}, {'A':'b','B':'y'} ]
+        pset.intersectionFilter( params_list )
+
+        instL = pset.getInstances()
+        assert len( instL ) == 2
+        assert {'A':'b', 'B':'x'} in instL
+        assert {'A':'b', 'B':'y'} in instL
+
 
 class Function_contains_parameter_name_value( vtu.vvtestTestCase ):
 

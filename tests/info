@@ -452,7 +452,7 @@ class info_tests( vtu.vvtestTestCase ):
         tf = TestFilter( None, None )
         tf.checkEnabled( tcase )
         assert len( tf.getSkipped() ) == 0
-        tcase.getSpec().setEnabled( False )
+        tcase.getSpec().setEnabled( False ) #magic
         tf.checkEnabled( tcase )
         tL = list( tf.getSkipped() )
         assert len(tL) == 1 and id( tL[0] ) == id( tcase )

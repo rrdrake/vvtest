@@ -9,7 +9,6 @@ import re
 
 from .errors import TestSpecError
 from . import FilterExpressions
-from .paramset import ParameterSet
 
 from .ScriptReader import check_parse_attributes_section
 
@@ -21,15 +20,17 @@ from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
 
 
-def parse_vvt_test( testobj, vspecs, evaluator ):
+def parse_vvt_test( inst ):
     ""
-    parse_enable        ( testobj, vspecs )
-    parse_keywords      ( testobj, vspecs )
-    parse_working_files ( testobj, vspecs, evaluator )
-    parse_timeouts      ( testobj, vspecs, evaluator )
-    parse_baseline      ( testobj, vspecs, evaluator )
-    parse_dependencies  ( testobj, vspecs, evaluator )
-    parse_preload_label ( testobj, vspecs, evaluator )
+    parse_enable        ( inst )
+    parse_keywords      ( inst )
+    parse_working_files ( inst )
+    parse_timeouts      ( inst )
+    parse_baseline      ( inst )
+    parse_dependencies  ( inst )
+    parse_preload_label ( inst )
+
+    inst.tfile.setConstructionCompleted()
 
 
 def parse_test_names( vspecs ):
@@ -98,7 +99,7 @@ def check_test_name_attributes( attrD, lineno ):
                 ' '.join( checkD.keys() ) + ', line ' + str(lineno) )
 
 
-def parse_keywords( tspec, vspecs ):
+def parse_keywords( inst ):
     """
     Parse the test keywords for the test script file.
     
@@ -109,9 +110,8 @@ def parse_keywords( tspec, vspecs ):
     TODO: what other implicit keywords ??
     """
     keys = []
-    tname = tspec.getName()
 
-    for spec in vspecs.getSpecList( 'keywords' ):
+    for spec in inst.source.getSpecList( 'keywords' ):
 
         if spec.attrs:
             # explicitly deny certain attributes for keyword definition
@@ -120,10 +120,10 @@ def parse_keywords( tspec, vspecs ):
                              'option','options']:
                 if attrname in spec.attrs:
                     raise TestSpecError( "the "+attrname + \
-                        " attribute is not allowed here, " + \
-                                 "line " + str(spec.lineno) )
+                                " attribute is not allowed here, " + \
+                                "line " + str(spec.lineno) )
 
-        if not testname_ok_scr( spec.attrs, tname ):
+        if not testname_ok_scr( spec.attrs, inst.testname ):
             continue
 
         for key in spec.value.strip().split():
@@ -133,10 +133,18 @@ def parse_keywords( tspec, vspecs ):
                 raise TestSpecError( 'invalid keyword: "'+key+'", line ' + \
                                      str(spec.lineno) )
 
-    tspec.setKeywords( keys )
+    inst.tfile.setKeywordList( keys )
 
 
-def parse_parameterize( vspecs, tname, evaluator, force_params ):
+class FilterParsingInstance:
+
+    def __init__(self, testname='', evaluator=None ):
+        ""
+        self.testname = testname
+        self.evaluator = evaluator
+
+
+def parse_parameterize( pset, vspecs, tname, evaluator, force_params ):
     """
     Parses the parameter settings for a script test file.
 
@@ -149,10 +157,7 @@ def parse_parameterize( vspecs, tname, evaluator, force_params ):
         #VVT: parameterize : np,dt,dh = 1, 0.1  , 0.2
         #VVT::                          4, 0.01 , 0.02
         #VVT::                          8, 0.001, 0.002
-
-    Returns a ParameterSet object.
     """
-    pset = ParameterSet()
     tmap = {}
 
     for spec in vspecs.getSpecList( 'parameterize' ):
@@ -164,7 +169,8 @@ def parse_parameterize( vspecs, tname, evaluator, force_params ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(lnum) )
 
-        if not attr_filter( spec.attrs, tname, None, evaluator, lnum ):
+        inst = FilterParsingInstance( testname=tname, evaluator=evaluator )
+        if not attr_filter( spec.attrs, inst, lnum ):
             continue
 
         L = spec.value.split( '=', 1 )
@@ -206,8 +212,6 @@ def parse_parameterize( vspecs, tname, evaluator, force_params ):
             pset.addParameterGroup( nameL, valL, staged )
 
     pset.setParameterTypeMap( tmap )
-
-    return pset
 
 
 def auto_determine_param_types( nameL, valL, tmap ):
@@ -335,7 +339,7 @@ def parse_param_group_values( name_list, value_string, lineno ):
     return vL
 
 
-def parse_analyze( t, vspecs, evaluator ):
+def parse_analyze( tname, vspecs, evaluator ):
     """
     Parse any analyze specifications.
     
@@ -351,14 +355,14 @@ def parse_analyze( t, vspecs, evaluator ):
     form = None
     specval = None
     for spec in vspecs.getSpecList( 'analyze' ):
-        
+
         if spec.attrs and \
            ( 'parameters' in spec.attrs or 'parameter' in spec.attrs ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(spec.lineno) )
-        
-        if not attr_filter( spec.attrs, t.getName(), None,
-                            evaluator, spec.lineno ):
+
+        inst = FilterParsingInstance( testname=tname, evaluator=evaluator )
+        if not attr_filter( spec.attrs, inst, spec.lineno ):
             continue
 
         if spec.attrs and 'file' in spec.attrs:
@@ -381,32 +385,7 @@ def parse_analyze( t, vspecs, evaluator ):
     return specval
 
 
-def check_add_analyze_test( pset, testL, vspecs, evaluator ):
-    ""
-    if len(testL) > 0:
-
-        t = testL[0]
-
-        analyze_spec = parse_analyze( t, vspecs, evaluator )
-
-        if analyze_spec:
-
-            numparams = len( pset.getParameters() )
-            if numparams == 0:
-                raise TestSpecError( 'an analyze requires at least one ' + \
-                                     'parameter to be defined' )
-
-            # create an analyze test
-            parent = t.makeParent()
-            parent.setParameterSet( pset )
-            testL.append( parent )
-
-            parent.setAnalyzeScript( analyze_spec )
-            if not analyze_spec.startswith('-'):
-                parent.addLinkFile( analyze_spec )
-
-
-def parse_working_files( t, vspecs, evaluator ):
+def parse_working_files( inst ):
     """
         #VVT: copy : file1 file2
         #VVT: link : file3 file4
@@ -417,30 +396,33 @@ def parse_working_files( t, vspecs, evaluator ):
     """
     cpfiles = []
     lnfiles = []
-    tname = t.getName()
-    params = t.getParameters()
 
-    for spec in vspecs.getSpecList( 'copy' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
-            collect_filenames( spec, cpfiles, tname, params, evaluator )
+    for spec in inst.source.getSpecList( 'copy' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
+            collect_filenames( spec, cpfiles, inst.testname, inst.params,
+                               inst.evaluator )
 
-    for spec in vspecs.getSpecList( 'link' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
-            collect_filenames( spec, lnfiles, tname, params, evaluator )
+    for spec in inst.source.getSpecList( 'link' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
+            collect_filenames( spec, lnfiles, inst.testname, inst.params,
+                               inst.evaluator )
     
     for src,dst in lnfiles:
-        t.addLinkFile( src, dst )
+        inst.tfile.addLinkFile( src, dst )
     for src,dst in cpfiles:
-        t.addCopyFile( src, dst )
+        inst.tfile.addCopyFile( src, dst )
 
     fL = []
-    for spec in vspecs.getSpecList( 'sources' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+    for spec in inst.source.getSpecList( 'sources' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
             if spec.value:
                 L = spec.value.split()
-                variable_expansion( tname, evaluator.getPlatformName(), params, L )
+                variable_expansion( inst.testname,
+                                    inst.evaluator.getPlatformName(),
+                                    inst.params,
+                                    L )
                 fL.extend( L )
-    t.setSourceFiles( fL )
+    inst.tfile.setSourceFiles( fL )
 
 
 def collect_filenames( spec, flist, tname, paramD, evaluator ):
@@ -481,15 +463,13 @@ def collect_filenames( spec, flist, tname, paramD, evaluator ):
         flist.extend( [ [f,None] for f in fL ] )
 
 
-def parse_timeouts( t, vspecs, evaluator ):
+def parse_timeouts( inst ):
     """
       #VVT: timeout : 3600
       #VVT: timeout (testname=vvfull, platforms=Linux) : 3600
     """
-    tname = t.getName()
-    params = t.getParameters()
-    for spec in vspecs.getSpecList( 'timeout' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+    for spec in inst.source.getSpecList( 'timeout' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
             sval = spec.value
             try:
                 ival = int(sval)
@@ -497,10 +477,10 @@ def parse_timeouts( t, vspecs, evaluator ):
             except:
                 raise TestSpecError( 'timeout value must be a positive ' + \
                             'integer: "'+sval+'", line ' + str(spec.lineno) )
-            t.setTimeout( ival )
+            inst.tfile.setTimeout( ival )
 
 
-def parse_baseline( t, vspecs, evaluator ):
+def parse_baseline( inst ):
     """
       #VVT: baseline : copyfrom,copyto copyfrom,copyto
       #VVT: baseline : --option-name
@@ -510,14 +490,11 @@ def parse_baseline( t, vspecs, evaluator ):
     otherwise, if the value starts with a hyphen then the second form
     otherwise, the value is the name of a filename
     """
-    tname = t.getName()
-    params = t.getParameters()
-    
     cpat = re.compile( '[\t ]*,[\t ]*' )
 
-    for spec in vspecs.getSpecList( 'baseline' ):
+    for spec in inst.source.getSpecList( 'baseline' ):
         
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
             
             sval = spec.value.strip()
 
@@ -555,18 +532,21 @@ def parse_baseline( t, vspecs, evaluator ):
                                   'absolute paths, line ' + str(spec.lineno) )
                     fL.append( [fsrc,fdst] )
                 
-                variable_expansion( tname, evaluator.getPlatformName(), params, fL )
+                variable_expansion( inst.testname,
+                                    inst.evaluator.getPlatformName(),
+                                    inst.params,
+                                    fL )
 
                 for fsrc,fdst in fL:
-                    t.addBaselineFile( fsrc, fdst )
+                    inst.tfile.addBaselineFile( fsrc, fdst )
 
             else:
-                t.setBaselineScript( sval )
+                inst.tfile.setBaselineScript( sval )
                 if not sval.startswith( '-' ):
-                    t.addLinkFile( sval )
+                    inst.tfile.addLinkFile( sval )
 
 
-def parse_dependencies( t, vspecs, evaluator ):
+def parse_dependencies( inst ):
     """
     Parse the test names that must run before this test can run.
 
@@ -578,29 +558,26 @@ def parse_dependencies( t, vspecs, evaluator ):
 
         #VVT: testname = testA (depends on=testB, result="*")
     """
-    tname = t.getName()
-    params = t.getParameters()
-
-    for spec in vspecs.getSpecList( 'depends on' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+    for spec in inst.source.getSpecList( 'depends on' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
 
             wx = create_dependency_result_expression( spec.attrs )
             exp = parse_expect_criterion( spec.attrs, spec.lineno )
 
             for val in spec.value.strip().split():
-                t.addDependency( val, wx, exp )
+                inst.tfile.addDependency( val, wx, exp )
 
-    specL = vspecs.getSpecList("testname") + vspecs.getSpecList("name")
+    specL = inst.source.getSpecList("testname") + inst.source.getSpecList("name")
     for spec in specL:
 
         name,attrD = parse_test_name_value( spec.value, spec.lineno )
-        if name == tname:
+        if name == inst.testname:
 
             wx = create_dependency_result_expression( attrD )
             exp = parse_expect_criterion( spec.attrs, spec.lineno )
 
             for depname in attrD.get( 'depends on', '' ).split():
-                t.addDependency( depname, wx, exp )
+                inst.tfile.addDependency( depname, wx, exp )
 
 
 def parse_expect_criterion( attrs, lineno ):
@@ -624,17 +601,14 @@ def parse_expect_criterion( attrs, lineno ):
     return exp
 
 
-def parse_preload_label( tspec, vspecs, evaluator ):
+def parse_preload_label( inst ):
     """
     #VVT: preload (filters) : label
     """
-    tname = tspec.getName()
-    params = tspec.getParameters()
-
-    for spec in vspecs.getSpecList( 'preload' ):
-        if attr_filter( spec.attrs, tname, params, evaluator, spec.lineno ):
+    for spec in inst.source.getSpecList( 'preload' ):
+        if attr_filter( spec.attrs, inst, spec.lineno ):
             val = ' '.join( spec.value.strip().split() )
-            tspec.setPreloadLabel( val )
+            inst.tfile.setPreloadLabel( val )
 
 
 def testname_ok_scr( attrs, tname ):
@@ -647,7 +621,7 @@ def testname_ok_scr( attrs, tname ):
     return True
 
 
-def attr_filter( attrs, testname, paramD, evaluator, lineno ):
+def attr_filter( attrs, inst, lineno ):
     """
     Checks for known attribute names in the given 'attrs' dictionary.
     Returns False only if at least one attribute evaluates to false.
@@ -659,21 +633,21 @@ def attr_filter( attrs, testname, paramD, evaluator, lineno ):
             try:
 
                 if name == "testname":
-                    if not evauate_testname_expr( testname, value ):
+                    if not evauate_testname_expr( inst.testname, value ):
                         return False
 
                 elif name in ["platform","platforms"]:
-                    if not evaluator.evaluate_platform_expr( value ):
+                    if not inst.evaluator.evaluate_platform_expr( value ):
                         return False
 
                 elif name in ["option","options"]:
                     wx = FilterExpressions.WordExpression( value )
-                    if not evaluator.evaluate_option_expr( wx ):
+                    if not inst.evaluator.evaluate_option_expr( wx ):
                         return False
 
                 elif name in ["parameter","parameters"]:
                     pf = FilterExpressions.ParamFilter(value)
-                    if not pf.evaluate( paramD ):
+                    if not pf.evaluate( inst.params ):
                         return False
 
             except ValueError:
@@ -684,7 +658,7 @@ def attr_filter( attrs, testname, paramD, evaluator, lineno ):
     return True
 
 
-def parse_enable( testobj, vspecs ):
+def parse_enable( inst ):
     """
     Parse syntax that will filter out this test by platform or build option.
     
@@ -700,16 +674,14 @@ def parse_enable( testobj, vspecs ):
     ANDed together.  If more than one "enable" block is given, each must
     result in True for the test to be included.
     """
-    tname = testobj.getName()
-
-    for spec in vspecs.getSpecList( 'enable' ):
+    for spec in inst.source.getSpecList( 'enable' ):
 
         platexpr = None
         opexpr = None
 
         if spec.attrs:
 
-            if not testname_ok_scr( spec.attrs, tname ):
+            if not testname_ok_scr( spec.attrs, inst.testname ):
                 # the "enable" does not apply to this test name
                 continue
 
@@ -726,7 +698,7 @@ def parse_enable( testobj, vspecs ):
                             'invalid "platforms" attribute value '
                             ', line ' + str(spec.lineno) )
                 wx = FilterExpressions.WordExpression( platexpr )
-                testobj.addEnablePlatformExpression( wx )
+                inst.tfile.addEnablePlatformExpression( wx )
 
             opexpr = spec.attrs.get( 'options',
                                      spec.attrs.get( 'option', None ) )
@@ -736,7 +708,7 @@ def parse_enable( testobj, vspecs ):
                 # an empty option expression is ignored
                 if opexpr:
                     wx = FilterExpressions.WordExpression( opexpr )
-                    testobj.addEnableOptionExpression( wx )
+                    inst.tfile.addEnableOptionExpression( wx )
 
         if spec.value:
             val = spec.value.lower().strip()
@@ -747,4 +719,4 @@ def parse_enable( testobj, vspecs ):
                 raise TestSpecError( 'an "enable" with platforms or ' + \
                     'options attributes cannot specify "false", line ' + \
                     str(spec.lineno) )
-            testobj.setEnabled( val == 'true' )
+            inst.tfile.setEnabled( val == 'true' )

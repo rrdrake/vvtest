@@ -93,6 +93,7 @@ class TestListReader:
 
             except Exception:
                 pass
+                raise #magic
 
         assert self.vers in [32, 33, 34], \
             'corrupt test list file or older format: '+str(self.filename)
@@ -202,6 +203,7 @@ def test_to_string( tcase, extended=False ):
     names/values, and attribute names/values.
     """
     tspec = tcase.getSpec()
+    tstat = tcase.getStat()
 
     assert tspec.getName() and tspec.getRootpath() and tspec.getFilepath()
 
@@ -217,7 +219,7 @@ def test_to_string( tcase, extended=False ):
     else:
         testdict['params'] = tspec.getParameters()
 
-    testdict['attrs'] = tspec.getAttrs()
+    testdict['attrs'] = tstat.getAttrs()
 
     if extended:
         insert_extended_test_info( tcase, testdict )
@@ -241,19 +243,20 @@ def string_to_test( strid ):
     tspec = TestSpec.TestSpec( name, root, path )
 
     if 'paramset' in testdict:
-        pset = ParameterSet()
+        pset = tspec.getParameterSet()
         for T,L in testdict['paramset'].items():
             pset.addParameterGroup( T, L )
-        tspec.setParameterSet( pset )
+        tspec.setIsAnalyze()
     else:
         tspec.setParameters( testdict['params'] )
 
-    tspec.setKeywords( testdict['keywords'] )
-
-    for k,v in testdict['attrs'].items():
-        tspec.setAttr( k, v )
+    tspec.setKeywordList( testdict['keywords'] )
 
     tcase = TestCase( tspec )
+    tstat = tcase.getStat()
+
+    for k,v in testdict['attrs'].items():
+        tstat.setAttr( k, v )
 
     check_load_extended_info( tcase, testdict )
 

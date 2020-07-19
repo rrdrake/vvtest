@@ -44,7 +44,7 @@ from libvvtest.userplugin import UserPluginBridge, import_module_by_name
 import libvvtest.paramset as paramset
 from libvvtest.TestList import TestList
 from libvvtest.execlist import TestExecList
-from libvvtest.testcreator import TestCreator
+import libvvtest.testcreator as testcreator
 from libvvtest.scanner import TestFileScanner
 from libvvtest.FilterExpressions import WordExpression
 from libvvtest.depend import connect_dependency
@@ -642,10 +642,27 @@ def assert_summary_string( summary_string,
     if skip    != None: assert valD['skip']    == skip
 
 
+def make_simple_script_parse_instance( srcfile ):
+    ""
+    from libvvtest.ScriptReader import ScriptReader
+
+    evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+    vspecs = ScriptReader( srcfile )
+    testname = os.path.splitext(srcfile)[0]
+    ts = TestSpec.TestSpec( testname, os.getcwd(), srcfile )
+
+    inst = testcreator.ParsingInstance( testname=testname,
+                                        tfile=ts,
+                                        source=vspecs,
+                                        evaluator=evaluator )
+
+    return inst
+
+
 def make_fake_TestSpec( name='atest', keywords=['key1','key2'] ):
     ""
     ts = TestSpec.TestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
-    ts.setKeywords( keywords )
+    ts.setKeywordList( keywords )
     ts.setParameters( { 'np':'4' } )
     return ts
 
@@ -771,13 +788,15 @@ def make_TestCase_list( timespec='runtime' ):
             tspec.setConstructionCompleted()
 
             tcase = testcase.TestCase( tspec )
-            tcase.getStat().resetResults()
+            tstat = tcase.getStat()
+
+            tstat.resetResults()
 
             if timespec == 'runtime':
-                tcase.getStat().setRuntime( (i+1)*10+j+1 )
+                tstat.setRuntime( (i+1)*10+j+1 )
             else:
                 assert timespec == 'timeout'
-                tcase.getSpec().setAttr( 'timeout', (i+1)*10+j+1 )
+                tstat.setAttr( 'timeout', (i+1)*10+j+1 )
 
             tests.append( tcase )
 
@@ -803,13 +822,13 @@ def scan_to_make_TestExecList( path, timeout_attr=None ):
     ""
     tlist = TestList()
 
-    tc = TestCreator( 'XBox', [] )
+    tc = testcreator.TestCreator( 'XBox', [] )
     scan = TestFileScanner( tc )
     scan.scanPath( tlist, path )
 
     if timeout_attr != None:
         for tcase in tlist.getTests():
-            tcase.getSpec().setAttr( 'timeout', timeout_attr )
+            tcase.getStat().setAttr( 'timeout', timeout_attr )
 
     tlist.createAnalyzeGroupMap()
 

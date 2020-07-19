@@ -58,8 +58,7 @@ class ParameterSet:
         """
         Such as { 'np': int, 'dx': float }.
         """
-        self.type_map.clear()
-        self.type_map.update( type_map )
+        self.type_map = dict( type_map )
 
     def getParameterTypeMap(self):
         ""
@@ -71,20 +70,28 @@ class ParameterSet:
             return self.staged[0], self.staged[1]  # names list, values list
         return None
 
-    def applyParamFilter(self, param_filter_function):
+    def applyParamFilter(self, param_filter_func):
         """
-        The param_filter_function() function is called to filter down the set
-        of parameter instances.  The list returned with getInstances() will
-        reflect the filtering.
+        Filters down the set of parameter instances, which is reflected in
+        the getInstances() method afterwards. The param_filter_func() function
+        is called with a parameter dict instance, and should return True to
+        retain that instance or False to remove it.
         """
         self._constructInstances()
 
         newL = []
         for instD in self.instances:
-            if param_filter_function( instD ):
+            if param_filter_func( instD ):
                 newL.append( instD )
 
         self.instances = newL
+
+    def intersectionFilter(self, params_list):
+        """
+        Restricts the parameter instances to those that are in 'params_list',
+        a list of parameter name to value dictionaries.
+        """
+        self.applyParamFilter( lambda pD: pD in params_list )
 
     def getInstances(self):
         """

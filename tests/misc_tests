@@ -507,15 +507,16 @@ class exit_status_controls( vtu.vvtestTestCase ):
 
         for tcase in testD.values():
             tspec = tcase.getSpec()
+            tstat = tcase.getStat()
             if tspec.getName() == 'good':
-                assert tspec.getAttr( 'result' ) == 'pass'
-                assert tspec.getAttr( 'xvalue' ) == 0
+                assert tstat.getAttr( 'result' ) == 'pass'
+                assert tstat.getAttr( 'xvalue' ) == 0
             elif tspec.getName() == 'bad':
-                assert tspec.getAttr( 'result' ) == 'fail'
-                assert tspec.getAttr( 'xvalue' ) > 0
+                assert tstat.getAttr( 'result' ) == 'fail'
+                assert tstat.getAttr( 'xvalue' ) > 0
             elif tspec.getName() == 'ugly':
-                assert tspec.getAttr( 'result' ) == 'diff'
-                assert tspec.getAttr( 'xvalue' ) == DIFF_EXIT_STATUS
+                assert tstat.getAttr( 'result' ) == 'diff'
+                assert tstat.getAttr( 'xvalue' ) == DIFF_EXIT_STATUS
 
 
 def get_command_line( filepat ):

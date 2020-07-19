@@ -128,6 +128,8 @@ class TestFileScanner:
         for tspec in testL:
             if not self._is_duplicate_execute_directory( tspec ):
                 tcase = TestCase( tspec )
+                if tspec.hasKeyword( 'TDD' ):
+                    tcase.getStat().setAttr( 'TDD', True )
                 testlist.addTest( tcase )
                 self.xdirmap[ tspec.getExecuteDirectory() ] = tcase
 

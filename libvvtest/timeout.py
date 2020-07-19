@@ -53,7 +53,7 @@ class TimeHandler:
 
             tout = self._apply_timeout_options( tout )
 
-            tcase.getSpec().setAttr( 'timeout', tout )
+            tcase.getStat().setAttr( 'timeout', tout )
 
         cache = None
 

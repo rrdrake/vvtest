@@ -20,7 +20,6 @@ import libvvtest.pathutil as pathutil
 from libvvtest.errors import FatalError
 import libvvtest.location as location
 import libvvtest.execute as execute
-from libvvtest.outpututils import pretty_time
 
 
 version = '1.2'

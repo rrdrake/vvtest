@@ -222,21 +222,22 @@ class StagingOracle:
         idx = self.getStageIndex( tspec )
         if idx > 0:
 
-            paramD = tspec.getParameters()
-            self._overwrite_with_stage_params( paramD, idx-1 )
+            paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            idgen = TestSpec.IDGenerator( tspec.getName(),
-                                          tspec.getFilepath(),
-                                          paramD,
-                                          self.param_nameL )
-            displ = idgen.computeDisplayString()
+            displ = TestSpec.make_display_string( tspec.getName(),
+                                                  tspec.getFilepath(),
+                                                  paramD,
+                                                  self.param_nameL )
 
             return displ
 
         return None
 
-    def _overwrite_with_stage_params(self, paramD, stage_idx):
+    def _create_params_for_stage(self, tspec, stage_idx):
         ""
+        paramD = tspec.getParameters()
         for i,pname in enumerate( self.param_nameL ):
             pval = self.param_valueL[ stage_idx ][i]
             paramD[ pname ] = pval
+
+        return paramD

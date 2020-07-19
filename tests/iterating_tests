@@ -222,7 +222,7 @@ def timeout_tuple( tcase ):
     ""
     return [ tcase.getSpec().getDisplayString(),
              tcase.getSize(),
-             tcase.getSpec().getAttr('timeout') ]
+             tcase.getStat().getAttr('timeout') ]
 
 
 def make_test_backlog_object( timespec='runtime' ):

@@ -436,12 +436,9 @@ class preload_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = vtu.make_fake_TestSpec()
-        vspecs = ScriptReader( 'testA.vvt' )
-        evl = testcreator.ExpressionEvaluator( 'XBox', [] )
-
-        parsevvt.parse_preload_label( tspec, vspecs, evl )
-        assert tspec.getPreloadLabel() == 'fakepython'
+        inst = vtu.make_simple_script_parse_instance( 'testA.vvt' )
+        parsevvt.parse_preload_label( inst )
+        assert inst.tfile.getPreloadLabel() == 'fakepython'
 
     def test_using_a_preload_label_in_a_test(self):
         ""

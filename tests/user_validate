@@ -83,7 +83,7 @@ class validate_plugin_unit_tests( vtu.vvtestTestCase ):
         tcase = vtu.make_fake_TestCase( keywords=['lightning','fast'] )
         assert not plug.validateTest( tcase )
 
-        tcase.getSpec().setKeywords( ['lightning','fist'] )
+        tcase.getSpec().setKeywordList( ['lightning','fist'] )
         rtn = plug.validateTest( tcase )
         assert rtn and rtn == "keywords must contain fast, medium, or long"
 

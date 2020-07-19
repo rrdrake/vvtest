@@ -176,9 +176,10 @@ def batch_group_to_list( batchgroup ):
 
     for tcase in batchgroup:
         tspec = tcase.getSpec()
+        tstat = tcase.getStat()
         gL.append( [ tspec.getDisplayString(),
                      tcase.getSize(),
-                     tspec.getAttr( 'timeout' ) ] )
+                     tstat.getAttr( 'timeout' ) ] )
 
     return gL
 

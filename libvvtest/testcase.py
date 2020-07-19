@@ -8,12 +8,12 @@ from .teststatus import TestStatus
 
 class TestCase:
 
-    def __init__(self, testspec, testexec=None):
+    def __init__(self, testspec):
         ""
         self.tspec = testspec
-        self.texec = testexec
+        self.tstat = TestStatus()
+        self.texec = None
 
-        self.tstat = TestStatus( testspec )
         self.deps = []
         self.depdirs = {}  # xdir -> match pattern
         self.has_dependent = False
@@ -22,13 +22,13 @@ class TestCase:
         ""
         return self.tspec
 
-    def getExec(self):
-        ""
-        return self.texec
-
     def getStat(self):
         ""
         return self.tstat
+
+    def getExec(self):
+        ""
+        return self.texec
 
     def setExec(self, texec):
         ""

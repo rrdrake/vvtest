@@ -293,7 +293,7 @@ def make_runtime_key( tcase ):
 
 def make_timeout_key( tcase ):
     ""
-    return [ tcase.getSize()[0], tcase.getSpec().getAttr( 'timeout' ) ]
+    return [ tcase.getSize()[0], tcase.getStat().getAttr( 'timeout' ) ]
 
 
 class TestCaseCompare:

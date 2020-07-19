@@ -41,12 +41,14 @@ class TestResults:
     def testdir   (self): return self.hdr.get('TEST_DIRECTORY',None)
     def inProgress(self): return 'IN_PROGRESS' in self.hdr
 
-    def addTest(self, testspec, rootrel):
+    def addTest(self, testcase, rootrel):
         """
         Adds the test results for this test to the database.
         """
-        testkey = make_test_key( testspec )
-        self.addTestName( rootrel, testkey, testspec.getAttrs() )
+        tspec = testcase.getSpec()
+        tstat = testcase.getStat()
+        testkey = make_test_key( tspec )
+        self.addTestName( rootrel, testkey, tstat.getAttrs() )
 
     def addTestName(self, rootrel, testkey, attrD):
         """

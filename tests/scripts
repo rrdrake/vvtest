@@ -528,7 +528,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert len( pD ) == 1
         assert pD.pop('np') == '4'
 
-        tspec.setParameterTypes( { 'np': int } )
+        tspec.getParameterSet().setParameterTypeMap( { 'np': int } )
         assert type( tspec.getParameterValue( 'np' ) ) == type('')
         pD = tspec.getParameters()
         assert len( pD ) == 1
@@ -550,7 +550,8 @@ class script_tests( vtu.vvtestTestCase ):
         evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
-        pset = parsevvt.parse_parameterize( vspecs, 'blue', evaluator, None )
+        pset = ParameterSet()
+        parsevvt.parse_parameterize( pset, vspecs, 'blue', evaluator, None )
 
         tmap = pset.getParameterTypeMap()
         assert len( tmap ) == 3
@@ -568,7 +569,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert type( pD['np'] ) == type(2)
         assert type( pD['dy'] ) == type(9.9)
 
-        sid = tio.test_to_string( TestCase( tspec, None ) )
+        sid = tio.test_to_string( TestCase( tspec ) )
         tcase = reparse_test_string( sid )
         pD = tcase.getSpec().getParameters( typed=True )
         assert type( pD['foo'] ) == type('')

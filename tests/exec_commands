@@ -126,6 +126,12 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
         assert cmdL[1] == absfile
 
 
+def make_TestSpec( filename ):
+    ""
+    tspec = TestSpec( 'atest', os.getcwd(), filename )
+    return tspec
+
+
 class function_make_test_script_command( vtu.vvtestTestCase ):
 
     def test_an_xml_test_specification_is_hard_coded_to_runscript(self):
@@ -136,7 +142,7 @@ class function_make_test_script_command( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.xml' )
+        tspec = make_TestSpec( 'subdir/atest.xml' )
 
         os.chdir( 'rundir' )
 
@@ -153,7 +159,7 @@ class function_make_test_script_command( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         os.chdir( 'rundir' )
 
@@ -177,7 +183,7 @@ class function_command_from_filename_or_option( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         os.chdir( 'rundir' )
 
@@ -193,7 +199,7 @@ class function_command_from_filename_or_option( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         os.chdir( 'rundir' )
 
@@ -212,7 +218,7 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
         tspec.setBaselineScript( '--run-baseline' )
 
         os.chdir( 'rundir' )
@@ -229,7 +235,7 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         pset = ParameterSet()
         pset.addParameter( 'myparam', ['myvalue'] )
@@ -257,7 +263,7 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         pset = ParameterSet()
         pset.addParameter( 'myparam', ['myvalue'] )
@@ -287,7 +293,7 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         pset = ParameterSet()
         pset.addParameter( 'myparam', ['myvalue'] )
@@ -311,8 +317,9 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
+        tspec.setIsAnalyze()
         pset = ParameterSet()
         pset.addParameter( 'myparam', ['myvalue'] )
         tspec.setParameterSet( pset )
@@ -335,7 +342,7 @@ class make_baseline_commands( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.xml' )
+        tspec = make_TestSpec( 'subdir/atest.xml' )
 
         os.chdir( 'rundir' )
 
@@ -353,7 +360,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.xml' )
+        tspec = make_TestSpec( 'subdir/atest.xml' )
         tspec.setBaselineScript( 'echo hello\n' )
 
         os.chdir( 'rundir' )
@@ -371,7 +378,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.xml' )
+        tspec = make_TestSpec( 'subdir/atest.xml' )
         tspec.setBaselineScript( 'echo hello\n' )
 
         os.chdir( 'rundir' )
@@ -389,7 +396,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         tspec.setBaselineScript( '--run-baseline' )
 
@@ -408,8 +415,9 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
+        tspec.setIsAnalyze()
         pset = ParameterSet()
         pset.addParameter( 'myparam', ['myvalue'] )
         tspec.setParameterSet( pset )
@@ -433,7 +441,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.vvt' )
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
 
         tspec.setBaselineScript( '--run-baseline' )
 
@@ -452,7 +460,7 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        tspec = TestSpec( 'atest', os.getcwd(), 'subdir/atest.xml' )
+        tspec = make_TestSpec( 'subdir/atest.xml' )
 
         os.chdir( 'rundir' )
 

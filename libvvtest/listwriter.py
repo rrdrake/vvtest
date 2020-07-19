@@ -129,7 +129,7 @@ class ListWriter:
         for tcase in tcaseL:
             rootrel = fmtresults.determine_rootrel( tcase.getSpec(), dcache )
             if rootrel:
-                tr.addTest( tcase.getSpec(), rootrel )
+                tr.addTest( tcase, rootrel )
 
         pname = rtinfo.getInfo( 'platform' )
         cplr = rtinfo.getInfo( 'compiler' )

@@ -17,7 +17,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.paramset as ParameterSet
+import libvvtest.paramset as paramset
 from libvvtest.TestSpec import TestSpec
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
@@ -35,7 +35,7 @@ class staged_parameters( vtu.vvtestTestCase ):
 
     def test_marking_parameters_as_staged(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ('stage','np'), [ ('1','1'), ('2','4') ] )
 
         tmap = {}
@@ -99,7 +99,8 @@ class staged_parameters( vtu.vvtestTestCase ):
         evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
-        pset = parsevvt.parse_parameterize( vspecs, 'blue', evaluator, None )
+        pset = paramset.ParameterSet()
+        parsevvt.parse_parameterize( pset, vspecs, 'blue', evaluator, None )
 
         assert len( pset.getInstances() ) == 3
         nL,vL = pset.getStagedGroup()
@@ -107,19 +108,25 @@ class staged_parameters( vtu.vvtestTestCase ):
         assert vL == [ ['1','1'], ['2','8'], ['3','1'] ]
 
         vspecs = ScriptReader( 'err1.vvt' )
+        pset = paramset.ParameterSet()
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err1', evaluator, None )
+                parsevvt.parse_parameterize, pset, vspecs, 'err1', evaluator, None )
 
     def create_test_list(self, spec_file):
         ""
+        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+        vctor = testcreator.ScriptTestConstructor( os.getcwd(), spec_file,
+                                                   None, evaluator )
+        vctor.readFile()
+
+        # magic: this function could be improved by splitting functions up
+        #        a little more in the ScriptTestConstructor class
         tname = os.path.splitext( basename( spec_file ) )[0]
 
-        vspecs = ScriptReader( spec_file )
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
-        pset = parsevvt.parse_parameterize( vspecs, tname, evaluator, None )
+        pset = paramset.ParameterSet()
+        parsevvt.parse_parameterize( pset, vctor.source, tname, evaluator, None )
 
-        testL = testcreator.generate_test_objects( tname, os.getcwd(),
-                                                   spec_file, pset )
+        testL = vctor.generate_test_objects( tname, pset )
 
         return pset, testL
 
@@ -433,7 +440,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         parseutil.mark_staged_tests( pset, testL )
 
         for ts in testL:
-            sid = tio.test_to_string( TestCase( ts, None ) )
+            sid = tio.test_to_string( TestCase( ts ) )
             tcase = reparse_test_string( sid )
             ts2 = tcase.getSpec()
             assert ts.getParameters()    == ts2.getParameters()
@@ -612,7 +619,7 @@ def find_single_dependency( tspec, testL ):
     ""
     testcasemap = {}
     for ts in testL:
-        testcasemap[ ts.getID() ] = TestCase( ts, None )
+        testcasemap[ ts.getID() ] = TestCase( ts )
 
     depL = tspec.getDependencies()
     assert len( depL ) == 1

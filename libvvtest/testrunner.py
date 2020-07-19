@@ -49,7 +49,7 @@ class TestRunner:
                                     self.getCommonXMLDB( tspec ) )
         texec.setExecutionHandler( handler )
 
-        texec.setTimeout( tspec.getAttr( 'timeout', 0 ) )
+        texec.setTimeout( tstat.getAttr( 'timeout', 0 ) )
 
         tstat.resetResults()
 

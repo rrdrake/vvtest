@@ -21,6 +21,7 @@ from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testcreator as testcreator
 import libvvtest.parsexml as parsexml
 import libvvtest.parsevvt as parsevvt
+from libvvtest.paramset import ParameterSet
 
 
 class parameter_tests( vtu.vvtestTestCase ):
@@ -269,38 +270,52 @@ class parameter_tests( vtu.vvtestTestCase ):
 
     def test_that_an_analyze_sees_restricted_parameters(self):
         ""
-        util.writefile( 'basic.xml', """
-            <rtest name="basic">
+        util.writefile( 'foo.xml', """
+            <rtest name="foo">
               <parameterize isize="1 2 4"/>
-              <execute> echo "execute basic isize = $isize" </execute>
+              <execute> echo "execute isize = $isize" </execute>
               <analyze>
                 echo "access PARAM_isize = $PARAM_isize"
               </analyze>
             </rtest> """ )
+        util.writefile( 'bar.vvt', """
+            #VVT: parameterize : isize = 1 2 4
+            #VVT: analyze : --analyze
+            import sys
+            import vvtest_util as vvt
+            if '--analyze' in sys.argv[1:]:
+                print ( "access PARAM_isize = "+' '.join( vvt.PARAM_isize ) )
+            else:
+                print ( "execute isize = "+vvt.isize )
+            """ )
         time.sleep(1)
+
+        def check_params( testname ):
+            ""
+            lines = util.grepfiles( 'access PARAM_isize',
+                                    tdir+'/'+testname+'/execute.log' )
+            assert len(lines) == 1
+            pL = lines[0].split('=',1)[1].strip().split()
+            assert pL == ['1', '2']
 
         for batch in [False,True]:
 
             vtu.remove_results()
 
             vrun = vtu.runvvtest( "-p 'isize<=2'", batch=batch )
-            vrun.assertCounts( total=3, npass=3 )
+            vrun.assertCounts( total=6, npass=6 )
             tdir = vrun.resultsDir()
 
-            lines = util.grepfiles( 'access PARAM_isize',
-                                    tdir+'/basic/execute.log' )
-            assert len(lines) == 1
-            pL = lines[0].split('=',1)[1].strip().split()
-            assert pL == ['1', '2']
+            check_params( 'foo' )
+            check_params( 'bar' )
 
-            vrun = vtu.runvvtest( "-R", batch=batch, chdir=tdir+'/basic' )
+            vrun = vtu.runvvtest( "-R", batch=batch, chdir=tdir+'/foo' )
             vrun.assertCounts( total=1, npass=1 )
+            check_params( 'foo' )
 
-            lines = util.grepfiles( 'access PARAM_isize',
-                                    tdir+'/basic/execute.log' )
-            assert len(lines) == 1
-            pL = lines[0].split('=',1)[1].strip().split()
-            assert pL == ['1', '2']
+            vrun = vtu.runvvtest( "-R", batch=batch, chdir=tdir+'/bar' )
+            vrun.assertCounts( total=1, npass=1 )
+            check_params( 'bar' )
 
     def test_using_parameterize_with_script_test(self):
         ""
@@ -415,51 +430,64 @@ class parameter_tests( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'err1.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err1', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err1', evaluator, None )
 
         vspecs = ScriptReader( 'err2.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err2', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err2', evaluator, None )
 
         vspecs = ScriptReader( 'err3.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err3', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err3', evaluator, None )
 
         vspecs = ScriptReader( 'err4.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err4', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err4', evaluator, None )
 
         vspecs = ScriptReader( 'err4b.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err4b', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err4b', evaluator, None )
 
         vspecs = ScriptReader( 'err5.vvt' )
-        parsevvt.parse_parameterize( vspecs, 'err5', evaluator, {'np':'3'} )
+        parsevvt.parse_parameterize( ParameterSet(),
+                                     vspecs, 'err5', evaluator, {'np':'3'} )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err5', evaluator, {'dt':'0.2'} )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err5', evaluator, {'dt':'0.2'} )
 
         vspecs = ScriptReader( 'err6.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err6', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err6', evaluator, None )
 
         vspecs = ScriptReader( 'err7.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err7', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err7', evaluator, None )
 
         vspecs = ScriptReader( 'err8.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err8', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err8', evaluator, None )
 
         vspecs = ScriptReader( 'err9.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err9', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err9', evaluator, None )
 
         vspecs = ScriptReader( 'err10.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                parsevvt.parse_parameterize, vspecs, 'err10', evaluator, None )
+                parsevvt.parse_parameterize, ParameterSet(),
+                                             vspecs, 'err10', evaluator, None )
 
         vspecs = ScriptReader( 'ok11.vvt' )
-        parsevvt.parse_parameterize( vspecs, 'ok11', evaluator, None )
+        parsevvt.parse_parameterize( ParameterSet(),
+                                     vspecs, 'ok11', evaluator, None )
 
     def test_for_duplicate_parameters_in_xml_form(self):
         ""
@@ -484,14 +512,17 @@ class parameter_tests( vtu.vvtestTestCase ):
 
         xdoc = parsexml.read_xml_file( 'err1.xml' )
         self.assertRaises( testcreator.TestSpecError,
-                parsexml.parse_parameterize, xdoc, 'err1', evaluator, None )
+                parsexml.parse_parameterize, ParameterSet(),
+                                             xdoc, 'err1', evaluator, None )
 
         xdoc = parsexml.read_xml_file( 'ok1.xml' )
-        parsexml.parse_parameterize( xdoc, 'ok1', evaluator, None )
+        parsexml.parse_parameterize( ParameterSet(),
+                                     xdoc, 'ok1', evaluator, None )
 
         xdoc = parsexml.read_xml_file( 'err2.xml' )
         self.assertRaises( testcreator.TestSpecError,
-            parsexml.parse_parameterize, xdoc, 'err2', evaluator, None )
+            parsexml.parse_parameterize, ParameterSet(),
+                                         xdoc, 'err2', evaluator, None )
 
 
 #####################################################################

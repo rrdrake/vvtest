@@ -561,21 +561,24 @@ example_include_2_version_33 = """\
 
 def create_TestCase():
     ""
-    ts = TestSpec.TestSpec( 'atest', os.getcwd(), 'atest.xml' )
+    tspec = TestSpec.TestSpec( 'atest', os.getcwd(), 'atest.xml' )
 
-    ts.setKeywords( ['key1','key2'] )
+    tspec.setKeywordList( ['key1','key2'] )
 
-    ts.setParameters( { 'P1':'V1', 'P2':'V2' } )
+    tspec.setParameters( { 'P1':'V1', 'P2':'V2' } )
 
-    ts.setAttr("aname1", "a value")
-    ts.setAttr("aname2", "a\nvalue")
-    ts.setAttr("aname3", 'a"value"')
-    ts.setAttr("aname4", "a'value'")
-    ts.setAttr('aname5', 23)
-    ts.setAttr('aname6', 23.23)
-    ts.setAttr('aname7', None)
+    tcase = TestCase( testspec=tspec )
+    tstat = tcase.getStat()
 
-    return TestCase( testspec=ts )
+    tstat.setAttr("aname1", "a value")
+    tstat.setAttr("aname2", "a\nvalue")
+    tstat.setAttr("aname3", 'a"value"')
+    tstat.setAttr("aname4", "a'value'")
+    tstat.setAttr('aname5', 23)
+    tstat.setAttr('aname6', 23.23)
+    tstat.setAttr('aname7', None)
+
+    return tcase
 
 
 def assert_TestCase_same_as_fake( tcase, rootdir=None ):
@@ -584,6 +587,7 @@ def assert_TestCase_same_as_fake( tcase, rootdir=None ):
         rootdir = os.getcwd()
 
     tspec = tcase.getSpec()
+    tstat = tcase.getStat()
 
     assert tspec.getName() == 'atest'
     assert tspec.getRootpath() == rootdir
@@ -602,13 +606,13 @@ def assert_TestCase_same_as_fake( tcase, rootdir=None ):
         pD[n] = v
     assert pD == { 'P1':'V1', 'P2':'V2' }
 
-    assert tspec.getAttr('aname1') == "a value"
-    assert tspec.getAttr('aname2') == 'a\nvalue'
-    assert tspec.getAttr('aname3') == 'a"value"'
-    assert tspec.getAttr('aname4') == "a'value'"
-    assert tspec.getAttr('aname5') == 23
-    assert tspec.getAttr('aname6') == 23.23
-    assert tspec.getAttr('aname7') == None
+    assert tstat.getAttr('aname1') == "a value"
+    assert tstat.getAttr('aname2') == 'a\nvalue'
+    assert tstat.getAttr('aname3') == 'a"value"'
+    assert tstat.getAttr('aname4') == "a'value'"
+    assert tstat.getAttr('aname5') == 23
+    assert tstat.getAttr('aname6') == 23.23
+    assert tstat.getAttr('aname7') == None
 
 
 def create_TestCase_with_results():
@@ -624,6 +628,7 @@ def create_fake_analyze_TestCase():
     ""
     tspec = TestSpec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
 
+    tspec.setIsAnalyze()
     pset = ParameterSet.ParameterSet()
     pset.addParameter( 'A', ['a1','a2'] )
     tspec.setParameterSet( pset )
