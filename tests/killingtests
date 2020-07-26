@@ -18,7 +18,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.TestExec as TestExec
+import libvvtest.testexec as testexec
 
 
 class Timeout_when_baselining( vtu.vvtestTestCase ):
@@ -63,13 +63,13 @@ class process_group_execution( vtu.vvtestTestCase ):
     def setUp(self):
         ""
         vtu.vvtestTestCase.setUp( self )
-        TestExec.register_signal_handlers( reset=True )
+        testexec.register_signal_handlers( reset=True )
 
     def test_signal_exception_class_stores_the_signal_number(self):
         ""
         try:
-            TestExec.signal_handler( 42, None )
-        except TestExec.SignalException:
+            testexec.signal_handler( 42, None )
+        except testexec.SignalException:
             exc = sys.exc_info()[1]
             assert exc.sig == 42
 
@@ -231,7 +231,7 @@ class integration_signalling_tests( vtu.vvtestTestCase ):
     def setUp(self):
         ""
         vtu.vvtestTestCase.setUp( self )
-        TestExec.register_signal_handlers( reset=True )
+        testexec.register_signal_handlers( reset=True )
 
     def test_sub_sub_process_signalling_in_a_test_script(self):
         ""
@@ -287,7 +287,7 @@ def run_script_using_group_exec_subprocess( scriptname,
 def fork_and_run_script( scriptname, timeout=None, signum=signal.SIGINT ):
     ""
     def run_script():
-        x = TestExec.group_exec_subprocess( scriptname, shell=True )
+        x = testexec.group_exec_subprocess( scriptname, shell=True )
         os._exit(x)
 
     newpid = os.fork()

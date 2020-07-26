@@ -6,7 +6,7 @@
 
 import os, sys
 
-from .TestExec import TestExec
+from .testexec import TestExec
 from . import depend
 from .teststatus import copy_test_results
 
