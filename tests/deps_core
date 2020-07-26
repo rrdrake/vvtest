@@ -22,7 +22,7 @@ import libvvtest.parsevvt as parsevvt
 from libvvtest.errors import TestSpecError
 
 from libvvtest.testcase import TestCase
-from libvvtest.TestSpec import TestSpec
+from libvvtest.testspec import TestSpec
 from libvvtest.TestExec import TestExec
 from libvvtest.FilterExpressions import WordExpression
 

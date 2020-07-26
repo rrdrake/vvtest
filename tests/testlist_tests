@@ -22,7 +22,7 @@ from testutils import print3
 
 import libvvtest.testlistio as tio
 import libvvtest.TestList as TestList
-import libvvtest.TestSpec as TestSpec
+import libvvtest.testspec as testspec
 from libvvtest.testcase import TestCase
 import libvvtest.paramset as ParameterSet
 
@@ -561,7 +561,7 @@ example_include_2_version_33 = """\
 
 def create_TestCase():
     ""
-    tspec = TestSpec.TestSpec( 'atest', os.getcwd(), 'atest.xml' )
+    tspec = testspec.TestSpec( 'atest', os.getcwd(), 'atest.xml' )
 
     tspec.setKeywordList( ['key1','key2'] )
 
@@ -626,7 +626,7 @@ def create_TestCase_with_results():
 
 def create_fake_analyze_TestCase():
     ""
-    tspec = TestSpec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
+    tspec = testspec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
 
     tspec.setIsAnalyze()
     pset = ParameterSet.ParameterSet()

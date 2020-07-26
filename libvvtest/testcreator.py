@@ -7,7 +7,7 @@
 import os, sys
 from os.path import join as pjoin
 
-from . import TestSpec
+from . import testspec
 from . import FilterExpressions
 
 from .ScriptReader import ScriptReader
@@ -181,7 +181,7 @@ class TestConstructor:
             raise TestSpecError( 'an analyze requires at least one ' + \
                                  'parameter to be defined' )
 
-        parent = TestSpec.TestSpec( testname, self.root, self.fpath )
+        parent = testspec.TestSpec( testname, self.root, self.fpath )
 
         parent.setIsAnalyze()
         parent.setParameterSet( paramset )
@@ -204,14 +204,14 @@ class TestConstructor:
         testL = []
 
         if len( pset.getParameters() ) == 0:
-            t = TestSpec.TestSpec( tname, self.root, self.fpath )
+            t = testspec.TestSpec( tname, self.root, self.fpath )
             testL.append(t)
 
         else:
             # take a cartesian product of all the parameter values
             for pdict in pset.getInstances():
                 # create the test and add to test list
-                t = TestSpec.TestSpec( tname, self.root, self.fpath )
+                t = testspec.TestSpec( tname, self.root, self.fpath )
                 t.setParameters( pdict )
                 t.setParameterSet( pset )
                 testL.append(t)

@@ -21,7 +21,7 @@ from testutils import print3
 import libvvtest.TestExec as TE
 import libvvtest.makecmd as makecmd
 
-from libvvtest.TestSpec import TestSpec
+from libvvtest.testspec import TestSpec
 from libvvtest.paramset import ParameterSet
 
 

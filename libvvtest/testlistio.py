@@ -9,7 +9,7 @@ import time
 import stat
 import shutil
 
-from . import TestSpec
+from . import testspec
 from .paramset import ParameterSet
 from .testcase import TestCase
 
@@ -240,7 +240,7 @@ def string_to_test( strid ):
     root = testdict['root']
     path = testdict['path']
 
-    tspec = TestSpec.TestSpec( name, root, path )
+    tspec = testspec.TestSpec( name, root, path )
 
     if 'paramset' in testdict:
         pset = tspec.getParameterSet()

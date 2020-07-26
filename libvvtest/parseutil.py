@@ -8,7 +8,7 @@ import os, sys
 import re
 
 from .errors import TestSpecError
-from . import TestSpec
+from . import testspec
 from .paramset import ParameterSet
 from . import FilterExpressions
 
@@ -224,7 +224,7 @@ class StagingOracle:
 
             paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            displ = TestSpec.make_display_string( tspec.getName(),
+            displ = testspec.make_display_string( tspec.getName(),
                                                   tspec.getFilepath(),
                                                   paramD,
                                                   self.param_nameL )

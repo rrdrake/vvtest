@@ -20,7 +20,7 @@ import libvvtest.testcreator as testcreator
 from libvvtest.errors import TestSpecError
 
 from libvvtest.paramset import ParameterSet
-from libvvtest.TestSpec import TestSpec
+from libvvtest.testspec import TestSpec
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testlistio as tio

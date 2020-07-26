@@ -18,7 +18,7 @@ import testutils as util
 from testutils import print3
 
 import libvvtest.paramset as paramset
-from libvvtest.TestSpec import TestSpec
+from libvvtest.testspec import TestSpec
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 from libvvtest.RuntimeConfig import RuntimeConfig

@@ -36,7 +36,7 @@ cfgdir = os.path.join( topdir, 'config' )
 vvtest_file = pjoin( topdir, 'vvtest' )
 resultspy = pjoin( topdir, 'libvvtest', 'results.py' )
 
-import libvvtest.TestSpec as TestSpec
+import libvvtest.testspec as testspec
 import libvvtest.testcase as testcase
 import libvvtest.teststatus as teststatus
 from libvvtest.RuntimeConfig import RuntimeConfig
@@ -649,7 +649,7 @@ def make_simple_script_parse_instance( srcfile ):
     evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
     vspecs = ScriptReader( srcfile )
     testname = os.path.splitext(srcfile)[0]
-    ts = TestSpec.TestSpec( testname, os.getcwd(), srcfile )
+    ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
 
     inst = testcreator.ParsingInstance( testname=testname,
                                         tfile=ts,
@@ -661,7 +661,7 @@ def make_simple_script_parse_instance( srcfile ):
 
 def make_fake_TestSpec( name='atest', keywords=['key1','key2'] ):
     ""
-    ts = TestSpec.TestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
+    ts = testspec.TestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
     ts.setKeywordList( keywords )
     ts.setParameters( { 'np':'4' } )
     return ts
