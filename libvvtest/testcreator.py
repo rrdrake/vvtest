@@ -13,11 +13,9 @@ from . import FilterExpressions
 from .ScriptReader import ScriptReader
 from .errors import TestSpecError
 
-from .parseutil import create_dependency_result_expression
-
 from . import parsexml
 from . import parsevvt
-from . import parseutil
+from . import staging
 from .paramset import ParameterSet
 
 
@@ -143,7 +141,7 @@ class TestConstructor:
         tspec.setParameterSet( new_pset )
 
         if new_pset.getStagedGroup():
-            parseutil.mark_staged_tests( new_pset, [ tspec ] )
+            staging.mark_staged_tests( new_pset, [ tspec ] )
 
         if tspec.isAnalyze():
             analyze_spec = self.parseAnalyzeSpec( tname )
@@ -158,7 +156,7 @@ class TestConstructor:
 
         testL = self.generate_test_objects( tname, pset )
 
-        parseutil.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL )
 
         analyze_spec = self.parseAnalyzeSpec( tname )
         self.check_add_analyze_test( analyze_spec, tname, pset, testL )
