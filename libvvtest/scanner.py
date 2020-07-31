@@ -8,6 +8,7 @@ import os, sys
 
 from .errors import FatalError, TestSpecError
 from .testcase import TestCase
+from .staging import tests_are_related_by_staging
 
 
 class TestFileScanner:
@@ -147,7 +148,8 @@ class TestFileScanner:
             warn = [ 'ignoring test with duplicate execution directory',
                      '      first   : ' + tspec0.getFilename(),
                      '      second  : ' + tspec.getFilename(),
-                     '      exec dir: ' + xdir ]
+                     '      exec dir: ' + xdir,
+                     '      stringid: ' + tspec.getDisplayString() ]
 
             ddir = tspec.getDisplayString()
             if ddir != xdir:
@@ -158,23 +160,6 @@ class TestFileScanner:
             return True
 
         return False
-
-
-def tests_are_related_by_staging( tspec1, tspec2 ):
-    ""
-    xdir1 = tspec1.getExecuteDirectory()
-    disp1 = tspec1.getDisplayString()
-
-    xdir2 = tspec2.getExecuteDirectory()
-    disp2 = tspec2.getDisplayString()
-
-    if xdir1 == xdir2 and \
-       tspec1.getFilename() == tspec2.getFilename() and \
-       xdir1 != disp1 and disp1.startswith( xdir1 ) and \
-       xdir2 != disp2 and disp2.startswith( xdir2 ):
-        return True
-
-    return False
 
 
 def make_test_extension_list( spectype ):

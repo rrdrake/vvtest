@@ -10,7 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-from os.path import basename
+from os.path import basename, abspath
 import time
 
 import vvtestutils as vtu
@@ -523,7 +523,8 @@ class staged_parameters( vtu.vvtestTestCase ):
         assert len( ids ) == 1
         assert ids.pop() == tcase1.getSpec().getID()
 
-        ids = depend.find_tests_by_pattern( bdir, 'atest.np', tmap )
+        # matching is against the display string (thus the trailing space)
+        ids = depend.find_tests_by_pattern( bdir, 'atest.np *', tmap )
         assert len( ids ) == 1
         assert ids.pop() == tcase3.getSpec().getID()
 
@@ -535,11 +536,63 @@ class staged_parameters( vtu.vvtestTestCase ):
                  tcase2.getSpec().getID() : tcase2,
                  tcase.getSpec().getID()  : tcase }
 
-        ids = depend.find_tests_by_pattern( bdir, 'atest.np', tmap )
+        # matching is against the display string (thus the trailing space)
+        ids = depend.find_tests_by_pattern( bdir, 'atest.np *', tmap )
         assert len( ids ) == 2
         tcase_1_or_2 = [ tcase1.getSpec().getID(), tcase2.getSpec().getID() ]
         assert ids.pop() in tcase_1_or_2
         assert ids.pop() in tcase_1_or_2
+
+    def test_if_two_tests_are_related_by_staging(self):
+        ""
+        tcase1 = vtu.make_fake_staged_TestCase( 0 )
+        tcase2 = vtu.make_fake_staged_TestCase( 1 )
+        tcase3 = vtu.make_fake_staged_TestCase( 2 )
+
+        assert staging.tests_are_related_by_staging( tcase1.getSpec(),
+                                                     tcase1.getSpec() )
+
+        assert staging.tests_are_related_by_staging( tcase1.getSpec(),
+                                                     tcase2.getSpec() )
+        assert staging.tests_are_related_by_staging( tcase1.getSpec(),
+                                                     tcase3.getSpec() )
+        assert staging.tests_are_related_by_staging( tcase2.getSpec(),
+                                                     tcase3.getSpec() )
+
+        tcase4 = vtu.make_fake_TestCase( name='btest' )
+        assert not staging.tests_are_related_by_staging( tcase1.getSpec(),
+                                                         tcase4.getSpec() )
+        assert not staging.tests_are_related_by_staging( tcase2.getSpec(),
+                                                         tcase4.getSpec() )
+        assert not staging.tests_are_related_by_staging( tcase3.getSpec(),
+                                                         tcase4.getSpec() )
+
+        assert not staging.tests_are_related_by_staging( tcase4.getSpec(),
+                                                         tcase4.getSpec() )
+
+        util.writefile( 'd1/red.vvt', """
+            #VVT: parameterize (staged) : np = 1 3
+            """ )
+        util.writefile( 'd2/red.vvt', """
+            #VVT: parameterize (staged) : np = 1 5
+            """ )
+        time.sleep(1)
+
+        tc = testcreator.TestCreator()
+        tL1 = tc.fromFile( os.getcwd(), 'd1/red.vvt' )
+        tL2 = tc.fromFile( os.getcwd(), 'd2/red.vvt' )
+
+        assert staging.tests_are_related_by_staging( tL1[0], tL1[1] )
+        assert staging.tests_are_related_by_staging( tL2[0], tL2[1] )
+        assert not staging.tests_are_related_by_staging( tL1[0], tL2[0] )
+        assert not staging.tests_are_related_by_staging( tL1[1], tL2[1] )
+
+        tL1 = tc.fromFile( abspath('d1'), 'red.vvt' )
+        tL2 = tc.fromFile( abspath('d2'), 'red.vvt' )
+
+        for t1 in tL1:
+            for t2 in tL2:
+                assert not staging.tests_are_related_by_staging( t1, t2 )
 
     def test_staging_integration_test(self):
         ""

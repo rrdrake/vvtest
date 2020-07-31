@@ -77,10 +77,10 @@ class StagingOracle:
 
             paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            displ = testspec.make_display_string( tspec.getName(),
-                                                  tspec.getFilepath(),
-                                                  paramD,
-                                                  self.param_nameL )
+            displ = make_display_string( tspec.getName(),
+                                         tspec.getFilepath(),
+                                         paramD,
+                                         self.param_nameL )
 
             return displ
 
@@ -94,3 +94,29 @@ class StagingOracle:
             paramD[ pname ] = pval
 
         return paramD
+
+
+def make_display_string( testname, filepath, paramD, staged_names ):
+    ""
+    idgen = testspec.IDGenerator( testname, filepath, paramD, staged_names )
+    return idgen.computeDisplayString()
+
+
+def tests_are_related_by_staging( tspec1, tspec2 ):
+    ""
+    if tspec1.getFilename() == tspec2.getFilename():
+
+        idgen1 = tspec1.getIDGenerator()
+        idgen2 = tspec2.getIDGenerator()
+
+        names1 = idgen1.getStageNames()
+        names2 = idgen2.getStageNames()
+
+        if names1 and names1 == names2:
+
+            id1 = idgen1.computeID( compress_stage=True )
+            id2 = idgen2.computeID( compress_stage=True )
+
+            return id1 == id2
+
+    return False

@@ -434,7 +434,7 @@ class exclude_tests( vtu.vvtestTestCase ):
         tf = TestFilter( None, None )
         assert tf.checkEnabled( tcase )
 
-        tcase.getSpec().setEnabled( False ) #magic
+        tcase.getSpec().setEnabled( False )
         assert not tf.checkEnabled( tcase )
 
     def test_parse_enable_integration_test(self):

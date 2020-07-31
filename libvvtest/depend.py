@@ -100,14 +100,14 @@ class FailedTestDependency:
     def willNeverRun(self): return True
 
 
-def find_tests_by_pattern( xdir, pattern, testcasemap ):
+def find_tests_by_pattern( srcdir, pattern, testcasemap ):
     """
-    The 'xdir' is the execute directory of the dependent test.  The shell
-    glob 'pattern' is matched against the display strings of tests in the
-    'testcasemap', in this order:
+    The 'srcdir' is the directory of the dependent test source file relative
+    the scan root.  The shell glob 'pattern' is matched against the display
+    strings of tests in the 'testcasemap', in this order:
 
-        1. basename(xdir)/pat
-        2. basename(xdir)/*/pat
+        1. srcdir/pat
+        2. srcdir/*/pat
         3. pat
         4. *pat
 
@@ -119,14 +119,13 @@ def find_tests_by_pattern( xdir, pattern, testcasemap ):
 
     A python set of TestSpec ID is returned.
     """
-    tbase = os.path.dirname( xdir )
-    if tbase == '.':
-        tbase = ''
-    elif tbase:
-        tbase += '/'
+    if srcdir == '.':
+        srcdir = ''
+    elif srcdir:
+        srcdir += '/'
 
-    pat1 = os.path.normpath( tbase+pattern )
-    pat2 = tbase+'*/'+pattern
+    pat1 = os.path.normpath( srcdir+pattern )
+    pat2 = srcdir+'*/'+pattern
     pat3 = pattern
     pat4 = '*'+pattern
 
@@ -137,41 +136,30 @@ def find_tests_by_pattern( xdir, pattern, testcasemap ):
         tspec = tcase.getSpec()
         displ = tspec.getDisplayString()
 
-        if tspec.getStageID() == None:
-            xdir = None
-        else:
-            xdir = tspec.getExecuteDirectory()
-
-        if match_test( xdir, displ, pat1 ):
+        if fnmatch.fnmatch( displ, pat1 ):
             L1.append( tid )
 
-        if match_test( xdir, displ, pat2 ):
+        if fnmatch.fnmatch( displ, pat2 ):
             L2.append( tid )
 
-        if match_test( xdir, displ, pat3 ):
+        if fnmatch.fnmatch( displ, pat3 ):
             L3.append( tid )
 
-        if match_test( xdir, displ, pat4 ):
+        if fnmatch.fnmatch( displ, pat4 ):
             L4.append( tid )
 
     for L in [ L1, L2, L3, L4 ]:
         if len(L) > 0:
-            return collect_match_test_ids( L, testcasemap )
+            return collect_matching_test_ids( L, testcasemap )
 
     return set()
 
 
-def match_test( xdir, displ, pat ):
-    ""
-    return fnmatch.fnmatch( displ, pat ) or \
-           ( xdir and fnmatch.fnmatch( xdir, pat ) )
-
-
-def collect_match_test_ids( idlist, testcasemap ):
+def collect_matching_test_ids( idlist, testcasemap ):
     ""
     idset = set()
 
-    stagemap = map_staged_xdir_to_tspec_list( idlist, testcasemap )
+    stagemap = map_staged_test_id_to_tspec_list( idlist, testcasemap )
 
     for tid in idlist:
         tspec = testcasemap[tid].getSpec()
@@ -183,7 +171,8 @@ def collect_match_test_ids( idlist, testcasemap ):
 
 def not_staged_or_last_stage( stagemap, tspec ):
     ""
-    stagL = stagemap.get( tspec.getExecuteDirectory(), None )
+    tid = tspec.getIDGenerator().computeID( compress_stage=True )
+    stagL = stagemap.get( tid, None )
 
     if stagL == None or len(stagL) < 2:
         return True
@@ -200,7 +189,7 @@ def no_last_stages( tspecs ):
     return True
 
 
-def map_staged_xdir_to_tspec_list( idlist, testcasemap ):
+def map_staged_test_id_to_tspec_list( idlist, testcasemap ):
     ""
     stagemap = {}
 
@@ -214,10 +203,10 @@ def map_staged_xdir_to_tspec_list( idlist, testcasemap ):
 
 def add_test_to_map( stagemap, tspec ):
     ""
-    xdir = tspec.getExecuteDirectory()
-    tL = stagemap.get( xdir, None )
+    tid = tspec.getIDGenerator().computeID( compress_stage=True )
+    tL = stagemap.get( tid, None )
     if tL == None:
-        stagemap[xdir] = [tspec]
+        stagemap[tid] = [tspec]
     else:
         tL.append( tspec )
 
@@ -239,8 +228,8 @@ def check_connect_dependencies( tcase, testcasemap, strict=True ):
 
     for dep_pat,expr,expect in tspec.getDependencies():
 
-        xdir = tspec.getExecuteDirectory()
-        depL = find_tests_by_pattern( xdir, dep_pat, testcasemap )
+        srcdir = os.path.dirname( tspec.getFilepath() )
+        depL = find_tests_by_pattern( srcdir, dep_pat, testcasemap )
 
         if match_criteria_satisfied( strict, depL, expr, expect ):
             for dep_id in depL:

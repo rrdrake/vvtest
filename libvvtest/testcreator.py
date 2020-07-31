@@ -21,11 +21,11 @@ from .paramset import ParameterSet
 
 class TestCreator:
 
-    def __init__(self, platname, optionlist):
+    def __init__(self, platname=os.uname()[0], optionlist=[]):
         ""
         self.evaluator = ExpressionEvaluator( platname, optionlist )
 
-    def fromFile(self, rootpath, relpath, force_params):
+    def fromFile(self, rootpath, relpath, force_params=None):
         """
         The 'rootpath' is the top directory of the file scan.  The 'relpath' is
         the name of the test file relative to 'rootpath' (it must not be an

@@ -7,6 +7,9 @@
 import os
 from os.path import basename
 
+# magic: move this import?
+import hashlib
+
 from .testfile import TestFile
 
 
@@ -37,8 +40,7 @@ class TestSpec( TestFile ):
 
     def _set_identifiers(self):
         ""
-        fpath = self.getFilepath()
-        idgen = IDGenerator( self.name, fpath, self.params, self.staged )
+        idgen = self.getIDGenerator()
 
         self.xdir = idgen.computeExecuteDirectory()
         self.testid = idgen.computeID()
@@ -98,6 +100,11 @@ class TestSpec( TestFile ):
         parameters with values.
         """
         return self.testid
+
+    def getIDGenerator(self):
+        ""
+        return IDGenerator( self.name, self.getFilepath(),
+                            self.params, self.staged )
 
     def setStagedParameters(self, is_first_stage, is_last_stage,
                                   stage_name, *param_names):
@@ -205,7 +212,11 @@ class IDGenerator:
         self.params = params
         self.staged = staged_names
 
-    def computeExecuteDirectory(self):
+    def getStageNames(self):
+        ""
+        return self.staged
+
+    def computeExecuteDirectory(self, shorten=True):
         ""
         bname = self.name
 
@@ -213,13 +224,17 @@ class IDGenerator:
         if len( paramL ) > 0:
             bname += '.' + '.'.join(paramL)
 
+        # if shorten and len(bname) > 10:
+        #     hsh = hex( int( int( hashlib.sha1(bname).hexdigest(), 16 ) % (10**8) ) )[2:]
+        #     bname = self.name+'.'+hsh
+
         dname = os.path.dirname( self.filepath )
 
         return os.path.normpath( os.path.join( dname, bname ) )
 
     def computeDisplayString(self):
         ""
-        displ = self.computeExecuteDirectory()
+        displ = self.computeExecuteDirectory( shorten=False )
 
         if self.staged:
 
@@ -237,13 +252,13 @@ class IDGenerator:
 
         return displ
 
-    def computeID(self):
+    def computeID(self, compress_stage=False):
         ""
         lst = [ self.filepath, self.name ]
-        lst.extend( self._get_parameters_as_list() )
+        lst.extend( self._get_parameters_as_list( compress_stage ) )
         return tuple( lst )
 
-    def _get_parameters_as_list(self, compress_stage=False):
+    def _get_parameters_as_list(self, compress_stage):
         ""
         L = []
         if len( self.params ) > 0:
@@ -277,9 +292,3 @@ def apply_types_to_param_values( paramD, param_types ):
     for n,v in paramD.items():
         if n in param_types:
             paramD[n] = param_types[n](v)
-
-
-def make_display_string( testname, filepath, paramD, staged_names ):
-    ""
-    idgen = IDGenerator( testname, filepath, paramD, staged_names )
-    return idgen.computeDisplayString()
