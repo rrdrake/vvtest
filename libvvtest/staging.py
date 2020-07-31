@@ -10,7 +10,7 @@ from . import testspec
 from . import parseutil
 
 
-def mark_staged_tests( pset, testL ):
+def mark_staged_tests( pset, testL, testctor ):
     """
     1. each test must be told which parameter names form the staged set
     2. the first and last tests in a staged set must be marked as such
@@ -18,7 +18,7 @@ def mark_staged_tests( pset, testL ):
     """
     if pset.getStagedGroup():
 
-        oracle = StagingOracle( pset.getStagedGroup() )
+        oracle = StagingOracle( pset.getStagedGroup(), testctor )
 
         for tspec in testL:
 
@@ -48,12 +48,14 @@ def add_staged_dependency( from_tspec, to_display_string ):
 
 class StagingOracle:
 
-    def __init__(self, stage_group):
+    def __init__(self, stage_group, testctor):
         ""
         self.param_nameL = stage_group[0]
         self.param_valueL = stage_group[1]
 
         self.stage_values = [ vals[0] for vals in self.param_valueL ]
+
+        self.tctor = testctor
 
     def getStagedParameterNames(self):
         ""
@@ -77,10 +79,11 @@ class StagingOracle:
 
             paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            displ = make_display_string( tspec.getName(),
+            tid = self.tctor.makeTestID( tspec.getName(),
                                          tspec.getFilepath(),
                                          paramD,
                                          self.param_nameL )
+            displ = tid.computeDisplayString()
 
             return displ
 
@@ -94,12 +97,6 @@ class StagingOracle:
             paramD[ pname ] = pval
 
         return paramD
-
-
-def make_display_string( testname, filepath, paramD, staged_names ):
-    ""
-    idgen = testspec.TestID( testname, filepath, paramD, staged_names )
-    return idgen.computeDisplayString()
 
 
 def tests_are_related_by_staging( tspec1, tspec2 ):

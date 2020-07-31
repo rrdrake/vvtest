@@ -25,6 +25,7 @@ from libvvtest.location import split_by_largest_existing_path
 from libvvtest.location import determine_test_directory
 from libvvtest.location import test_results_subdir_name
 
+from libvvtest.testctor import TestConstructor
 import libvvtest.TestList as TestList
 import libvvtest.testlistio as testlistio
 from libvvtest.permsetter import PermissionSetter
@@ -500,7 +501,7 @@ class exit_status_controls( vtu.vvtestTestCase ):
 
         fn = util.globfile( tdir+'/testlist.*' )
         rd = testlistio.TestListReader( fn )
-        rd.read()
+        rd.read( TestConstructor() )
 
         testD = rd.getTests()
         assert len( testD ) == 3
@@ -524,7 +525,7 @@ def get_command_line( filepat ):
     rf = util.globfile( filepat )
 
     lr = testlistio.TestListReader( rf )
-    lr.read()
+    lr.read( TestConstructor() )
 
     cmdl = lr.getAttr( 'cmdline' )
     assert type(cmdl) == type([])

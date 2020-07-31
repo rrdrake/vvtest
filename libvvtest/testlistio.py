@@ -70,7 +70,7 @@ class TestListReader:
         self.incl = set()
         self.tests = {}
 
-    def read(self):
+    def read(self, testctor):
         ""
         for key,val in self._iterate_file_lines():
             try:
@@ -88,17 +88,18 @@ class TestListReader:
                 elif key == 'Finish':
                     self.finish = eval( val )[1]
                 else:
-                    tcase = string_to_test( val )
+                    tcase = string_to_test( val, testctor )
                     self.tests[ tcase.getSpec().getID() ] = tcase
 
             except Exception:
                 pass
+                raise #magic
 
         assert self.vers in [32, 33, 34], \
             'corrupt test list file or older format: '+str(self.filename)
 
         for incl_file in self.incl:
-            self._read_include_file( incl_file )
+            self._read_include_file( incl_file, testctor )
 
     def getFileVersion(self):
         ""
@@ -162,7 +163,7 @@ class TestListReader:
                 except Exception:
                     pass
 
-    def _read_include_file(self, fname):
+    def _read_include_file(self, fname, testctor):
         ""
         if not os.path.isabs( fname ):
             # include file is relative to self.filename
@@ -171,7 +172,7 @@ class TestListReader:
         if os.path.exists( fname ):
 
             tlr = TestListReader( fname )
-            tlr.read()
+            tlr.read( testctor )
             self.tests.update( tlr.getTests() )
 
 
@@ -228,7 +229,7 @@ def test_to_string( tcase, extended=False ):
     return s
 
 
-def string_to_test( strid ):
+def string_to_test( strid, testctor ):
     """
     Creates and returns a partially filled TestSpec object from a string
     produced by the test_to_string() method.
@@ -239,7 +240,7 @@ def string_to_test( strid ):
     root = testdict['root']
     path = testdict['path']
 
-    tspec = testspec.TestSpec( name, root, path )
+    tspec = testctor.makeTestSpec( name, root, path )
 
     if 'paramset' in testdict:
         pset = tspec.getParameterSet()

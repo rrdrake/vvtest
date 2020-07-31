@@ -192,7 +192,7 @@ def scan_path_with_warnings_output( path ):
 
 def construct_TestList_and_TestFileScanner( spectype=None, ostream=None ):
     ""
-    creator = TestCreator( 'atari', [] )
+    creator = TestCreator()
     tlist = TestList.TestList()
 
     if ostream:

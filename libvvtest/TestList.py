@@ -23,7 +23,7 @@ class TestList:
 
     base_filename = 'testlist'
 
-    def __init__(self, directory=None, identifier=None):
+    def __init__(self, directory=None, identifier=None, testctor=None):
         ""
         if not directory:
             directory = os.getcwd()
@@ -33,6 +33,8 @@ class TestList:
 
         if identifier != None:
             self.filename += '.'+str(identifier)
+
+        self.tctor = testctor
 
         self.rundate = None
         self.results_file = None
@@ -134,7 +136,7 @@ class TestList:
         if os.path.exists( self.filename ):
 
             tlr = testlistio.TestListReader( self.filename )
-            tlr.read()
+            tlr.read( self.tctor )
 
             self.rundate = tlr.getAttr( 'rundate', None )
 
@@ -172,7 +174,7 @@ class TestList:
         for fn in files:
 
             tlr = testlistio.TestListReader( fn )
-            tlr.read()
+            tlr.read( self.tctor )
 
             self.datestamp = tlr.getStartDate()
             self.finish = tlr.getFinishDate()

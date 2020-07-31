@@ -16,11 +16,11 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.testcreator as testcreator
+from libvvtest.testcreator import TestCreator, ExpressionEvaluator
 from libvvtest.errors import TestSpecError
 
 from libvvtest.paramset import ParameterSet
-from libvvtest.testspec import TestSpec
+from libvvtest.testctor import TestConstructor
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testlistio as tio
@@ -547,7 +547,7 @@ class script_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+        evaluator = ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
         pset = ParameterSet()
@@ -559,8 +559,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert tmap['dx'] == float
         assert tmap['dy'] == float
 
-        creat = testcreator.TestCreator( 'atari', [] )
-        tL = creat.fromFile( os.getcwd(), 'blue.vvt', None )
+        tL = TestCreator().fromFile( os.getcwd(), 'blue.vvt', None )
         assert len( tL ) == 2*2*2*2
 
         tspec = tL[3]
@@ -609,10 +608,9 @@ class script_tests( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid )
+    tcase = tio.string_to_test( stringid, TestConstructor() )
 
-    creator = testcreator.TestCreator( 'atari', [] )
-    creator.reparse( tcase.getSpec() )
+    TestCreator().reparse( tcase.getSpec() )
 
     return tcase
 

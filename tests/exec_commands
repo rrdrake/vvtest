@@ -20,7 +20,7 @@ from testutils import print3
 
 import libvvtest.makecmd as makecmd
 
-from libvvtest.testspec import TestSpec
+from libvvtest.testctor import TestConstructor
 from libvvtest.paramset import ParameterSet
 
 
@@ -127,7 +127,7 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
 
 def make_TestSpec( filename ):
     ""
-    tspec = TestSpec( 'atest', os.getcwd(), filename )
+    tspec = TestConstructor().makeTestSpec( 'atest', os.getcwd(), filename )
     return tspec
 
 

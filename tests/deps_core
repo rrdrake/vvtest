@@ -17,6 +17,7 @@ import testutils as util
 from testutils import print3
 
 import libvvtest.testcreator as testcreator
+from libvvtest.testctor import TestConstructor
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.parsevvt as parsevvt
 from libvvtest.errors import TestSpecError
@@ -647,14 +648,14 @@ def make_TestSpec_test_case( name, subdir=None ):
     if subdir: subdir = os.path.normpath( subdir ) + '/'
     else:      subdir = ''
 
-    ts = TestSpec( name, os.getcwd(), subdir+name+'.vvt' )
+    ts = TestConstructor().makeTestSpec( name, os.getcwd(), subdir+name+'.vvt' )
 
     return TestCase( ts )
 
 
 def make_TestExec_test_case( name ):
     ""
-    ts = TestSpec( name, os.getcwd(), name+'.vvt' )
+    ts = TestConstructor().makeTestSpec( name, os.getcwd(), name+'.vvt' )
     tcase = TestCase( ts )
     tcase.setExec( TestExec() )
     return tcase
@@ -662,7 +663,7 @@ def make_TestExec_test_case( name ):
 
 def create_tests( relpath, platname=None ):
     ""
-    creator = testcreator.TestCreator( platname, [] )
+    creator = testcreator.TestCreator( platname )
     tL = creator.fromFile( '.', relpath, None )
 
     return tL

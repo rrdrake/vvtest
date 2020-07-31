@@ -22,15 +22,17 @@ class Batcher:
                        tlist, xlist, perms,
                        qsublimit,
                        batch_length, max_timeout,
-                       namer, jobhandler):
+                       namer, jobhandler,
+                       testctor ):
         ""
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
         self.jobhandler = jobhandler
+        self.tctor = testctor
 
-        self.results = ResultsHandler( tlist, xlist )
+        self.results = ResultsHandler( tlist, xlist, self.tctor )
 
         self.suffix = tlist.getResultsSuffix()
         self.vvtestcmd = vvtestcmd
@@ -145,7 +147,7 @@ class Batcher:
         ""
         batchid = bjob.getBatchID()
         bdir = self.namer.getBatchDir( batchid )
-        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL )
+        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL, self.tctor )
 
         maxsize = compute_max_size( tlist )
 
@@ -389,9 +391,9 @@ class BatchGroup:
         return [ self.tsum, self.size, self.groupid, self.tests ]
 
 
-def make_batch_TestList( batchdir, batchid, suffix, qlist ):
+def make_batch_TestList( batchdir, batchid, suffix, qlist, testctor ):
     ""
-    tl = TestList.TestList( batchdir, batchid )
+    tl = TestList.TestList( batchdir, batchid, testctor )
 
     tl.setResultsSuffix( suffix )
 
@@ -432,10 +434,11 @@ def apply_queue_timeout_bump_factor( qtime ):
 
 class ResultsHandler:
 
-    def __init__(self, tlist, xlist):
+    def __init__(self, tlist, xlist, testctor):
         ""
         self.tlist = tlist
         self.xlist = xlist
+        self.tctor = testctor
 
     def addResultsInclude(self, bjob):
         ""
@@ -454,7 +457,7 @@ class ResultsHandler:
         if os.path.isfile( rfile ):
 
             tlr = testlistio.TestListReader( rfile )
-            tlr.read()
+            tlr.read( self.tctor )
             jobtests = tlr.getTests()
 
             for file_tcase in jobtests.values():

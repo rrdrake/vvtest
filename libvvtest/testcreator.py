@@ -21,9 +21,15 @@ from .paramset import ParameterSet
 
 class TestCreator:
 
-    def __init__(self, platname=os.uname()[0], optionlist=[]):
+    def __init__(self, platname=os.uname()[0], optionlist=[], testctor=None):
         ""
         self.evaluator = ExpressionEvaluator( platname, optionlist )
+
+        if testctor == None:
+            from .testctor import TestConstructor
+            testctor = TestConstructor()
+
+        self.tctor = testctor
 
     def fromFile(self, rootpath, relpath, force_params=None):
         """
@@ -40,7 +46,8 @@ class TestCreator:
         form = map_extension_to_spec_form( relpath )
 
         ctor = create_test_constructor( form, rootpath, relpath,
-                                        self.evaluator, force_params )
+                                        self.evaluator, self.tctor,
+                                        force_params )
 
         ctor.readFile()
         tests = ctor.createTests()
@@ -62,7 +69,9 @@ class TestCreator:
 
             ctor = create_test_constructor( form, tspec.getRootpath(),
                                                   tspec.getFilepath(),
-                                                  self.evaluator, None )
+                                                  self.evaluator,
+                                                  self.tctor,
+                                                  None )
 
             ctor.readFile( strict=True )
             ctor.reparseTest( tspec )
@@ -106,14 +115,17 @@ class ExpressionEvaluator:
         return word_expr.evaluate( self.option_list.count )
 
 
-class TestConstructor:
+class TestMaker:
 
-    def __init__(self, rootpath, relpath, evaluator, force_params={}):
+    def __init__(self, rootpath, relpath, evaluator, testctor,
+                       force_params={} ):
         ""
         self.root = rootpath
         self.fpath = relpath
         self.force = force_params
         self.evaluator = evaluator
+
+        self.tctor = testctor
 
         self.source = None
 
@@ -141,7 +153,7 @@ class TestConstructor:
         tspec.setParameterSet( new_pset )
 
         if new_pset.getStagedGroup():
-            staging.mark_staged_tests( new_pset, [ tspec ] )
+            staging.mark_staged_tests( new_pset, [ tspec ], self.tctor )
 
         if tspec.isAnalyze():
             analyze_spec = self.parseAnalyzeSpec( tname )
@@ -156,7 +168,7 @@ class TestConstructor:
 
         testL = self.generate_test_objects( tname, pset )
 
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, self.tctor )
 
         analyze_spec = self.parseAnalyzeSpec( tname )
         self.check_add_analyze_test( analyze_spec, tname, pset, testL )
@@ -179,7 +191,7 @@ class TestConstructor:
             raise TestSpecError( 'an analyze requires at least one ' + \
                                  'parameter to be defined' )
 
-        parent = testspec.TestSpec( testname, self.root, self.fpath )
+        parent = self.tctor.makeTestSpec( testname, self.root, self.fpath )
 
         parent.setIsAnalyze()
         parent.setParameterSet( paramset )
@@ -202,14 +214,14 @@ class TestConstructor:
         testL = []
 
         if len( pset.getParameters() ) == 0:
-            t = testspec.TestSpec( tname, self.root, self.fpath )
+            t = self.tctor.makeTestSpec( tname, self.root, self.fpath )
             testL.append(t)
 
         else:
             # take a cartesian product of all the parameter values
             for pdict in pset.getInstances():
                 # create the test and add to test list
-                t = testspec.TestSpec( tname, self.root, self.fpath )
+                t = self.tctor.makeTestSpec( tname, self.root, self.fpath )
                 t.setParameters( pdict )
                 t.setParameterSet( pset )
                 testL.append(t)
@@ -232,7 +244,7 @@ class ParsingInstance:
         self.evaluator = evaluator
 
 
-class XMLTestConstructor( TestConstructor ):
+class XMLTestMaker( TestMaker ):
 
     def readFile(self, strict=False):
         ""
@@ -259,7 +271,7 @@ class XMLTestConstructor( TestConstructor ):
         parsexml.parse_xml_test( inst )
 
 
-class ScriptTestConstructor( TestConstructor ):
+class ScriptTestMaker( TestMaker ):
 
     def readFile(self, strict=False):
         ""
@@ -295,13 +307,15 @@ def map_extension_to_spec_form( filepath ):
 
 
 def create_test_constructor( spec_form, rootpath, relpath,
-                             evaluator, force_params ):
+                             evaluator, testctor, force_params ):
     ""
     if spec_form == 'xml':
-        ctor = XMLTestConstructor( rootpath, relpath, evaluator, force_params )
+        ctor = XMLTestMaker( rootpath, relpath, evaluator, testctor,
+                             force_params )
 
     elif spec_form == 'script':
-        ctor = ScriptTestConstructor( rootpath, relpath, evaluator, force_params )
+        ctor = ScriptTestMaker( rootpath, relpath, evaluator, testctor,
+                                force_params )
 
     else:
         raise Exception( "invalid test specification form: "+form )

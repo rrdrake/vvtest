@@ -27,6 +27,7 @@ import libvvtest.batchutils as batchutils
 import batch.batching as batching
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
+from libvvtest.testctor import TestConstructor
 
 
 class InformationPrinter( vtu.vvtestTestCase ):
@@ -140,7 +141,8 @@ def make_fake_Batcher( tlist ):
                                 tlist, None, None,
                                 None,
                                 None, None,
-                                None, jobhandler )
+                                None, jobhandler,
+                                TestConstructor() )
 
     bjob = jobhandler.createJob()
     bjob.setAttr( 'testlist', tlist )

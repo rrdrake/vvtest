@@ -20,6 +20,7 @@ import libvvtest.pathutil as pathutil
 from libvvtest.errors import FatalError
 import libvvtest.location as location
 import libvvtest.execute as execute
+from libvvtest.testctor import TestConstructor
 
 
 version = '1.2'
@@ -486,7 +487,9 @@ def make_TestList( rtdata, batchid=None ):
         namer = create_batch_namer( test_dir )
         tdir = namer.getBatchDir( batchid )
 
-    tlist = TestList.TestList( tdir, batchid )
+    tctor = TestConstructor()
+
+    tlist = TestList.TestList( tdir, batchid, tctor )
 
     return tlist
 
@@ -986,12 +989,15 @@ def create_Batcher( opts, optD, rtdata,
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
                                            batchitf, namer )
 
+    testctor = TestConstructor()
+
     batch = batchutils.Batcher( vvtestcmd,
                                 tlist, xlist, perms,
                                 qsublimit,
                                 opts.batch_length,
                                 opts.max_timeout,
-                                namer, jobhandler )
+                                namer, jobhandler,
+                                testctor )
 
     return batch
 

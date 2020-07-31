@@ -17,8 +17,9 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.errors import TestSpecError
 import libvvtest.paramset as paramset
-from libvvtest.testspec import TestSpec
+from libvvtest.testctor import TestConstructor
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 from libvvtest.RuntimeConfig import RuntimeConfig
@@ -26,7 +27,8 @@ import libvvtest.depend as depend
 import libvvtest.testlistio as tio
 import libvvtest.testrunner as testrunner
 
-import libvvtest.testcreator as testcreator
+from libvvtest.testcreator import TestCreator, ExpressionEvaluator
+from libvvtest.testcreator import ScriptTestMaker
 import libvvtest.parsevvt as parsevvt
 import libvvtest.staging as staging
 
@@ -40,7 +42,8 @@ class staged_parameters( vtu.vvtestTestCase ):
 
         tmap = {}
         for pdict in pset.getInstances():
-            ts = TestSpec( 'aname', os.getcwd(), 'aname.vvt' )
+            tctor = TestConstructor()
+            ts = tctor.makeTestSpec( 'aname', os.getcwd(), 'aname.vvt' )
             ts.setParameters( pdict )
 
             if pdict['stage'] == '1':
@@ -96,7 +99,7 @@ class staged_parameters( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+        evaluator = ExpressionEvaluator( 'atari', [] )
 
         vspecs = ScriptReader( 'blue.vvt' )
         pset = paramset.ParameterSet()
@@ -109,18 +112,18 @@ class staged_parameters( vtu.vvtestTestCase ):
 
         vspecs = ScriptReader( 'err1.vvt' )
         pset = paramset.ParameterSet()
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                 parsevvt.parse_parameterize, pset, vspecs, 'err1', evaluator, None )
 
     def create_test_list(self, spec_file):
         ""
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
-        vctor = testcreator.ScriptTestConstructor( os.getcwd(), spec_file,
-                                                   None, evaluator )
+        evaluator = ExpressionEvaluator( 'atari', [] )
+        vctor = ScriptTestMaker( os.getcwd(), spec_file,
+                                 evaluator, TestConstructor() )
         vctor.readFile()
 
         # magic: this function could be improved by splitting functions up
-        #        a little more in the ScriptTestConstructor class
+        #        a little more in the ScriptTestMaker class
         tname = os.path.splitext( basename( spec_file ) )[0]
 
         pset = paramset.ParameterSet()
@@ -163,11 +166,11 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         assert oracle.numStages() == 3
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         assert oracle.numStages() == 2
 
     def test_staging_oracle_can_determine_the_stage_index_of_a_test(self):
@@ -185,7 +188,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         assert len( testL ) == 3
         for ts in testL:
             if ts.getParameterValue( 'np' ) == '2':
@@ -196,7 +199,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 assert oracle.getStageIndex( ts ) == 2
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         assert len( testL ) == 2
         for ts in testL:
             if ts.getParameterValue( 'np' ) == '1':
@@ -205,7 +208,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 assert oracle.getStageIndex( ts ) == 1
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         assert len( testL ) == 4
         num_idx_0 = num_idx_1 = 0
         for ts in testL:
@@ -233,7 +236,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -247,7 +250,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -259,7 +262,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        oracle = staging.StagingOracle( pset.getStagedGroup() )
+        oracle = staging.StagingOracle( pset.getStagedGroup(), TestConstructor() )
         for ts in testL:
             prev = oracle.findPreviousStageDisplayID( ts )
             np = ts.getParameterValue( 'np' )
@@ -286,7 +289,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, TestConstructor() )
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -315,7 +318,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'red.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL , TestConstructor())
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -337,7 +340,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, TestConstructor() )
 
         for tspec in testL:
             np = tspec.getParameterValue( 'np' )
@@ -385,7 +388,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, TestConstructor() )
 
         for tspec in testL:
             depL = tspec.getDependencies()
@@ -404,7 +407,7 @@ class staged_parameters( vtu.vvtestTestCase ):
                 raise Exception( 'unexpected np value: '+str(np) )
 
         pset,testL = self.create_test_list( 'pink.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, TestConstructor() )
 
         for tspec in testL:
             depL = tspec.getDependencies()
@@ -437,7 +440,7 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         pset,testL = self.create_test_list( 'blue.vvt' )
-        staging.mark_staged_tests( pset, testL )
+        staging.mark_staged_tests( pset, testL, TestConstructor() )
 
         for ts in testL:
             sid = tio.test_to_string( TestCase( ts ) )
@@ -578,7 +581,7 @@ class staged_parameters( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tc = testcreator.TestCreator()
+        tc = TestCreator()
         tL1 = tc.fromFile( os.getcwd(), 'd1/red.vvt' )
         tL2 = tc.fromFile( os.getcwd(), 'd2/red.vvt' )
 
@@ -690,10 +693,9 @@ def find_single_dependency( tspec, testL ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid )
+    tcase = tio.string_to_test( stringid, TestConstructor() )
 
-    creator = testcreator.TestCreator( 'atari', [] )
-    creator.reparse( tcase.getSpec() )
+    TestCreator().reparse( tcase.getSpec() )
 
     return tcase
 
