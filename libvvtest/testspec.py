@@ -36,15 +36,16 @@ class TestSpec( TestFile ):
         self.first_stage = True
         self.last_stage = True
 
+        self.idgen = make_test_id
         self._set_identifiers()
 
     def _set_identifiers(self):
         ""
-        idgen = self.getIDGenerator()
+        tid = self.getTestID()
 
-        self.xdir = idgen.computeExecuteDirectory()
-        self.testid = idgen.computeID()
-        self.displ = idgen.computeDisplayString()
+        self.xdir = tid.computeExecuteDirectory()
+        self.testid = tid.computeID()
+        self.displ = tid.computeDisplayString()
 
     def getName(self):
         ""
@@ -101,10 +102,10 @@ class TestSpec( TestFile ):
         """
         return self.testid
 
-    def getIDGenerator(self):
+    def getTestID(self):
         ""
-        return IDGenerator( self.name, self.getFilepath(),
-                            self.params, self.staged )
+        return self.idgen( self.name, self.getFilepath(),
+                           self.params, self.staged )
 
     def setStagedParameters(self, is_first_stage, is_last_stage,
                                   stage_name, *param_names):
@@ -203,7 +204,7 @@ class TestSpec( TestFile ):
         return self.is_analyze
 
 
-class IDGenerator:
+class TestID:
 
     def __init__(self, testname, filepath, params, staged_names):
         ""
@@ -292,3 +293,9 @@ def apply_types_to_param_values( paramD, param_types ):
     for n,v in paramD.items():
         if n in param_types:
             paramD[n] = param_types[n](v)
+
+
+def make_test_id( testname, filepath, params, staged_names ):
+    ""
+    tid = TestID( testname, filepath, params, staged_names )
+    return tid

@@ -98,7 +98,7 @@ class StagingOracle:
 
 def make_display_string( testname, filepath, paramD, staged_names ):
     ""
-    idgen = testspec.IDGenerator( testname, filepath, paramD, staged_names )
+    idgen = testspec.TestID( testname, filepath, paramD, staged_names )
     return idgen.computeDisplayString()
 
 
@@ -106,8 +106,8 @@ def tests_are_related_by_staging( tspec1, tspec2 ):
     ""
     if tspec1.getFilename() == tspec2.getFilename():
 
-        idgen1 = tspec1.getIDGenerator()
-        idgen2 = tspec2.getIDGenerator()
+        idgen1 = tspec1.getTestID()
+        idgen2 = tspec2.getTestID()
 
         names1 = idgen1.getStageNames()
         names2 = idgen2.getStageNames()

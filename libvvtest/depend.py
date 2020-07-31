@@ -171,7 +171,7 @@ def collect_matching_test_ids( idlist, testcasemap ):
 
 def not_staged_or_last_stage( stagemap, tspec ):
     ""
-    tid = tspec.getIDGenerator().computeID( compress_stage=True )
+    tid = tspec.getTestID().computeID( compress_stage=True )
     stagL = stagemap.get( tid, None )
 
     if stagL == None or len(stagL) < 2:
@@ -203,7 +203,7 @@ def map_staged_test_id_to_tspec_list( idlist, testcasemap ):
 
 def add_test_to_map( stagemap, tspec ):
     ""
-    tid = tspec.getIDGenerator().computeID( compress_stage=True )
+    tid = tspec.getTestID().computeID( compress_stage=True )
     tL = stagemap.get( tid, None )
     if tL == None:
         stagemap[tid] = [tspec]
