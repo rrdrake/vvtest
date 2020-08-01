@@ -125,6 +125,8 @@ class MainEntry:
                               cmdline=self.argv,
                               vvtestdir=self.vvtestdir,
                               curdir=self.curdir )
+        if self.opts.short_xdirs:
+            rtinfo.setInfo( shortxdirs=self.opts.short_xdirs )
         self.rtdata.setRuntimeInfo( rtinfo )
 
         rtconfig = construct_RuntimeConfig( self.opts, self.optD )
@@ -384,6 +386,7 @@ def construct_TestConstructor( opts ):
     ""
     tctor = TestConstructor()
 
+    # magic: check and print error if this fails to cast to int
     if opts.short_xdirs:
         tctor.setShorten( int( opts.short_xdirs ) )
 
@@ -636,6 +639,8 @@ def write_cache_file( opts, optD, rtdata, test_dir, plat, perms ):
                 fp.write( 'USE_ENV=1\n' )
             if opts.check:
                 fp.write( 'CHECK=' + ' '.join( opts.check ) + '\n' )
+            if opts.short_xdirs:
+                fp.write( 'SHORT_XDIRS='+opts.short_xdirs + '\n' )
 
         perms.set( abspath(f) )
 
@@ -676,6 +681,9 @@ def read_cache_file( opts, optD, rtconfig, cache_file ):
                 opts.dash_e = True
             elif kvpair[0] == 'CHECK':
                 opts.check = kvpair[1].split()
+            elif kvpair[0] == 'SHORT_XDIRS':
+                if not opts.short_xdirs:
+                    opts.short_xdirs = kvpair[1]
 
 
 def get_test_cache_file():

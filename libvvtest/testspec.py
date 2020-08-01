@@ -36,14 +36,6 @@ class TestSpec( TestFile ):
         self.idgen = idgenerator
         self._set_identifiers()
 
-    def _set_identifiers(self):
-        ""
-        tid = self.getTestID()
-
-        self.xdir = tid.computeExecuteDirectory()
-        self.testid = tid.computeID()
-        self.displ = tid.computeDisplayString()
-
     def getName(self):
         ""
         return self.name
@@ -98,11 +90,6 @@ class TestSpec( TestFile ):
         parameters with values.
         """
         return self.testid
-
-    def getTestID(self):
-        ""
-        return self.idgen( self.name, self.getFilepath(),
-                           self.params, self.staged )
 
     def setStagedParameters(self, is_first_stage, is_last_stage,
                                   stage_name, *param_names):
@@ -199,6 +186,27 @@ class TestSpec( TestFile ):
         test group.
         """
         return self.is_analyze
+
+    def getTestID(self):
+        """
+        constructs and returns a TestID object; this object is used to
+        determine the exec dir, the ID, and the display string
+        """
+        return self.idgen( self.name, self.getFilepath(),
+                           self.params, self.staged )
+
+    def resetIDGenerator(self, idgenerator):
+        ""
+        self.idgen = idgenerator
+        self._set_identifiers()
+
+    def _set_identifiers(self):
+        ""
+        tid = self.getTestID()
+
+        self.xdir = tid.computeExecuteDirectory()
+        self.testid = tid.computeID()
+        self.displ = tid.computeDisplayString()
 
 
 def apply_types_to_param_values( paramD, param_types ):

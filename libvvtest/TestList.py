@@ -13,6 +13,7 @@ from os.path import join as pjoin
 from . import testlistio
 from .groups import ParameterizeAnalyzeGroups
 from .teststatus import copy_test_results
+from .testctor import TestConstructor
 
 
 class TestList:
@@ -184,10 +185,13 @@ class TestList:
             if self.finish:
                 file_attrs['finishepoch'] = self.finish
 
+            tctor = make_TestConstructor( file_attrs )
+
             for xdir,tcase in tlr.getTests().items():
 
                 t = self.tcasemap.get( xdir, None )
                 if t != None:
+                    tctor.resetTestID( t.getSpec() )
                     copy_test_results( t, tcase )
                     if not preserve_skips:
                         t.getStat().removeAttr( 'skip' )
@@ -323,3 +327,14 @@ def glob_results_files( basename ):
     fileL = glob.glob( basename+'.*' )
     fileL.sort()
     return fileL
+
+
+def make_TestConstructor( file_attrs ):
+    ""
+    tctor = TestConstructor()
+
+    nc = file_attrs.get( 'shortxdirs', None )
+    if nc != None:
+        tctor.setShorten( int(nc) )
+
+    return tctor

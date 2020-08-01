@@ -129,6 +129,22 @@ class TestID_tests( unittest.TestCase ):
         assert xdir.startswith( 'bar/foobarbaz_foobarbaz_.' )
         assert displ.startswith( tid3.computeExecuteDirectory(shorten=False) )
 
+    def test_the_ID_generator_can_be_reset(self):
+        ""
+        tctor1 = TestConstructor()
+        tspec = vtu.make_fake_TestSpec( tctor=tctor1 )
+
+        xdir1 = tspec.getExecuteDirectory()
+
+        tctor2 = TestConstructor()
+        tctor2.setShorten( 5 )
+        tctor2.resetTestID( tspec )
+
+        xdir2 = tspec.getExecuteDirectory()
+
+        print3( xdir1, xdir2 )
+        assert xdir1 != xdir2
+
 
 class using_short_xdirs( vtu.vvtestTestCase ):
 
@@ -189,6 +205,12 @@ class using_short_xdirs( vtu.vvtestTestCase ):
                 assert os.path.exists( pjoin( depdirs[i], 'execute.log' ) )
                 assert 'foobar=bar' not in basename( depdirs[i] )
                 assert 'foobar=foo' not in basename( depdirs[i] )
+
+            lines1 = vtu.extract_testlines( vrun.out )
+
+            vrun = vtu.runvvtest( '-i -v' )
+            lines2 = vtu.extract_testlines( vrun.out )
+            assert lines1 == lines2
 
 
 ############################################################################

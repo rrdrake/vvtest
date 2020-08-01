@@ -32,3 +32,7 @@ class TestConstructor:
         ""
         tspec = testspec.TestSpec( testname, rootpath, filepath, self.makeTestID )
         return tspec
+
+    def resetTestID(self, tspec):
+        ""
+        tspec.resetIDGenerator( self.makeTestID )
