@@ -4,7 +4,7 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os
+import os, sys
 from os.path import basename
 
 import hashlib
@@ -19,6 +19,12 @@ class TestID:
         self.params = params
         self.staged = staged_names
 
+        self.short = 100
+
+    def setShorten(self, value):
+        ""
+        self.short = value
+
     def getStageNames(self):
         ""
         return self.staged
@@ -31,9 +37,8 @@ class TestID:
         if len( paramL ) > 0:
             bname += '.' + '.'.join(paramL)
 
-        # if shorten and len(bname) > 10:
-        #     hsh = hex( int( int( hashlib.sha1(bname).hexdigest(), 16 ) % (10**8) ) )[2:]
-        #     bname = self.name+'.'+hsh
+        if shorten:
+            bname = self._compute_shortened_name( bname )
 
         dname = os.path.dirname( self.filepath )
 
@@ -93,8 +98,20 @@ class TestID:
                 return True
         return False
 
+    def _compute_shortened_name(self, fullname):
+        ""
+        if self.short and len(fullname) > self.short:
+            hsh = _compute_hash( fullname )[:10]
+            return self.name[:20] + '.' + hsh
+        else:
+            return fullname
 
-def make_test_id( testname, filepath, params, staged_names ):
-    ""
-    tid = TestID( testname, filepath, params, staged_names )
-    return tid
+
+if sys.version_info[0] < 3:
+    def _compute_hash( astring ):
+        ""
+        return hashlib.sha1(astring).hexdigest()
+else:
+    def _compute_hash( astring ):
+        ""
+        return hashlib.sha1( astring.encode() ).hexdigest()

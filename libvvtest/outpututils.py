@@ -32,13 +32,27 @@ def XstatusString( tcase, test_dir, cwd ):
     s += ' %7s' % format_test_run_time( tcase )
     s += ' %14s' % format_test_run_date( tcase )
 
-    xdir = ref.getDisplayString()
-    s += ' ' + pathutil.relative_execute_directory( xdir, test_dir, cwd )
+    s += ' ' + location_display_string( ref, test_dir, cwd )
 
     if skipreason:
         s += ' skip_reason="'+skipreason+'"'
 
     return s
+
+
+def location_display_string( tspec, test_dir, cwd ):
+    ""
+    displ = tspec.getDisplayString()
+    loc = pathutil.relative_execute_directory( displ, test_dir, cwd )
+
+    tid = tspec.getTestID()
+    if tid.computeExecuteDirectory( shorten=True ) != \
+       tid.computeExecuteDirectory( shorten=False ):
+        xdir = tspec.getExecuteDirectory()
+        xdir = pathutil.relative_execute_directory( xdir, test_dir, cwd )
+        loc = xdir + ' -> ' + loc
+
+    return loc
 
 
 def get_test_command_line( test_exec_dir ):

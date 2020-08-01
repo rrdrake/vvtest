@@ -573,6 +573,9 @@ def create_parser( argvlist, vvtest_version ):
         help='Pass options and/or arguments to each test script.' )
     grp.add_argument( '--encode-exit-status', action='store_true',
         help='Exit nonzero if at least one test did not pass or did not run.' )
+    grp.add_argument( '--short-xdirs', metavar='NUMCHARS',
+        help='Shorten long execution directory names with more characters '
+             'than the given value (default is 100).' )
 
     # resources
     grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )

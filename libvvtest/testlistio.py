@@ -93,7 +93,6 @@ class TestListReader:
 
             except Exception:
                 pass
-                raise #magic
 
         assert self.vers in [32, 33, 34], \
             'corrupt test list file or older format: '+str(self.filename)

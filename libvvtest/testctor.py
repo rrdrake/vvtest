@@ -15,11 +15,17 @@ class TestConstructor:
 
     def __init__(self):
         ""
-        pass
+        self.nchars = None
+
+    def setShorten(self, numchars):
+        ""
+        self.nchars = numchars
 
     def makeTestID(self, testname, filepath, params, staged_names):
         ""
         tid = testid.TestID( testname, filepath, params, staged_names )
+        if self.nchars != None:
+            tid.setShorten( self.nchars )
         return tid
 
     def makeTestSpec(self, testname, rootpath, filepath):

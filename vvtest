@@ -65,6 +65,9 @@ class MainEntry:
 
         self.constructPlatform()
 
+        tctor = construct_TestConstructor( self.opts )
+        self.rtdata.setTestConstructor( tctor )
+
         self.constructTestDirectory()
 
         self.rtdata.setPermissionsObject( self.opts, self.optD )
@@ -211,7 +214,8 @@ class MainEntry:
         rtconfig = self.rtdata.getRuntimeConfig()
 
         creator = TestCreator( rtconfig.getPlatformName(),
-                               rtconfig.getOptionList() )
+                               rtconfig.getOptionList(),
+                               self.rtdata.getTestConstructor() )
 
         scanner = TestFileScanner( creator,
                                    force_params_dict=self.optD['param_dict'],
@@ -333,6 +337,9 @@ class RuntimeData:
     def setTestTimeHandler(self, timehandler): self.timehandler = timehandler
     def getTestTimeHandler(self): return self.timehandler
 
+    def setTestConstructor(self, tctor): self.tctor = tctor
+    def getTestConstructor(self): return self.tctor
+
 
 def construct_platform_instance( vvtestdir, opts, optD ):
     ""
@@ -371,6 +378,16 @@ def construct_RuntimeConfig( opts, optD ):
     rtconfig.setRuntimeSum( opts.tsum )
 
     return rtconfig
+
+
+def construct_TestConstructor( opts ):
+    ""
+    tctor = TestConstructor()
+
+    if opts.short_xdirs:
+        tctor.setShorten( int( opts.short_xdirs ) )
+
+    return tctor
 
 
 class InformationMode:
@@ -487,7 +504,7 @@ def make_TestList( rtdata, batchid=None ):
         namer = create_batch_namer( test_dir )
         tdir = namer.getBatchDir( batchid )
 
-    tctor = TestConstructor()
+    tctor = rtdata.getTestConstructor()
 
     tlist = TestList.TestList( tdir, batchid, tctor )
 
@@ -989,7 +1006,7 @@ def create_Batcher( opts, optD, rtdata,
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
                                            batchitf, namer )
 
-    testctor = TestConstructor()
+    tctor = rtdata.getTestConstructor()
 
     batch = batchutils.Batcher( vvtestcmd,
                                 tlist, xlist, perms,
@@ -997,7 +1014,7 @@ def create_Batcher( opts, optD, rtdata,
                                 opts.batch_length,
                                 opts.max_timeout,
                                 namer, jobhandler,
-                                testctor )
+                                tctor )
 
     return batch
 
@@ -1022,6 +1039,8 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     if opts.dash_m: cmd += ' -m'
     if opts.postclean: cmd += ' -C'
     if opts.analyze: cmd += ' -a'
+
+    if opts.short_xdirs: cmd += ' --short-xdirs ' + opts.short_xdirs
 
     cmd += ' -n 1'  # force sequential batch execution
 

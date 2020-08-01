@@ -660,9 +660,11 @@ def make_simple_script_parse_instance( srcfile ):
     return inst
 
 
-def make_fake_TestSpec( name='atest', keywords=['key1','key2'] ):
+def make_fake_TestSpec( name='atest', keywords=['key1','key2'], tctor=None ):
     ""
-    ts = TestConstructor().makeTestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
+    if tctor == None:
+        tctor = TestConstructor()
+    ts = tctor.makeTestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
     ts.setKeywordList( keywords )
     ts.setParameters( { 'np':'4' } )
     return ts
