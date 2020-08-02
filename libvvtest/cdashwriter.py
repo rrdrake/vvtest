@@ -279,11 +279,13 @@ def is_http_url( destination ):
 def get_test_output( testdir, tspec, file_max_KB ):
     ""
     tdir = pjoin( testdir, tspec.getExecuteDirectory() )
+    displ = pjoin( testdir, tspec.getDisplayString() )
 
     out = '\n'
     out += 'CURTIME : ' + time.ctime() + '\n'
     out += 'HOSTNAME: ' + os.uname()[1] + '\n'
     out += 'TESTDIR : ' + tdir + '\n'
+    out += 'TEST ID : ' + displ + '\n'
 
     out += '\n$ ls -l '+tdir+'\n'
     out += '\n'.join( list_directory_as_strings( tdir ) ) + '\n'

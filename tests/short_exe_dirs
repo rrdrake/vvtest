@@ -212,6 +212,166 @@ class using_short_xdirs( vtu.vvtestTestCase ):
             lines2 = vtu.extract_testlines( vrun.out )
             assert lines1 == lines2
 
+    def test_running_in_a_results_directory(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foobar = foo bar
+            #VVT: analyze : --analyze
+            import sys, os
+            import vvtest_util as vvt
+            if '--analyze' in sys.argv[1:]:
+                for ddir in vvt.DEPDIRS:
+                    assert os.path.exists( ddir )
+            else:
+                with open( 'outfile', 'wt' ) as fp:
+                    fp.write( vvt.foobar + os.linesep )
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--short-xdirs 10', batch=batch )
+            vrun.assertCounts( total=3, npass=3 )
+            tdir = vrun.resultsDir()
+            assert len( glob.glob( tdir+'/atest.*' ) ) == 2
+
+            vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir+'/atest' )
+            vrun.assertCounts( total=1, npass=1 )
+            assert len( glob.glob( tdir+'/atest.*' ) ) == 2
+
+            vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=3, npass=3 )
+            assert len( glob.glob( tdir+'/atest.*' ) ) == 2
+
+            vrun = vtu.runvvtest( '-R --short-xdirs 40', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=3, npass=3 )
+            # the current behavior is that a previously run test will pick up
+            # the previous short xdirs value, and so specifying --short-xdirs
+            # on the vvtest command line does not take effect
+            assert len( glob.glob( tdir+'/atest.*' ) ) == 2
+
+    def test_shortened_directories_with_staging(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize (staged) : foobar = foo bar
+            import os
+            import vvtest_util as vvt
+            with open( 'outfile', 'at' ) as fp:
+                bn = os.path.basename(os.getcwd())
+                fp.write( 'stage='+str(vvt.stage)+' '+bn+os.linesep )
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--short-xdirs 5', batch=batch )
+            vrun.assertCounts( total=2, npass=2 )
+            tdir = vrun.resultsDir()
+            fL = glob.glob( tdir+'/atest*/outfile' )
+            assert len( fL ) == 1
+            for line in util.readfile( fL[0] ).splitlines():
+                assert 'foobar=' not in line
+            assert len( glob.glob( tdir+'/atest*' ) ) == 1
+
+            vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=2, npass=2 )
+            assert len( glob.glob( tdir+'/atest*' ) ) == 1
+
+    def test_depends_on_with_shortening(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            import os
+            import vvtest_util as vvt
+            if vvt.foo == 'baz':
+                with open( 'outfile', 'wt' ) as fp:
+                    fp.write( 'bar'+os.linesep )
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: depends on : atest.foo=baz
+            import os
+            import vvtest_util as vvt
+            assert len( vvt.DEPDIRS ) == 1
+            assert os.path.exists( vvt.DEPDIRS[0]+'/outfile' )
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--short-xdirs 5', batch=batch )
+            vrun.assertCounts( total=3, npass=3 )
+            tdir = vrun.resultsDir()
+
+            assert len( glob.glob( tdir+'/atest*' ) ) == 2
+            assert len( glob.glob( tdir+'/btest' ) ) == 1
+
+    def test_generating_the_tests_then_executing(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--short-xdirs 5 -g' )
+            vrun.assertCounts( total=2, notrun=2 )
+            tdir = vrun.resultsDir()
+
+            vrun = vtu.runvvtest( chdir=tdir, batch=batch )
+            vrun.assertCounts( total=2, npass=2 )
+
+            assert len( glob.glob( tdir+'/atest.*' ) ) == 2
+            assert len( glob.glob( tdir+'/atest.*foo*' ) ) == 0
+
+    def test_rebaseline_with_shortened_test_names(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            #VVT: link : base.txt
+            #VVT: baseline (parameters="foo=baz"): --rebase
+            import sys, os
+            import vvtest_util as vvt
+            if '--rebase' in sys.argv[1:]:
+                with open( 'base.txt', 'wt' ) as fp:
+                    fp.write( 'good value'+os.linesep )
+            else:
+                with open( 'base.txt', 'rt' ) as fp:
+                    val = fp.read().strip()
+                if val != 'good value':
+                    sys.exit( vvt.diff_exit_status )
+            """ )
+        util.writefile( 'base.txt', 'bad value' )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '--short-xdirs 5' )
+        vrun.assertCounts( total=2, diff=2 )
+        tdir = vrun.resultsDir()
+        assert len( glob.glob( tdir+'/atest*' ) ) == 2
+
+        vrun = vtu.runvvtest( '-b', chdir=tdir )
+        assert len( glob.glob( tdir+'/atest*' ) ) == 2
+
+        vrun = vtu.runvvtest( '-R', chdir=tdir )
+        vrun.assertCounts( total=2, npass=2 )
+        assert len( glob.glob( tdir+'/atest*' ) ) == 2
+
+        vrun = vtu.runvvtest( '-R --short-xdirs 5' )
+        vrun.assertCounts( total=2, npass=2 )
+        assert len( glob.glob( tdir+'/atest*' ) ) == 2
+
+        vrun = vtu.runvvtest( '-R' )
+        vrun.assertCounts( total=2, npass=2 )
+        assert len( glob.glob( tdir+'/atest*' ) ) == 2
+
 
 ############################################################################
 
