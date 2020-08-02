@@ -514,7 +514,7 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         vrun.assertCounts( total=5, npass=2, diff=2, fail=1 )
 
         creator = TestCreator( vrun.platformName() )
-        tL = creator.fromFile( '.', 'DiffTest.xml', None )
+        tL = creator.fromFile( '.', 'DiffTest.vvt', None )
         tst = tL[0]
 
         tcase = TestCase( tst )
@@ -544,9 +544,9 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         time.sleep(1)
 
         assert getfsize( 'gfm/README.md' ) > 800
-        assert getfsize( 'gfm/FailTest.md' ) > 3000
-        assert getfsize( 'gfm/DiffTest.np=1.md' ) > 1000
-        assert getfsize( 'gfm/DiffTest.np=2.md' ) > 1000
+        assert getfsize( 'gfm/FailTest.md' ) > 1500
+        assert getfsize( 'gfm/DiffTest.np_stage=1(np=1).md' ) > 1000
+        assert getfsize( 'gfm/DiffTest.np_stage=2(np=2).md' ) > 1000
         assert len( glob.glob( 'gfm/*param*' ) ) == 0
 
     def test_producing_gitlab_markdown_as_part_of_execution(self):
@@ -559,9 +559,9 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         time.sleep(1)
 
         assert getfsize( 'gfm/README.md' ) > 800
-        assert getfsize( 'gfm/FailTest.md' ) > 3000
-        assert getfsize( 'gfm/DiffTest.np=1.md' ) > 1000
-        assert getfsize( 'gfm/DiffTest.np=2.md' ) > 1000
+        assert getfsize( 'gfm/FailTest.md' ) > 1500
+        assert getfsize( 'gfm/DiffTest.np_stage=1(np=1).md' ) > 1000
+        assert getfsize( 'gfm/DiffTest.np_stage=2(np=2).md' ) > 1000
         assert len( glob.glob( 'gfm/*param*' ) ) == 0
 
         fval = util.readfile( 'gfm/README.md' ).strip()
@@ -611,21 +611,24 @@ def write_three_test_files():
         import time
         time.sleep(1)
         """ )
-    util.writefile( "FailTest.vvt", """
-        import os, sys, time
-        import vvtest_util as vvt
-        time.sleep(2)
-        raise Exception( 'pitch a fake exception' )
-        """)
-    util.writefile( "DiffTest.xml", """
-        <rtest name="DiffTest">
-            <parameterize np="1 2"/>
+    util.writefile( 'FailTest.xml', """
+        <rtest name="FailTest">
             <execute>
-                sleep 3
-                echo "fake difference of 29"
-                set have_diff = yes
+                sleep 2
+                foreach i (1 2 3 4 5 6 7 8 9)
+                    echo "exit with fake failure"
+                end
+                exit 1
             </execute>
-        </rtest>""")
+        </rtest>""" )
+    util.writefile( 'DiffTest.vvt', """
+        #VVT: parameterize (staged): np = 1 2
+        import time, sys
+        import vvtest_util as vvt
+        time.sleep(3)
+        print ( 'fake difference of 29' )
+        sys.exit( vvt.diff_exit_status )
+        """ )
 
 
 def grepforline( pattern, multi_line_string ):

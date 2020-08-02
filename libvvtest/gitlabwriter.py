@@ -205,10 +205,10 @@ class GitLabMarkDownConverter:
 
     def createTestFile(self, tcase):
         ""
-        xdir = tcase.getSpec().getDisplayString()
-        base = xdir.replace( os.sep, '_' ).replace( ' ', '_' )
+        base = sanitize_path_name( tcase.getSpec().getDisplayString() )
         fname = pjoin( self.destdir, base+'.md' )
 
+        xdir = tcase.getSpec().getExecuteDirectory()
         srcdir = pjoin( self.test_dir, xdir )
 
         result = outpututils.XstatusString( tcase, self.test_dir, os.getcwd() )
@@ -291,7 +291,7 @@ def format_gitlab_table_line( tcase, add_link ):
     result = tcase.getStat().getResultStatus()
     dt = outpututils.format_test_run_date( tcase )
     tm = outpututils.format_test_run_time( tcase )
-    path = tspec.getExecuteDirectory()
+    displ = tspec.getDisplayString()
 
     makelink = ( add_link and result in ['diff','fail','timeout'] )
 
@@ -299,7 +299,7 @@ def format_gitlab_table_line( tcase, add_link ):
         tm = '-'
 
     s = '| '+result+' | '+dt+' | '+tm+' | '
-    s += format_test_path_for_gitlab( path, makelink ) + ' |'
+    s += format_test_path_for_gitlab( displ, makelink ) + ' |'
 
     return s
 
@@ -307,10 +307,15 @@ def format_gitlab_table_line( tcase, add_link ):
 def format_test_path_for_gitlab( path, makelink ):
     ""
     if makelink:
-        repl = path.replace( os.sep, '_' )
+        repl = sanitize_path_name( path )
         return '['+path+']('+repl+'.md)'
     else:
         return path
+
+
+def sanitize_path_name( path ):
+    ""
+    return path.replace( os.sep, '_' ).replace( ' ', '_' )
 
 
 def stream_gitlab_files( fp, srcdir, selector, max_KB ):
