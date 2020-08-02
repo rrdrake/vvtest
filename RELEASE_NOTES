@@ -1,6 +1,12 @@
 
 Improvements:
 
+    - Add --short-xdirs option and default to a value of 100. With lots of
+      parameters and values, the test execution directories can grow quite
+      long and even fail on some file systems. Now by default, tests with
+      names longer than 100 characters are hashed and the test is executed
+      in the shorter named directory.
+
     - Add "expect" attribute to the "depends on" directive. A test with
       directive
 
