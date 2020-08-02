@@ -5,7 +5,8 @@
 # Government retains certain rights in this software.
 
 import os, sys
-from os.path import basename
+from os.path import dirname, normpath
+from os.path import join as pjoin
 
 import hashlib
 
@@ -40,9 +41,9 @@ class TestID:
         if shorten:
             bname = self._compute_shortened_name( bname )
 
-        dname = os.path.dirname( self.filepath )
+        dname = dirname( self.filepath )
 
-        return os.path.normpath( os.path.join( dname, bname ) )
+        return normpath( pjoin( dname, bname ) )
 
     def computeDisplayString(self):
         ""

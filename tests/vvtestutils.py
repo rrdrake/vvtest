@@ -677,7 +677,7 @@ def make_fake_TestCase( result=None, runtime=None, name='atest',
     tcase = testcase.TestCase( tspec )
     tstat = tcase.getStat()
 
-    tspec.setConstructionCompleted()
+    tspec.setSpecificationForm( 'dummy' )
 
     tstat.resetResults()
 
@@ -788,7 +788,7 @@ def make_TestCase_list( timespec='runtime' ):
 
             tspec = make_fake_TestSpec( name='atest'+str(i) )
             tspec.setParameters( { 'np':str(j+1) } )
-            tspec.setConstructionCompleted()
+            tspec.setSpecificationForm( 'dummy' )
 
             tcase = testcase.TestCase( tspec )
             tstat = tcase.getStat()

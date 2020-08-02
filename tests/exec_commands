@@ -128,6 +128,12 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
 def make_TestSpec( filename ):
     ""
     tspec = TestConstructor().makeTestSpec( 'atest', os.getcwd(), filename )
+
+    if os.path.splitext( filename )[1] == '.xml':
+        tspec.setSpecificationForm( 'xml' )
+    else:
+        tspec.setSpecificationForm( 'script' )
+
     return tspec
 
 

@@ -30,7 +30,7 @@ def parse_vvt_test( inst ):
     parse_dependencies  ( inst )
     parse_preload_label ( inst )
 
-    inst.tfile.setConstructionCompleted()
+    inst.tfile.setSpecificationForm( 'script' )
 
 
 def parse_test_names( vspecs ):

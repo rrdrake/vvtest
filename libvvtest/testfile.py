@@ -19,7 +19,8 @@ class TestFile:
         self.rootpath = rootpath
         self.filepath = filepath
 
-        self.ctor_done = False
+        self.specform = None       # None means construction not done,
+                                   # or 'xml' or 'script'
 
         self.enabled = True
         self.plat_enable = []      # list of WordExpression
@@ -41,14 +42,6 @@ class TestFile:
         self.baseline_spec = None
         self.src_files = []        # extra source files listed by the test
         self.deps = []             # list of (xdir pattern, result expr)
-
-    def setConstructionCompleted(self):
-        ""
-        self.ctor_done = True
-
-    def constructionCompleted(self):
-        ""
-        return self.ctor_done
 
     def getFilename(self):
         """
@@ -327,18 +320,16 @@ class TestFile:
         """
         return list( self.deps )
 
+    def setSpecificationForm(self, form):
+        ""
+        self.specform = form
+
+    def constructionCompleted(self):
+        ""
+        return self.specform != None
+
     def getSpecificationForm(self):
         """
-        Returns "xml" if the test was specified using XML, or "script" if the
-        test is a script.
+        returns None if construction is not completed, otherwise 'xml' or 'script'
         """
-        return map_extension_to_spec_form( self.filepath )
-
-
-# magic: use setter/getter for spec form instead of this function
-def map_extension_to_spec_form( filepath ):
-    ""
-    if os.path.splitext( filepath )[1] == '.xml':
-        return 'xml'
-    else:
-        return 'script'
+        return self.specform

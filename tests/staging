@@ -122,8 +122,6 @@ class staged_parameters( vtu.vvtestTestCase ):
                                  evaluator, TestConstructor() )
         vctor.readFile()
 
-        # magic: this function could be improved by splitting functions up
-        #        a little more in the ScriptTestMaker class
         tname = os.path.splitext( basename( spec_file ) )[0]
 
         pset = paramset.ParameterSet()

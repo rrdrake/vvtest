@@ -65,7 +65,7 @@ class TestCreator:
         """
         if not tspec.constructionCompleted():
 
-            form = tspec.getSpecificationForm()
+            form = map_extension_to_spec_form( tspec.getFilepath() )
 
             ctor = create_test_constructor( form, tspec.getRootpath(),
                                                   tspec.getFilepath(),
@@ -75,8 +75,6 @@ class TestCreator:
 
             ctor.readFile( strict=True )
             ctor.reparseTest( tspec )
-
-            tspec.setConstructionCompleted()
 
 
 class ExpressionEvaluator:
@@ -318,6 +316,6 @@ def create_test_constructor( spec_form, rootpath, relpath,
                                 force_params )
 
     else:
-        raise Exception( "invalid test specification form: "+form )
+        raise Exception( "invalid test specification form: "+spec_form )
 
     return ctor

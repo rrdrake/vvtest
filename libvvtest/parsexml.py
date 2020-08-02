@@ -78,7 +78,7 @@ def parse_xml_test( inst ):
     parse_execute_list     ( inst )
     parse_baseline         ( inst )
 
-    inst.tfile.setConstructionCompleted()
+    inst.tfile.setSpecificationForm( 'xml' )
 
 
 def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
