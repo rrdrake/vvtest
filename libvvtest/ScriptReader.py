@@ -9,6 +9,8 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 import re
+import token
+import tokenize
 
 from .errors import TestSpecError
 
@@ -57,65 +59,45 @@ class ScriptReader:
     vvtpat = re.compile( '[ \t]*#[ \t]*VVT[ \t]*:' )
 
     def readfile(self, filename):
-        """
-        """
-        rdr = FileLineReader( filename )
+        ""
+        lines = read_directive_lines( filename )
 
-        self.shebang = None
-        try:
-
-            line,info = rdr.nextline()
-
-            if line[:2] == '#!':
+        self.spec = None
+        for line,lineno in lines:
+            info = filename+':'+repr(lineno)
+            if lineno == 1 and line[:2] == '#!':
                 self.shebang = line[2:].strip()
-                line,info = rdr.nextline()
+            else:
+                self.parse_line( line, info )
 
-            spec = None
-            while line:
-                done,spec = self.parse_line( line, spec, info )
-                if done:
-                    break
-
-                line,info = rdr.nextline()
-
-            if spec != None:
-                self.speclineL.append( spec )
-
-        finally:
-            rdr.close()
+        if self.spec != None:
+            self.speclineL.append( self.spec )
 
         self.process_specs()
 
         self.filename = filename
 
-    def parse_line(self, line, spec, info):
-        """
-        Parse a line of the script file.
-        """
-        done = False
-        line = line.strip()
+    def parse_line(self, line, info):
+        ""
         if line:
-            if line[0] == '#':
+            char0 = line[0]
+
+            if char0 == '#':
                 m = ScriptReader.vvtpat.match( line )
                 if m == None:
                     # comment line, which stops any continuation
-                    if spec != None:
-                        self.speclineL.append( spec )
-                        spec = None
+                    if self.spec != None:
+                        self.speclineL.append( self.spec )
+                        self.spec = None
                 else:
-                    spec = self.parse_spec( line[m.end():], spec, info )
-            else:
-                # not empty and not a comment
-                done = True
+                    self.parse_spec( line[m.end():], info )
 
-        elif spec != None:
+        elif self.spec != None:
             # an empty line stops any continuation
-            self.speclineL.append( spec )
-            spec = None
+            self.speclineL.append( self.spec )
+            self.spec = None
 
-        return done,spec
-
-    def parse_spec(self, line, spec, info):
+    def parse_spec(self, line, info):
         """
         Parse the contents of the line after a #VVT: marker.
         """
@@ -123,24 +105,22 @@ class ScriptReader:
         if line:
             if line[0] == ':':
                 # continuation of previous spec
-                if spec == None:
+                if self.spec == None:
                     raise TestSpecError( "A #VVT:: continuation was found" + \
                             " but there is nothing to continue, " + info )
                 elif len(line) > 1:
-                    spec[1] += ' ' + line[1:]
-            elif spec == None:
+                    self.spec[1] += ' ' + line[1:]
+            elif self.spec == None:
                 # no existing spec and new spec found
-                spec = [ info, line ]
+                self.spec = [ info, line ]
             else:
                 # spec exists and new spec found
-                self.speclineL.append( spec )
-                spec = [ info, line ]
-        elif spec != None:
+                self.speclineL.append( self.spec )
+                self.spec = [ info, line ]
+        elif self.spec != None:
             # an empty line stops any continuation
-            self.speclineL.append( spec )
-            spec = None
-
-        return spec
+            self.speclineL.append( self.spec )
+            self.spec = None
 
     # the following pattern should match the first paren enclosed stuff,
     # but parens within double quotes are ignored
@@ -219,6 +199,33 @@ class ScriptReader:
         return inclreader.getSpecList()
 
 
+def read_directive_lines( filename ):
+    ""
+    lines = []
+
+    skipnl = False
+    with open( filename, 'rt' ) as fp:
+        for tok_type,tok,beg,end,line in tokenize.generate_tokens( fp.readline ):
+
+            if tok_type == tokenize.COMMENT:
+                lines.append( (tok.strip(),end[0]) )
+                skipnl = True
+
+            else:
+                if tok_type == tokenize.NL:
+                    if not skipnl:
+                        lines.append( ('',end[0]) )
+                elif tok_type == token.STRING:
+                    lines.append( ('',end[0]) )
+                elif tok_type == token.NEWLINE:
+                    pass
+                else:
+                    break
+                skipnl = False
+
+    return lines
+
+
 def split_attr_match( matchobj, origstr ):
     ""
     attrs = origstr[:matchobj.end()]
@@ -283,23 +290,3 @@ def check_parse_attributes_section( a_string, file_and_lineno ):
         attrD = parse_attr_string_into_dict( attrs, file_and_lineno )
 
     return attrD, tail
-
-
-class FileLineReader:
-
-    def __init__(self, filename):
-        ""
-        self.filename = filename
-
-        self.fp = open( filename )
-        self.lineno = 0
-
-    def nextline(self):
-        ""
-        line = self.fp.readline()
-        self.lineno += 1
-        return line, self.filename+':'+str(self.lineno)
-
-    def close(self):
-        ""
-        self.fp.close()

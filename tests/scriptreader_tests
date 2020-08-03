@@ -11,6 +11,7 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 import time
+import glob
 
 import vvtestutils as vtu
 import testutils as util
@@ -68,6 +69,88 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
                          ('keyname4', 'value4' ),
                          ('keyname5', 'value5' ),
                          ('keyname6', 'value6' ) )
+
+    def test_solitary_strings_before_directives_are_ignored(self):
+        ""
+        util.writefile( 'script00.vvt', """\
+            "My cool file"
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script01.vvt', """
+
+            "My cool file"
+
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script02.vvt', """\
+            'My cool file'
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script03.vvt', """
+
+            'My cool file'
+
+            #VVT: keyname : value
+            """ )
+        util.writescript( 'script04.vvt', """
+            #!/usr/bin/env python
+            'My cool file'
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script05.vvt', '''
+
+            """My cool file"""
+
+            #VVT: keyname : value
+            ''' )
+        util.writefile( 'script06.vvt', """
+            '''My cool file'''
+
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script07.vvt', '''
+
+            """
+            My cool file.
+            This is line two.
+            """
+
+            #VVT: keyname : value
+            ''' )
+        util.writefile( 'script08.vvt', """
+            '''
+            My cool file.
+            This is line two.
+            '''
+
+            #VVT: keyname : value
+            """ )
+        util.writefile( 'script09.vvt', '''
+            """
+            My cool file.
+            This is line two.
+            """
+            #VVT: keyname : value
+            ''' )
+        util.writefile( 'script10.vvt', '''
+            """My cool file.
+            This is line two."""
+
+            #VVT: keyname : value
+            ''' )
+        util.writefile( 'script11.vvt', '''
+            """My cool file.
+            This is line two."""
+            #VVT: keyname : value
+            ''' )
+        time.sleep(1)
+
+        fnL = glob.glob( 'script*.vvt' )
+        fnL.sort()
+        for fn in fnL:
+            print3( fn )
+            rdr = ScriptReader( fn )
+            assert_speclist( rdr.getSpecList(), ('keyname', 'value') )
 
 
 class ScriptReader_include_directives( vtu.vvtestTestCase ):
