@@ -156,6 +156,13 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( '-vv --config', adir, batch=batch )
             vrun.assertCounts( total=1, npass=1 )
+            tdir = vrun.resultsDir()
+
+            if batch:
+                # prologue and epilogue should not be called in the batch jobs
+                fn = util.globfile( tdir+'/batchset*/qbat-out*' )
+                assert len( util.grepfiles( 'CMDLINE=', fn ) ) == 0
+                assert len( util.grepfiles( 'EPILOGUE=', fn ) ) == 0
 
             def check_cmdline( out ):
                 lines = util.greplines( 'EPILOGUE=', out )

@@ -1083,7 +1083,8 @@ def restartTests( opts, optD, rtdata ):
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
 
-    rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
+    if batchid == None:
+        rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
     tlist = make_TestList( rtdata, batchid )
 
@@ -1121,7 +1122,8 @@ def restartTests( opts, optD, rtdata ):
     rtinfo.setInfo( finishepoch=time.time() )
     results_writer.postrun( tlist, rtinfo )
 
-    call_user_epilogue( rtdata, tlist )
+    if batchid == None:
+        call_user_epilogue( rtdata, tlist )
 
     return tlist.encodeIntegerWarning()
 

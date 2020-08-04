@@ -119,6 +119,9 @@ Improvements:
 
 Fixes:
 
+    - The user plugin functions prologue() and epilogue() were being called
+      in the execution of batch jobs. Now they are not.
+
     - Under some circumstances, previous test results would not show up in
       the vvtest -i output, and some tests would fail to rerun when running
       inside the test results directory.
