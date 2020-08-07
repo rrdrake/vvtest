@@ -16,24 +16,21 @@ from .teststatus import copy_test_results
 from .testctor import TestConstructor
 
 
+default_filename = 'testlist'
+
+
 class TestList:
     """
     Stores a set of TestCase objects and has utilities to read and write them
     to a file.
     """
 
-    base_filename = 'testlist'
-
-    def __init__(self, directory=None, identifier=None, testctor=None):
+    def __init__(self, filename=None, testctor=None):
         ""
-        if not directory:
-            directory = os.getcwd()
-
-        fn = pjoin( directory, TestList.base_filename )
-        self.filename = normpath( abspath( fn ) )
-
-        if identifier != None:
-            self.filename += '.'+str(identifier)
+        if filename:
+            self.filename = normpath( abspath( filename ) )
+        else:
+            self.filename = abspath( default_filename )
 
         self.tctor = testctor
 

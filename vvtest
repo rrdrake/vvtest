@@ -357,8 +357,7 @@ def construct_platform_instance( vvtestdir, opts, optD ):
                 opts.devices,
                 opts.max_devices,
                 optD['onopts'],        # -o
-                optD['offopts'],       # -O
-                opts.qsub_id )         # --qsub-id
+                optD['offopts'] )      # -O
 
     return plat
 
@@ -502,17 +501,16 @@ def make_TestList( rtdata, batchid=None ):
     test_dir = rtdata.getTestResultsDir()
 
     if batchid == None:
-        tdir = test_dir
+        fn = pjoin( test_dir, TestList.default_filename )
     else:
         namer = create_batch_namer( test_dir )
-        tdir = namer.getBatchDir( batchid )
+        fn = namer.getFilePath( TestList.default_filename, batchid )
 
     tctor = rtdata.getTestConstructor()
 
-    tlist = TestList.TestList( tdir, batchid, tctor )
+    tlist = TestList.TestList( fn, tctor )
 
     return tlist
-
 
 
 def symlink_batch_files_in_tests( test_dir, tlist, batchid ):

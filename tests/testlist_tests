@@ -340,7 +340,8 @@ class TestList_results_file( vtu.vvtestTestCase ):
 
         # write include test list file containing suffix attribute
         tcase = list( tl.getTests() )[0]
-        tlincl = TestList.TestList( directory='subdir', identifier=3 )
+        fn = os.path.join( 'subdir/'+TestList.default_filename )
+        tlincl = TestList.TestList( filename=fn )
         tlincl.setResultsSuffix( sfx )
         tlincl.addTest( tcase )
         tlincl.stringFileWrite( extended=True )
@@ -352,8 +353,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         # create the sublist test results
-        tlsub = TestList.TestList( directory='subdir', identifier=3,
-                                   testctor=TestConstructor() )
+        tlsub = TestList.TestList( filename=fn, testctor=TestConstructor() )
         tlsub.readTestList()
         write_TestList_fake_results( tlsub )
         time.sleep(1)

@@ -324,8 +324,7 @@ class ResourcePool:
 
 def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
                               numprocs, maxprocs, devices, max_devices,
-                              onopts, offopts,
-                              qsubid ):
+                              onopts, offopts ):
     """
     This function is an adaptor around construct_Platform(), which passes
     through the command line arguments as a dictionary.

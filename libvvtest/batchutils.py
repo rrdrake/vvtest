@@ -145,14 +145,25 @@ class Batcher:
 
     def _construct_job(self, bjob, testL):
         ""
-        batchid = bjob.getBatchID()
-        bdir = self.namer.getBatchDir( batchid )
-        tlist = make_batch_TestList( bdir, batchid, self.suffix, testL, self.tctor )
+        tlist = self._make_TestList( bjob.getBatchID(), testL )
 
         maxsize = compute_max_size( tlist )
 
         bjob.setMaxSize( maxsize )
         bjob.setAttr( 'testlist', tlist )
+
+    def _make_TestList(self, batchid, qlist ):
+        ""
+        fn = self.namer.getFilePath( TestList.default_filename, batchid )
+
+        tl = TestList.TestList( fn, self.tctor )
+
+        tl.setResultsSuffix( self.suffix )
+
+        for tcase in qlist:
+            tl.addTest( tcase )
+
+        return tl
 
     def _start_job(self, bjob):
         ""
@@ -389,18 +400,6 @@ class BatchGroup:
     def asList(self):
         ""
         return [ self.tsum, self.size, self.groupid, self.tests ]
-
-
-def make_batch_TestList( batchdir, batchid, suffix, qlist, testctor ):
-    ""
-    tl = TestList.TestList( batchdir, batchid, testctor )
-
-    tl.setResultsSuffix( suffix )
-
-    for tcase in qlist:
-        tl.addTest( tcase )
-
-    return tl
 
 
 def compute_max_size( tlist ):

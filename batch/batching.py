@@ -352,16 +352,15 @@ class BatchFileNamer:
         file name in the batchset subdirectory and with the id appended.
         """
         subd = self.getBatchDir( batchid )
-        fn = os.path.join( subd, basename+'.'+str(batchid) )
+        fn = os.path.join( self.rootdir, subd, basename+'.'+str(batchid) )
         return fn
 
     def getBatchDir(self, batchid):
         """
         Given a queue/batch id, this function returns the corresponding
-        subdirectory name.  The 'batchid' argument can be a string or integer.
+        subdirectory name.
         """
-        d = 'batchset' + str( int( float(batchid)/50 + 0.5 ) )
-        return os.path.join( self.rootdir, d )
+        return 'batchset' + str( int( float(batchid)/50 + 0.5 ) )
 
     def globBatchDirectories(self):
         """

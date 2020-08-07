@@ -175,8 +175,7 @@ class constructing_platform( vtu.vvtestTestCase ):
         plat = vvplatform.create_Platform_instance(
                     os.getcwd(), None, None, None, None,
                     None, None, None, None,
-                    None, None,
-                    None )
+                    None, None )
 
         optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
         plat = vvplatform.create_Platform_instance(
@@ -185,8 +184,7 @@ class constructing_platform( vtu.vvtestTestCase ):
                     optD,
                     True,
                     10, 20, None, None,
-                    ['dbg'], ['symbols'],
-                    23 )
+                    ['dbg'], ['symbols'] )
         self.check_platform_object( plat )
 
     def check_platform_object(self, plat):
