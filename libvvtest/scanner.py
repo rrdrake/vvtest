@@ -13,7 +13,7 @@ from .staging import tests_are_related_by_staging
 
 class TestFileScanner:
 
-    def __init__(self, creator,
+    def __init__(self, creator, path_list=[],
                        force_params_dict=None,
                        spectype=None,
                        warning_output_stream=sys.stdout):
@@ -28,6 +28,7 @@ class TestFileScanner:
         both *.xml and *.vvt.
         """
         self.creator = creator
+        self.path_list = path_list
         self.params = force_params_dict
         self.warnout = warning_output_stream
 
@@ -35,9 +36,9 @@ class TestFileScanner:
 
         self.xdirmap = {}  # TestSpec xdir -> TestCase object
 
-    def scanPaths(self, testlist, path_list):
+    def scanPaths(self, testlist):
         ""
-        for d in path_list:
+        for d in self.path_list:
             if not os.path.exists(d):
                 raise FatalError( 'scan path does not exist: ' + str(d) )
 

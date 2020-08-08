@@ -10,20 +10,24 @@ import os, sys
 class TimeHandler:
 
     def __init__(self, userplugin, cmdline_timeout,
-                       timeout_multiplier, max_timeout):
+                       timeout_multiplier, max_timeout,
+                       cache):
         ""
         self.plugin = userplugin
         self.cmdline_timeout = cmdline_timeout
         self.tmult = timeout_multiplier
         self.maxtime = max_timeout
+        self.cache = cache
 
-    def load(self, cache, tlist):
+    def load(self, tlist):
         """
         For each test, a 'runtimes' file will be read (if it exists) and the
         run time for this platform extracted.  This run time is saved as the
         test execute time.  Also, a timeout is calculated for each test and
         placed in the 'timeout' attribute.
         """
+        self.cache.load()
+
         for tcase in tlist.getTests():
 
             tspec = tcase.getSpec()
@@ -34,7 +38,7 @@ class TimeHandler:
                 tout = tspec.getTimeout()
 
             # look for a previous runtime value
-            tlen,tresult = cache.getRunTime( tspec )
+            tlen,tresult = self.cache.getRunTime( tspec )
 
             if tlen != None:
 
@@ -54,8 +58,6 @@ class TimeHandler:
             tout = self._apply_timeout_options( tout )
 
             tcase.getStat().setAttr( 'timeout', tout )
-
-        cache = None
 
     def _timeout_if_test_timed_out(self, tspec, runtime):
         ""

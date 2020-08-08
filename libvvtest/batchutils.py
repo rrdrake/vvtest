@@ -154,7 +154,7 @@ class Batcher:
 
     def _make_TestList(self, batchid, qlist ):
         ""
-        fn = self.namer.getFilePath( TestList.default_filename, batchid )
+        fn = self.namer.getBatchPath( batchid )
 
         tl = TestList.TestList( fn, self.tctor )
 

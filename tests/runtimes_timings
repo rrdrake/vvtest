@@ -60,6 +60,7 @@ class runtimes_and_timings( vtu.vvtestTestCase ):
         tL = TestCreator().fromFile( tests, 'dir1/one.xml', None )
         tst = tL[0]
         cache = fmtresults.LookupCache( platname, 'cplr' )
+        cache.load()
         tm,tv = cache.getRunTime( tst )
         assert tm == None
 
@@ -77,6 +78,7 @@ class runtimes_and_timings( vtu.vvtestTestCase ):
         # leave the source tree runtimes file empty and use the
         # multiplatform results
         cache = fmtresults.LookupCache( plat, cplr, os.path.abspath('testing') )
+        cache.load()
         tm,tv = cache.getRunTime( tst )
         assert tm != None and tm > 0 and tm < 10
 
@@ -87,6 +89,7 @@ class runtimes_and_timings( vtu.vvtestTestCase ):
 
         # a time for the test should be found from the source tree runtimes file
         cache = fmtresults.LookupCache( platname, 'cplr' )
+        cache.load()
         tm,tv = cache.getRunTime( tst )
         assert tm != None and tm > 0 and tm < 10
 

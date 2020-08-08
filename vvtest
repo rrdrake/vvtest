@@ -21,6 +21,7 @@ from libvvtest.errors import FatalError
 import libvvtest.location as location
 import libvvtest.execute as execute
 from libvvtest.testctor import TestConstructor
+import libvvtest.TestList as TestList
 
 
 version = '1.2'
@@ -81,23 +82,23 @@ class MainEntry:
         exitstat = 0
 
         if information_mode( self.opts ):
-            mode = InformationMode( self.opts, self.optD, self.rtdata )
+            mode = InformationMode( self.opts, self.optD, self.rtdata, self.tlm )
             exitstat = mode.run( self.dirs )
 
         elif self.opts.dash_g:
-            generateTestList( self.opts, self.optD, self.dirs, self.rtdata )
+            generateTestList( self.opts, self.optD, self.rtdata, self.tlm )
 
         elif self.opts.dash_b:
 
             if self.opts.dash_R or self.opts.dash_w:
                 raise FatalError( 'cannot use -R or -w with -b (baseline)' )
 
-            baselineTests( self.opts, self.optD, self.rtdata )
+            baselineTests( self.opts, self.optD, self.rtdata, self.tlm )
 
         elif self.opts.extract:
             extractTestFiles( self.opts.scan_type,
                               self.optD['param_dict'],
-                              self.dirs, self.opts.extract, self.rtdata )
+                              self.opts.extract, self.rtdata, self.tlm )
 
         else:
 
@@ -107,10 +108,9 @@ class MainEntry:
                 rtconfig.addResultsKeywordExpression( 'notrun or notdone' )
 
             if self.rtdata.isRestartMode():
-                exitstat = restartTests( self.opts, self.optD, self.rtdata )
+                exitstat = restartTests( self.opts, self.optD, self.rtdata, self.tlm )
             else:
-                exitstat = runTests( self.opts, self.optD,
-                                     self.rtdata, self.dirs )
+                exitstat = runTests( self.opts, self.optD, self.rtdata, self.tlm )
 
         if self.opts.encode_exit_status:
             return exitstat
@@ -214,30 +214,38 @@ class MainEntry:
         from libvvtest.timeout import TimeHandler
 
         rtconfig = self.rtdata.getRuntimeConfig()
+        test_dir = self.rtdata.getTestResultsDir()
 
         creator = TestCreator( rtconfig.getPlatformName(),
                                rtconfig.getOptionList(),
                                self.rtdata.getTestConstructor() )
 
-        scanner = TestFileScanner( creator,
+        scanner = TestFileScanner( creator, self.dirs,
                                    force_params_dict=self.optD['param_dict'],
                                    spectype=self.opts.scan_type )
-        self.rtdata.setTestScanner( scanner )
 
         plug = import_plugin_module( rtconfig )
         self.rtdata.setUserPlugin( plug )
 
-        test_dir = self.rtdata.getTestResultsDir()
-
         testfilter = TestFilter( rtconfig, plug )
         tsel = TestSelector( test_dir, testfilter, creator )
-        self.rtdata.setTestSelector( tsel )
 
+        plat = self.rtdata.getPlatformObject()
+        tcache = construct_runtime_lookup_cache( plat )
         timehandler = TimeHandler( plug,
                                    self.opts.dash_T,
                                    self.opts.timeout_multiplier,
-                                   self.opts.max_timeout )
-        self.rtdata.setTestTimeHandler( timehandler )
+                                   self.opts.max_timeout,
+                                   tcache )
+
+        import batch.batching as batching
+        namer = batching.BatchFileNamer( test_dir )
+
+        self.tlm = TestListManager( namer=namer,
+                                    tctor=self.rtdata.getTestConstructor(),
+                                    scanner=scanner,
+                                    selector=tsel,
+                                    timehandler=timehandler )
 
 
 def import_plugin_module( rtconfig ):
@@ -310,14 +318,8 @@ class RuntimeData:
     def setRuntimeConfig(self, rtconfig): self.rtconfig = rtconfig
     def getRuntimeConfig(self): return self.rtconfig
 
-    def setTestScanner(self, scanner): self.scanner = scanner
-    def getTestScanner(self): return self.scanner
-
     def setUserPlugin(self, plugin): self.plugin = plugin
     def getUserPlugin(self): return self.plugin
-
-    def setTestSelector(self, selector): self.selector = selector
-    def getTestSelector(self): return self.selector
 
     def setTestResultsDir(self, test_dir): self.test_dir = test_dir
     def getTestResultsDir(self): return self.test_dir
@@ -335,9 +337,6 @@ class RuntimeData:
 
     def setResultsWriter(self, writer): self.results_writer = writer
     def getResultsWriter(self): return self.results_writer
-
-    def setTestTimeHandler(self, timehandler): self.timehandler = timehandler
-    def getTestTimeHandler(self): return self.timehandler
 
     def setTestConstructor(self, tctor): self.tctor = tctor
     def getTestConstructor(self): return self.tctor
@@ -394,11 +393,12 @@ def construct_TestConstructor( opts ):
 
 class InformationMode:
 
-    def __init__(self, opts, optD, rtdata):
+    def __init__(self, opts, optD, rtdata, tlm):
         ""
         self.opts = opts
         self.optD = optD
         self.rtdata = rtdata
+        self.tlm = tlm
 
     def run(self, scan_dirs):
         ""
@@ -425,22 +425,19 @@ class InformationMode:
     def loadTestList(self, scan_dirs):
         ""
         test_dir = self.rtdata.getTestResultsDir()
-        selector = self.rtdata.getTestSelector()
-        scanner = self.rtdata.getTestScanner()
         rtconfig = self.rtdata.getRuntimeConfig()
         plat = self.rtdata.getPlatformObject()
 
-        tlist = make_TestList( self.rtdata )
+        tlist = self.tlm.makeTestList()
 
         restart = self.rtdata.isRestartMode()
-        have_cache = self.rtdata.isRestartMode() or os.path.exists( test_dir )
+        have_cache = ( restart or os.path.exists( test_dir ) )
 
         if not restart and ( self.opts.keys or self.opts.files ):
-            scanner.scanPaths( tlist, scan_dirs )
+            self.tlm.scanPaths()
 
         elif have_cache:
-            maybe_turn_off_max_size_filtering( False, True,
-                                               self.opts, plat, rtconfig )
+            maybe_turn_off_max_size_filtering( self.tlm, False, True, self.opts, plat )
             rtconfig.applyTDDExpression( False )
             self._read_test_list( tlist )
 
@@ -448,17 +445,16 @@ class InformationMode:
             print3( 'WARNING: previous test results directory not found,',
                     test_dir )
 
-        selector.prepareActiveTests( tlist, remove_new_skips=True )
+        self.tlm.prepareActive( remove_new_skips=True )
 
         return tlist
 
     def _read_test_list(self, tlist):
         ""
-        writers = self.rtdata.getResultsWriter()
         rtinfo = self.rtdata.getRuntimeInfo()
 
-        tlist.readTestList()
-        attrs = tlist.readTestResults()
+        self.tlm.readTests()
+        attrs = self.tlm.readResults()
 
         rtinfo.setInfo( **attrs )
 
@@ -494,65 +490,92 @@ class InformationMode:
             print3( d )
 
 
-def make_TestList( rtdata, batchid=None ):
+class TestListManager:
+
+    def __init__(self, namer, tctor, scanner, selector, timehandler ):
+        ""
+        self.namer = namer
+        self.tctor = tctor
+        self.scanner = scanner
+        self.selector = selector
+        self.timehandler = timehandler
+
+    def getFileNamer(self):
+        ""
+        return self.namer
+
+    def makeTestList(self, batchid=None):
+        ""
+        fn = self.namer.getFilePath( batchid )
+
+        self.tlist = TestList.TestList( fn, self.tctor )
+
+        return self.tlist
+
+    def scanPaths(self):
+        ""
+        self.scanner.scanPaths( self.tlist )
+
+    def applyFilters(self):
+        ""
+        self.selector.applyPermanentFilters( self.tlist )
+
+    def readTests(self):
+        ""
+        self.tlist.readTestList()
+
+    def loadTestTimes(self):
+        ""
+        self.timehandler.load( self.tlist )
+
+    def readResults(self, preserve_skips=False):
+        ""
+        attrs = self.tlist.readTestResults( preserve_skips=preserve_skips )
+        return attrs
+
+    def addBatchFileLinksToTests(self, batchid):
+        ""
+        qbat = self.namer.getScriptPath( batchid )
+        qout = self.namer.getOutputPath( batchid )
+
+        for tcase in self.tlist.getTests():
+            tcase.getSpec().addLinkFile( qbat )
+            tcase.getSpec().addLinkFile( qout )
+
+    def prepareActive(self, batchid=None, remove_new_skips=False ):
+        ""
+        self.selector.prepareActiveTests( self.tlist,
+                                          apply_filters=(batchid==None),
+                                          remove_new_skips=remove_new_skips )
+
+    def prepareForBaseline(self):
+        ""
+        self.selector.prepareBaselineTests( self.tlist )
+
+
+def write_test_list_file( tlist, file_attrs, perms ):
     ""
-    import libvvtest.TestList as TestList
-
-    test_dir = rtdata.getTestResultsDir()
-
-    if batchid == None:
-        fn = pjoin( test_dir, TestList.default_filename )
-    else:
-        namer = create_batch_namer( test_dir )
-        fn = namer.getFilePath( TestList.default_filename, batchid )
-
-    tctor = rtdata.getTestConstructor()
-
-    tlist = TestList.TestList( fn, tctor )
-
-    return tlist
-
-
-def symlink_batch_files_in_tests( test_dir, tlist, batchid ):
-    ""
-    namer = create_batch_namer( test_dir )
-
-    qbat = namer.getScriptPath( batchid )
-    qout = namer.getOutputPath( batchid )
-
-    for tcase in tlist.getTests():
-        tcase.getSpec().addLinkFile( qbat )
-        tcase.getSpec().addLinkFile( qout )
-
-
-def create_batch_namer( test_dir ):
-    ""
-    import batch.batching as batching
-    return batching.BatchFileNamer( test_dir )
+    tlist.stringFileWrite( **file_attrs )
+    perms.set( tlist.getFilename() )
 
 
 ##############################################################################
 
-def generateTestList( opts, optD, dirs, rtdata ):
+def generateTestList( opts, optD, rtdata, tlm ):
     """
     """
     rtconfig = rtdata.getRuntimeConfig()
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     perms = rtdata.getPermissionsObject()
-    timehandler = rtdata.getTestTimeHandler()
     plugin = rtdata.getUserPlugin()
-    selector = rtdata.getTestSelector()
-    scanner = rtdata.getTestScanner()
     rtinfo = rtdata.getRuntimeInfo()
 
-    tlist = make_TestList( rtdata )
+    tlist = tlm.makeTestList()
 
-    scanner.scanPaths( tlist, dirs )
-
-    timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
-
-    selector.applyPermanentFilters( tlist )
+    tlm.scanPaths()
+    tlm.loadTestTimes()
+    tlm.applyFilters()
 
     rtdata.getResultsWriter().prerun( tlist, rtinfo, verbosity=1 )
     print3()
@@ -562,8 +585,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
 
     write_cache_file( opts, optD, rtdata, test_dir, plat, perms )
 
-    tlist.stringFileWrite( **rtinfo.asDict() )
-    perms.set( tlist.getFilename() )
+    write_test_list_file( tlist, rtinfo.asDict(), perms )
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
@@ -573,7 +595,7 @@ def generateTestList( opts, optD, dirs, rtdata ):
     print3( "\nTest directory:", basename( test_dir ) )
 
 
-def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
+def extractTestFiles( scan_type, param_dict, target_dir, rtdata, tlm ):
     """
     Uses all the regular filtering mechanisms to gather tests from a test
     source area and copies the files used for each test into a separate
@@ -581,16 +603,11 @@ def extractTestFiles( scan_type, param_dict, dirs, target_dir, rtdata ):
     """
     import libvvtest.extract as extract
 
-    tlist = make_TestList( rtdata )
+    tlist = tlm.makeTestList()
 
-    rtdata.getTestScanner().scanPaths( tlist, dirs )
-
-    plat = rtdata.getPlatformObject()
-    cache = construct_runtime_lookup_cache( plat )
-    rtdata.getTestTimeHandler().load( cache, tlist )
-    selector = rtdata.getTestSelector()
-
-    selector.applyPermanentFilters( tlist )
+    tlm.scanPaths()
+    tlm.loadTestTimes()
+    tlm.applyFilters()
 
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
 
@@ -703,28 +720,24 @@ def call_user_epilogue( rtdata, tlist ):
     plug.callEpilogue( rdir, tlist.getTests() )
 
 
-def runTests( opts, optD, rtdata, dirs ):
+def runTests( opts, optD, rtdata, tlm ):
     """
     Executes a list of tests.
     """
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
-    timehandler = rtdata.getTestTimeHandler()
-    selector = rtdata.getTestSelector()
-    scanner = rtdata.getTestScanner()
     rtinfo = rtdata.getRuntimeInfo()
-    rtconfig = rtdata.getRuntimeConfig()
+    perms = rtdata.getPermissionsObject()
 
     rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    tlist = make_TestList( rtdata )
+    maybe_turn_off_max_size_filtering( tlm, opts.batch, False, opts, plat )
+    tlist = tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
-
-    perms = rtdata.getPermissionsObject()
 
     location.create_test_directory( test_dir, opts.dash_M,
                                     rtinfo.getInfo('curdir'), perms )
@@ -734,21 +747,13 @@ def runTests( opts, optD, rtdata, dirs ):
 
     write_cache_file( opts, optD, rtdata, test_dir, plat, perms )
 
-    scanner.scanPaths( tlist, dirs )
-
-    tlist.readTestList()
-
-    timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
-
-    # apply filters and save the test list in the TestResults directory
-    maybe_turn_off_max_size_filtering( opts.batch, False, opts, plat, rtconfig )
-    selector.applyPermanentFilters( tlist )
-    tlist.stringFileWrite( **rtinfo.asDict() )
-    perms.set( tlist.getFilename() )
-
-    tlist.readTestResults( preserve_skips=True )
-
-    selector.prepareActiveTests( tlist )
+    tlm.scanPaths()
+    tlm.readTests()
+    tlm.loadTestTimes()
+    tlm.applyFilters()
+    write_test_list_file( tlist, rtinfo.asDict(), perms )
+    tlm.readResults( preserve_skips=True )
+    tlm.prepareActive()
 
     results_writer = rtdata.getResultsWriter()
 
@@ -758,7 +763,7 @@ def runTests( opts, optD, rtdata, dirs ):
     if tlist.numActive() > 0:
         run_test_exec_list( opts, optD, rtdata,
                             tlist, test_dir, perms,
-                            results_writer )
+                            results_writer, tlm )
 
     print3()
     rtinfo.setInfo( finishepoch=time.time() )
@@ -771,8 +776,21 @@ def runTests( opts, optD, rtdata, dirs ):
     return tlist.encodeIntegerWarning()
 
 
-def maybe_turn_off_max_size_filtering( isbatch, isrestart,
-                                       opts, plat, rtconfig ):
+def maybe_turn_off_max_size_filtering_magic( isbatch, isrestart,
+                                             opts, plat, rtconfig ):
+    ""
+    if isrestart:
+        if opts.dash_N == None:
+            rtconfig.applyMaxProcsExpression( False )
+        if opts.max_devices == None:
+            rtconfig.applyMaxDevicesExpression( False )
+
+    elif isbatch:
+        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
+            rtconfig.applyMaxProcsExpression( False )
+
+
+def maybe_turn_off_max_size_filtering( tlman, isbatch, isrestart, opts, plat ):
     """
     Platform sets max num processors (CPU cores):
         - uses -N or a plugin value
@@ -784,15 +802,25 @@ def maybe_turn_off_max_size_filtering( isbatch, isrestart,
         - if neither of those, it uses the value of --devices
         - otherwise it defaults to zero
     """
+    cpu = True
+    dev = True
+
     if isrestart:
         if opts.dash_N == None:
-            rtconfig.applyMaxProcsExpression( False )
+            cpu = False
         if opts.max_devices == None:
-            rtconfig.applyMaxDevicesExpression( False )
+            dev = False
 
     elif isbatch:
         if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            rtconfig.applyMaxProcsExpression( False )
+            cpu = False
+
+    # magic: maybe use setter on selector to apply max'es
+    rtconfig = tlman.selector.tfilter.rtconfig
+    if not cpu:
+        rtconfig.applyMaxProcsExpression( False )
+    if not dev:
+        rtconfig.applyMaxDevicesExpression( False )
 
 
 def check_for_currently_running_vvtest( tlist, optforce ):
@@ -962,7 +990,7 @@ def get_testing_directory( opts, platobj ):
 
 def run_test_exec_list( opts, optD, rtdata,
                         tlist, test_dir, perms,
-                        results_writer ):
+                        results_writer, tlm ):
     ""
     rtconfig = rtdata.getRuntimeConfig()
     plat = rtdata.getPlatformObject()
@@ -981,12 +1009,13 @@ def run_test_exec_list( opts, optD, rtdata,
         tlrun.runDirect( opts.qsub_id )
 
     else:
-        batch = create_Batcher( opts, optD, rtdata,
+        namer = tlm.getFileNamer()
+        batch = create_Batcher( opts, optD, rtdata, namer,
                                 tlist, xlist, test_dir, plat, perms )
         tlrun.runBatch( batch )
 
 
-def create_Batcher( opts, optD, rtdata,
+def create_Batcher( opts, optD, rtdata, namer,
                     tlist, xlist, test_dir, plat, perms ):
     ""
     import libvvtest.batchutils as batchutils
@@ -1005,8 +1034,6 @@ def create_Batcher( opts, optD, rtdata,
     vvtestcmd = vvtest_command_line_for_batch( opts, optD,
                                                rtdata.getVvtestPath(),
                                                rtdata.getRuntimeConfig() )
-
-    namer = batching.BatchFileNamer( test_dir )
 
     check_interval, check_timeout = determine_job_check_intervals()
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
@@ -1069,12 +1096,11 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     return cmd
 
 
-def restartTests( opts, optD, rtdata ):
+def restartTests( opts, optD, rtdata, tlm ):
     ""
     batchid = opts.qsub_id
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
-    selector = rtdata.getTestSelector()
     rtconfig = rtdata.getRuntimeConfig()
     rtinfo = rtdata.getRuntimeInfo()
 
@@ -1084,23 +1110,22 @@ def restartTests( opts, optD, rtdata ):
     if batchid == None:
         rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    tlist = make_TestList( rtdata, batchid )
+    maybe_turn_off_max_size_filtering( tlm, opts.batch, True, opts, plat )
+    tlist = tlm.makeTestList( opts.qsub_id )
 
-    tlist.readTestList()
-    tlist.readTestResults()
+    tlm.readTests()
+    tlm.readResults()
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
-        timehandler = rtdata.getTestTimeHandler()
-        timehandler.load( construct_runtime_lookup_cache( plat ), tlist )
+        tlm.loadTestTimes()
     else:
-        symlink_batch_files_in_tests( test_dir, tlist, batchid )
+        tlm.addBatchFileLinksToTests( batchid )
 
-    maybe_turn_off_max_size_filtering( opts.batch, True, opts, plat, rtconfig )
     rtconfig.applyTDDExpression( False )
 
-    selector.prepareActiveTests( tlist, apply_filters=( batchid == None ) )
+    tlm.prepareActive( batchid=opts.qsub_id )
 
     perms = rtdata.getPermissionsObject()
 
@@ -1114,7 +1139,7 @@ def restartTests( opts, optD, rtdata ):
     if tlist.numActive() > 0:
         run_test_exec_list( opts, optD, rtdata,
                             tlist, test_dir, perms,
-                            results_writer )
+                            results_writer, tlm )
 
     print3()
     rtinfo.setInfo( finishepoch=time.time() )
@@ -1126,25 +1151,24 @@ def restartTests( opts, optD, rtdata ):
     return tlist.encodeIntegerWarning()
 
 
-def baselineTests( opts, optD, rtdata ):
+def baselineTests( opts, optD, rtdata, tlm ):
     ""
     rtconfig = rtdata.getRuntimeConfig()
     plat = rtdata.getPlatformObject()
     test_dir = rtdata.getTestResultsDir()
     plugin = rtdata.getUserPlugin()
-    selector = rtdata.getTestSelector()
     rtinfo = rtdata.getRuntimeInfo()
 
-    tlist = make_TestList( rtdata )
+    tlist = tlm.makeTestList()
 
-    tlist.readTestList()
-    tlist.readTestResults()
+    tlm.readTests()
+    tlm.readResults()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default
     rtconfig.addResultsKeywordExpression( 'diff' )
 
-    selector.prepareBaselineTests( tlist )
+    tlm.prepareForBaseline()
 
     rtdata.getResultsWriter().prerun( tlist, rtinfo, verbosity=1 )
     print3()

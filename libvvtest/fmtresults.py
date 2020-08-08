@@ -744,17 +744,21 @@ class LookupCache:
         ""
         self.platname = platname
         self.cplrname = cplrname
+        self.resultsdir = resultsdir
 
         self.multiDB = None
-        if resultsdir != None:
-            f = os.path.join( resultsdir, multiruntimes_filename )
-            self.multiDB = MultiResults()
-            if os.path.exists(f):
-                self.multiDB.readFile(f)
 
         self.testDB = TestResults()
         self.srcdirs = {}  # set of directories scanned for TestResults
         self.rootrelD = {}  # maps absolute path to root rel directory
+
+    def load(self):
+        ""
+        if self.resultsdir != None:
+            f = os.path.join( self.resultsdir, multiruntimes_filename )
+            self.multiDB = MultiResults()
+            if os.path.exists(f):
+                self.multiDB.readFile(f)
 
     def getRunTime(self, testspec):
         """

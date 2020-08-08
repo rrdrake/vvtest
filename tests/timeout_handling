@@ -29,14 +29,14 @@ class the_tests( vtu.vvtestTestCase ):
     def test_TimeoutHandler_construct_and_load(self):
         ""
         th = make_timeout_handler()
-        th.load( make_lookup_cache(), MockTestList() )
+        th.load( MockTestList() )
 
     def test_a_timeout_specified_by_the_test(self):
         ""
         th = make_timeout_handler()
         tlist = make_test_list( timeout=281 )
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 281
@@ -46,7 +46,7 @@ class the_tests( vtu.vvtestTestCase ):
         th = make_timeout_handler( max_timeout=200 )
         tlist = make_test_list( timeout=281 )
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 200
@@ -56,7 +56,7 @@ class the_tests( vtu.vvtestTestCase ):
         th = make_timeout_handler( timeout_multiplier=2.5 )
         tlist = make_test_list( timeout=11 )
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert abs( tstat.getAttr( 'timeout' ) - 11*2.5 ) < 2
@@ -66,7 +66,7 @@ class the_tests( vtu.vvtestTestCase ):
         th = make_timeout_handler( cmdline_timeout=42 )
         tlist = make_test_list( timeout=281 )
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 42
@@ -76,7 +76,7 @@ class the_tests( vtu.vvtestTestCase ):
         th = make_timeout_handler( cmdline_timeout=42, max_timeout=31 )
         tlist = make_test_list( timeout=281 )
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 31
@@ -86,13 +86,13 @@ class the_tests( vtu.vvtestTestCase ):
         th = make_timeout_handler()
         tlist = make_test_list()
 
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 60*60
 
         tlist = make_test_list( keyword='long' )
-        th.load( make_lookup_cache(), tlist )
+        th.load( tlist )
 
         tstat = tlist.getTests()[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 5*60*60
@@ -135,7 +135,8 @@ def make_timeout_handler( cmdline_timeout=None,
     th = timeout.TimeHandler( plug,
                               cmdline_timeout,
                               timeout_multiplier,
-                              max_timeout )
+                              max_timeout,
+                              make_lookup_cache() )
 
     return th
 

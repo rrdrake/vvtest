@@ -37,6 +37,7 @@ class TestList:
         self.rundate = None
         self.results_file = None
 
+        # magic: make these two attributes
         self.datestamp = None
         self.finish = None
 
@@ -50,6 +51,10 @@ class TestList:
 
     def setResultsSuffix(self, suffix=None):
         ""
+        # magic: make this an attribute called 'rundate'
+        #        and move the default date formatter out of this class
+        #        or pass the time in seconds (for consistency)
+        #   - and rename this function setResultsDate()
         if suffix:
             self.rundate = suffix
         elif not self.rundate:
@@ -292,6 +297,7 @@ class TestList:
 
     def encodeIntegerWarning(self):
         ""
+        # magic: move this encoding logic out of this class
         ival = 0
         for tcase in self.tcasemap.values():
             if not tcase.getStat().skipTest():
