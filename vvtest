@@ -212,6 +212,7 @@ class MainEntry:
         from libvvtest.filtering import TestFilter
         from libvvtest.testselector import TestSelector
         from libvvtest.timeout import TimeHandler
+        from batch.namer import BatchFileNamer
 
         rtconfig = self.rtdata.getRuntimeConfig()
         test_dir = self.rtdata.getTestResultsDir()
@@ -238,9 +239,7 @@ class MainEntry:
                                    self.opts.max_timeout,
                                    tcache )
 
-        import batch.batching as batching
-        namer = batching.BatchFileNamer( test_dir )
-
+        namer = BatchFileNamer( test_dir )
         self.tlm = TestListManager( namer=namer,
                                     tctor=self.rtdata.getTestConstructor(),
                                     scanner=scanner,
