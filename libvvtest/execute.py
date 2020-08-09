@@ -35,7 +35,7 @@ class TestListRunner:
         ""
         self.plat.display( isbatched=True )
 
-        self.tlist.setResultsSuffix()
+        self.tlist.setResultsDate()
 
         batch.writeQsubScripts()
 

@@ -55,7 +55,7 @@ class Timeout_when_baselining( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-b' )
 
         assert 'TIMED OUT' in vrun.out
-        assert time.time() - t0 < 8
+        assert time.time() - t0 < 10
 
 
 class process_group_execution( vtu.vvtestTestCase ):
@@ -252,7 +252,7 @@ class integration_signalling_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        vrun = vtu.runvvtest( '-T 2' )
+        vrun = vtu.runvvtest( '-T 4' )
         vrun.assertCounts( total=1, timeout=1 )
 
         time.sleep(11)
@@ -262,7 +262,7 @@ class integration_signalling_tests( vtu.vvtestTestCase ):
 
         tsL = vrun.grepTestLines( 'script' )[0].split()
         tm = vtu.parse_runtime_from_output_line( tsL )
-        assert tm < 5
+        assert tm < 8, 'total vvtest time exceeded: '+str(tm)
 
 
 ############################################################################

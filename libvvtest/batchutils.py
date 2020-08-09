@@ -34,7 +34,7 @@ class Batcher:
 
         self.results = ResultsHandler( tlist, xlist, self.tctor )
 
-        self.suffix = tlist.getResultsSuffix()
+        self.rundate = tlist.getResultsDate()
         self.vvtestcmd = vvtestcmd
 
         self.grouper = BatchTestGrouper( xlist, batch_length, max_timeout )
@@ -158,7 +158,7 @@ class Batcher:
 
         tl = TestList.TestList( fn, self.tctor )
 
-        tl.setResultsSuffix( self.suffix )
+        tl.setResultsDate( self.rundate )
 
         for tcase in qlist:
             tl.addTest( tcase )

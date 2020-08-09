@@ -95,6 +95,7 @@ class iterating_the_backlog( vtu.vvtestTestCase ):
     def test_iterate_TestExecList_by_size_and_constraint(self):
         ""
         tlist, xlist = vtu.make_fake_TestExecList( timespec='runtime' )
+        tlist.setResultsDate()
         tlist.initializeResultsFile()
 
         xlist._sort_by_size_and_runtime()

@@ -754,6 +754,8 @@ def runTests( opts, optD, rtdata, tlm ):
     tlm.readResults( preserve_skips=True )
     tlm.prepareActive()
 
+    tlist.setResultsDate()
+
     results_writer = rtdata.getResultsWriter()
 
     results_writer.prerun( tlist, rtinfo, verbosity=0 )
@@ -773,20 +775,6 @@ def runTests( opts, optD, rtdata, tlm ):
     call_user_epilogue( rtdata, tlist )
 
     return tlist.encodeIntegerWarning()
-
-
-def maybe_turn_off_max_size_filtering_magic( isbatch, isrestart,
-                                             opts, plat, rtconfig ):
-    ""
-    if isrestart:
-        if opts.dash_N == None:
-            rtconfig.applyMaxProcsExpression( False )
-        if opts.max_devices == None:
-            rtconfig.applyMaxDevicesExpression( False )
-
-    elif isbatch:
-        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            rtconfig.applyMaxProcsExpression( False )
 
 
 def maybe_turn_off_max_size_filtering( tlman, isbatch, isrestart, opts, plat ):
@@ -1118,6 +1106,7 @@ def restartTests( opts, optD, rtdata, tlm ):
     check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
+        tlist.setResultsDate()
         tlm.loadTestTimes()
     else:
         tlm.addBatchFileLinksToTests( batchid )

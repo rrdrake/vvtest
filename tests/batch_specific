@@ -384,10 +384,10 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         time.sleep(5)
 
         assert len( util.greplines( 'Cancelling jobs:', out ) ) == 1
-        assert len( util.greplines( 'kill -s', out ) ) >= 3
+        assert len( util.greplines( 'kill -s', out ) ) >= 2
         lineL = util.grepfiles( 'past sleep', 'TestResults*/*/execute.log' )
         assert len( lineL ) >= 1 and len( lineL ) < 5
-        assert t1-t0 < 6
+        assert t1-t0 < 11, 'total vvtest time exceeded: '+str(t1-t0)
 
 
 ########################################################################

@@ -34,12 +34,9 @@ class TestList:
 
         self.tctor = testctor
 
-        self.rundate = None
-        self.results_file = None
+        self.attrs = {}
 
-        # magic: make these two attributes
-        self.datestamp = None
-        self.finish = None
+        self.results_file = None
 
         self.groups = None  # a ParameterizeAnalyzeGroups class instance
 
@@ -49,26 +46,22 @@ class TestList:
         ""
         return self.filename
 
-    def setResultsSuffix(self, suffix=None):
+    def setResultsDate(self, epochtime=None):
         ""
-        # magic: make this an attribute called 'rundate'
-        #        and move the default date formatter out of this class
-        #        or pass the time in seconds (for consistency)
-        #   - and rename this function setResultsDate()
-        if suffix:
-            self.rundate = suffix
-        elif not self.rundate:
-            self.rundate = time.strftime( "%Y-%m-%d_%H:%M:%S" )
+        if epochtime != None:
+            self.attrs['rundate'] = int( float( epochtime ) + 0.5 )
+        else:
+            self.attrs['rundate'] = int( float( time.time() ) + 0.5 )
 
-        return self.rundate
+    def getResultsDate(self):
+        ""
+        return self.attrs.get( 'rundate', None )
 
     def getResultsFilename(self):
         ""
-        return self.filename+'.'+self.rundate
-
-    def getResultsSuffix(self):
-        ""
-        return self.rundate
+        rd = self.attrs['rundate']
+        tm = time.strftime( "%Y-%m-%d_%H:%M:%S", time.localtime( rd ) )
+        return self.filename+'.'+tm
 
     def stringFileWrite(self, extended=False, **file_attrs):
         """
@@ -78,10 +71,13 @@ class TestList:
         """
         assert self.filename
 
+        # magic: why not always write the attrs?
+
         tlw = testlistio.TestListWriter( self.filename )
 
-        if extended:
-            tlw.start( rundate=self.rundate, **file_attrs )
+        rd = self.getResultsDate()
+        if rd != None:
+            tlw.start( rundate=rd, **file_attrs )
         else:
             tlw.start( **file_attrs)
 
@@ -94,29 +90,21 @@ class TestList:
 
     def initializeResultsFile(self, **file_attrs):
         ""
-        self.setResultsSuffix()
-
-        rfile = self.filename + '.' + self.rundate
-        
+        rfile = self.getResultsFilename()
         self.results_file = testlistio.TestListWriter( rfile )
-
         self.results_file.start( **file_attrs )
 
         return rfile
 
-    def addIncludeFile(self, testlist_path):
+    def addIncludeFile(self, filename):
         """
         Appends the given filename to the test results file.
         """
-        assert self.rundate, 'suffix must have already been set'
-        inclf = testlist_path + '.' + self.rundate
-        self.results_file.addIncludeFile( inclf )
+        self.results_file.addIncludeFile( filename )
 
-    def completeIncludeFile(self, testlist_path):
+    def completeIncludeFile(self, filename):
         ""
-        assert self.rundate, 'suffix must have already been set'
-        inclf = testlist_path + '.' + self.rundate
-        self.results_file.includeFileCompleted( inclf )
+        self.results_file.includeFileCompleted( filename )
 
     def appendTestResult(self, tcase):
         """
@@ -141,7 +129,9 @@ class TestList:
             tlr = testlistio.TestListReader( self.filename )
             tlr.read( self.tctor )
 
-            self.rundate = tlr.getAttr( 'rundate', None )
+            rd = tlr.getAttr( 'rundate', None )
+            if rd != None:
+                self.attrs['rundate'] = rd
 
             for xdir,tcase in tlr.getTests().items():
                 if xdir not in self.tcasemap:
@@ -179,13 +169,14 @@ class TestList:
             tlr = testlistio.TestListReader( fn )
             tlr.read( self.tctor )
 
-            self.datestamp = tlr.getStartDate()
-            self.finish = tlr.getFinishDate()
+            if tlr.getStartDate() != None:
+                self.attrs['startdate'] = tlr.getStartDate()
+            fin = tlr.getFinishDate()
 
             file_attrs.clear()
             file_attrs.update( tlr.getAttrs() )
-            if self.finish:
-                file_attrs['finishepoch'] = self.finish
+            if fin:
+                file_attrs['finishepoch'] = fin
 
             tctor = make_TestConstructor( file_attrs )
 
@@ -206,20 +197,9 @@ class TestList:
         readTestResults() function.  If a read has not been done, the 'default'
         argument is returned.
         """
-        if self.datestamp:
-            return self.datestamp
-        return default
-
-    def getFinishDate(self, default=None):
-        """
-        Return the finish date from the last test results file read using the
-        readTestResults() function.  If a read has not been done, or vvtest is
-        still running, or vvtest got killed in the middle of running, the
-        'default' argument is returned.
-        """
-        if self.finish:
-            return self.finish
-        return default
+        # magic: move the set/get of startdate out of this class
+        #   - use the arbitrary attributes instead
+        return self.attrs.get( 'startdate', default )
 
     def getTests(self):
         """
