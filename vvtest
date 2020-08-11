@@ -457,6 +457,10 @@ class InformationMode:
 
         rtinfo.setInfo( **attrs )
 
+        fin = tlist.getFinishDate()
+        if fin:
+            rtinfo.setInfo( finishepoch=fin )
+
     def printKeywordUnion(self, tlist):
         ""
         from libvvtest.teststatus import RESULTS_KEYWORDS

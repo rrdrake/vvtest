@@ -29,17 +29,17 @@ class HTMLWriter:
 
     def postrun(self, atestlist, rtinfo):
         ""
-        self.writeDocument( atestlist )
+        self.writeDocument( atestlist, rtinfo )
 
     def info(self, atestlist, rtinfo):
         ""
-        self.writeDocument( atestlist )
+        self.writeDocument( atestlist, rtinfo )
 
-    def writeDocument(self, tlist):
+    def writeDocument(self, tlist, rtinfo):
         """
         Opens and writes an HTML summary file in the test directory.
         """
-        datestamp = tlist.getDateStamp( time.time() )
+        datestamp = rtinfo.getInfo( 'startepoch', time.time() )
         datestr = outpututils.make_date_stamp( datestamp, None,
                                                "%Y-%m-%d %H:%M:%S" )
 

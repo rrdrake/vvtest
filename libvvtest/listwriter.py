@@ -71,7 +71,7 @@ class ListWriter:
 
     def writeList(self, atestlist, rtinfo, inprogress=False):
         ""
-        datestamp = atestlist.getDateStamp( time.time() )
+        datestamp = rtinfo.getInfo( 'startepoch', time.time() )
         datestr = outpututils.make_date_stamp( datestamp, self.datestamp )
 
         if is_target_like_scp( self.outdir ):
