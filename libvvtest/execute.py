@@ -264,6 +264,22 @@ def start_test( xlist, tcase, platform, is_baseline=False ):
     tcase.getStat().markStarted( texec.getStartTime() )
 
 
+def encode_integer_warning( tlist ):
+    ""
+    ival = 0
+
+    for tcase in tlist.getTests():
+        if not tcase.getStat().skipTest():
+            result = tcase.getStat().getResultStatus()
+            if   result == 'diff'   : ival |= ( 2**1 )
+            elif result == 'fail'   : ival |= ( 2**2 )
+            elif result == 'timeout': ival |= ( 2**3 )
+            elif result == 'notdone': ival |= ( 2**4 )
+            elif result == 'notrun' : ival |= ( 2**5 )
+
+    return ival
+
+
 def print3( *args ):
     ""
     sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )

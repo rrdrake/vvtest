@@ -71,8 +71,6 @@ class TestList:
         """
         assert self.filename
 
-        # magic: why not always write the attrs?
-
         tlw = testlistio.TestListWriter( self.filename )
 
         if self.rundate != None:
@@ -174,7 +172,7 @@ class TestList:
             file_attrs.clear()
             file_attrs.update( tlr.getAttrs() )
 
-            tctor = make_TestConstructor( file_attrs )
+            tctor = self.tctor.spawn( file_attrs.get( 'shortxdirs', None ) )
 
             for xdir,tcase in tlr.getTests().items():
 
@@ -275,20 +273,6 @@ class TestList:
 
         return tL
 
-    def encodeIntegerWarning(self):
-        ""
-        # magic: move this encoding logic out of this class
-        ival = 0
-        for tcase in self.tcasemap.values():
-            if not tcase.getStat().skipTest():
-                result = tcase.getStat().getResultStatus()
-                if   result == 'diff'   : ival |= ( 2**1 )
-                elif result == 'fail'   : ival |= ( 2**2 )
-                elif result == 'timeout': ival |= ( 2**3 )
-                elif result == 'notdone': ival |= ( 2**4 )
-                elif result == 'notrun' : ival |= ( 2**5 )
-        return ival
-
     def addTest(self, tcase):
         """
         Add/overwrite a test in the list.
@@ -310,14 +294,3 @@ def glob_results_files( basename ):
     fileL = glob.glob( basename+'.*' )
     fileL.sort()
     return fileL
-
-
-def make_TestConstructor( file_attrs ):
-    ""
-    tctor = TestConstructor()
-
-    nc = file_attrs.get( 'shortxdirs', None )
-    if nc != None:
-        tctor.setShorten( int(nc) )
-
-    return tctor

@@ -36,3 +36,10 @@ class TestConstructor:
     def resetTestID(self, tspec):
         ""
         tspec.resetIDGenerator( self.makeTestID )
+
+    def spawn(self, numchars=None):
+        ""
+        tctor = TestConstructor()
+        if numchars != None:
+            tctor.setShorten( int( numchars ) )
+        return tctor

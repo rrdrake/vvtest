@@ -416,7 +416,7 @@ class InformationMode:
         else:
             rtinfo = self.rtdata.getRuntimeInfo()
             self.rtdata.getResultsWriter().info( tlist, rtinfo )
-            exitcode = tlist.encodeIntegerWarning()
+            exitcode = execute.encode_integer_warning( tlist )
             call_user_epilogue( self.rtdata, tlist )
 
         return exitcode
@@ -425,6 +425,7 @@ class InformationMode:
         ""
         test_dir = self.rtdata.getTestResultsDir()
         rtconfig = self.rtdata.getRuntimeConfig()
+        rtinfo = self.rtdata.getRuntimeInfo()
         plat = self.rtdata.getPlatformObject()
 
         tlist = self.tlm.makeTestList()
@@ -436,9 +437,13 @@ class InformationMode:
             self.tlm.scanPaths()
 
         elif have_cache:
-            maybe_turn_off_max_size_filtering( self.tlm, False, True, self.opts, plat )
+            maybe_turn_off_max_size_filtering( self.tlm, False, True,
+                                               self.opts, plat )
             rtconfig.applyTDDExpression( False )
-            self._read_test_list( tlist )
+
+            self.tlm.readTests()
+            attrs = self.tlm.readResults()
+            rtinfo.setInfo( **attrs )
 
         else:
             print3( 'WARNING: previous test results directory not found,',
@@ -447,19 +452,6 @@ class InformationMode:
         self.tlm.prepareActive( remove_new_skips=True )
 
         return tlist
-
-    def _read_test_list(self, tlist):
-        ""
-        rtinfo = self.rtdata.getRuntimeInfo()
-
-        self.tlm.readTests()
-        attrs = self.tlm.readResults()
-
-        rtinfo.setInfo( **attrs )
-
-        fin = tlist.getFinishDate()
-        if fin:
-            rtinfo.setInfo( finishepoch=fin )
 
     def printKeywordUnion(self, tlist):
         ""
@@ -534,6 +526,11 @@ class TestListManager:
     def readResults(self, preserve_skips=False):
         ""
         attrs = self.tlist.readTestResults( preserve_skips=preserve_skips )
+
+        fin = self.tlist.getFinishDate()
+        if fin != None:
+            attrs['finishepoch'] = fin
+
         return attrs
 
     def addBatchFileLinksToTests(self, batchid):
@@ -778,7 +775,7 @@ def runTests( opts, optD, rtdata, tlm ):
 
     call_user_epilogue( rtdata, tlist )
 
-    return tlist.encodeIntegerWarning()
+    return execute.encode_integer_warning( tlist )
 
 
 def maybe_turn_off_max_size_filtering( tlman, isbatch, isrestart, opts, plat ):
@@ -1140,7 +1137,7 @@ def restartTests( opts, optD, rtdata, tlm ):
     if batchid == None:
         call_user_epilogue( rtdata, tlist )
 
-    return tlist.encodeIntegerWarning()
+    return execute.encode_integer_warning( tlist )
 
 
 def baselineTests( opts, optD, rtdata, tlm ):

@@ -24,6 +24,7 @@ from libvvtest.location import determine_configdir
 from libvvtest.location import split_by_largest_existing_path
 from libvvtest.location import determine_test_directory
 from libvvtest.location import test_results_subdir_name
+from libvvtest.execute import encode_integer_warning
 
 from libvvtest.testctor import TestConstructor
 import libvvtest.TestList as TestList
@@ -364,27 +365,27 @@ class exit_status_controls( vtu.vvtestTestCase ):
         ""
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'pass' ) )
-        assert tl.encodeIntegerWarning() == 0
+        assert encode_integer_warning( tl ) == 0
 
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'diff' ) )
-        assert tl.encodeIntegerWarning() == 2**1
+        assert encode_integer_warning( tl ) == 2**1
 
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'fail' ) )
-        assert tl.encodeIntegerWarning() == 2**2
+        assert encode_integer_warning( tl ) == 2**2
 
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'timeout' ) )
-        assert tl.encodeIntegerWarning() == 2**3
+        assert encode_integer_warning( tl ) == 2**3
 
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'notdone' ) )
-        assert tl.encodeIntegerWarning() == 2**4
+        assert encode_integer_warning( tl ) == 2**4
 
         tl = TestList.TestList( None )
         tl.addTest( vtu.make_fake_TestCase( 'notrun' ) )
-        assert tl.encodeIntegerWarning() == 2**5
+        assert encode_integer_warning( tl ) == 2**5
 
     def test_encoding_tests_notrun_or_notpass_in_the_exit_status(self):
         ""
