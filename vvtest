@@ -437,8 +437,10 @@ class InformationMode:
             self.tlm.scanPaths()
 
         elif have_cache:
-            maybe_turn_off_max_size_filtering( self.tlm, False, True,
-                                               self.opts, plat )
+            if self.opts.dash_N == None:
+                rtconfig.applyMaxProcsExpression( False )
+            if self.opts.max_devices == None:
+                rtconfig.applyMaxDevicesExpression( False )
             rtconfig.applyTDDExpression( False )
 
             self.tlm.readTests()
@@ -542,10 +544,10 @@ class TestListManager:
             tcase.getSpec().addLinkFile( qbat )
             tcase.getSpec().addLinkFile( qout )
 
-    def prepareActive(self, batchid=None, remove_new_skips=False ):
+    def prepareActive(self, apply_filters=True, remove_new_skips=False ):
         ""
         self.selector.prepareActiveTests( self.tlist,
-                                          apply_filters=(batchid==None),
+                                          apply_filters=apply_filters,
                                           remove_new_skips=remove_new_skips )
 
     def prepareForBaseline(self):
@@ -728,10 +730,10 @@ def runTests( opts, optD, rtdata, tlm ):
     test_dir = rtdata.getTestResultsDir()
     rtinfo = rtdata.getRuntimeInfo()
     perms = rtdata.getPermissionsObject()
+    rtconfig = rtdata.getRuntimeConfig()
 
     rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    maybe_turn_off_max_size_filtering( tlm, opts.batch, False, opts, plat )
     tlist = tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
@@ -750,7 +752,14 @@ def runTests( opts, optD, rtdata, tlm ):
     tlm.scanPaths()
     tlm.readTests()
     tlm.loadTestTimes()
+
+    if opts.batch:
+        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
+            # we are batching and no num procs limit is available
+            rtconfig.applyMaxProcsExpression( False )
+
     tlm.applyFilters()
+
     write_test_list_file( tlist, rtinfo.asDict(), perms )
     tlm.readResults( preserve_skips=True )
     tlm.prepareActive()
@@ -776,39 +785,6 @@ def runTests( opts, optD, rtdata, tlm ):
     call_user_epilogue( rtdata, tlist )
 
     return execute.encode_integer_warning( tlist )
-
-
-def maybe_turn_off_max_size_filtering( tlman, isbatch, isrestart, opts, plat ):
-    """
-    Platform sets max num processors (CPU cores):
-        - uses -N or a plugin value
-        - if neither of those, then it probes for a max
-        - if the probe fails, it defaults to the value 4
-
-    Platform sets max num devices (GPUs):
-        - uses --max-devices or a plugin value
-        - if neither of those, it uses the value of --devices
-        - otherwise it defaults to zero
-    """
-    cpu = True
-    dev = True
-
-    if isrestart:
-        if opts.dash_N == None:
-            cpu = False
-        if opts.max_devices == None:
-            dev = False
-
-    elif isbatch:
-        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            cpu = False
-
-    # magic: maybe use setter on selector to apply max'es
-    rtconfig = tlman.selector.tfilter.rtconfig
-    if not cpu:
-        rtconfig.applyMaxProcsExpression( False )
-    if not dev:
-        rtconfig.applyMaxDevicesExpression( False )
 
 
 def check_for_currently_running_vvtest( tlist, optforce ):
@@ -1091,6 +1067,7 @@ def restartTests( opts, optD, rtdata, tlm ):
     test_dir = rtdata.getTestResultsDir()
     rtconfig = rtdata.getRuntimeConfig()
     rtinfo = rtdata.getRuntimeInfo()
+    perms = rtdata.getPermissionsObject()
 
     # this variable allows vvtest tests to run vvtest (ie, allows recursion)
     os.environ['VVTEST_TEST_ROOT'] = test_dir
@@ -1098,7 +1075,6 @@ def restartTests( opts, optD, rtdata, tlm ):
     if batchid == None:
         rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    maybe_turn_off_max_size_filtering( tlm, opts.batch, True, opts, plat )
     tlist = tlm.makeTestList( opts.qsub_id )
 
     tlm.readTests()
@@ -1106,19 +1082,22 @@ def restartTests( opts, optD, rtdata, tlm ):
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
-    if batchid == None:
-        tlist.setResultsDate()
-        tlm.loadTestTimes()
-    else:
-        tlm.addBatchFileLinksToTests( batchid )
+    if opts.dash_N == None:
+        # no max procs filter unless -N was given on command line
+        rtconfig.applyMaxProcsExpression( False )
+    if opts.max_devices == None:
+        # no max devices filter unless --max-devices was given on command line
+        rtconfig.applyMaxDevicesExpression( False )
 
     rtconfig.applyTDDExpression( False )
 
-    tlm.prepareActive( batchid=opts.qsub_id )
-
-    perms = rtdata.getPermissionsObject()
-
-    perms.set( tlist.getFilename() )
+    if batchid == None:
+        tlist.setResultsDate()
+        tlm.loadTestTimes()
+        tlm.prepareActive()
+    else:
+        tlm.addBatchFileLinksToTests( batchid )
+        tlm.prepareActive( apply_filters=False )
 
     results_writer = rtdata.getResultsWriter()
 
