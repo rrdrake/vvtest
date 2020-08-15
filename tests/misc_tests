@@ -20,7 +20,7 @@ from testutils import print3
 
 import libvvtest.location as location
 from libvvtest.location import find_vvtest_test_root_file
-from libvvtest.location import determine_configdir
+from libvvtest.location import collect_config_dirs
 from libvvtest.location import split_by_largest_existing_path
 from libvvtest.location import determine_test_directory
 from libvvtest.location import test_results_subdir_name
@@ -84,16 +84,16 @@ class configdir_handling( vtu.vvtestTestCase ):
 
     def test_simple_configdir_specification(self):
         ""
-        dL = determine_configdir( [], None )
+        dL = collect_config_dirs( [], None )
         assert dL == []
 
-        dL = determine_configdir( ['/a/path'], None )
+        dL = collect_config_dirs( ['/a/path'], None )
         assert dL == [ '/a/path' ]
 
-        dL = determine_configdir( [], '/a/path' )
+        dL = collect_config_dirs( [], '/a/path' )
         assert dL == [ '/a/path' ]
 
-        dL = determine_configdir( ['/a/path'], '/b/path' )
+        dL = collect_config_dirs( ['/a/path'], '/b/path' )
         assert dL == [ '/a/path' ]
 
     def test_abspath_is_applied(self):
@@ -101,10 +101,10 @@ class configdir_handling( vtu.vvtestTestCase ):
         os.mkdir( 'subdir' )
         time.sleep(1)
 
-        dL = determine_configdir( ['subdir'], None )
+        dL = collect_config_dirs( ['subdir'], None )
         assert dL == [ abspath('subdir') ]
 
-        dL = determine_configdir( [], '..' )
+        dL = collect_config_dirs( [], '..' )
         assert dL == [ dirname( os.getcwd() ) ]
 
     def test_multiple_paths(self):
@@ -112,16 +112,16 @@ class configdir_handling( vtu.vvtestTestCase ):
         os.mkdir( 'subdir' )
         time.sleep(1)
 
-        dL = determine_configdir( ['/a/path','/b/path'], None )
+        dL = collect_config_dirs( ['/a/path','/b/path'], None )
         assert dL == ['/a/path','/b/path']
 
-        dL = determine_configdir( ['/a/path:/b/path'], None )
+        dL = collect_config_dirs( ['/a/path:/b/path'], None )
         assert dL == ['/a/path','/b/path']
 
-        dL = determine_configdir( [], '/a/path:/b/path' )
+        dL = collect_config_dirs( [], '/a/path:/b/path' )
         assert dL == ['/a/path','/b/path']
 
-        dL = determine_configdir( [], '/a/path:subdir' )
+        dL = collect_config_dirs( [], '/a/path:subdir' )
         assert dL == ['/a/path',abspath('subdir')]
 
     def test_directories_with_colons(self):
@@ -158,13 +158,13 @@ class configdir_handling( vtu.vvtestTestCase ):
         assert d1 == None and d2 == 'foo:bar'
 
 
-        dL = determine_configdir( [], 'some:dir:subdir' )
+        dL = collect_config_dirs( [], 'some:dir:subdir' )
         assert dL == [abspath('some:dir'),abspath('subdir')]
 
-        dL = determine_configdir( [], 'subdir:some:dir' )
+        dL = collect_config_dirs( [], 'subdir:some:dir' )
         assert dL == [abspath('subdir'),abspath('some:dir')]
 
-        dL = determine_configdir( [], 'foo:some:dir' )
+        dL = collect_config_dirs( [], 'foo:some:dir' )
         assert dL == [abspath('foo'),abspath('some:dir')]
 
 

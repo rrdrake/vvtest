@@ -52,7 +52,7 @@ def find_vvtest_test_root_file( start_directory,
     return None
 
 
-def determine_configdir( opts_config, environ_config ):
+def collect_config_dirs( opts_config, environ_config ):
     ""
     cfgL = []
 
