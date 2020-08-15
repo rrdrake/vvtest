@@ -84,8 +84,7 @@ class MainEntry:
         exitstat = 0
 
         if information_mode( self.opts ):
-            mode = InformationMode( self.opts, self.optD, self.rtdata, self.tlm )
-            exitstat = mode.run()
+            exitstat = information_output( self.opts, self.rtdata, self.tlm )
 
         elif self.opts.dash_g:
             generateTestList( self.opts, self.optD, self.rtdata, self.tlm )
@@ -399,103 +398,6 @@ def construct_TestConstructor( opts ):
     return tctor
 
 
-class InformationMode:
-
-    def __init__(self, opts, optD, rtdata, tlm):
-        ""
-        self.opts = opts
-        self.optD = optD
-        self.rtdata = rtdata
-        self.tlm = tlm
-
-    def run(self):
-        ""
-        exitcode = 0
-
-        tlist = self.loadTestList()
-
-        test_dir = self.rtdata.getTestResultsDir()
-
-        if self.opts.keys:
-            self.printKeywordUnion( tlist )
-
-        elif self.opts.files:
-            self.printTestFiles( tlist )
-
-        else:
-            rtinfo = self.rtdata.getRuntimeInfo()
-            self.rtdata.getResultsWriter().info( tlist, rtinfo )
-            exitcode = execute.encode_integer_warning( tlist )
-            call_user_epilogue( self.rtdata, tlist )
-
-        return exitcode
-
-    def loadTestList(self):
-        ""
-        test_dir = self.rtdata.getTestResultsDir()
-        rtconfig = self.rtdata.getRuntimeConfig()
-        rtinfo = self.rtdata.getRuntimeInfo()
-        plat = self.rtdata.getPlatformObject()
-
-        tlist = self.tlm.makeTestList()
-
-        restart = self.rtdata.isRestartMode()
-        have_cache = ( restart or os.path.exists( test_dir ) )
-
-        if not restart and ( self.opts.keys or self.opts.files ):
-            self.tlm.scanPaths()
-
-        elif have_cache:
-            if self.opts.dash_N == None:
-                rtconfig.applyMaxProcsExpression( False )
-            if self.opts.max_devices == None:
-                rtconfig.applyMaxDevicesExpression( False )
-            rtconfig.applyTDDExpression( False )
-
-            self.tlm.readTests()
-            attrs = self.tlm.readResults()
-            rtinfo.setInfo( **attrs )
-
-        else:
-            print3( 'WARNING: previous test results directory not found,',
-                    test_dir )
-
-        self.tlm.prepareActive( remove_new_skips=True )
-
-        return tlist
-
-    def printKeywordUnion(self, tlist):
-        ""
-        from libvvtest.teststatus import RESULTS_KEYWORDS
-
-        print3( "\nresults keywords:", ' '.join( RESULTS_KEYWORDS ) )
-        kd = {}
-        for tcase in tlist.getActiveTests():
-            for k in tcase.getSpec().getKeywords( include_implicit=False ):
-                kd[k] = None
-        L = list( kd.keys() )
-        L.sort()
-        print3( "\ntest keywords: " )
-        while len(L) > 0:
-            k1 = L.pop(0)
-            if len(L) > 0: k2 = L.pop(0)
-            else:          k2 = ''
-            if len(L) > 0: k3 = L.pop(0)
-            else:          k3 = ''
-            print3( "  %-20s %-20s %-20s" % (k1,k2,k3) )
-
-    def printTestFiles(self, tlist):
-        ""
-        D = {}
-        for tcase in tlist.getActiveTests():
-            d = normpath( tcase.getSpec().getFilename() )
-            D[d] = None
-        L = list( D.keys() )
-        L.sort()
-        for d in L:
-            print3( d )
-
-
 class TestListManager:
 
     def __init__(self, locator, namer, tctor, scanner,
@@ -764,6 +666,54 @@ def baselineTests( opts, optD, rtdata, tlm ):
         execute.run_baseline( xlist, plat )
 
 
+def information_output( opts, rtdata, tlm ):
+    ""
+    exitcode = 0
+
+    test_dir = rtdata.getTestResultsDir()
+    rtconfig = rtdata.getRuntimeConfig()
+    rtinfo = rtdata.getRuntimeInfo()
+    plat = rtdata.getPlatformObject()
+
+    tlist = tlm.makeTestList()
+
+    restart = rtdata.isRestartMode()
+    have_cache = ( restart or os.path.exists( test_dir ) )
+
+    if not restart and ( opts.keys or opts.files ):
+        tlm.scanPaths()
+
+    elif have_cache:
+        if opts.dash_N == None:
+            rtconfig.applyMaxProcsExpression( False )
+        if opts.max_devices == None:
+            rtconfig.applyMaxDevicesExpression( False )
+        rtconfig.applyTDDExpression( False )
+
+        tlm.readTests()
+        attrs = tlm.readResults()
+        rtinfo.setInfo( **attrs )
+
+    else:
+        print3( 'WARNING: previous test results directory not found,', test_dir )
+
+    tlm.prepareActive( remove_new_skips=True )
+
+    if opts.keys:
+        print_keyword_union( tlist )
+
+    elif opts.files:
+        print_test_files( tlist )
+
+    else:
+        rtinfo = rtdata.getRuntimeInfo()
+        rtdata.getResultsWriter().info( tlist, rtinfo )
+        exitcode = execute.encode_integer_warning( tlist )
+        call_user_epilogue( rtdata, tlist )
+
+    return exitcode
+
+
 ##############################################################################
 
 
@@ -966,6 +916,39 @@ def get_output_verbosity_integer( dash_v ):
         verb = 0
 
     return verb
+
+
+def print_keyword_union( tlist ):
+    ""
+    from libvvtest.teststatus import RESULTS_KEYWORDS
+
+    print3( "\nresults keywords:", ' '.join( RESULTS_KEYWORDS ) )
+    kd = {}
+    for tcase in tlist.getActiveTests():
+        for k in tcase.getSpec().getKeywords( include_implicit=False ):
+            kd[k] = None
+    L = list( kd.keys() )
+    L.sort()
+    print3( "\ntest keywords: " )
+    while len(L) > 0:
+        k1 = L.pop(0)
+        if len(L) > 0: k2 = L.pop(0)
+        else:          k2 = ''
+        if len(L) > 0: k3 = L.pop(0)
+        else:          k3 = ''
+        print3( "  %-20s %-20s %-20s" % (k1,k2,k3) )
+
+
+def print_test_files( tlist ):
+    ""
+    D = {}
+    for tcase in tlist.getActiveTests():
+        d = normpath( tcase.getSpec().getFilename() )
+        D[d] = None
+    L = list( D.keys() )
+    L.sort()
+    for d in L:
+        print3( d )
 
 
 def information_mode( opts ):
