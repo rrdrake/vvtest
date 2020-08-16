@@ -57,6 +57,19 @@ class ConsoleWriter:
         self._write_test_list_results( atestlist, level )
         self._write_summary( atestlist, 'Summary:' )
 
+    def timings(self, atestlist):
+        ""
+        cwd = os.getcwd()
+
+        tosum,tL = collect_timing_list( atestlist, self.testdir, cwd )
+
+        fmt = '%8s %8s %s'
+        self.write( fmt % ('TIMEOUT','RUNTIME','TEST') )
+        for to,rt,ds in tL:
+            self.write( fmt % (to, rt, ds) )
+
+        self.write( 'TIMEOUT SUM =', outpututils.colon_separated_time(tosum) )
+
     def _write_summary(self, atestlist, label):
         ""
         self.write( label )
@@ -233,3 +246,40 @@ def get_prerun_list_level( verbosity, verbose ):
         level = verbose + 1
 
     return level
+
+
+def collect_timing_list( tlist, test_dir, cwd ):
+    ""
+    tL = []
+
+    for tcase in tlist.getTests():
+        tspec = tcase.getSpec()
+        tstat = tcase.getStat()
+
+        ds = tspec.getDisplayString()
+        lds = outpututils.location_display_string( tspec, test_dir, cwd )
+        rt = tstat.getRuntime( -1 )
+        to = tstat.getAttr( 'timeout', -1 )
+
+        tL.append( ( to, rt, ds, lds ) )
+
+    tL.sort()
+
+    tosum = 0
+    sortL = []
+    for to,rt,ds,lds in tL:
+
+        if rt < 0:
+            s_rt = ''
+        else:
+            s_rt = outpututils.colon_separated_time(rt)
+
+        if to < 0:
+            s_to = 'None'
+        else:
+            tosum += to
+            s_to = outpututils.colon_separated_time(to)
+
+        sortL.append( (s_to,s_rt,lds) )
+
+    return tosum,sortL

@@ -692,6 +692,8 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--files', action='store_true',
         help='Gather and print the file names that would be run, after '
              'filtering (subhelp: keywords).' )
+    grp.add_argument( '-t', '--show-times', dest='show_times', action='store_true',
+        help='Used with -i, this prints the timeouts for each test.' )
 
     psr.add_argument( 'directory', nargs='*' )
 

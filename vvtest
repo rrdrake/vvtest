@@ -84,7 +84,8 @@ class MainEntry:
         exitstat = 0
 
         if information_mode( self.opts ):
-            exitstat = information_output( self.opts, self.rtdata, self.tlm )
+            exitstat = information_output( self.opts, self.optD,
+                                           self.rtdata, self.tlm )
 
         elif self.opts.dash_g:
             generateTestList( self.opts, self.optD, self.rtdata, self.tlm )
@@ -601,7 +602,7 @@ def restartTests( opts, optD, rtdata, tlm ):
     if batchid == None:
         rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    tlist = tlm.makeTestList( opts.qsub_id )
+    tlist = tlm.makeTestList( batchid )
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
@@ -666,9 +667,13 @@ def baselineTests( opts, optD, rtdata, tlm ):
         execute.run_baseline( xlist, plat )
 
 
-def information_output( opts, rtdata, tlm ):
+def information_output( opts, optD, rtdata, tlm ):
     ""
     exitcode = 0
+
+    if opts.show_times:
+        output_timings( opts, optD, rtdata, tlm )
+        return exitcode
 
     test_dir = rtdata.getTestResultsDir()
     rtconfig = rtdata.getRuntimeConfig()
@@ -712,6 +717,55 @@ def information_output( opts, rtdata, tlm ):
         call_user_epilogue( rtdata, tlist )
 
     return exitcode
+
+
+def output_timings( opts, optD, rtdata, tlm ):
+    ""
+    rtinfo = rtdata.getRuntimeInfo()
+    rtconfig = rtdata.getRuntimeConfig()
+    results_writer = rtdata.getResultsWriter()
+    test_dir = rtdata.getTestResultsDir()
+
+    rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
+    tlist = tlm.makeTestList()
+
+    if not rtdata.isRestartMode():
+
+        tlm.scanPaths()
+        tlm.readTests()
+
+        if opts.batch:
+            if opts.dash_N == None and plat.getPluginMaxProcs() == None:
+                # we are batching and no num procs limit is available
+                rtconfig.applyMaxProcsExpression( False )
+
+        tlm.loadTestTimes()
+        tlm.applyFilters()
+
+        tlm.readResults( preserve_skips=True )
+        tlm.prepareActive()
+
+        tlist.setResultsDate()
+
+    else:
+        tlm.readTests()
+        tlm.readResults()
+
+        if opts.dash_N == None:
+            # no max procs filter unless -N was given on command line
+            rtconfig.applyMaxProcsExpression( False )
+        if opts.max_devices == None:
+            # no max devices filter unless --max-devices was given on command line
+            rtconfig.applyMaxDevicesExpression( False )
+
+        rtconfig.applyTDDExpression( False )
+
+        tlist.setResultsDate()
+        tlm.loadTestTimes()
+        tlm.prepareActive()
+
+    cwriter = construct_console_writer( test_dir, opts, optD )
+    cwriter.timings( tlist )
 
 
 ##############################################################################

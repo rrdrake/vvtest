@@ -1,6 +1,11 @@
 
 Improvements:
 
+    - Add option to print the timeout for each test, to be used with the -i
+      option, such as "vvtest -i -t" or "vvtest -i --show-times". The algorithm
+      for computing timeouts is followed as if a normal vvtest execution would
+      be performed.
+
     - Adjust script parsing to allow solitary strings (doc strings) at the
       top of tests (before the #VVT: comment directives).
 

@@ -355,6 +355,30 @@ class VvtestCommandRunner:
 
             self.testdates[ xdir ] = ( start, end )
 
+    def getTimeoutInfoSection(self):
+        ""
+        inside = False
+        tL = None
+        tsum = None
+        for line in self.out.splitlines():
+            if inside:
+                if line.strip().startswith( 'TIMEOUT SUM' ):
+                    tsum = parse_time( line.strip().split()[-1] )
+                    inside = False
+                else:
+                    lineL = line.strip().split( None, 2 )
+                    to = parse_time(lineL[0])
+                    if len( lineL ) == 2:
+                        tL.append( [ to, -1, lineL[1] ] )
+                    else:
+                        rt = parse_time(lineL[1])
+                        tL.append( [ to, rt, lineL[2] ] )
+            elif line.strip().split() == ['TIMEOUT','RUNTIME','TEST']:
+                tL = []
+                tsum = None
+                inside = True
+        return tL,tsum
+
 
 def runvvtest( *cmd_args, **options ):
     """
@@ -641,6 +665,18 @@ def assert_summary_string( summary_string,
     if notdone != None: assert valD['notdone'] == notdone
     if notrun  != None: assert valD['notrun']  == notrun
     if skip    != None: assert valD['skip']    == skip
+
+
+def parse_time( colon_time_string ):
+    ""
+    sL = colon_time_string.split(':')
+    sL.reverse()
+    tval = int( sL[0] )
+    if len( sL ) > 1:
+        tval += 60*int( sL[1] )
+    if len( sL) > 2:
+        tval += 60*60*int( sL[2] )
+    return tval
 
 
 def make_simple_script_parse_instance( srcfile ):
