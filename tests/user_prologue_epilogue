@@ -206,6 +206,29 @@ class prologue_epilogue_plugin_tests( vtu.vvtestTestCase ):
             assert 'directory not found' in vrun.out
             assert 'Traceback' not in vrun.out
 
+    def test_using_user_args_to_pass_options_to_prologue(self):
+        ""
+        util.writefile( 'atest.vvt', 'pass' )
+
+        util.writefile( 'adir/vvtest_user_plugin.py', """
+            def prologue( cmdline ):
+                ""
+                print ( 'the_cmdline='+repr(cmdline) )
+            """ )
+        adir = abspath( 'adir' )
+
+        time.sleep(1)
+
+        with util.set_environ( VVTEST_CONFIGDIR=adir ):
+
+            vrun = vtu.runvvtest( '--user-args "--myoption -j 9"' )
+            vrun.assertCounts( total=1, npass=1 )
+
+            sL = vrun.grepLines( 'the_cmdline=' )[0].split('the_cmdline=',1)
+            cmdL = eval( sL[1] )
+            idx = cmdL.index( '--user-args' )
+            assert cmdL[idx+1] == "--myoption -j 9"
+
 
 ############################################################################
 

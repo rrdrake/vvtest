@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - Add --user-args ARGS command line option, which is ignored by vvtest
+      except to pass through arbitrary arguments to the prologue() user plugin
+      function.
+
     - Add option to print the timeout for each test, to be used with the -i
       option, such as "vvtest -i -t" or "vvtest -i --show-times". The algorithm
       for computing timeouts is followed as if a normal vvtest execution would

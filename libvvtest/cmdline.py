@@ -617,6 +617,10 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '-e', dest='dash_e', action='store_true',
         help='Prevents test harness from overwriting environment '
              'variables prior to each test.' )
+    grp.add_argument( '--user-args', metavar='ARGS',
+        help='Ignored by vvtest.  Use --user-args to pass arguments through '
+             'sys.argv to user plugin functions.  User plugin functions are '
+             'responsible for parsing sys.argv to find --user-args.' )
 
     # batch
     grp = psr.add_argument_group( 'Batching / queuing (subhelp: batch)' )
