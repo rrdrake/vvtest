@@ -385,14 +385,19 @@ Can be used as part of the vvtest run, or given with the -i option.
 The --cdash=<specifications> option will either write an XML file in CDash
 format, or write and send that file to an http URL. The "specifications"
 string must start with either a filename or a URL, such as
-http://sparky.com/cdash. Additional name=value attributes can follow delineated
-with commas, such as "https://sparky.com/cdash, project=Proj, group=Important".
+http://sparky.com/cdash. Additional name=value attributes can follow as long
+as they are delineated with commas, such as
+"https://sparky.com/cdash, project=Proj, group=Important".
 The possible attributes are:
 >   project : the project name on the CDash server
 >   group   : the name of the group of build lines
 >   site    : the name of the host site
 >   name    : the name of the build line
 >   date    : the date of the build line
+>   files   : a value "all" means include output files for all tests, and a
+>             value "nonpass" (the default) outputs only for non-passing tests
+>   filemax : output files have their middle removed if over a max size; the
+>             default is 100KB, but can take values like 500KB, 10MB, and 1GB
 """
 
 

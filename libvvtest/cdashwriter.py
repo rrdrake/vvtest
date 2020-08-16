@@ -72,7 +72,7 @@ class CDashWriter:
 
         fmtr = self.formatter()
         set_global_data( fmtr, self.dspecs, rtinfo )
-        set_test_list( fmtr, atestlist, self.testdir )
+        set_test_list( fmtr, self.dspecs, atestlist, self.testdir )
         return fmtr
 
     def _write_data(self, fmtr, rtinfo):
@@ -160,7 +160,79 @@ def construct_destination_specs( destination, project=None,
         dspecs.site  = specs.get( 'site', None )
         dspecs.name  = specs.get( 'name', None )
 
+        if not err:
+            err = check_fill_files_attr( dspecs, specs.get( 'files', None ) )
+
+        if not err:
+            err = check_fill_filemax_attr( dspecs, specs.get( 'filemax', None ) )
+
     return dspecs,err
+
+
+def check_fill_files_attr( dspecs, value ):
+    ""
+    err = ''
+
+    if value:
+        if value not in ['nonpass','all']:
+            err = "unknown 'files' attribute value: "+repr(value)
+        else:
+            dspecs.files = value
+
+    return err
+
+
+def check_fill_filemax_attr( dspecs, value ):
+    ""
+    err = ''
+
+    if value:
+        nval = attempt_parse_number( value )
+
+        if nval == None:
+            val = ''.join( value.lower().split() )
+            if val.endswith('b'):
+                nval = attempt_parse_number( val[:-1], 0.001 )
+            if val.endswith('k'):
+                nval = attempt_parse_number( val[:-1], 1 )
+            elif val.endswith('kb'):
+                nval = attempt_parse_number( val[:-2], 1 )
+            if val.endswith('m'):
+                nval = attempt_parse_number( val[:-1], 1000 )
+            elif val.endswith('mb'):
+                nval = attempt_parse_number( val[:-2], 1000 )
+            if val.endswith('g'):
+                nval = attempt_parse_number( val[:-1], 1000000 )
+            elif val.endswith('gb'):
+                nval = attempt_parse_number( val[:-2], 1000000 )
+            if val.endswith('t'):
+                nval = attempt_parse_number( val[:-1], 1000000000 )
+            elif val.endswith('tb'):
+                nval = attempt_parse_number( val[:-2], 1000000000 )
+
+        if nval == None:
+            err = "invalid 'filemax' attribute value: "+repr(value)
+        else:
+            dspecs.filemax = nval
+
+    return err
+
+
+def attempt_parse_number( astring, multiplier=1 ):
+    ""
+    try:
+        ival = max( 0, int( astring ) ) * multiplier
+    except Exception:
+        try:
+            fval = max( 0.0, float( astring ) ) * multiplier
+        except Exception:
+            pass
+        else:
+            return fval
+    else:
+        return ival
+
+    return None
 
 
 def attempt_int_conversion( datestring ):
@@ -191,6 +263,8 @@ class DestinationSpecs:
         self.group = None
         self.site = None
         self.name = None
+        self.files = 'nonpass'
+        self.filemax = 100
 
 
 def set_global_data( fmtr, dspecs, rtinfo ):
@@ -228,11 +302,12 @@ def set_global_data( fmtr, dspecs, rtinfo ):
     fmtr.setTime( tstart, rtinfo.getInfo( 'finishepoch', None ) )
 
 
-def set_test_list( fmtr, atestlist, testdir ):
+def set_test_list( fmtr, dspecs, atestlist, testdir ):
     ""
-    tcaseL = atestlist.getActiveTests()
+    fspec = dspecs.files
+    max_KB = dspecs.filemax
 
-    for tcase in tcaseL:
+    for tcase in atestlist.getActiveTests():
 
         tspec = tcase.getSpec()
         tstat = tcase.getStat()
@@ -250,17 +325,16 @@ def set_test_list( fmtr, atestlist, testdir ):
             kwargs['runtime']   = tstat.getRuntime( None )
             kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
             kwargs['command']   = outpututils.get_test_command_line( logdir )
+            if fspec == 'all':
+                kwargs['output'] = get_test_output( testdir, tspec, max_KB )
 
         else:
-            file_max_KB = 100
-            out = get_test_output( testdir, tspec, file_max_KB )
-
             kwargs['status']    = 'failed'
             kwargs['runtime']   = tstat.getRuntime( None )
             kwargs['detail']    = vvstat
-            kwargs['output']    = out
             kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
             kwargs['command']   = outpututils.get_test_command_line( logdir )
+            kwargs['output']    = get_test_output( testdir, tspec, max_KB )
 
         fmtr.addTest( tspec.getDisplayString(), **kwargs )
 

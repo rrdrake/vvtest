@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - Add files=* and filemax=* attributes to CDash options. For example,
+        --cdash "http://my.com/cdash, project=Proj, files=all, filemax=1MB"
+      For more info, see the wiki or run vvtest help results.
+
     - Add --user-args ARGS command line option, which is ignored by vvtest
       except to pass through arbitrary arguments to the prologue() user plugin
       function.

@@ -219,6 +219,76 @@ class unit_tests( vtu.vvtestTestCase ):
         dspecs,err = cdashwriter.construct_destination_specs( "foo,=v,a=b" )
         assert err and 'invalid' in err
 
+    def test_destination_files_and_file_max_specifications(self):
+        ""
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, files=nonpass' )
+        assert not err
+        assert dspecs.files == 'nonpass'
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, files=all' )
+        assert not err
+        assert dspecs.files == 'all'
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, files=foobar' )
+        assert err and 'unknown' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=100' )
+        assert not err
+        assert dspecs.filemax == 100
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=200' )
+        assert not err
+        assert dspecs.filemax == 200
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=200K' )
+        assert not err
+        assert dspecs.filemax == 200
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=200KB' )
+        assert not err
+        assert dspecs.filemax == 200
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=1M' )
+        assert not err
+        assert dspecs.filemax == 1000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=1MB' )
+        assert not err
+        assert dspecs.filemax == 1000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10G' )
+        assert not err
+        assert dspecs.filemax == 10000000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10gB' )
+        assert not err
+        assert dspecs.filemax == 10000000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10T' )
+        assert not err
+        assert dspecs.filemax == 10000000000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10TB' )
+        assert not err
+        assert dspecs.filemax == 10000000000
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=256B' )
+        assert not err
+        assert abs( dspecs.filemax - 0.256 ) < 0.01
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=-1' )
+        assert not err
+        assert not dspecs.filemax < 0 and dspecs.filemax < 0.01
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=foo' )
+        assert err and 'invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=fookb' )
+        assert err and 'invalid' in err
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10-100' )
+        assert err and 'invalid' in err
+
     def test_a_URL_without_a_project_name_is_an_error(self):
         ""
         wr = cdashwriter.CDashWriter( os.getcwd(), None )
@@ -351,12 +421,11 @@ class unit_tests( vtu.vvtestTestCase ):
         assert len( util.greplines( 'subdir', out ) ) == 2
         assert len( util.greplines( ' .', out ) ) == 1
 
-    def test_output_from_failed_tests(self):
+    def make_fake_test_list_with_exec_directory(self, result='diff',
+                                                      extraout=False ):
         ""
-        fmtr = cdashutil.TestResultsFormatter()
-
         testlist = TestList()
-        tcase = vtu.make_fake_TestCase( name='atest', result='diff', runtime=23 )
+        tcase = vtu.make_fake_TestCase( name='atest', result=result, runtime=23 )
         testlist.addTest( tcase )
 
         xdir = tcase.getSpec().getExecuteDirectory()
@@ -366,23 +435,114 @@ class unit_tests( vtu.vvtestTestCase ):
             """ )
         os.mkdir( pjoin( xdir, 'asubdir' ) )
         os.symlink( 'file1.txt', pjoin( xdir, 'file2.txt' ) )
+        extra = ''
+        if extraout:
+            extra = ' '*20+'a'*75+'\n'
+            extra += ' '*20+'b'*75+'\n'
+            extra += ' '*20+'c'*75+'\n'
         util.writefile( pjoin( xdir, 'execute.log' ), """
             bunch of info
-            more info
-            """ )
+            more info"""+'\n'+extra )
 
-        cdashwriter.set_test_list( fmtr, testlist, os.getcwd() )
+        return testlist
 
-        fmtr.writeToFile( 'file.xml' )
+    def test_output_from_failed_tests(self):
+        ""
+        testlist = self.make_fake_test_list_with_exec_directory()
+        time.sleep(1)
 
-        xml = util.read_xml_file( 'file.xml' )
-        out = extract_test_output( xml, 'sdir/atest.np=4' )
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+
+        assert displ == 'sdir/atest.np=4'
+
+        out = attrs['output']
         print3( out )
         yr = time.strftime( "%Y", time.localtime() )
         assert len( util.greplines( yr+'* execute.log', out ) ) == 1
         assert len( util.greplines( '$ cat*execute.log', out ) ) == 1
         assert len( util.greplines( 'bunch of info', out ) ) == 1
         assert len( util.greplines( 'more info', out ) ) == 1
+
+        assert attrs['runtime'] == 23
+        assert attrs['status'] == 'failed'
+
+    def test_output_from_passed_tests(self):
+        ""
+        testlist = self.make_fake_test_list_with_exec_directory( 'pass' )
+        time.sleep(1)
+
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+        assert displ == 'sdir/atest.np=4'
+        assert not attrs.get( 'output', None )
+
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile,files=all' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+        assert displ == 'sdir/atest.np=4'
+        out = attrs['output']
+        print3( out )
+        assert len( util.greplines( 'bunch of info', out ) ) == 1
+
+    def test_output_file_size_is_limited(self):
+        ""
+        testlist = self.make_fake_test_list_with_exec_directory( extraout=True )
+        time.sleep(1)
+
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+        out = attrs['output']
+        assert 'middle of this file has been removed' not in out
+
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile,filemax=20B' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+
+        out = attrs['output']
+        print3( out )
+        assert 'middle of this file has been removed' in out
+
+        fmtr = MockFormatter()
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile,filemax=20MB' )
+        cdashwriter.set_test_list( fmtr, dspecs, testlist, os.getcwd() )
+
+        assert len( fmtr.tests ) == 1
+        displ,attrs = list(fmtr.tests.items())[0]
+
+        out = attrs['output']
+        print3( out )
+        assert 'middle of this file has been removed' not in out
+
+
+class MockFormatter:
+
+    def __init__(self):
+        ""
+        self.tests = {}  # display string to kwargs
+
+    def addTest(self, displ, **kwargs):
+        ""
+        assert displ and displ.strip() == displ
+        self.tests[ displ ] = dict( kwargs )
 
 
 class integration_tests( vtu.vvtestTestCase ):
@@ -391,6 +551,7 @@ class integration_tests( vtu.vvtestTestCase ):
         ""
         util.writefile( 'good.vvt', """
             import time
+            print ( 'hello from the good test' )
             time.sleep(2)
             """ )
         util.writefile( 'bad.vvt', """
@@ -411,12 +572,14 @@ class integration_tests( vtu.vvtestTestCase ):
         self.check_good_bad_ugly( 'file.xml' )
 
         vrun = vtu.runvvtest( '-i --cdash file2.xml' )
-
         self.check_good_bad_ugly( 'file2.xml' )
 
         self.assert_same_submit_files( 'file.xml', 'file2.xml' )
 
-    def check_good_bad_ugly(self, filename):
+        vrun = vtu.runvvtest( '-i --cdash "file3.xml,files=all,filemax=1MB"' )
+        self.check_good_bad_ugly( 'file3.xml', good_output=True )
+
+    def check_good_bad_ugly(self, filename, good_output=False):
         ""
         xml = util.read_xml_file( filename )
 
@@ -425,6 +588,10 @@ class integration_tests( vtu.vvtestTestCase ):
         assert int(testinfo['Exit Value']) == 0
         assert sys.executable in testinfo['FullCommandLine']
         assert 'good.vvt' in testinfo['FullCommandLine']
+        if good_output:
+            assert 'hello from the good test' in testinfo['output']
+        else:
+            assert 'output' not in testinfo
 
         testinfo = extract_test_results( xml, 'bad' )
         assert testinfo['Completion Status'] == 'diff'
@@ -432,6 +599,7 @@ class integration_tests( vtu.vvtestTestCase ):
         assert int(testinfo['Exit Value']) > 0
         assert sys.executable in testinfo['FullCommandLine']
         assert 'bad.vvt' in testinfo['FullCommandLine']
+        assert 'hello from the bad test' in testinfo['output']
 
         assert extract_test_results( xml, 'ugly' ) == None
 
