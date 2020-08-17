@@ -455,14 +455,18 @@ class ResultsHandler:
 
         if os.path.isfile( rfile ):
 
-            tlr = testlistio.TestListReader( rfile )
-            tlr.read( self.tctor )
-            jobtests = tlr.getTests()
-
-            for file_tcase in jobtests.values():
-                tcase = self.xlist.checkStateChange( file_tcase )
-                if tcase and tcase.getStat().isDone():
-                    donetests.append( tcase )
+            try:
+                tlr = testlistio.TestListReader( rfile )
+                tlr.read( self.tctor )
+                jobtests = tlr.getTests()
+            except Exception:
+                # file system race condition can cause corruption, ignore
+                pass
+            else:
+                for file_tcase in jobtests.values():
+                    tcase = self.xlist.checkStateChange( file_tcase )
+                    if tcase and tcase.getStat().isDone():
+                        donetests.append( tcase )
 
     def getReasonForNotRun(self, bjob):
         ""
