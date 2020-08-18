@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import basename
 import time
 
 import vvtestutils as vtu
@@ -227,6 +228,13 @@ class validate_plugin_integration_tests( vtu.vvtestTestCase ):
             assert len( vrun.grepTestLines( 'skip *testB' ) ) == 1
             assert len( vrun.grepTestLines(
                         'keywords must contain fast, medium, or long' ) ) == 1
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--files --config', adir, batch=batch )
+            fL = vrun.out.strip().splitlines()
+            assert len(fL) == 1, 'wrong number of files: '+repr(fL)
+            assert basename( fL[0] ) == 'testA.vvt'
 
     def test_integration_with_error_in_plugin(self):
         ""

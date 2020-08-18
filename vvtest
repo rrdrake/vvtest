@@ -506,18 +506,17 @@ def generateTestList( opts, optD, rtdata, tlm ):
 
     tlist = tlm.makeTestList()
 
+    tlm.prepareTestingDirectory()
+    tlm.writeCache()
+
     tlm.scanPaths()
     tlm.loadTestTimes()
     tlm.applyFilters()
 
+    write_test_list_file( tlist, rtinfo.asDict(), perms )
+
     rtdata.getResultsWriter().prerun( tlist, rtinfo, verbosity=1 )
     print3()
-
-    tlm.prepareTestingDirectory()
-
-    tlm.writeCache()
-
-    write_test_list_file( tlist, rtinfo.asDict(), perms )
 
     runner = TestRunner( test_dir, plat, rtconfig, plugin, perms )
 
@@ -538,6 +537,7 @@ def extractTestFiles( scan_type, param_dict, target_dir, rtdata, tlm ):
     tlist = tlm.makeTestList()
 
     tlm.scanPaths()
+    tlm.readTests()
     tlm.loadTestTimes()
     tlm.applyFilters()
 
@@ -556,22 +556,20 @@ def runTests( opts, optD, rtdata, tlm ):
 
     rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    tlist = tlm.makeTestList()
-
-    check_for_currently_running_vvtest( tlist, opts.force )
-
-    tlm.prepareTestingDirectory()
-
-    tlm.writeCache()
-
-    tlm.scanPaths()
-    tlm.readTests()
-
     if opts.batch:
         if opts.dash_N == None and plat.getPluginMaxProcs() == None:
             # we are batching and no num procs limit is available
             rtconfig.applyMaxProcsExpression( False )
 
+    tlist = tlm.makeTestList()
+
+    check_for_currently_running_vvtest( tlist, opts.force )
+
+    tlm.prepareTestingDirectory()
+    tlm.writeCache()
+
+    tlm.scanPaths()
+    tlm.readTests()
     tlm.loadTestTimes()
     tlm.applyFilters()
 
@@ -602,13 +600,6 @@ def restartTests( opts, optD, rtdata, tlm ):
     if batchid == None:
         rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    tlist = tlm.makeTestList( batchid )
-
-    check_for_currently_running_vvtest( tlist, opts.force )
-
-    tlm.readTests()
-    tlm.readResults()
-
     if opts.dash_N == None:
         # no max procs filter unless -N was given on command line
         rtconfig.applyMaxProcsExpression( False )
@@ -618,10 +609,17 @@ def restartTests( opts, optD, rtdata, tlm ):
 
     rtconfig.applyTDDExpression( False )
 
+    tlist = tlm.makeTestList( batchid )
+
+    check_for_currently_running_vvtest( tlist, opts.force )
+
+    tlm.readTests()
+    tlm.readResults()
+
     if batchid == None:
-        tlist.setResultsDate()
         tlm.loadTestTimes()
         tlm.prepareActive()
+        tlist.setResultsDate()
     else:
         tlm.addBatchFileLinksToTests( batchid )
         tlm.prepareActive( apply_filters=False )
@@ -687,6 +685,9 @@ def information_output( opts, optD, rtdata, tlm ):
 
     if not restart and ( opts.keys or opts.files ):
         tlm.scanPaths()
+        tlm.readTests()
+        tlm.loadTestTimes()
+        tlm.applyFilters()
 
     elif have_cache:
         if opts.dash_N == None:
