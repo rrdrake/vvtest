@@ -134,30 +134,16 @@ class TestList:
                 if xdir not in self.tcasemap:
                     self.tcasemap[ xdir ] = tcase
 
-    def readTestResults(self, preserve_skips=False):
+    def readTestResults(self):
         """
         Glob for results filenames and read them all in increasing order
-        by rundate.
-
-        If 'preserve_skips' is False, each test read in from a results file
-        will have its skip setting removed from the test.
+        by rundate, replacing tests in this object.
         """
         fL = glob_results_files( self.filename )
-        file_attrs = self._read_file_list( fL, preserve_skips )
+        file_attrs = self._read_file_list( fL )
         return file_attrs
 
-    def resultsFileIsMarkedFinished(self):
-        ""
-        finished = True
-
-        rfileL = glob_results_files( self.filename )
-        if len(rfileL) > 0:
-           if not testlistio.file_is_marked_finished( rfileL[-1] ):
-                finished = False
-
-        return finished
-
-    def _read_file_list(self, files, preserve_skips):
+    def _read_file_list(self, files):
         ""
         file_attrs = {}
 
@@ -175,15 +161,38 @@ class TestList:
             tctor = self.tctor.spawn( file_attrs.get( 'shortxdirs', None ) )
 
             for xdir,tcase in tlr.getTests().items():
-
-                t = self.tcasemap.get( xdir, None )
-                if t != None:
-                    tctor.resetTestID( t.getSpec() )
-                    copy_test_results( t, tcase )
-                    if not preserve_skips:
-                        t.getStat().removeAttr( 'skip' )
+                tctor.resetTestID( tcase.getSpec() )
+                self.tcasemap[ xdir ] = tcase
 
         return file_attrs
+
+    def addTestsWithoutOverwrite(self, tcaselist):
+        ""
+        for tcase in tcaselist:
+            tid = tcase.getSpec().getID()
+            if tid not in self.tcasemap:
+                self.tcasemap[ tid ] = tcase
+
+    def copyTestResults(self, tcaselist):
+        ""
+        for tcase in tcaselist:
+            tid = tcase.getSpec().getID()
+            t = self.tcasemap.get( tid, None )
+            if t != None:
+                copy_test_results( t, tcase )
+                # magic: add a getIDGenerator() method to TestSpec
+                t.getSpec().resetIDGenerator( tcase.getSpec().idgen )
+
+    def resultsFileIsMarkedFinished(self):
+        ""
+        finished = True
+
+        rfileL = glob_results_files( self.filename )
+        if len(rfileL) > 0:
+           if not testlistio.file_is_marked_finished( rfileL[-1] ):
+                finished = False
+
+        return finished
 
     def getDateStamp(self):
         """

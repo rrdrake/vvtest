@@ -436,19 +436,19 @@ class TestListManager:
 
         return self.tlist
 
-    def writeCache(self):
+    def writeCacheFile(self):
         ""
         self.cachehandler.writeCache( self.perms )
 
-    def scanPaths(self):
+    def scanForTests(self):
         ""
         self.scanner.scanPaths( self.tlist )
 
-    def applyFilters(self):
+    def applyPermanentFilters(self):
         ""
         self.selector.applyPermanentFilters( self.tlist )
 
-    def readTests(self):
+    def readTestList(self):
         ""
         self.tlist.readTestList()
 
@@ -456,15 +456,30 @@ class TestListManager:
         ""
         self.timehandler.load( self.tlist )
 
-    def readResults(self, preserve_skips=False):
+    def readPreviousResults(self):
         ""
-        attrs = self.tlist.readTestResults( preserve_skips=preserve_skips )
+        fn = self.namer.getFilePath()
+        self.prev_tlist = TestList.TestList( fn, self.tctor )
 
-        fin = self.tlist.getFinishDate()
+        # magic: this function causes the testlist to be read twice
+        #   - is there a way to avoid reading it here?
+        self.prev_tlist.readTestList()
+
+        attrs = self.prev_tlist.readTestResults()
+
+        fin = self.prev_tlist.getFinishDate()
         if fin != None:
             attrs['finishepoch'] = fin
 
         return attrs
+
+    def unionPreviousTests(self):
+        ""
+        self.tlist.addTestsWithoutOverwrite( self.prev_tlist.getTests() )
+
+    def mergePreviousResults(self):
+        ""
+        self.tlist.copyTestResults( self.prev_tlist.getTests() )
 
     def addBatchFileLinksToTests(self, batchid):
         ""
@@ -507,11 +522,11 @@ def generateTestList( opts, optD, rtdata, tlm ):
     tlist = tlm.makeTestList()
 
     tlm.prepareTestingDirectory()
-    tlm.writeCache()
+    tlm.writeCacheFile()
 
-    tlm.scanPaths()
+    tlm.scanForTests()
     tlm.loadTestTimes()
-    tlm.applyFilters()
+    tlm.applyPermanentFilters()
 
     write_test_list_file( tlist, rtinfo.asDict(), perms )
 
@@ -536,10 +551,10 @@ def extractTestFiles( scan_type, param_dict, target_dir, rtdata, tlm ):
 
     tlist = tlm.makeTestList()
 
-    tlm.scanPaths()
-    tlm.readTests()
+    tlm.scanForTests()
+    tlm.readTestList()
     tlm.loadTestTimes()
-    tlm.applyFilters()
+    tlm.applyPermanentFilters()
 
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
 
@@ -556,25 +571,23 @@ def runTests( opts, optD, rtdata, tlm ):
 
     rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    if opts.batch:
-        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            # we are batching and no num procs limit is available
-            rtconfig.applyMaxProcsExpression( False )
+    adjust_filter_settings_for_batch( opts, plat, rtconfig )
 
     tlist = tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
     tlm.prepareTestingDirectory()
-    tlm.writeCache()
+    tlm.writeCacheFile()
 
-    tlm.scanPaths()
-    tlm.readTests()
+    tlm.scanForTests()
+    tlm.readPreviousResults()
+    tlm.unionPreviousTests()
     tlm.loadTestTimes()
-    tlm.applyFilters()
+    tlm.applyPermanentFilters()
 
     write_test_list_file( tlist, rtinfo.asDict(), perms )
-    tlm.readResults( preserve_skips=True )
+    tlm.mergePreviousResults()
     tlm.prepareActive()
 
     tlist.setResultsDate()
@@ -600,27 +613,20 @@ def restartTests( opts, optD, rtdata, tlm ):
     if batchid == None:
         rtdata.getUserPlugin().callPrologue( rtinfo.getInfo('cmdline') )
 
-    if opts.dash_N == None:
-        # no max procs filter unless -N was given on command line
-        rtconfig.applyMaxProcsExpression( False )
-    if opts.max_devices == None:
-        # no max devices filter unless --max-devices was given on command line
-        rtconfig.applyMaxDevicesExpression( False )
-
-    rtconfig.applyTDDExpression( False )
+    adjust_filter_settings_for_restart( opts, rtconfig )
 
     tlist = tlm.makeTestList( batchid )
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
-    tlm.readTests()
-    tlm.readResults()
-
     if batchid == None:
+        tlm.readPreviousResults()
+        tlm.unionPreviousTests()
         tlm.loadTestTimes()
         tlm.prepareActive()
         tlist.setResultsDate()
     else:
+        tlm.readTestList()
         tlm.addBatchFileLinksToTests( batchid )
         tlm.prepareActive( apply_filters=False )
 
@@ -642,8 +648,8 @@ def baselineTests( opts, optD, rtdata, tlm ):
 
     tlist = tlm.makeTestList()
 
-    tlm.readTests()
-    tlm.readResults()
+    tlm.readPreviousResults()
+    tlm.unionPreviousTests()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default
@@ -684,20 +690,16 @@ def information_output( opts, optD, rtdata, tlm ):
     have_cache = ( restart or os.path.exists( test_dir ) )
 
     if not restart and ( opts.keys or opts.files ):
-        tlm.scanPaths()
-        tlm.readTests()
+        tlm.scanForTests()
+        tlm.readTestList()
         tlm.loadTestTimes()
-        tlm.applyFilters()
+        tlm.applyPermanentFilters()
 
     elif have_cache:
-        if opts.dash_N == None:
-            rtconfig.applyMaxProcsExpression( False )
-        if opts.max_devices == None:
-            rtconfig.applyMaxDevicesExpression( False )
-        rtconfig.applyTDDExpression( False )
+        adjust_filter_settings_for_restart( opts, rtconfig )
 
-        tlm.readTests()
-        attrs = tlm.readResults()
+        attrs = tlm.readPreviousResults()
+        tlm.unionPreviousTests()
         rtinfo.setInfo( **attrs )
 
     else:
@@ -722,6 +724,7 @@ def information_output( opts, optD, rtdata, tlm ):
 
 def output_timings( opts, optD, rtdata, tlm ):
     ""
+    plat = rtdata.getPlatformObject()
     rtinfo = rtdata.getRuntimeInfo()
     rtconfig = rtdata.getRuntimeConfig()
     results_writer = rtdata.getResultsWriter()
@@ -732,41 +735,49 @@ def output_timings( opts, optD, rtdata, tlm ):
 
     if not rtdata.isRestartMode():
 
-        tlm.scanPaths()
-        tlm.readTests()
+        adjust_filter_settings_for_batch( opts, plat, rtconfig )
 
-        if opts.batch:
-            if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-                # we are batching and no num procs limit is available
-                rtconfig.applyMaxProcsExpression( False )
-
+        tlm.scanForTests()
+        tlm.readPreviousResults()
+        tlm.unionPreviousTests()
         tlm.loadTestTimes()
-        tlm.applyFilters()
-
-        tlm.readResults( preserve_skips=True )
+        tlm.applyPermanentFilters()
+        tlm.mergePreviousResults()
         tlm.prepareActive()
-
-        tlist.setResultsDate()
 
     else:
-        tlm.readTests()
-        tlm.readResults()
+        adjust_filter_settings_for_restart( opts, rtconfig )
 
-        if opts.dash_N == None:
-            # no max procs filter unless -N was given on command line
-            rtconfig.applyMaxProcsExpression( False )
-        if opts.max_devices == None:
-            # no max devices filter unless --max-devices was given on command line
-            rtconfig.applyMaxDevicesExpression( False )
-
-        rtconfig.applyTDDExpression( False )
-
-        tlist.setResultsDate()
+        tlm.readPreviousResults()
+        tlm.unionPreviousTests()
         tlm.loadTestTimes()
         tlm.prepareActive()
+
+    tlist.setResultsDate()
 
     cwriter = construct_console_writer( test_dir, opts, optD )
     cwriter.timings( tlist )
+
+
+def adjust_filter_settings_for_batch( opts, plat, rtconfig ):
+    ""
+    if opts.batch:
+        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
+            # we are batching and no num procs limit is available
+            rtconfig.applyMaxProcsExpression( False )
+
+
+def adjust_filter_settings_for_restart( opts, rtconfig ):
+    ""
+    if opts.dash_N == None:
+        # no max procs filter unless -N was given on command line
+        rtconfig.applyMaxProcsExpression( False )
+
+    if opts.max_devices == None:
+        # no max devices filter unless --max-devices was given on command line
+        rtconfig.applyMaxDevicesExpression( False )
+
+    rtconfig.applyTDDExpression( False )
 
 
 ##############################################################################

@@ -484,7 +484,7 @@ class info_tests( vtu.vvtestTestCase ):
 
     def test_that_command_line_info_ignores_its_own_filtering(self):
         """
-        When using "vvtest -i -K pass", for example, the skips shown in the
+        When using "vvtest -iv -K pass", for example, the skips shown in the
         summary output should NOT include the tests filtered out by "-K pass".
         """
         util.writefile( 'blue.vvt', """

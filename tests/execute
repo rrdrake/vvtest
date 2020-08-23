@@ -279,6 +279,8 @@ class execute_tests( vtu.vvtestTestCase ):
 
         vtu.runvvtest( '-S hello=jupiter' ).assertCounts( total=2, npass=2 )
 
+        # this also tests that -i shows previous test results (not just
+        # those of the last run)
         vrun = vtu.runvvtest( '-i -v' )
         vrun.assertCounts( total=6, npass=6 )
 
