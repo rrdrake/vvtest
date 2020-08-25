@@ -293,9 +293,17 @@ def check_valid_attr_name( name ):
 
 def copy_test_results( to_tcase, from_tcase ):
     ""
-    for k,v in from_tcase.getStat().getAttrs().items():
+    from_attrs = from_tcase.getStat().getAttrs()
+    to_tstat = to_tcase.getStat()
+
+    for k,v in from_attrs.items():
         if k in ['state','xtime','xdate','xvalue','result']:
-            to_tcase.getStat().setAttr( k, v )
+            to_tstat.setAttr( k, v )
+
+    if 'skip' in from_attrs:
+        to_tstat.setAttr( 'skip', from_attrs['skip'] )
+    else:
+        to_tstat.removeAttr( 'skip' )
 
 
 def translate_exit_status_to_result_string( exit_status ):

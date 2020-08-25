@@ -456,30 +456,21 @@ class TestListManager:
         ""
         self.timehandler.load( self.tlist )
 
-    def readPreviousResults(self):
+    def readAndMergePreviouslyRunTests(self):
         ""
         fn = self.namer.getFilePath()
-        self.prev_tlist = TestList.TestList( fn, self.tctor )
+        prev_tlist = TestList.TestList( fn, self.tctor )
 
-        # magic: this function causes the testlist to be read twice
-        #   - is there a way to avoid reading it here?
-        self.prev_tlist.readTestList()
+        attrs = prev_tlist.readTestResults()
 
-        attrs = self.prev_tlist.readTestResults()
-
-        fin = self.prev_tlist.getFinishDate()
+        fin = prev_tlist.getFinishDate()
         if fin != None:
             attrs['finishepoch'] = fin
 
+        self.tlist.addTestsWithoutOverwrite( prev_tlist.getTests() )
+        self.tlist.copyTestResults( prev_tlist.getTests() )
+
         return attrs
-
-    def unionPreviousTests(self):
-        ""
-        self.tlist.addTestsWithoutOverwrite( self.prev_tlist.getTests() )
-
-    def mergePreviousResults(self):
-        ""
-        self.tlist.copyTestResults( self.prev_tlist.getTests() )
 
     def addBatchFileLinksToTests(self, batchid):
         ""
@@ -581,13 +572,11 @@ def runTests( opts, optD, rtdata, tlm ):
     tlm.writeCacheFile()
 
     tlm.scanForTests()
-    tlm.readPreviousResults()
-    tlm.unionPreviousTests()
+    tlm.readAndMergePreviouslyRunTests()
     tlm.loadTestTimes()
     tlm.applyPermanentFilters()
 
     write_test_list_file( tlist, rtinfo.asDict(), perms )
-    tlm.mergePreviousResults()
     tlm.prepareActive()
 
     tlist.setResultsDate()
@@ -620,8 +609,8 @@ def restartTests( opts, optD, rtdata, tlm ):
     check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
-        tlm.readPreviousResults()
-        tlm.unionPreviousTests()
+        tlm.readTestList()
+        tlm.readAndMergePreviouslyRunTests()
         tlm.loadTestTimes()
         tlm.prepareActive()
         tlist.setResultsDate()
@@ -648,8 +637,7 @@ def baselineTests( opts, optD, rtdata, tlm ):
 
     tlist = tlm.makeTestList()
 
-    tlm.readPreviousResults()
-    tlm.unionPreviousTests()
+    tlm.readAndMergePreviouslyRunTests()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default
@@ -698,8 +686,8 @@ def information_output( opts, optD, rtdata, tlm ):
     elif have_cache:
         adjust_filter_settings_for_restart( opts, rtconfig )
 
-        attrs = tlm.readPreviousResults()
-        tlm.unionPreviousTests()
+        tlm.readTestList()
+        attrs = tlm.readAndMergePreviouslyRunTests()
         rtinfo.setInfo( **attrs )
 
     else:
@@ -738,18 +726,15 @@ def output_timings( opts, optD, rtdata, tlm ):
         adjust_filter_settings_for_batch( opts, plat, rtconfig )
 
         tlm.scanForTests()
-        tlm.readPreviousResults()
-        tlm.unionPreviousTests()
+        tlm.readAndMergePreviouslyRunTests()
         tlm.loadTestTimes()
         tlm.applyPermanentFilters()
-        tlm.mergePreviousResults()
         tlm.prepareActive()
 
     else:
         adjust_filter_settings_for_restart( opts, rtconfig )
 
-        tlm.readPreviousResults()
-        tlm.unionPreviousTests()
+        tlm.readAndMergePreviouslyRunTests()
         tlm.loadTestTimes()
         tlm.prepareActive()
 
