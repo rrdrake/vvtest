@@ -131,7 +131,7 @@ class TestExecList:
                 self.stopped[ tid ] = tcase
 
         if tcase:
-            copy_test_results( tcase, tmp_tcase )
+            copy_test_results( tcase.getStat(), tmp_tcase.getStat() )
             self.tlist.appendTestResult( tcase )
 
         return tcase

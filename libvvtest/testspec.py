@@ -192,13 +192,17 @@ class TestSpec( TestFile ):
         constructs and returns a TestID object; this object is used to
         determine the exec dir, the ID, and the display string
         """
-        return self.idgen( self.name, self.getFilepath(),
-                           self.params, self.staged )
+        return self.idgen.makeID( self.name, self.getFilepath(),
+                                  self.params, self.staged )
 
     def resetIDGenerator(self, idgenerator):
         ""
         self.idgen = idgenerator
         self._set_identifiers()
+
+    def getIDGenerator(self):
+        ""
+        return self.idgen
 
     def _set_identifiers(self):
         ""

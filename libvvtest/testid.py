@@ -116,3 +116,22 @@ else:
     def _compute_hash( astring ):
         ""
         return hashlib.sha1( astring.encode() ).hexdigest()
+
+
+class IDGenerator:
+
+    def __init__(self, numchars):
+        ""
+        if numchars:
+            self.nchars = int( numchars )
+        else:
+            self.nchars = numchars
+
+    def makeID(self, testname, filepath, params, staged_names):
+        ""
+        tid = TestID( testname, filepath, params, staged_names )
+
+        if self.nchars != None:
+            tid.setShorten( self.nchars )
+
+        return tid

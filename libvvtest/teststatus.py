@@ -291,10 +291,9 @@ def check_valid_attr_name( name ):
             raise ValueError( "character '" + c + "' not allowed in name" )
 
 
-def copy_test_results( to_tcase, from_tcase ):
+def copy_test_results( to_tstat, from_tstat ):
     ""
-    from_attrs = from_tcase.getStat().getAttrs()
-    to_tstat = to_tcase.getStat()
+    from_attrs = from_tstat.getAttrs()
 
     for k,v in from_attrs.items():
         if k in ['state','xtime','xdate','xvalue','result']:

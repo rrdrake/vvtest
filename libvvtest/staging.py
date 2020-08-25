@@ -79,10 +79,11 @@ class StagingOracle:
 
             paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            tid = self.tctor.makeTestID( tspec.getName(),
-                                         tspec.getFilepath(),
-                                         paramD,
-                                         self.param_nameL )
+            idgen = self.tctor.getIDGenerator()
+            tid = idgen.makeID( tspec.getName(),
+                                tspec.getFilepath(),
+                                paramD,
+                                self.param_nameL )
             displ = tid.computeDisplayString()
 
             return displ

@@ -158,10 +158,11 @@ class TestList:
             file_attrs.clear()
             file_attrs.update( tlr.getAttrs() )
 
-            tctor = self.tctor.spawn( file_attrs.get( 'shortxdirs', None ) )
+            short = file_attrs.get( 'shortxdirs', None )
+            idgen = self.tctor.makeIDGenerator( short )
 
             for xdir,tcase in tlr.getTests().items():
-                tctor.resetTestID( tcase.getSpec() )
+                tcase.getSpec().resetIDGenerator( idgen )
                 self.tcasemap[ xdir ] = tcase
 
         return file_attrs
@@ -176,12 +177,11 @@ class TestList:
     def copyTestResults(self, tcaselist):
         ""
         for tcase in tcaselist:
-            tid = tcase.getSpec().getID()
-            t = self.tcasemap.get( tid, None )
+            tspec = tcase.getSpec()
+            t = self.tcasemap.get( tspec.getID(), None )
             if t != None:
-                copy_test_results( t, tcase )
-                # magic: add a getIDGenerator() method to TestSpec
-                t.getSpec().resetIDGenerator( tcase.getSpec().idgen )
+                copy_test_results( t.getStat(), tcase.getStat() )
+                t.getSpec().resetIDGenerator( tspec.getIDGenerator() )
 
     def resultsFileIsMarkedFinished(self):
         ""

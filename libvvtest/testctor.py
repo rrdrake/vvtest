@@ -15,31 +15,20 @@ class TestConstructor:
 
     def __init__(self):
         ""
-        self.nchars = None
+        self.idgen = testid.IDGenerator( None )
 
     def setShorten(self, numchars):
         ""
-        self.nchars = numchars
+        self.idgen = testid.IDGenerator( numchars )
 
-    def makeTestID(self, testname, filepath, params, staged_names):
+    def getIDGenerator(self):
         ""
-        tid = testid.TestID( testname, filepath, params, staged_names )
-        if self.nchars != None:
-            tid.setShorten( self.nchars )
-        return tid
+        return self.idgen
+
+    def makeIDGenerator(self, numchars):
+        ""
+        return testid.IDGenerator( numchars )
 
     def makeTestSpec(self, testname, rootpath, filepath):
         ""
-        tspec = testspec.TestSpec( testname, rootpath, filepath, self.makeTestID )
-        return tspec
-
-    def resetTestID(self, tspec):
-        ""
-        tspec.resetIDGenerator( self.makeTestID )
-
-    def spawn(self, numchars=None):
-        ""
-        tctor = TestConstructor()
-        if numchars != None:
-            tctor.setShorten( int( numchars ) )
-        return tctor
+        return testspec.TestSpec( testname, rootpath, filepath, self.idgen )

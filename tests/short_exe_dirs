@@ -131,14 +131,13 @@ class TestID_tests( unittest.TestCase ):
 
     def test_the_ID_generator_can_be_reset(self):
         ""
-        tctor1 = TestConstructor()
-        tspec = vtu.make_fake_TestSpec( tctor=tctor1 )
+        tctor = TestConstructor()
+        tspec = vtu.make_fake_TestSpec( tctor=tctor )
 
         xdir1 = tspec.getExecuteDirectory()
 
-        tctor2 = TestConstructor()
-        tctor2.setShorten( 5 )
-        tctor2.resetTestID( tspec )
+        idgen2 = tctor.makeIDGenerator( 5 )
+        tspec.resetIDGenerator( idgen2 )
 
         xdir2 = tspec.getExecuteDirectory()
 
