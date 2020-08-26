@@ -42,13 +42,12 @@ class MainEntry:
         self.exepath = exepath
         self.curdir = os.getcwd()
 
-        self.loc = Locator( os.getcwd(), self.exepath )
 
     def constructObjects(self):
         ""
         self.start_epoch = time.time()
 
-        check_load_bootstrap_file( self.loc )
+        check_load_bootstrap_file( self.curdir, self.exepath )
 
         # this may call sys.exit (for help or errors)
         self.opts, self.optD, self.dirs = \
@@ -58,7 +57,9 @@ class MainEntry:
             # scan current working directory by default
             self.dirs.append( '.' )
 
-        self.loc.setOptions( mirror=self.opts.dash_M, wipe=self.opts.dash_w )
+        self.loc = location.Locator( self.curdir,
+                                     self.opts.dash_M,
+                                     self.opts.dash_w )
 
         configdirs = self.loc.getConfigDirs( self.opts.config )
 
@@ -71,9 +72,10 @@ class MainEntry:
         tctor = construct_TestConstructor( self.opts )
         self.rtdata.setTestConstructor( tctor )
 
-        self.computeTestDirectory()
+        test_dir = self.computeTestDirectory()
 
-        self.rtdata.setPermissionsObject( self.opts, self.optD )
+        perms = make_PermissionSetter( test_dir, self.opts.perms )
+        self.rtdata.setPermissionsObject( perms )
 
         self.constructResultsWriter()
 
@@ -201,6 +203,8 @@ class MainEntry:
         self.rtdata.setTestResultsDir( td )
         rtinfo.setInfo( rundir=td )
 
+        return td
+
     def constructResultsWriter(self):
         ""
         resw = construct_results_writers( self.opts, self.optD,
@@ -253,6 +257,7 @@ class MainEntry:
                                     selector=tsel,
                                     timehandler=timehandler,
                                     cachehandler=self.cash,
+                                    rtinfo=self.rtdata.getRuntimeInfo(),
                                     perms=self.rtdata.getPermissionsObject() )
 
 
@@ -339,8 +344,7 @@ class RuntimeData:
         """
         return self.is_restart
 
-    def setPermissionsObject(self, opts, optD):
-        self.perms = make_PermissionSetter( self.test_dir, opts.perms )
+    def setPermissionsObject(self, perms): self.perms = perms
     def getPermissionsObject(self): return self.perms
 
     def setResultsWriter(self, writer): self.results_writer = writer
@@ -403,7 +407,7 @@ class TestListManager:
 
     def __init__(self, locator, namer, tctor, scanner,
                        selector, timehandler, cachehandler,
-                       perms):
+                       rtinfo, perms):
         ""
         self.tlist = None
 
@@ -414,6 +418,7 @@ class TestListManager:
         self.selector = selector
         self.timehandler = timehandler
         self.cachehandler = cachehandler
+        self.rtinfo = rtinfo
         self.perms = perms
 
     def getFileNamer(self):
@@ -472,6 +477,12 @@ class TestListManager:
 
         return attrs
 
+    def writeTestList(self):
+        ""
+        attrs = self.rtinfo.asDict()
+        self.tlist.stringFileWrite( **attrs )
+        self.perms.set( self.tlist.getFilename() )
+
     def addBatchFileLinksToTests(self, batchid):
         ""
         qbat = self.namer.getScriptPath( batchid )
@@ -492,12 +503,6 @@ class TestListManager:
         self.selector.prepareBaselineTests( self.tlist )
 
 
-def write_test_list_file( tlist, file_attrs, perms ):
-    ""
-    tlist.stringFileWrite( **file_attrs )
-    perms.set( tlist.getFilename() )
-
-
 ##############################################################################
 
 def generateTestList( opts, optD, rtdata, tlm ):
@@ -514,12 +519,10 @@ def generateTestList( opts, optD, rtdata, tlm ):
 
     tlm.prepareTestingDirectory()
     tlm.writeCacheFile()
-
     tlm.scanForTests()
     tlm.loadTestTimes()
     tlm.applyPermanentFilters()
-
-    write_test_list_file( tlist, rtinfo.asDict(), perms )
+    tlm.writeTestList()
 
     rtdata.getResultsWriter().prerun( tlist, rtinfo, verbosity=1 )
     print3()
@@ -575,8 +578,7 @@ def runTests( opts, optD, rtdata, tlm ):
     tlm.readAndMergePreviouslyRunTests()
     tlm.loadTestTimes()
     tlm.applyPermanentFilters()
-
-    write_test_list_file( tlist, rtinfo.asDict(), perms )
+    tlm.writeTestList()
     tlm.prepareActive()
 
     tlist.setResultsDate()
@@ -779,88 +781,6 @@ def construct_runtime_lookup_cache( plat ):
     cache = LookupCache( pname, cplr, tdir )
 
     return cache
-
-
-class Locator:
-
-    def __init__(self, curdir, exepath):
-        ""
-        self.curdir = curdir
-        self.exepath = exepath
-
-        self.mirror = None
-        self.wipe = False
-
-        self.cashfile = None
-        self.testdir = None
-
-    def setOptions(self, mirror=None, wipe=None):
-        ""
-        if mirror != None:
-            self.mirror = mirror
-        if wipe != None:
-            self.wipe = wipe
-
-    def findDirectoryWithBootstrapFile(self):
-        """
-        to allow for vvtest to be a soft link to an installed vvtest directory
-        tree, look for a bootstrap file in sys.path (which follows soft links)
-        then in the directory containing the soft link itself
-        """
-        for dn in sys.path + [dirname(self.exepath)]:
-            fn = self.makeAbsPath( pjoin( dn, 'vvtest_bootstrap.py' ) )
-            if os.path.exists( fn ):
-                return dirname( normpath(fn) )
-
-        return None
-
-    def getConfigDirs(self, cmdline_configdir=None):
-        ""
-        varval = os.getenv( 'VVTEST_CONFIGDIR' )
-        cdir = location.collect_config_dirs( cmdline_configdir, varval )
-        return cdir
-
-    def findCacheFile(self):
-        """
-        returns None if the CWD is not inside a TestResults directory
-        """
-        # an environment variable is used to identify vvtest run recursion
-        troot = os.environ.get( 'VVTEST_TEST_ROOT', None )
-
-        self.cashfile = location.find_vvtest_test_root_file( self.curdir,
-                                                             troot,
-                                                             'test.cache' )
-
-        return self.cashfile
-
-    def setTestingDirectory(self, rundir, onopts, offopts, platname):
-        ""
-        sd = location.test_results_subdir_name( rundir,
-                                                onopts, offopts,
-                                                platname )
-
-        if self.cashfile:
-            assert os.path.isabs( self.cashfile )
-            self.testdir = normpath( dirname( self.cashfile ) )
-        else:
-            self.testdir = self.makeAbsPath( sd )
-
-        return self.testdir
-
-    def createTestingDirectory(self, perms):
-        ""
-        location.create_test_directory( self.testdir, self.mirror,
-                                        self.curdir, perms )
-
-        if self.wipe:
-            pathutil.remove_directory_contents( self.testdir )
-
-    def makeAbsPath(self, path):
-        ""
-        if os.path.isabs( path ):
-            return path
-        else:
-            return pjoin( self.curdir, path )
 
 
 class CacheFileHandler:
@@ -1273,9 +1193,14 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
 
 ###########################################################################
 
-def check_load_bootstrap_file( locator ):
-    ""
-    bootdir = locator.findDirectoryWithBootstrapFile()
+def check_load_bootstrap_file( cwd, exepath ):
+    """
+    to allow for vvtest to be a soft link to an installed vvtest directory
+    tree, look for a bootstrap file in sys.path (which follows soft links)
+    then in the directory containing the soft link itself
+    """
+    bootdir = location.find_sys_directory_with_file( cwd, exepath,
+                                                     'vvtest_bootstrap.py' )
     if bootdir:
         try:
             import vvtest_bootstrap

@@ -10,6 +10,7 @@ from os.path import normpath, abspath, basename, dirname
 import shutil
 
 from .errors import FatalError
+from . import pathutil
 
 
 SCRATCH_DIR_SEARCH_LIST = [ '/scratch',
@@ -20,6 +21,79 @@ SCRATCH_DIR_SEARCH_LIST = [ '/scratch',
                             '/scratch2',
                             '/var/scrl1',
                             '/gpfs1' ]
+
+
+def find_sys_directory_with_file( cwd, exepath, filename ):
+    ""
+    for dn in sys.path + [dirname(exepath)]:
+
+        if not abspath(dn):
+            dn = pjoin( cwd, dn )
+
+        fn = pjoin( dn, filename )
+
+        if os.path.exists( fn ):
+            return dirname( normpath(fn) )
+
+    return None
+
+
+class Locator:
+
+    def __init__(self, curdir, mirror=None, wipe=False):
+        ""
+        self.curdir = curdir
+
+        self.mirror = mirror
+        self.wipe = ( wipe == True )
+
+        self.cashfile = None
+        self.testdir = None
+
+    def getConfigDirs(self, cmdline_configdir=None):
+        ""
+        varval = os.getenv( 'VVTEST_CONFIGDIR' )
+        cdir = collect_config_dirs( cmdline_configdir, varval )
+        return cdir
+
+    def findCacheFile(self):
+        """
+        returns None if the CWD is not inside a TestResults directory
+        """
+        # an environment variable is used to identify vvtest run recursion
+        troot = os.environ.get( 'VVTEST_TEST_ROOT', None )
+
+        self.cashfile = find_vvtest_test_root_file( self.curdir,
+                                                    troot,
+                                                    'test.cache' )
+
+        return self.cashfile
+
+    def setTestingDirectory(self, rundir, onopts, offopts, platname):
+        ""
+        sd = test_results_subdir_name( rundir, onopts, offopts, platname )
+
+        if self.cashfile:
+            assert os.path.isabs( self.cashfile )
+            self.testdir = normpath( dirname( self.cashfile ) )
+        else:
+            self.testdir = self.makeAbsPath( sd )
+
+        return self.testdir
+
+    def createTestingDirectory(self, perms):
+        ""
+        create_test_directory( self.testdir, self.mirror, self.curdir, perms )
+
+        if self.wipe:
+            pathutil.remove_directory_contents( self.testdir )
+
+    def makeAbsPath(self, path):
+        ""
+        if os.path.isabs( path ):
+            return path
+        else:
+            return pjoin( self.curdir, path )
 
 
 def find_vvtest_test_root_file( start_directory,
