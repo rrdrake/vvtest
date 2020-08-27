@@ -30,113 +30,6 @@ search_fnmatch = ['*.inp','*.apr','*.i']
 USER_PLUGIN_MODULE_NAME = 'vvtest_user_plugin'
 
 
-class MainEntry:
-
-    def __init__(self, argv, vvtestdir, exepath):
-        """
-        'vvtestdir' is the (real) directory containing the vvtest script
-        """
-        self.argv = argv
-        self.vvtestdir = vvtestdir
-        self.exepath = exepath
-        self.curdir = os.getcwd()
-
-        self.rtdata = RuntimeData( self.curdir, self.exepath )
-
-    def constructObjects(self):
-        ""
-        self.start_epoch = time.time()
-
-        check_load_bootstrap_file( self.curdir, self.exepath )
-
-        # this may call sys.exit (for help or errors)
-        self.opts, self.optD, self.dirs = \
-            cmdline.parse_command_line( self.argv[1:], version )
-
-        construct_locator( self.rtdata, self.opts )
-
-        configdirs = self.rtdata.loc.getConfigDirs( self.opts.config )
-
-        insert_configdirs_into_sys_path( self.vvtestdir, configdirs )
-
-        construct_runtime_config( self.rtdata, self.opts, self.optD )
-
-        construct_and_process_cache_file( self.rtdata, self.opts, self.optD )
-
-        construct_runtime_info( self.rtdata, self.argv, self.vvtestdir,
-                                self.opts, self.start_epoch )
-
-        create_configuration( self.rtdata.rtconfig, self.opts, self.optD,
-                              self.vvtestdir, configdirs )
-
-        # this is scheduled for deprecation
-        if self.opts.check:
-            for n in self.opts.check:
-                os.environ[ 'CHECK_' + n.upper() ] = ''
-
-        construct_platform( self.rtdata, self.vvtestdir, self.opts, self.optD )
-
-        construct_testcase_constructor( self.rtdata, self.opts )
-
-        compute_testing_directory( self.rtdata, self.opts, self.optD )
-
-        construct_permission_setter( self.rtdata, self.opts )
-
-        construct_results_writers( self.rtdata, self.opts, self.optD )
-
-        construct_testcase_creator( self.rtdata )
-
-        construct_test_scanner( self.rtdata, self.dirs, self.opts, self.optD )
-
-        import_plugin_module( self.rtdata )
-
-        construct_test_selector( self.rtdata )
-
-        construct_test_time_handler( self.rtdata, self.opts )
-
-        construct_test_list_manager( self.rtdata )
-
-    def execute(self):
-        ""
-        exitstat = 0
-
-        tlm = self.rtdata.tlm
-
-        if information_mode( self.opts ):
-            exitstat = information_output( self.opts, self.optD,
-                                           self.rtdata, tlm )
-
-        elif self.opts.dash_g:
-            generateTestList( self.opts, self.optD, self.rtdata, tlm )
-
-        elif self.opts.dash_b:
-
-            if self.opts.dash_R or self.opts.dash_w:
-                raise FatalError( 'cannot use -R or -w with -b (baseline)' )
-
-            baselineTests( self.opts, self.optD, self.rtdata, tlm )
-
-        elif self.opts.extract:
-            extractTestFiles( self.opts.scan_type,
-                              self.optD['param_dict'],
-                              self.opts.extract, self.rtdata, tlm )
-
-        else:
-
-            # if no results keywords are specified, then add -k notrun/notdone
-            if not self.opts.dash_w and not self.opts.dash_R:
-                rtconfig = self.rtdata.rtconfig
-                rtconfig.addResultsKeywordExpression( 'notrun or notdone' )
-
-            if self.rtdata.isrestart:
-                exitstat = restartTests( self.opts, self.optD, self.rtdata, tlm )
-            else:
-                exitstat = runTests( self.opts, self.optD, self.rtdata, tlm )
-
-        if self.opts.encode_exit_status:
-            return exitstat
-
-
 class RuntimeData:
     def __init__(self, curdir, exepath):
         ""
@@ -157,6 +50,87 @@ class RuntimeData:
         self.scanner        = None   # TestFileScanner object
         self.selector       = None   # TestSelector object
         self.tlm            = None   # TestListManager object
+
+
+def construct_vvtest( argv, vvtestdir, exepath ):
+    """
+    'vvtestdir' is the (real) directory containing the vvtest script
+    """
+    curdir = os.getcwd()
+    start_epoch = time.time()
+
+    rtdata = RuntimeData( curdir, exepath )
+
+    check_load_bootstrap_file( curdir, exepath )
+
+    # this may call sys.exit (for help or errors)
+    opts, optD, scandirs = \
+        cmdline.parse_command_line( argv[1:], version )
+
+    construct_locator( rtdata, opts )
+    configdirs = rtdata.loc.getConfigDirs( opts.config )
+    insert_configdirs_into_sys_path( vvtestdir, configdirs )
+    construct_runtime_config( rtdata, opts, optD )
+    construct_and_process_cache_file( rtdata, opts, optD )
+    construct_runtime_info( rtdata, argv, vvtestdir, opts, start_epoch )
+    create_configuration( rtdata.rtconfig, opts, optD, vvtestdir, configdirs )
+
+    # this is scheduled for deprecation
+    if opts.check:
+        for n in opts.check:
+            os.environ[ 'CHECK_' + n.upper() ] = ''
+
+    construct_platform( rtdata, vvtestdir, opts, optD )
+    construct_testcase_constructor( rtdata, opts )
+    compute_testing_directory( rtdata, opts, optD )
+    construct_permission_setter( rtdata, opts )
+    construct_results_writers( rtdata, opts, optD )
+    construct_testcase_creator( rtdata )
+    construct_test_scanner( rtdata, scandirs, opts, optD )
+    import_plugin_module( rtdata )
+    construct_test_selector( rtdata )
+    construct_test_time_handler( rtdata, opts )
+    construct_test_list_manager( rtdata )
+
+    return rtdata, opts, optD
+
+
+def run_vvtest( rtdata, opts, optD ):
+    ""
+    exitstat = 0
+
+    if information_mode( opts ):
+        exitstat = information_output( opts, optD, rtdata, rtdata.tlm )
+
+    elif opts.dash_g:
+        generateTestList( opts, optD, rtdata, rtdata.tlm )
+
+    elif opts.dash_b:
+
+        if opts.dash_R or opts.dash_w:
+            raise FatalError( 'cannot use -R or -w with -b (baseline)' )
+
+        baselineTests( opts, optD, rtdata, rtdata.tlm )
+
+    elif opts.extract:
+        extractTestFiles( opts.scan_type,
+                          optD['param_dict'],
+                          opts.extract, rtdata, rtdata.tlm )
+
+    else:
+
+        # if no results keywords are specified, then add -k notrun/notdone
+        if not opts.dash_w and not opts.dash_R:
+            rtconfig = rtdata.rtconfig
+            rtconfig.addResultsKeywordExpression( 'notrun or notdone' )
+
+        if rtdata.isrestart:
+            exitstat = restartTests( opts, optD, rtdata, rtdata.tlm )
+        else:
+            exitstat = runTests( opts, optD, rtdata, rtdata.tlm )
+
+    if opts.encode_exit_status:
+        return exitstat
 
 
 def construct_locator( rtdata, opts ):
@@ -1231,10 +1205,8 @@ def main():
     adjust_sys_path_for_shared_modules( vvtestdir )
 
     try:
-        main_entry = MainEntry( sys.argv, vvtestdir, exepath )
-        main_entry.constructObjects()
-
-        exitstat = main_entry.execute()
+        rtdata,opts,optD = construct_vvtest( sys.argv, vvtestdir, exepath )
+        exitstat = run_vvtest( rtdata, opts, optD )
         if exitstat:
             return exitstat
 
