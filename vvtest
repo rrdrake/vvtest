@@ -100,34 +100,36 @@ def run_vvtest( rtdata, opts, optD ):
     exitstat = 0
 
     if information_mode( opts ):
-        exitstat = information_output( opts, optD, rtdata, rtdata.tlm )
+        if opts.show_times:
+            output_timings( opts, optD, rtdata )
+        else:
+            exitstat = information_output( opts, optD, rtdata )
 
     elif opts.dash_g:
-        generateTestList( opts, optD, rtdata, rtdata.tlm )
+        generate_test_list( opts, optD, rtdata )
 
     elif opts.dash_b:
 
         if opts.dash_R or opts.dash_w:
             raise FatalError( 'cannot use -R or -w with -b (baseline)' )
 
-        baselineTests( opts, optD, rtdata, rtdata.tlm )
+        baseline_tests( opts, optD, rtdata )
 
     elif opts.extract:
-        extractTestFiles( opts.scan_type,
-                          optD['param_dict'],
-                          opts.extract, rtdata, rtdata.tlm )
+        extract_test_files( opts.scan_type,
+                            optD['param_dict'],
+                            opts.extract, rtdata )
 
     else:
 
-        # if no results keywords are specified, then add -k notrun/notdone
         if not opts.dash_w and not opts.dash_R:
-            rtconfig = rtdata.rtconfig
-            rtconfig.addResultsKeywordExpression( 'notrun or notdone' )
+            # if no results keywords are specified, then add -k notrun/notdone
+            rtdata.rtconfig.addResultsKeywordExpression( 'notrun or notdone' )
 
         if rtdata.isrestart:
-            exitstat = restartTests( opts, optD, rtdata, rtdata.tlm )
+            exitstat = restart_tests( opts, optD, rtdata )
         else:
-            exitstat = runTests( opts, optD, rtdata, rtdata.tlm )
+            exitstat = run_tests( opts, optD, rtdata )
 
     if opts.encode_exit_status:
         return exitstat
@@ -404,6 +406,161 @@ def construct_test_list_manager( rtdata ):
                                   perms=rtdata.perms )
 
 
+def information_mode( opts ):
+    ""
+    return opts.dash_i or opts.keys or opts.files
+
+
+def need_console_output( opts ):
+    ""
+    if information_mode( opts ):
+        if opts.html or opts.junit or opts.gitlab or \
+           opts.save_results or opts.cdash:
+            return False
+
+    return True
+
+
+def construct_results_writers( rtdata, opts, optD ):
+    ""
+    import libvvtest.resultsout as resultsout
+
+    writers = resultsout.ResultsWriters()
+
+    if need_console_output( opts ):
+        conobj = construct_console_writer( rtdata.testdir, opts, optD )
+        writers.addWriter( conobj )
+
+    if opts.qsub_id == None:
+
+        if opts.html:
+            htmlobj = construct_html_writer( rtdata.testdir, opts, optD,
+                                             rtdata.perms )
+            writers.addWriter( htmlobj )
+
+        if opts.junit:
+            junitobj = construct_junit_writer( rtdata.testdir, opts, optD,
+                                               rtdata.perms )
+            writers.addWriter( junitobj )
+
+        if opts.gitlab:
+            wr = construct_gitlab_writer( rtdata.testdir, opts, optD,
+                                          rtdata.perms )
+            writers.addWriter( wr )
+
+        if opts.cdash:
+            wr = construct_cdash_writer( rtdata.testdir, opts, optD,
+                                         rtdata.perms )
+            writers.addWriter( wr )
+
+        if opts.save_results:
+            wr = construct_testlist_writer( rtdata.testdir, opts, optD,
+                                            rtdata.perms, rtdata.plat )
+            writers.addWriter( wr )
+
+    rtdata.results_writer = writers
+
+
+def construct_console_writer( test_dir, opts, optD ):
+    ""
+    import libvvtest.consolewriter as consolewriter
+
+    verb = get_output_verbosity_integer( opts.dash_v )
+
+    conobj = consolewriter.ConsoleWriter( sys.stdout, test_dir, verb )
+
+    conobj.setSortingSpecification( optD['sort_letters'] )
+
+    return conobj
+
+
+def construct_html_writer( test_dir, opts, optD, perms ):
+    ""
+    import libvvtest.htmlwriter as htmlwriter
+
+    htmlobj = htmlwriter.HTMLWriter( perms, opts.html, test_dir )
+
+    return htmlobj
+
+
+def construct_junit_writer( test_dir, opts, optD, perms ):
+    ""
+    import libvvtest.junitwriter as junitwriter
+
+    junitobj = junitwriter.JUnitWriter( perms, opts.junit, test_dir )
+
+    junitobj.setOutputDate( opts.results_date )
+
+    return junitobj
+
+
+def construct_gitlab_writer( test_dir, opts, optD, perms ):
+    ""
+    import libvvtest.gitlabwriter as gitlabwriter
+
+    gitlabobj = gitlabwriter.GitLabWriter( opts.gitlab, test_dir, perms )
+
+    gitlabobj.setSortingSpecification( optD['sort_letters'] )
+    gitlabobj.setOutputDate( opts.results_date )
+    gitlabobj.setNamingTags( optD['onopts'], opts.results_tag )
+
+    return gitlabobj
+
+
+def construct_cdash_writer( test_dir, opts, optD, perms ):
+    ""
+    import libvvtest.cdashwriter as cdashwriter
+    import cdashutil
+
+    cdashobj = cdashwriter.CDashWriter( test_dir, perms )
+
+    cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
+                                cdashutil.FileSubmitter )
+
+    err = cdashobj.initialize( opts.cdash,
+                               project=opts.cdash_project,
+                               datestamp=opts.results_date,
+                               options=optD['onopts'],
+                               tag=opts.results_tag )
+
+    if err:
+        raise FatalError( err )
+
+    return cdashobj
+
+
+def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):
+    ""
+    import libvvtest.listwriter as listwriter
+
+    todir = get_testing_directory( opts, platobj )
+
+    if not listwriter.is_target_like_scp( todir ):
+        todir = normpath( abspath( todir ) )
+
+    wlistobj = listwriter.ListWriter( perms, todir, test_dir )
+
+    wlistobj.setOutputDate( opts.results_date )
+    wlistobj.setNamingTags( optD['onopts'], opts.results_tag )
+
+    return wlistobj
+
+
+def get_testing_directory( opts, platobj ):
+    ""
+    if type( opts.save_results ) == type(''):
+        tdir = opts.save_results
+    else:
+        tdir = platobj.testingDirectory()
+
+    if not tdir:
+        raise FatalError( 'failed to determine --save-results directory' )
+
+    return tdir
+
+
+#############################################################################
+
 class TestListManager:
 
     def __init__(self, locator, namer, tctor, scanner,
@@ -506,9 +663,10 @@ class TestListManager:
 
 ##############################################################################
 
-def generateTestList( opts, optD, rtdata, tlm ):
-    """
-    """
+def generate_test_list( opts, optD, rtdata ):
+    ""
+    tlm = rtdata.tlm
+
     tlist = tlm.makeTestList()
 
     tlm.prepareTestingDirectory()
@@ -530,13 +688,15 @@ def generateTestList( opts, optD, rtdata, tlm ):
     print3( "\nTest directory:", basename( rtdata.testdir ) )
 
 
-def extractTestFiles( scan_type, param_dict, target_dir, rtdata, tlm ):
+def extract_test_files( scan_type, param_dict, target_dir, rtdata ):
     """
     Uses all the regular filtering mechanisms to gather tests from a test
     source area and copies the files used for each test into a separate
     directory.
     """
     import libvvtest.extract as extract
+
+    tlm = rtdata.tlm
 
     tlist = tlm.makeTestList()
 
@@ -548,10 +708,10 @@ def extractTestFiles( scan_type, param_dict, target_dir, rtdata, tlm ):
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
 
 
-def runTests( opts, optD, rtdata, tlm ):
-    """
-    Executes a list of tests.
-    """
+def run_tests( opts, optD, rtdata ):
+    ""
+    tlm = rtdata.tlm
+
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
     adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
@@ -581,8 +741,9 @@ def runTests( opts, optD, rtdata, tlm ):
     return execute.encode_integer_warning( tlist )
 
 
-def restartTests( opts, optD, rtdata, tlm ):
+def restart_tests( opts, optD, rtdata ):
     ""
+    tlm = rtdata.tlm
     batchid = opts.qsub_id
 
     if batchid == None:
@@ -613,8 +774,10 @@ def restartTests( opts, optD, rtdata, tlm ):
     return execute.encode_integer_warning( tlist )
 
 
-def baselineTests( opts, optD, rtdata, tlm ):
+def baseline_tests( opts, optD, rtdata ):
     ""
+    tlm = rtdata.tlm
+
     tlist = tlm.makeTestList()
 
     tlm.readAndMergePreviouslyRunTests()
@@ -639,13 +802,11 @@ def baselineTests( opts, optD, rtdata, tlm ):
         execute.run_baseline( xlist, rtdata.plat )
 
 
-def information_output( opts, optD, rtdata, tlm ):
+def information_output( opts, optD, rtdata ):
     ""
     exitcode = 0
 
-    if opts.show_times:
-        output_timings( opts, optD, rtdata, tlm )
-        return exitcode
+    tlm = rtdata.tlm
 
     tlist = tlm.makeTestList()
 
@@ -684,8 +845,10 @@ def information_output( opts, optD, rtdata, tlm ):
     return exitcode
 
 
-def output_timings( opts, optD, rtdata, tlm ):
+def output_timings( opts, optD, rtdata ):
     ""
+    tlm = rtdata.tlm
+
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
     tlist = tlm.makeTestList()
 
@@ -866,159 +1029,6 @@ def print_test_files( tlist ):
     L.sort()
     for d in L:
         print3( d )
-
-
-def information_mode( opts ):
-    ""
-    return opts.dash_i or opts.keys or opts.files
-
-
-def need_console_output( opts ):
-    ""
-    if information_mode( opts ):
-        if opts.html or opts.junit or opts.gitlab or \
-           opts.save_results or opts.cdash:
-            return False
-
-    return True
-
-
-def construct_results_writers( rtdata, opts, optD ):
-    ""
-    import libvvtest.resultsout as resultsout
-
-    writers = resultsout.ResultsWriters()
-
-    if need_console_output( opts ):
-        conobj = construct_console_writer( rtdata.testdir, opts, optD )
-        writers.addWriter( conobj )
-
-    if opts.qsub_id == None:
-
-        if opts.html:
-            htmlobj = construct_html_writer( rtdata.testdir, opts, optD,
-                                             rtdata.perms )
-            writers.addWriter( htmlobj )
-
-        if opts.junit:
-            junitobj = construct_junit_writer( rtdata.testdir, opts, optD,
-                                               rtdata.perms )
-            writers.addWriter( junitobj )
-
-        if opts.gitlab:
-            wr = construct_gitlab_writer( rtdata.testdir, opts, optD,
-                                          rtdata.perms )
-            writers.addWriter( wr )
-
-        if opts.cdash:
-            wr = construct_cdash_writer( rtdata.testdir, opts, optD,
-                                         rtdata.perms )
-            writers.addWriter( wr )
-
-        if opts.save_results:
-            wr = construct_testlist_writer( rtdata.testdir, opts, optD,
-                                            rtdata.perms, rtdata.plat )
-            writers.addWriter( wr )
-
-    rtdata.results_writer = writers
-
-
-def construct_console_writer( test_dir, opts, optD ):
-    ""
-    import libvvtest.consolewriter as consolewriter
-
-    verb = get_output_verbosity_integer( opts.dash_v )
-
-    conobj = consolewriter.ConsoleWriter( sys.stdout, test_dir, verb )
-
-    conobj.setSortingSpecification( optD['sort_letters'] )
-
-    return conobj
-
-
-def construct_html_writer( test_dir, opts, optD, perms ):
-    ""
-    import libvvtest.htmlwriter as htmlwriter
-
-    htmlobj = htmlwriter.HTMLWriter( perms, opts.html, test_dir )
-
-    return htmlobj
-
-
-def construct_junit_writer( test_dir, opts, optD, perms ):
-    ""
-    import libvvtest.junitwriter as junitwriter
-
-    junitobj = junitwriter.JUnitWriter( perms, opts.junit, test_dir )
-
-    junitobj.setOutputDate( opts.results_date )
-
-    return junitobj
-
-
-def construct_gitlab_writer( test_dir, opts, optD, perms ):
-    ""
-    import libvvtest.gitlabwriter as gitlabwriter
-
-    gitlabobj = gitlabwriter.GitLabWriter( opts.gitlab, test_dir, perms )
-
-    gitlabobj.setSortingSpecification( optD['sort_letters'] )
-    gitlabobj.setOutputDate( opts.results_date )
-    gitlabobj.setNamingTags( optD['onopts'], opts.results_tag )
-
-    return gitlabobj
-
-
-def construct_cdash_writer( test_dir, opts, optD, perms ):
-    ""
-    import libvvtest.cdashwriter as cdashwriter
-    import cdashutil
-
-    cdashobj = cdashwriter.CDashWriter( test_dir, perms )
-
-    cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
-                                cdashutil.FileSubmitter )
-
-    err = cdashobj.initialize( opts.cdash,
-                               project=opts.cdash_project,
-                               datestamp=opts.results_date,
-                               options=optD['onopts'],
-                               tag=opts.results_tag )
-
-    if err:
-        raise FatalError( err )
-
-    return cdashobj
-
-
-def construct_testlist_writer( test_dir, opts, optD, perms, platobj ):
-    ""
-    import libvvtest.listwriter as listwriter
-
-    todir = get_testing_directory( opts, platobj )
-
-    if not listwriter.is_target_like_scp( todir ):
-        todir = normpath( abspath( todir ) )
-
-    wlistobj = listwriter.ListWriter( perms, todir, test_dir )
-
-    wlistobj.setOutputDate( opts.results_date )
-    wlistobj.setNamingTags( optD['onopts'], opts.results_tag )
-
-    return wlistobj
-
-
-def get_testing_directory( opts, platobj ):
-    ""
-    if type( opts.save_results ) == type(''):
-        tdir = opts.save_results
-    else:
-        tdir = platobj.testingDirectory()
-
-    if not tdir:
-        raise FatalError( 'failed to determine --save-results directory' )
-
-    return tdir
 
 
 def run_test_exec_list( opts, optD, rtdata, perms, tlm ):
