@@ -395,13 +395,8 @@ def construct_test_list_manager( rtdata ):
     from batch.namer import BatchFileNamer
     namer = BatchFileNamer( rtdata.testdir )
 
-    rtdata.tlm = TestListManager( locator=rtdata.loc,
-                                  namer=namer,
+    rtdata.tlm = TestListManager( namer=namer,
                                   tctor=rtdata.tctor,
-                                  scanner=rtdata.scanner,
-                                  selector=rtdata.selector,
-                                  timehandler=rtdata.timehandler,
-                                  cachehandler=rtdata.cash,
                                   rtinfo=rtdata.rtinfo,
                                   perms=rtdata.perms )
 
@@ -563,19 +558,12 @@ def get_testing_directory( opts, platobj ):
 
 class TestListManager:
 
-    def __init__(self, locator, namer, tctor, scanner,
-                       selector, timehandler, cachehandler,
-                       rtinfo, perms):
+    def __init__(self, namer, tctor, rtinfo, perms):
         ""
         self.tlist = None
 
-        self.locator = locator
         self.namer = namer
         self.tctor = tctor
-        self.scanner = scanner
-        self.selector = selector
-        self.timehandler = timehandler
-        self.cachehandler = cachehandler
         self.rtinfo = rtinfo
         self.perms = perms
 
@@ -587,10 +575,6 @@ class TestListManager:
         ""
         return self.tlist
 
-    def prepareTestingDirectory(self):
-        ""
-        self.locator.createTestingDirectory( self.perms )
-
     def makeTestList(self, batchid=None):
         ""
         fn = self.namer.getFilePath( batchid )
@@ -599,25 +583,9 @@ class TestListManager:
 
         return self.tlist
 
-    def writeCacheFile(self):
-        ""
-        self.cachehandler.writeCache( self.perms )
-
-    def scanForTests(self):
-        ""
-        self.scanner.scanPaths( self.tlist )
-
-    def applyPermanentFilters(self):
-        ""
-        self.selector.applyPermanentFilters( self.tlist )
-
     def readTestList(self):
         ""
         self.tlist.readTestList()
-
-    def loadTestTimes(self):
-        ""
-        self.timehandler.load( self.tlist )
 
     def readAndMergePreviouslyRunTests(self):
         ""
@@ -650,31 +618,19 @@ class TestListManager:
             tcase.getSpec().addLinkFile( qbat )
             tcase.getSpec().addLinkFile( qout )
 
-    def prepareActive(self, apply_filters=True, remove_new_skips=False ):
-        ""
-        self.selector.prepareActiveTests( self.tlist,
-                                          apply_filters=apply_filters,
-                                          remove_new_skips=remove_new_skips )
-
-    def prepareForBaseline(self):
-        ""
-        self.selector.prepareBaselineTests( self.tlist )
-
 
 ##############################################################################
 
 def generate_test_list( opts, optD, rtdata ):
     ""
-    tlm = rtdata.tlm
+    tlist = rtdata.tlm.makeTestList()
 
-    tlist = tlm.makeTestList()
-
-    tlm.prepareTestingDirectory()
-    tlm.writeCacheFile()
-    tlm.scanForTests()
-    tlm.loadTestTimes()
-    tlm.applyPermanentFilters()
-    tlm.writeTestList()
+    rtdata.loc.createTestingDirectory( rtdata.perms )
+    rtdata.cash.writeCache( rtdata.perms )
+    rtdata.scanner.scanPaths( tlist )
+    rtdata.timehandler.load( tlist )
+    rtdata.selector.applyPermanentFilters( tlist )
+    rtdata.tlm.writeTestList()
 
     rtdata.results_writer.prerun( tlist, rtdata.rtinfo, verbosity=1 )
     print3()
@@ -696,43 +652,39 @@ def extract_test_files( scan_type, param_dict, target_dir, rtdata ):
     """
     import libvvtest.extract as extract
 
-    tlm = rtdata.tlm
+    tlist = rtdata.tlm.makeTestList()
 
-    tlist = tlm.makeTestList()
-
-    tlm.scanForTests()
-    tlm.readTestList()
-    tlm.loadTestTimes()
-    tlm.applyPermanentFilters()
+    rtdata.scanner.scanPaths( tlist )
+    rtdata.tlm.readTestList()
+    rtdata.timehandler.load( tlist )
+    rtdata.selector.applyPermanentFilters( tlist )
 
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
 
 
 def run_tests( opts, optD, rtdata ):
     ""
-    tlm = rtdata.tlm
-
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
     adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
 
-    tlist = tlm.makeTestList()
+    tlist = rtdata.tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
-    tlm.prepareTestingDirectory()
-    tlm.writeCacheFile()
+    rtdata.loc.createTestingDirectory( rtdata.perms )
+    rtdata.cash.writeCache( rtdata.perms )
 
-    tlm.scanForTests()
-    tlm.readAndMergePreviouslyRunTests()
-    tlm.loadTestTimes()
-    tlm.applyPermanentFilters()
-    tlm.writeTestList()
-    tlm.prepareActive()
+    rtdata.scanner.scanPaths( tlist )
+    rtdata.tlm.readAndMergePreviouslyRunTests()
+    rtdata.timehandler.load( tlist )
+    rtdata.selector.applyPermanentFilters( tlist )
+    rtdata.tlm.writeTestList()
+    rtdata.selector.prepareActiveTests( tlist )
 
     tlist.setResultsDate()
 
-    run_test_exec_list( opts, optD, rtdata, rtdata.perms, tlm )
+    run_test_exec_list( opts, optD, rtdata )
 
     print3( "Test directory:", basename( rtdata.testdir ) )
 
@@ -743,7 +695,6 @@ def run_tests( opts, optD, rtdata ):
 
 def restart_tests( opts, optD, rtdata ):
     ""
-    tlm = rtdata.tlm
     batchid = opts.qsub_id
 
     if batchid == None:
@@ -751,22 +702,22 @@ def restart_tests( opts, optD, rtdata ):
 
     adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
 
-    tlist = tlm.makeTestList( batchid )
+    tlist = rtdata.tlm.makeTestList( batchid )
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
     if batchid == None:
-        tlm.readTestList()
-        tlm.readAndMergePreviouslyRunTests()
-        tlm.loadTestTimes()
-        tlm.prepareActive()
+        rtdata.tlm.readTestList()
+        rtdata.tlm.readAndMergePreviouslyRunTests()
+        rtdata.timehandler.load( tlist )
+        rtdata.selector.prepareActiveTests( tlist )
         tlist.setResultsDate()
     else:
-        tlm.readTestList()
-        tlm.addBatchFileLinksToTests( batchid )
-        tlm.prepareActive( apply_filters=False )
+        rtdata.tlm.readTestList()
+        rtdata.tlm.addBatchFileLinksToTests( batchid )
+        rtdata.selector.prepareActiveTests( tlist, apply_filters=False )
 
-    run_test_exec_list( opts, optD, rtdata, rtdata.perms, tlm )
+    run_test_exec_list( opts, optD, rtdata )
 
     if batchid == None:
         rtdata.plugin.callEpilogue( rtdata.testdir, tlist.getTests() )
@@ -776,17 +727,15 @@ def restart_tests( opts, optD, rtdata ):
 
 def baseline_tests( opts, optD, rtdata ):
     ""
-    tlm = rtdata.tlm
+    tlist = rtdata.tlm.makeTestList()
 
-    tlist = tlm.makeTestList()
-
-    tlm.readAndMergePreviouslyRunTests()
+    rtdata.tlm.readAndMergePreviouslyRunTests()
 
     # if the keyword expression does not include a results keyword, then
     # add the 'diff' keyword so that only diffs are rebaselined by default
     rtdata.rtconfig.addResultsKeywordExpression( 'diff' )
 
-    tlm.prepareForBaseline()
+    rtdata.selector.prepareBaselineTests( tlist )
 
     rtdata.results_writer.prerun( tlist, rtdata.rtinfo, verbosity=1 )
     print3()
@@ -806,30 +755,28 @@ def information_output( opts, optD, rtdata ):
     ""
     exitcode = 0
 
-    tlm = rtdata.tlm
-
-    tlist = tlm.makeTestList()
+    tlist = rtdata.tlm.makeTestList()
 
     have_cache = ( rtdata.isrestart or os.path.exists( rtdata.testdir ) )
 
     if not rtdata.isrestart and ( opts.keys or opts.files ):
-        tlm.scanForTests()
-        tlm.readTestList()
-        tlm.loadTestTimes()
-        tlm.applyPermanentFilters()
+        rtdata.scanner.scanPaths( tlist )
+        rtdata.tlm.readTestList()
+        rtdata.timehandler.load( tlist )
+        rtdata.selector.applyPermanentFilters( tlist )
 
     elif have_cache:
         adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
 
-        tlm.readTestList()
-        attrs = tlm.readAndMergePreviouslyRunTests()
+        rtdata.tlm.readTestList()
+        attrs = rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.rtinfo.setInfo( **attrs )
 
     else:
         print3( 'WARNING: previous test results directory not found,',
                 rtdata.testdir )
 
-    tlm.prepareActive( remove_new_skips=True )
+    rtdata.selector.prepareActiveTests( tlist, remove_new_skips=True )
 
     if opts.keys:
         print_keyword_union( tlist )
@@ -847,28 +794,25 @@ def information_output( opts, optD, rtdata ):
 
 def output_timings( opts, optD, rtdata ):
     ""
-    tlm = rtdata.tlm
-
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
-    tlist = tlm.makeTestList()
+    tlist = rtdata.tlm.makeTestList()
 
     if not rtdata.isrestart:
 
         adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
 
-        tlm.scanForTests()
-        tlm.readAndMergePreviouslyRunTests()
-        tlm.loadTestTimes()
-        tlm.applyPermanentFilters()
-        tlm.prepareActive()
+        rtdata.scanner.scanPaths( tlist )
+        rtdata.tlm.readAndMergePreviouslyRunTests()
+        rtdata.timehandler.load( tlist )
+        rtdata.selector.applyPermanentFilters( tlist )
 
     else:
         adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
 
-        tlm.readAndMergePreviouslyRunTests()
-        tlm.loadTestTimes()
-        tlm.prepareActive()
+        rtdata.tlm.readAndMergePreviouslyRunTests()
+        rtdata.timehandler.load( tlist )
 
+    rtdata.selector.prepareActiveTests( tlist )
     tlist.setResultsDate()
 
     cwriter = construct_console_writer( rtdata.testdir, opts, optD )
@@ -1031,9 +975,9 @@ def print_test_files( tlist ):
         print3( d )
 
 
-def run_test_exec_list( opts, optD, rtdata, perms, tlm ):
+def run_test_exec_list( opts, optD, rtdata ):
     ""
-    tlist = tlm.getTestList()
+    tlist = rtdata.tlm.getTestList()
 
     rtdata.results_writer.prerun( tlist, rtdata.rtinfo, verbosity=0 )
     print3()
@@ -1044,12 +988,12 @@ def run_test_exec_list( opts, optD, rtdata, perms, tlm ):
         os.environ['VVTEST_TEST_ROOT'] = rtdata.testdir
 
         runner = TestRunner( rtdata.testdir, rtdata.plat, rtdata.rtconfig,
-                             rtdata.plugin, perms )
+                             rtdata.plugin, rtdata.perms )
 
         xlist = TestExecList( tlist, runner )
         xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
 
-        tlrun = execute.TestListRunner( rtdata.testdir, tlist, xlist, perms,
+        tlrun = execute.TestListRunner( rtdata.testdir, tlist, xlist, rtdata.perms,
                                         rtdata.rtinfo, rtdata.results_writer,
                                         rtdata.plat )
 
@@ -1057,10 +1001,10 @@ def run_test_exec_list( opts, optD, rtdata, perms, tlm ):
             tlrun.runDirect( opts.qsub_id )
 
         else:
-            namer = tlm.getFileNamer()
+            namer = rtdata.tlm.getFileNamer()
             batch = create_Batcher( opts, optD, rtdata, namer,
                                     tlist, xlist, rtdata.testdir,
-                                    rtdata.plat, perms )
+                                    rtdata.plat, rtdata.perms )
             tlrun.runBatch( batch )
 
     print3()
