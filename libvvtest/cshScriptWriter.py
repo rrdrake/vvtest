@@ -9,7 +9,7 @@ import string
 import re
 import stat
 
-diffExitStatus = 64
+from .teststatus import DIFF_EXIT_STATUS
 
 content_replace_re = re.compile('[$][(]CONTENT[)]')
 expect_status_replace_re = re.compile('[$][(]EXPECT_STATUS[)]')
@@ -276,7 +276,7 @@ def writeScript( testcase, xdb, plat, \
         'echo " "',
         'if ( "$have_diff" != "no" ) then',
         '  echo "*** at least one diff test showed differences; exiting diff"',
-        '  exit ' + str(diffExitStatus),
+        '  exit ' + str(DIFF_EXIT_STATUS),
         'endif',
         'echo "++++++++++++++++ SUCCESS: ' + idstr + '"' ] )
 

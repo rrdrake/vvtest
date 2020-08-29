@@ -280,6 +280,12 @@ class tests_for_TestDependency_class( vtu.vvtestTestCase ):
         tcase = vtu.make_TestCase_with_a_dependency( 'skipfail' )
         assert tcase.willNeverRun()
 
+        tcase = vtu.make_TestCase_with_a_dependency( 'runskip' )
+        assert tcase.willNeverRun()
+
+        tcase = vtu.make_TestCase_with_a_dependency( 'runskip', '*' )
+        assert not tcase.willNeverRun()
+
         tcase = vtu.make_TestCase_with_a_dependency( 'notdone' )
         assert not tcase.willNeverRun()
 

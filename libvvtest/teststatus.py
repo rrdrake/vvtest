@@ -13,14 +13,16 @@ RESULTS_KEYWORDS = [ 'notrun', 'notdone',
                      'timeout', 'skip' ]
 
 
-# this is the exit status that tests use to indicate a diff
 DIFF_EXIT_STATUS = 64
+SKIP_EXIT_STATUS = 63
+
 
 PARAM_SKIP = 'param'
 RESTART_PARAM_SKIP = 'restartparam'
 KEYWORD_SKIP = 'keyword'
 RESULTS_KEYWORD_SKIP = 'resultskeyword'
 SUBDIR_SKIP = 'subdir'
+RUNTIME_SKIP = 'runskip'
 
 SKIP_REASON = {
         PARAM_SKIP           : 'excluded by parameter expression',
@@ -28,6 +30,7 @@ SKIP_REASON = {
         KEYWORD_SKIP         : 'excluded by keyword expression',
         RESULTS_KEYWORD_SKIP : 'previous result keyword expression',
         SUBDIR_SKIP          : 'current working directory',
+        RUNTIME_SKIP         : 'runtime skip returned as exit status',
         'enabled'            : 'disabled',
         'platform'           : 'excluded by platform expression',
         'option'             : 'excluded by option expression',
@@ -234,7 +237,10 @@ class TestStatus:
             return 'notrun'
 
         elif st == 'done':
-            return self.attrs.get( 'result', 'fail' )
+            if 'result' not in self.attrs and self.skipTest():
+                return 'skip'
+            else:
+                return self.attrs.get( 'result', 'fail' )
 
         else:
             return 'notdone'
@@ -274,7 +280,10 @@ class TestStatus:
         self.attrs['xvalue'] = exit_status
 
         result = translate_exit_status_to_result_string( exit_status )
-        self.attrs['result'] = result
+        if result == 'skip':
+            self.attrs['skip'] = RUNTIME_SKIP
+        else:
+            self.attrs['result'] = result
 
     def markTimedOut(self):
         ""
@@ -312,6 +321,9 @@ def translate_exit_status_to_result_string( exit_status ):
 
     elif exit_status == DIFF_EXIT_STATUS:
         return 'diff'
+
+    elif exit_status == SKIP_EXIT_STATUS:
+        return 'skip'
 
     else:
         return 'fail'

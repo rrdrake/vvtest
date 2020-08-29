@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST: vvtest
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+import time
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+from libvvtest.teststatus import translate_exit_status_to_result_string
+from libvvtest.teststatus import DIFF_EXIT_STATUS, SKIP_EXIT_STATUS
+from libvvtest.testcase import TestCase
+
+
+class unit_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        ""
+        util.setup_test( cleanout=False )
+
+    def test_translating_the_exit_status(self):
+        ""
+        assert translate_exit_status_to_result_string( 0 ) == 'pass'
+        assert translate_exit_status_to_result_string( DIFF_EXIT_STATUS ) == 'diff'
+        assert translate_exit_status_to_result_string( SKIP_EXIT_STATUS ) == 'skip'
+        assert translate_exit_status_to_result_string( 1 ) == 'fail'
+        assert translate_exit_status_to_result_string( 2 ) == 'fail'
+        assert translate_exit_status_to_result_string( 7 ) == 'fail'
+
+    def test_marking_tests_done_with_exit_status(self):
+        ""
+        tcase = vtu.make_fake_TestCase( result='notdone' )
+        tstat = tcase.getStat()
+        tstat.markDone( 0 )
+        assert not tstat.isNotrun()
+        assert     tstat.isDone()
+        assert not tstat.isNotDone()
+        assert     tstat.passed()
+        assert tstat.getResultStatus() == 'pass'
+
+        tcase = vtu.make_fake_TestCase( result='notdone' )
+        tstat = tcase.getStat()
+        tstat.markDone( DIFF_EXIT_STATUS )
+        assert not tstat.isNotrun()
+        assert     tstat.isDone()
+        assert not tstat.isNotDone()
+        assert not tstat.passed()
+        assert tstat.getResultStatus() == 'diff'
+
+        tcase = vtu.make_fake_TestCase( result='notdone' )
+        tstat = tcase.getStat()
+        tstat.markDone( SKIP_EXIT_STATUS )
+        assert not tstat.isNotrun()
+        assert     tstat.isDone()
+        assert not tstat.isNotDone()
+        assert not tstat.passed()
+        assert tstat.getResultStatus() == 'skip'
+        assert 'runtime skip' in tstat.getReasonForSkipTest()
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_skipping_a_test_at_runtime(self):
+        ""
+        util.writefile( 'atest.vvt', 'pass' )
+        util.writefile( 'btest.vvt', """
+            import sys
+            import vvtest_util as vvt
+            sys.exit( vvt.skip_exit_status )
+            """ )
+        util.writescript( 'ctest.vvt', """
+            #!/bin/bash
+            source vvtest_util.sh
+            exit $skip_exit_status
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( batch=batch )
+            vrun.assertCounts( total=1, npass=1 )
+            assert vrun.countLines( '2 due to*runtime skip' ) == 1
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '-vv', batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+            tdir = vrun.resultsDir()
+            assert vrun.countTestLines( 'runtime skip' ) == 2
+
+            vrun = vtu.runvvtest( '-i -vv' )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+
+            vrun = vtu.runvvtest( '-R -vv', chdir=tdir, batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+            assert vrun.countTestLines( 'runtime skip' ) == 2
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )

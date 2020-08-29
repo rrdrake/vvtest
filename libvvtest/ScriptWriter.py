@@ -8,6 +8,8 @@ import os, sys
 from os.path import join as pjoin
 from os.path import dirname, normpath
 
+from .teststatus import DIFF_EXIT_STATUS, SKIP_EXIT_STATUS
+
 
 def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     """
@@ -70,7 +72,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
             w.add( 'sys.path.insert( 0, "'+d+'" )' )
 
         w.add( '',
-               'diff_exit_status = 64',
+               'diff_exit_status = '+str(DIFF_EXIT_STATUS),
+               'skip_exit_status = '+str(SKIP_EXIT_STATUS),
                'opt_analyze = "--execute_analysis_sections" in sys.argv[1:] ' + \
                           'or "--execute-analysis-sections" in sys.argv[1:]' )
 
@@ -162,7 +165,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
         w.add( 'CONFIGDIR="'+':'.join( configdirs )+'"' )
 
         w.add( '',
-               'diff_exit_status=64' )
+               'diff_exit_status='+str(DIFF_EXIT_STATUS),
+               'skip_exit_status='+str(SKIP_EXIT_STATUS) )
 
         platenv = plat.getEnvironment()
         w.add( '',

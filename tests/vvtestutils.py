@@ -729,6 +729,9 @@ def make_fake_TestCase( result=None, runtime=None, name='atest',
             tstat.markStarted( tm )
             tstat.markDone( 1 )
             tstat.markSkipByPlatform()
+        elif result == 'runskip':
+            tstat.markStarted( tm )
+            tstat.markDone( teststatus.SKIP_EXIT_STATUS )
         elif result == 'timeout':
             tstat.markStarted( tm )
             tstat.markTimedOut()
