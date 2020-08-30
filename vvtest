@@ -349,7 +349,7 @@ def construct_test_selector( rtdata ):
 
     testfilter = TestFilter( rtdata.rtconfig, rtdata.plugin )
 
-    tsel = TestSelector( rtdata.testdir, testfilter, rtdata.creator )
+    tsel = TestSelector( rtdata.testdir, testfilter )
 
     rtdata.selector = tsel
 
@@ -672,7 +672,8 @@ def run_tests( opts, optD, rtdata ):
     rtdata.timehandler.load( tlist )
     rtdata.selector.applyPermanentFilters( tlist )
     rtdata.tlm.writeTestList()
-    rtdata.selector.prepareActiveTests( tlist )
+    rtdata.selector.applyRuntimeFilters( tlist )
+    rtdata.scanner.completeTestParsing( tlist )
 
     tlist.setResultsDate()
 
@@ -702,12 +703,14 @@ def restart_tests( opts, optD, rtdata ):
         rtdata.tlm.readTestList()
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.load( tlist )
-        rtdata.selector.prepareActiveTests( tlist )
+        rtdata.selector.applyRuntimeFilters( tlist )
+        rtdata.scanner.completeTestParsing( tlist )
         tlist.setResultsDate()
     else:
         rtdata.tlm.readTestList()
         rtdata.tlm.addBatchFileLinksToTests( batchid )
-        rtdata.selector.prepareActiveTests( tlist, apply_filters=False )
+        rtdata.selector.applyRuntimeFilters( tlist, apply_filters=False )
+        rtdata.scanner.completeTestParsing( tlist )
 
     run_test_exec_list( opts, optD, rtdata )
 
@@ -727,7 +730,9 @@ def baseline_tests( opts, optD, rtdata ):
     # add the 'diff' keyword so that only diffs are rebaselined by default
     rtdata.rtconfig.addResultsKeywordExpression( 'diff' )
 
-    rtdata.selector.prepareBaselineTests( tlist )
+    rtdata.selector.applyRuntimeFilters( tlist )
+    rtdata.scanner.completeTestParsing( tlist )
+    rtdata.selector.applyBaselineFilter( tlist )
 
     rtdata.results_writer.prerun( tlist, rtdata.rtinfo, verbosity=1 )
     print3()
@@ -768,7 +773,8 @@ def information_output( opts, optD, rtdata ):
         print3( 'WARNING: previous test results directory not found,',
                 rtdata.testdir )
 
-    rtdata.selector.prepareActiveTests( tlist, remove_new_skips=True )
+    rtdata.selector.applyRuntimeFilters( tlist, remove_new_skips=True )
+    rtdata.scanner.completeTestParsing( tlist )
 
     if opts.keys:
         print_keyword_union( tlist )
@@ -804,7 +810,8 @@ def output_timings( opts, optD, rtdata ):
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.load( tlist )
 
-    rtdata.selector.prepareActiveTests( tlist )
+    rtdata.selector.applyRuntimeFilters( tlist )
+    rtdata.scanner.completeTestParsing( tlist )
     tlist.setResultsDate()
 
     cwriter = construct_console_writer( rtdata.testdir, opts, optD )

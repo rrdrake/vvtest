@@ -11,10 +11,9 @@ from . import pathutil
 
 class TestSelector:
 
-    def __init__(self, test_dir, testfilter, creator):
+    def __init__(self, test_dir, testfilter):
         ""
         self.tfilter = testfilter
-        self.creator = creator
 
         self._set_filter_dir( test_dir, os.getcwd() )
 
@@ -29,8 +28,8 @@ class TestSelector:
 
         tlist.countActive()
 
-    def prepareActiveTests(self, tlist, apply_filters=True,
-                                        remove_new_skips=False):
+    def applyRuntimeFilters(self, tlist, apply_filters=True,
+                                         remove_new_skips=False):
         """
         If 'remove_new_skips' is True then every test skipped by the current
         filtering is removed entirely from the test list, but skips from a
@@ -41,18 +40,10 @@ class TestSelector:
         if apply_filters:
             self._apply_filters( tlist, remove_new_skips=remove_new_skips )
 
-        self._refresh_active_tests( tlist )
-
         tlist.countActive()
 
-    def prepareBaselineTests(self, tlist):
+    def applyBaselineFilter(self, tlist):
         ""
-        tlist.createAnalyzeGroupMap()
-
-        self._apply_filters( tlist )
-
-        self._refresh_active_tests( tlist )
-
         self.tfilter.applyBaselineSkips( tlist.getTestMap() )
 
         tlist.countActive()
@@ -70,11 +61,6 @@ class TestSelector:
 
         if remove_new_skips:
             self.tfilter.removeNewSkips( tcasemap )
-
-    def _refresh_active_tests(self, tlist):
-        ""
-        for tcase in tlist.getActiveTests():
-            self.creator.reparse( tcase.getSpec() )
 
     def _set_filter_dir(self, test_dir, cwd):
         """

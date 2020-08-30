@@ -26,7 +26,7 @@ class RemotePython:
             logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
             logfp.flush()
 
-        self.sub = RemoteProcess( self.cmdL)
+        self.sub = RemoteProcess( self.cmdL )
 
         self.inp = ReprWriter( self.sub.getStdIn(), logfp )
         self.out = AsynchronousReader( self.sub.getStdOut(), logfp, 'OUT' )

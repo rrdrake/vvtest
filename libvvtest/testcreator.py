@@ -57,24 +57,22 @@ class TestCreator:
     def reparse(self, tspec):
         """
         Parses the test source file and resets the settings for the given test.
-        The test name is not changed.  The parameters in the test source file
-        are not considered; instead, the parameters already defined in the test
+        The test name is not changed, and the parameters in the test source file
+        are not considered.  Instead, the parameters already defined in the test
         object are used.
 
         A TestSpecError is raised if the file has an invalid specification.
         """
-        if not tspec.constructionCompleted():
+        form = map_extension_to_spec_form( tspec.getFilepath() )
 
-            form = map_extension_to_spec_form( tspec.getFilepath() )
+        ctor = create_test_constructor( form, tspec.getRootpath(),
+                                              tspec.getFilepath(),
+                                              self.evaluator,
+                                              self.tctor,
+                                              None )
 
-            ctor = create_test_constructor( form, tspec.getRootpath(),
-                                                  tspec.getFilepath(),
-                                                  self.evaluator,
-                                                  self.tctor,
-                                                  None )
-
-            ctor.readFile( strict=True )
-            ctor.reparseTest( tspec )
+        ctor.readFile( strict=True )
+        ctor.reparseTest( tspec )
 
 
 class ExpressionEvaluator:

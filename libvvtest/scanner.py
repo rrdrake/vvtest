@@ -58,6 +58,13 @@ class TestFileScanner:
             for root,dirs,files in os.walk( bpath ):
                 self._scan_recurse( testlist, bpath, root, dirs, files )
 
+    def completeTestParsing(self, testlist):
+        ""
+        for tcase in testlist.getActiveTests():
+            tspec = tcase.getSpec()
+            if not tspec.constructionCompleted():
+                self.creator.reparse( tspec )
+
     def _scan_recurse(self, testlist, basedir, d, dirs, files):
         """
         This function is given to os.walk to recursively scan a directory
