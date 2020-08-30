@@ -209,7 +209,7 @@ class save_results_output( vtu.vvtestTestCase ):
         ""
         tcase,tlist = self.prep_testlist( 'adir' )
 
-        perm = DummyPermissionSetter()
+        perm = MockPermissionSetter()
         rtinfo = RuntimeInfo( platform='Xbox', compiler='gcc' )
 
         lwr = listwriter.ListWriter( perm, 'odir', abspath('tdir') )
@@ -243,7 +243,7 @@ class save_results_output( vtu.vvtestTestCase ):
 
         tcase,tlist = self.prep_testlist( 'adir' )
 
-        perm = DummyPermissionSetter()
+        perm = MockPermissionSetter()
         rtinfo = RuntimeInfo( platform='Xbox', compiler='gcc' )
 
         lwr = listwriter.ListWriter( perm, 'sparky:'+abspath('odir'),
@@ -270,9 +270,9 @@ def add_runtimes_marker_file( rootdir ):
     tr.writeRuntimes( abspath(rootdir), None )
 
 
-class DummyPermissionSetter:
+class MockPermissionSetter:
     def __init__(self): pass
-    def set(self, path): pass
+    def apply(self, path): pass
     def recurse(self, path): pass
 
 

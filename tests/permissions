@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 import stat
 
@@ -41,7 +42,143 @@ class unit_tests( vtu.vvtestTestCase ):
 
     def test_specification_error_on_construction(self):
         ""
-        self.assertRaises( FatalError, PermissionSetter, '.', 'g=rq' )
+        self.assertRaises( FatalError, PermissionSetter, os.getcwd(), 'g=rq' )
+
+    def test_setting_permissions_on_a_nonexistent_path_is_an_error(self):
+        ""
+        perms = PermissionSetter( os.getcwd(), 'g=rx' )
+        self.assertRaises( Exception, perms.apply, 'junk' )
+        self.assertRaises( Exception, perms.recurse, 'junk' )
+        self.assertRaises( Exception, perms.apply, abspath('junk') )
+        self.assertRaises( Exception, perms.recurse, abspath('junk') )
+
+    def test_an_empty_specification_is_a_noop(self):
+        ""
+        perms = PermissionSetter( os.getcwd(), None )
+        perms.apply( abspath('junk') )
+        perms.recurse( abspath('junk') )
+
+        perms = PermissionSetter( os.getcwd(), '' )
+        perms.apply( abspath('junk') )
+        perms.recurse( abspath('junk') )
+
+        perms = PermissionSetter( os.getcwd(), [] )
+        perms.apply( abspath('junk') )
+        perms.recurse( abspath('junk') )
+
+    def test_setting_perms_on_a_subdirectory_path(self):
+        ""
+        util.writefile( 'subdir1/file1.txt', 'content' )
+        util.remove_group_write_perm( 'subdir1/file1.txt' )
+        util.remove_group_write_perm( 'subdir1' )
+
+        util.writefile( 'subdir2/file2.txt', 'content' )
+        util.remove_group_write_perm( 'subdir2/file2.txt' )
+        util.remove_group_write_perm( 'subdir2' )
+
+        time.sleep(1)
+
+        assert not util.has_group_write( 'subdir1/file1.txt' )
+        assert not util.has_group_write( 'subdir1' )
+        assert not util.has_group_write( 'subdir2/file2.txt' )
+        assert not util.has_group_write( 'subdir2' )
+
+        perms = PermissionSetter( os.getcwd(), 'g+w' )
+        perms.apply( 'subdir1/file1.txt' )
+        perms.apply( abspath('subdir2/file2.txt' ) )
+
+        assert util.has_group_write( 'subdir1/file1.txt' )
+        assert util.has_group_write( 'subdir1' )
+        assert util.has_group_write( 'subdir2/file2.txt' )
+        assert util.has_group_write( 'subdir2' )
+
+    def test_setting_perms_on_a_non_subdirectory_path(self):
+        ""
+        util.writefile( 'subdir1/file1.txt', 'content' )
+        util.remove_group_write_perm( 'subdir1/file1.txt' )
+        util.remove_group_write_perm( 'subdir1' )
+
+        util.writefile( 'subdir2/file2.txt', 'content' )
+        util.remove_group_write_perm( 'subdir2/file2.txt' )
+        util.remove_group_write_perm( 'subdir2' )
+
+        time.sleep(1)
+
+        assert not util.has_group_write( 'subdir1/file1.txt' )
+        assert not util.has_group_write( 'subdir1' )
+        assert not util.has_group_write( 'subdir2/file2.txt' )
+        assert not util.has_group_write( 'subdir2' )
+
+        perms = PermissionSetter( abspath('subdir1'), 'g+w' )
+        perms.apply( abspath('subdir2/file2.txt' ) )
+
+        assert not util.has_group_write( 'subdir1/file1.txt' )
+        assert not util.has_group_write( 'subdir1' )
+        assert     util.has_group_write( 'subdir2/file2.txt' )
+        assert not util.has_group_write( 'subdir2' )
+
+    def test_setting_perms_on_the_top_level(self):
+        ""
+        util.writefile( 'subdir1/file1.txt', 'content' )
+        util.remove_group_write_perm( 'subdir1/file1.txt' )
+        util.remove_group_write_perm( 'subdir1' )
+
+        util.writefile( 'subdir2/file2.txt', 'content' )
+        util.remove_group_write_perm( 'subdir2/file2.txt' )
+        util.remove_group_write_perm( 'subdir2' )
+
+        util.writefile( 'subdir3/file3.txt', 'content' )
+        util.remove_group_write_perm( 'subdir3/file3.txt' )
+        util.remove_group_write_perm( 'subdir3' )
+
+        time.sleep(1)
+
+        perms = PermissionSetter( abspath('subdir1'), 'g+w' )
+        perms.apply( abspath('subdir1') )
+
+        perms = PermissionSetter( abspath('subdir2'), 'g+w' )
+        perms.apply( '.' )
+
+        perms = PermissionSetter( abspath('subdir3'), 'g+w' )
+        perms.apply( 'file3.txt' )
+
+        assert not util.has_group_write( 'subdir1/file1.txt' )
+        assert     util.has_group_write( 'subdir1' )
+        assert not util.has_group_write( 'subdir2/file2.txt' )
+        assert     util.has_group_write( 'subdir2' )
+        assert     util.has_group_write( 'subdir3/file3.txt' )
+        assert     util.has_group_write( 'subdir3' )
+
+    def test_caching_prevents_multiple_perm_changes_to_the_same_path(self):
+        ""
+        util.writefile( 'subdir1/file1.txt', 'content' )
+        util.remove_group_write_perm( 'subdir1/file1.txt' )
+        util.remove_group_write_perm( 'subdir1' )
+
+        util.writefile( 'subdir2/file2.txt', 'content' )
+        util.remove_group_write_perm( 'subdir2/file2.txt' )
+        util.remove_group_write_perm( 'subdir2' )
+
+        time.sleep(1)
+
+        perms = PermissionSetter( abspath('subdir1'), 'g+w' )
+        perms.apply( 'file1.txt' )
+        assert util.has_group_write( 'subdir1/file1.txt' )
+        assert util.has_group_write( 'subdir1' )
+
+        util.remove_group_write_perm( 'subdir1/file1.txt' )
+        util.remove_group_write_perm( 'subdir1' )
+        perms.apply( 'file1.txt' )
+        assert not util.has_group_write( 'subdir1/file1.txt' )
+        assert not util.has_group_write( 'subdir1' )
+
+        perms.apply( abspath('subdir2/file2.txt') )
+        assert util.has_group_write( 'subdir2/file2.txt' )
+
+        # non-subdirectory paths do not use the caching
+        util.remove_group_write_perm( 'subdir2/file2.txt' )
+        perms.apply( abspath('subdir2/file2.txt') )
+        assert util.has_group_write( 'subdir2/file2.txt' )
 
 
 class integration_tests( vtu.vvtestTestCase ):

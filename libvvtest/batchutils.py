@@ -194,8 +194,8 @@ class Batcher:
 
         bname = self.jobhandler.writeJobScript( bjob, qtime, cmd )
 
-        self.perms.set( bname )
-        self.perms.set( tname )
+        self.perms.apply( bname )
+        self.perms.apply( tname )
 
     def _check_get_stopped_jobs(self, qdoneL, tdoneL):
         ""
@@ -508,14 +508,14 @@ def check_make_directory( dirname, perms ):
     if dirname and dirname != '.':
         if not os.path.exists( dirname ):
             os.mkdir( dirname )
-            perms.set( dirname )
+            perms.apply( dirname )
 
 
 def check_set_outfile_permissions( bjob, perms, curtime ):
     ""
     ofile = bjob.getOutputFilename()
     if not bjob.outfileSeen() and os.path.exists( ofile ):
-        perms.set( ofile )
+        perms.apply( ofile )
         bjob.setOutfileSeen( curtime )
 
 

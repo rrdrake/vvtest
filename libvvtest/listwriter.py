@@ -101,7 +101,7 @@ class ListWriter:
             self.writeTestResults( tcaseL, tofile, rtinfo, inprogress )
 
         finally:
-            self.permsetter.set( tofile )
+            self.permsetter.apply( tofile )
 
     def makeFilename(self, datestr, rtinfo):
         ""

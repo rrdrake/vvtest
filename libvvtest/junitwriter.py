@@ -106,7 +106,7 @@ class JUnitWriter:
 
         finally:
             fp.close()
-            self.permsetter.set( self.filename )
+            self.permsetter.apply( self.filename )
 
     def write_testcase(self, fp, tcase, result, pkgclass, max_KB):
         ""

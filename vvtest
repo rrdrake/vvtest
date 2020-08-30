@@ -291,17 +291,9 @@ def compute_testing_directory( rtdata, opts, optD ):
 
 def construct_permission_setter( rtdata, opts ):
     ""
-    if opts.perms:
-        from libvvtest.permsetter import PermissionSetter
-        perms = PermissionSetter( rtdata.testdir, opts.perms )
+    from libvvtest.permsetter import PermissionSetter
 
-    else:
-        class DummyPermissionSetter:
-            def __init__(self): pass
-            def set(self, path): pass
-            def recurse(self, path): pass
-
-        perms = DummyPermissionSetter()
+    perms = PermissionSetter( rtdata.testdir, opts.perms )
 
     rtdata.perms = perms
 
@@ -606,8 +598,8 @@ class TestListManager:
     def writeTestList(self):
         ""
         attrs = self.rtinfo.asDict()
-        self.tlist.stringFileWrite( **attrs )
-        self.perms.set( self.tlist.getFilename() )
+        fn = self.tlist.stringFileWrite( **attrs )
+        self.perms.apply( fn )
 
     def addBatchFileLinksToTests(self, batchid):
         ""
@@ -882,7 +874,7 @@ class CacheFileHandler:
             if self.opts.short_xdirs:
                 fp.write( 'SHORT_XDIRS='+self.opts.short_xdirs + '\n' )
 
-        perms.set( abspath(self.filename) )
+        perms.apply( abspath(self.filename) )
 
     def readCache(self):
         ""

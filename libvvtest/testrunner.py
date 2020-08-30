@@ -60,7 +60,7 @@ class TestRunner:
         if not os.path.exists( wdir ):
             os.makedirs( wdir )
 
-        self.perms.set( xdir )
+        self.perms.apply( xdir )
 
     def getCommonXMLDB(self, tspec):
         ""
@@ -93,7 +93,7 @@ class ExecutionHandler:
         if self.rtconfig.getAttr('logfile'):
             logfname = get_execution_log_filename( self.tcase, baseline )
             redirect_stdout_stderr_to_filename( logfname )
-            self.perms.set( os.path.abspath( logfname ) )
+            self.perms.apply( os.path.abspath( logfname ) )
 
     def check_run_preclean(self, baseline):
         ""
@@ -213,7 +213,7 @@ class ExecutionHandler:
             finally:
                 fp.close()
 
-            self.perms.set( os.path.abspath( "machinefile" ) )
+            self.perms.apply( os.path.abspath( "machinefile" ) )
 
     def finishExecution(self, exit_status, timedout):
         ""
@@ -312,7 +312,7 @@ class ExecutionHandler:
                                          self.rtconfig.getAttr('offopts'),
                                          script_file )
 
-            self.perms.set( os.path.abspath( script_file ) )
+            self.perms.apply( os.path.abspath( script_file ) )
 
     def write_script_utils(self):
         ""
@@ -331,7 +331,7 @@ class ExecutionHandler:
                                           self.platform,
                                           self.test_dir )
 
-                self.perms.set( os.path.abspath( script_file ) )
+                self.perms.apply( os.path.abspath( script_file ) )
 
 
 def get_execution_log_filename( tcase, baseline ):

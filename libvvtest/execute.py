@@ -56,7 +56,7 @@ def run_batch( batch, tlist, xlist, perms, rtinfo, results_writer, test_dir ):
     uthook = utesthooks.construct_unit_testing_hook( 'batch' )
 
     rfile = tlist.initializeResultsFile( **rtinfo.asDict() )
-    perms.set( os.path.abspath( rfile ) )
+    perms.apply( os.path.abspath( rfile ) )
 
     info = TestInformationPrinter( sys.stdout, tlist, batch )
 
@@ -151,7 +151,7 @@ def run_test_list( qsub_id, tlist, xlist, test_dir, plat,
     uthook = utesthooks.construct_unit_testing_hook( 'run', qsub_id )
 
     rfile = tlist.initializeResultsFile( **rtinfo.asDict() )
-    perms.set( os.path.abspath( rfile ) )
+    perms.apply( os.path.abspath( rfile ) )
 
     info = TestInformationPrinter( sys.stdout, xlist )
 

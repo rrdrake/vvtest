@@ -105,7 +105,7 @@ class CDashWriter:
     def _write_file(self, fmtr, filename):
         ""
         fmtr.writeToFile( filename )
-        self.permsetter.set( filename )
+        self.permsetter.apply( filename )
 
 
 def parse_destination_string( destination ):

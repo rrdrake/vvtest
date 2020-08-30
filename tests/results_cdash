@@ -642,7 +642,7 @@ class integration_tests( vtu.vvtestTestCase ):
 def make_CDashWriter( destination, subclass_submitter=None,
                       project=None, datestamp=None ):
     ""
-    perms = PermissionSetter( os.getcwd(), [] )
+    perms = PermissionSetter( os.getcwd(), None )
 
     wr = cdashwriter.CDashWriter( os.getcwd(), perms )
 

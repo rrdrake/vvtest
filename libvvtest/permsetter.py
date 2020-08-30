@@ -5,11 +5,14 @@
 # Government retains certain rights in this software.
 
 import os, sys
+from os.path import normpath, dirname
+from os.path import join as pjoin
 import stat
 import itertools
 
 import perms
 from .errors import FatalError
+from . import pathutil
 
 
 class PermissionSetter:
@@ -25,54 +28,63 @@ class PermissionSetter:
                             ['wg-alegra','g=rx','o=']
                             ['wg-alegra', 'g=rx,o=rx']
         """
+        assert os.path.isabs( topdir )
+
         self.topdir = topdir
         self.spec = spec
-        self.cache = {}
+        self.cache = set()
 
-        self.speclist = parse_permission_specifications( spec )
+        if spec:
+            self.speclist = parse_permission_specifications( spec )
 
-    def set(self, path):
+    def apply(self, path):
         """
-        If 'path' is an absolute path, then set the permissions on the base
-        path segment only.
+        If 'path' is a relative path, then it is assumed relative to 'topdir'.
 
-        If 'path' is a relative path, then it must be relative to 'topdir'
-        and the permissions are set on the path and all intermediate
-        directories at or below the 'topdir'.
+        If 'path' is a subdirectory of 'topdir', then the permissions are set
+        on the path and all intermediate directories at or below the 'topdir'.
+        Otherwise, permissions are only set on the given 'path'.
 
-        An instance of this class caches the paths that have their permissions
-        set and will not set them more than once.
+        An instance of this class caches the paths that have had their
+        permissions set and will not set them more than once.
         """
+        if not self.spec:
+            return
+
         if os.path.isabs( path ):
-            assert os.path.exists( path )
-            self._setperms( path )
+
+            assert os.path.exists( path ), 'path does not exist: '+repr(path)
+
+            path = normpath( path )
+
+            if not pathutil.is_subdir( self.topdir, path ):
+                self._setperms( path )
+                return
 
         else:
-            path = os.path.normpath( path )
+            path = normpath( path )
             assert not path.startswith( '..' )
 
-            fp = os.path.join( self.topdir, path )
-            assert os.path.exists( fp )
+            fp = normpath( pjoin( self.topdir, path ) )
+            assert os.path.exists( fp ), 'path does not exist: '+repr(fp)
 
-            # split the path into a list of directory segments
-            L = []
-            p = path
-            while True:
-                d,b = os.path.split( p )
-                L.append( b )
-                if d:
-                    p = d
-                else:
-                    break
-            L.reverse()
+            path = fp
 
-            rel = '.'
-            for b in L:
-                rel = os.path.normpath( os.path.join( rel, b ) )
-                if rel not in self.cache:
-                    self.cache[ rel ] = None
-                    fp = os.path.join( self.topdir, rel )
-                    self._setperms( fp )
+        while True:
+            if path in self.cache:
+                break
+
+            self._setperms( path )
+            self.cache.add( path )
+
+            if os.path.samefile( path, self.topdir ):
+                break
+
+            up = dirname( path )
+            if os.path.samefile( up, path ):
+                break
+
+            path = up
 
     def recurse(self, path):
         """
@@ -81,6 +93,9 @@ class PermissionSetter:
         to the each entry in the directory.  Soft links are left untouched
         and not followed.
         """
+        if not self.spec:
+            return
+
         if os.path.isdir( path ):
             
             if not os.path.islink( path ):
@@ -89,7 +104,7 @@ class PermissionSetter:
             def walker( arg, dirname, dirs, files ):
                 ""
                 for f in itertools.chain( dirs, files ):
-                    p = os.path.join( dirname, f )
+                    p = pjoin( dirname, f )
                     if not os.path.islink(p):
                         arg._setperms(p)
 
@@ -100,9 +115,7 @@ class PermissionSetter:
             self._setperms( path )
 
     def _setperms(self, path):
-        """
-        Applies the permissions stored in this class to the give path.
-        """
+        ""
         perms.apply_chmod( path, *self.speclist )
 
 

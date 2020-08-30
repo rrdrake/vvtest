@@ -82,7 +82,7 @@ class HTMLWriter:
 
         finally:
             fp.close()
-            self.permsetter.set( os.path.abspath( self.filename ) )
+            self.permsetter.apply( os.path.abspath( self.filename ) )
 
     def writeTestList(self, fp, tlist):
         """

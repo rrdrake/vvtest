@@ -231,7 +231,7 @@ class test_results_directory( vtu.vvtestTestCase ):
         ""
         assert len( os.listdir('.') ) == 0
 
-        perms = PermissionSetter( os.getcwd(), [] )
+        perms = PermissionSetter( os.getcwd(), None )
 
         rtn = location.make_scratch_mirror( os.getcwd(), perms )
 
@@ -250,7 +250,7 @@ class test_results_directory( vtu.vvtestTestCase ):
         ""
         os.mkdir( 'thisone' )
 
-        perms = PermissionSetter( os.getcwd(), [] )
+        perms = PermissionSetter( os.getcwd(), None )
 
         dirs = [ abspath('noexist'), abspath('thisone') ]
         rtn = location.search_and_make_scratch_directory( dirs, perms )
@@ -260,7 +260,7 @@ class test_results_directory( vtu.vvtestTestCase ):
     def test_making_a_scratch_directory(self):
         ""
         curdir = os.getcwd()
-        perms = PermissionSetter( curdir, [] )
+        perms = PermissionSetter( curdir, None )
 
         rtn = location.make_any_scratch_directory( [ abspath('junk') ], perms )
         assert rtn == None
@@ -325,7 +325,7 @@ class test_results_directory( vtu.vvtestTestCase ):
         os.makedirs( 'wrkdir/dest2' )
         os.makedirs( 'fakescratch' )
 
-        perms = PermissionSetter( os.getcwd(), [] )
+        perms = PermissionSetter( os.getcwd(), None )
 
         ok = location.make_mirror_directory( abspath('testdir'),
                                              abspath('dest1'),

@@ -238,7 +238,7 @@ def create_test_directory( testdirname, Mval, curdir, perms ):
                 os.remove( testdirname )  # remove broken softlink
             os.mkdir( testdirname )
 
-        perms.set( testdirname )
+        perms.apply( testdirname )
 
 
 def make_mirror_directory( testdirname, Mval, curdir, perms,
@@ -270,7 +270,7 @@ def make_mirror_directory( testdirname, Mval, curdir, perms,
     mirdir = pjoin( Mval, basename( testdirname ) )
 
     check_and_make_directory( mirdir )
-    perms.set( mirdir )
+    perms.apply( mirdir )
 
     force_link_directory( testdirname, mirdir )
 
@@ -350,7 +350,7 @@ def make_scratch_mirror( scratch, perms ):
             except Exception:
                 pass
             else:
-                perms.set( ud )
+                perms.apply( ud )
                 return ud
 
     return None

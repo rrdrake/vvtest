@@ -861,6 +861,16 @@ def remove_write_perms( path ):
     return fm
 
 
+def remove_group_write_perm( path ):
+    ""
+    fm = stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
+
+    perm = fm & ( ~( stat.S_IWGRP ) )
+    os.chmod( path, perm )
+
+    return fm
+
+
 def probe_for_two_different_groups():
     ""
     import grp
