@@ -107,7 +107,7 @@ class remote_process_tests( trigutil.trigTestCase ):
         assert not rp.isAlive()
 
 
-class fd_writer_tests( trigutil.trigTestCase ):
+class command_writer_tests( trigutil.trigTestCase ):
 
     def write_to_file(self, logfp=None):
         ""
@@ -147,10 +147,10 @@ class async_reader_tests( trigutil.trigTestCase ):
         ""
         fdr,fdw = os.pipe()
 
-        if sys.version_info[0] > 2:
-            readfp = os.fdopen( fdr, 'rb', closefd=False )
-        else:
+        if sys.version_info[0] < 3:
             readfp = os.fdopen( os.dup( fdr ), 'rb' )
+        else:
+            readfp = os.fdopen( fdr, 'rb', closefd=False )
 
         return fdr, fdw, readfp
 
@@ -291,6 +291,42 @@ class bootstrap_functions( trigutil.trigTestCase ):
 
         x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
         # print3( out )
+
+    def test_executing_python_code(self):
+        ""
+        code = dedent( """
+            import sys, os
+            newvar = 'add this to globals'
+            myvar = 24
+            def myfunc():
+                global myvar
+                myvar = 42
+            sys.stdout.write( 'AVALUE='+str(myvar)+os.linesep )
+            myfunc()
+            sys.stdout.write( 'BVALUE='+str(myvar)+os.linesep )
+            sys.stdout.flush()
+            """ )
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                _remotepython_eval_lines( """+repr(code)+""" )
+                print ( 'NEWVAR='+repr(newvar) )
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+        assert 'AVALUE=24' in out and 'BVALUE=42' in out
+        assert "NEWVAR='add this to globals'" in out
+
+    def test_capturing_a_remote_exception(self):
+        ""
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                _remotepython_eval_lines( 
+                """ ) )
+        time.sleep(1)
 
     def test_the_traceback_module_will_use_a_replacement_getline(self):
         """
@@ -671,6 +707,37 @@ class integration_tests( unittest.TestCase ):
         assert 'raise Exception( "fake exception" )' in exc
         assert len( util.greplines( 'File *mymod2*line 5, in myfunc', exc ) ) == 1
         assert 'fake exception' in exc.splitlines()[-1]
+
+    def test_adding_a_module_with_syntax_error_shows_code_lines(self):
+        ""
+        rem = RemotePython( pythonexe=rpy, logfile='logfile' )
+        try:
+            ok = rem.start()
+            assert ok
+            rem.addModule( 'mymod',
+                    'import os, sys',
+                    'if 1 = 2:',
+                    '    pass' )
+            while rem.isAlive():
+                time.sleep(0.5)
+            out,err = flush_lines_from_remote( rem )
+        finally:
+            rem.close()
+
+        assert not out
+        print3( err )
+        accum = []
+        for line in err.splitlines():
+            line = line.strip()
+            if 'remotemodule_mymod' in line and 'line 2' in line:
+                accum.append( 'loc' )
+            elif line.startswith( 'if 1 = 2:' ):
+                accum.append( 'if' )
+            elif line.startswith( '^' ):
+                accum.append( 'carrot' )
+            elif line.startswith( 'SyntaxError: invalid syntax' ):
+                accum.append( 'err' )
+        assert accum == ['loc','if','carrot','err']
 
     def test_using_real_ssh(self):
         ""

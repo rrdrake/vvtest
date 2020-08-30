@@ -315,22 +315,29 @@ def _remotepython_add_module( modname, srclines ):
 def _remotepython_add_eval_linecache( lines ):
     ""
     global _remotepython_eval_count
-    _remotepython_eval_count += 1
-    filename = "<remotecode"+str(_remotepython_eval_count)+">"
+    if lines.startswith( '_remotepython_' ):
+        filename = '<remotepython>'
+    else:
+        _remotepython_eval_count += 1
+        filename = "<remotecode"+str(_remotepython_eval_count)+">"
     _remotepython_linecache[ filename ] = lines.splitlines()
     return filename
+
+def _remotepython_eval_lines( lines ):
+    ""
+    try:
+        filename = _remotepython_add_eval_linecache( lines )
+        eval( compile( lines, filename, "exec" ), globals() )
+    except Exception:
+        traceback.print_exc()
+        sys.exit(1)
 """
 
 bootstrap_waitloop = """
 line = sys.stdin.readline()
 while line:
     lines = eval( line.strip() )
-    filename = _remotepython_add_eval_linecache( lines )
-    try:
-        eval( compile( lines, filename, "exec" ) )
-    except Exception:
-        traceback.print_exc()
-        sys.exit(1)
+    _remotepython_eval_lines( lines )
     line = sys.stdin.readline()
 """
 
