@@ -16,12 +16,15 @@ class BackgroundRunner:
         ""
         self.maxrunning = maxconcurrent
 
-        self.collectors = []
+        self.objs = []
         self.running = []
 
-    def runall(self, collectors):
-        ""
-        self.collectors = collectors
+    def runall(self, run_objects):
+        """
+        Runs the given objects in the background until all are done. Each
+        object must have a dispatch() method and a complete(exc,val) method.
+        """
+        self.objs = run_objects
         self.running = []
 
         while not self.isDone():
@@ -33,15 +36,14 @@ class BackgroundRunner:
 
     def isDone(self):
         ""
-        return len( self.collectors ) == 0 and len( self.running ) == 0
+        return len( self.objs ) == 0 and len( self.running ) == 0
 
     def checkRun(self):
         ""
-        while len( self.running ) < self.maxrunning and \
-              len( self.collectors ) > 0:
-            coll = self.collectors.pop()
-            thr = ThreadedFunctionCall( coll.dispatch )
-            self.running.append( [ thr, coll ] )
+        while len( self.running ) < self.maxrunning and len( self.objs ) > 0:
+            obj = self.objs.pop()
+            thr = ThreadedFunctionCall( obj.dispatch )
+            self.running.append( [ thr, obj ] )
 
     def checkFinished(self):
         ""
@@ -50,13 +52,13 @@ class BackgroundRunner:
         runL = list( self.running )
         self.running = []
 
-        for thr,coll in runL:
+        for thr,obj in runL:
             if thr.isDone():
                 exc,val = thr.getResult()
-                coll.complete( exc, val )
+                obj.complete( exc, val )
                 numfinished += 1
             else:
-                self.running.append( [ thr,coll ] )
+                self.running.append( [ thr,obj ] )
 
         return numfinished
 
