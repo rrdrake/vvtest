@@ -47,7 +47,7 @@ class RemotePythonProxy:
 
         ok = self.remote.start( timeout )
         if ok:
-            err = _send_internal_utilities( self.remote )
+            err = _send_internal_utilities( self.remote, timeout )
 
         if not ok or err:
             msg = ( self.remote.getStartupOutput() + '\n' + err ).rstrip()
@@ -63,7 +63,7 @@ class RemotePythonProxy:
     def execute(self, *lines_of_python_code):
         """
         Lines of python code can be sent as strings with newlines and/or
-        separate arguments.
+        as separate arguments.
         """
         if not self.remote.isAlive():
             raise FailedConnectionError( 'connection is not alive' )
@@ -97,8 +97,15 @@ class RemotePythonProxy:
                                     funcname, args, kwargs )
         return rtn
 
+    # magic:
+    def assign(self, local_name, constructor, *args, **kwargs):
+        ""
+        pass
+
     def construct(self, constructor, *args, **kwargs):
         """
+        # magic: allow 'constructor' to be a function or class type
+
         Create an object on the remote side and return a proxy object. These
         proxy objects are constrained to function calls only with arguments
         of implicit types, such as strings, numbers, lists, and dictionaries
@@ -113,6 +120,10 @@ class RemotePythonProxy:
 
     def module(self, module_name):
         """
+        # magic: change name to import_module
+        # magic: add optional 'local_name' argument
+        # magic: allow argument to be a module object
+
         Import a Python module on the remote side and return a proxy object.
         For example,
 
@@ -196,10 +207,10 @@ class ObjectProxy:
         return remote_function_call( self.remote, self.timeout, func, args, kwargs )
 
 
-_return_value_marker     = '_pythonproxy_return_value='
-_len_return_value_marker = len( _return_value_marker )
-_exception_marker        = '_pythonproxy_exception='
-_len_exception_marker    = len( _exception_marker )
+_return_value_marker          = '_pythonproxy_return_value='
+_len_return_value_marker      = len( _return_value_marker )
+_pythonproxy_exception_marker = '_pythonproxy_exception='
+_len_exception_marker         = len( _pythonproxy_exception_marker )
 
 
 def remote_function_call( remote, timeout, funcname, args, kwargs ):
@@ -209,12 +220,7 @@ def remote_function_call( remote, timeout, funcname, args, kwargs ):
     if not remote.isAlive():
         raise FailedConnectionError( 'connection is not alive' )
 
-    remote.execute(
-        'try:',
-        '  '+cmd,
-        'except Exception:',
-        '  tb = _pythonproxy_capture_traceback( sys.exc_info() )',
-        '  print ( "'+_exception_marker+'"+repr(tb) )' )
+    remote.execute( '_remotepython_try_except('+repr(cmd)+')' )
 
     val = wait_for_return_value( remote, timeout )
 
@@ -239,6 +245,22 @@ def compose_remote_command( funcname, args, kwargs ):
 
 def wait_for_return_value( remote, timeout ):
     ""
+    for out in remote_output_iterator( remote, timeout ):
+
+        if out.startswith( _return_value_marker ):
+            val = out.strip()[_len_return_value_marker:]
+            break
+
+        elif out.startswith( _pythonproxy_exception_marker ):
+            exc = eval( out.strip()[_len_exception_marker:] )
+            fmtexc = _format_remote_exception( exc )
+            raise RemoteExceptionError( 'caught remote exception:\n'+fmtexc )
+
+    return val
+
+
+def remote_output_iterator( remote, timeout ):
+    ""
     tstart = time.time()
     pause = 0.1
 
@@ -247,13 +269,7 @@ def wait_for_return_value( remote, timeout ):
         out = remote.getOutputLine()
 
         if out:
-            if out.startswith( _return_value_marker ):
-                val = out.strip()[_len_return_value_marker:]
-                break
-            elif out.startswith( _exception_marker ):
-                exc = eval( out.strip()[_len_exception_marker:] )
-                fmtexc = _format_remote_exception( exc )
-                raise RemoteExceptionError( 'caught remote exception:\n'+fmtexc )
+            yield out
 
         elif timeout != None and time.time() - tstart > timeout:
             secs = "%.1f" % (time.time()-tstart)
@@ -267,8 +283,6 @@ def wait_for_return_value( remote, timeout ):
             time.sleep( pause )
             pause = min( pause * 2, 2 )
 
-    return val
-
 
 def _pythonproxy_construct_object( constructor_funcname, *args, **kwargs ):
     """
@@ -278,6 +292,20 @@ def _pythonproxy_construct_object( constructor_funcname, *args, **kwargs ):
     objid = id( obj )
     _pythonproxy_object_store[ objid ] = obj
     return objid
+
+
+# this function is specially named .. it starts with "_remotepython_"
+# the remotepython.py coding will not (uniquely) line cache statements
+# that start with that string
+# we do this for try/except because it will be called many times and we
+# don't want to needlessly accumulate the line cache
+def _remotepython_try_except( statement ):
+    ""
+    try:
+        eval( compile( statement, "<pythonproxy>", "exec" ), globals() )
+    except Exception:
+        tb = _pythonproxy_capture_traceback( sys.exc_info() )
+        print ( _pythonproxy_exception_marker+repr(tb) )
 
 
 def _pythonproxy_import_module( module_name ):
@@ -298,16 +326,20 @@ def _pythonproxy_capture_traceback( excinfo ):
     return tb
 
 
-_UTILITIES_LIST = [ 'import sys',
-                    'sys.dont_write_bytecode = True',
-                    'sys.excepthook = sys.__excepthook__',
-                    'import os',
-                    '_pythonproxy_object_store = {}',
-                    _pythonproxy_construct_object,
-                    _pythonproxy_import_module,
-                    _pythonproxy_capture_traceback ]
+_UTILITIES_LIST = [
+    'import sys',
+    'sys.dont_write_bytecode = True',
+    'sys.excepthook = sys.__excepthook__',
+    'import os',
+    '_pythonproxy_object_store = {}',
+    '_pythonproxy_exception_marker = '+repr(_pythonproxy_exception_marker),
+    _pythonproxy_construct_object,
+    _remotepython_try_except,
+    _pythonproxy_import_module,
+    _pythonproxy_capture_traceback,
+]
 
-def _send_internal_utilities( remote, utils=_UTILITIES_LIST ):
+def _send_internal_utilities( remote, timeout, utils=_UTILITIES_LIST ):
     ""
     err = ''
 
@@ -321,6 +353,12 @@ def _send_internal_utilities( remote, utils=_UTILITIES_LIST ):
                     err = 'Failed to get source code for '+str(util)
                     break
             remote.execute( pycode )
+
+        if not err:
+            remote.execute( 'print ( "_pythonproxy_mark_" )' )
+            for out in remote_output_iterator( remote, timeout ):
+                if '_pythonproxy_mark_' in out:
+                    break
 
     except Exception:
         err = _pythonproxy_capture_traceback( sys.exc_info() )

@@ -319,15 +319,6 @@ class bootstrap_functions( trigutil.trigTestCase ):
         assert 'AVALUE=24' in out and 'BVALUE=42' in out
         assert "NEWVAR='add this to globals'" in out
 
-    def test_capturing_a_remote_exception(self):
-        ""
-        util.writefile( 'scr.py',
-            remotepython.bootstrap_preamble + \
-            dedent( """
-                _remotepython_eval_lines( 
-                """ ) )
-        time.sleep(1)
-
     def test_the_traceback_module_will_use_a_replacement_getline(self):
         """
         The traceback module uses the linecache module to get line information
