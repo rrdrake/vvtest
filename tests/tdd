@@ -125,6 +125,35 @@ class tdd_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-R', chdir=vrun.resultsDir() )
         vrun.assertCounts( total=2, npass=2 )
 
+    def test_depends_on_a_TDD_test_and_a_skipped_test(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: depends on (result=*) : btest ctest*
+            import vvtest_util as vvt
+            print ( 'DEPDIRS='+repr(vvt.DEPDIRS) )
+            assert len( vvt.DEPDIRS ) == 0
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: keywords = TDD
+            pass
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: parameterize : np = 8
+            pass
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '-N 4', batch=batch )
+            vrun.assertCounts( total=1, npass=1 )
+
+            pat = 'DEPDIRS='
+            depdirs = eval( vrun.greplogs(pat)[0].split(pat,1)[1] )
+            assert len( depdirs ) == 0
+
     def test_that_tests_marked_TDD_carry_the_mark_to_the_test_results_file(self):
         ""
         util.writefile( "testone.xml", """

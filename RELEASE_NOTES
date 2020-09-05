@@ -141,6 +141,13 @@ Improvements:
 
 Fixes:
 
+    - Consider testA depends on testB with result=*, but testB is filtered
+      out by keyword. The DEPDIRS variable in testA's vvtest_util.py file
+      included testB. This was considered a bug. Now testB is not in DEPDIRS.
+
+    - Fix a crash (traceback) in a situation where one test depends on
+      another test that will never run.
+
     - The user plugin functions prologue() and epilogue() were being called
       in the execution of batch jobs. Now they are not.
 

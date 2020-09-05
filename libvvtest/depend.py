@@ -20,12 +20,18 @@ class TestDependency:
         ""
         return self.tcase.getExec() != None
 
-    def hasSameTestID(self, testdep):
+    def getTestID(self):
         ""
-        tid1 = self.tcase.getSpec().getID()
-        tid2 = testdep.tcase.getSpec().getID()
+        return self.tcase.getSpec().getID()
 
-        return tid1 == tid2
+    def ranOrCouldRun(self):
+        ""
+        tstat = self.tcase.getStat()
+
+        if tstat.isNotrun() and tstat.skipTest():
+            return False
+
+        return True
 
     def satisfiesResult(self):
         ""
@@ -92,7 +98,8 @@ class FailedTestDependency:
     """
     def __init__(self, reason): self.reason = reason
     def hasTestExec(self): return False
-    def hasSameTestID(self, testdep): return False
+    def getTestID(self): return None
+    def ranOrCouldRun(self): return False
     def satisfiesResult(self): return False
     def getMatchDirectory(self): return None,None
     def isBlocking(self): return True

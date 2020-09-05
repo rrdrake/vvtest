@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import basename
 import glob
 import time
 
@@ -161,19 +162,13 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
     def test_a_result_wildcard_will_ignore_a_skipped_dependency(self):
         ""
         util.writefile( 'testA.vvt', """
-            #VVT: depends on (result="*") : testB testC
+            #VVT: depends on (result="*") : testB
+            #VVT: depends on (result=*) : testC
             import os
             import vvtest_util as vvt
-            print ( vvt.DEPDIRS )
-            assert len( vvt.DEPDIRS ) == 2
-            if os.path.exists( vvt.DEPDIRS[0] ):
-                assert os.path.basename( vvt.DEPDIRS[0] ) == 'testB'
-                assert os.path.basename( vvt.DEPDIRS[1] ) == 'testC'
-                assert not os.path.exists( vvt.DEPDIRS[1] )
-            else:
-                assert os.path.basename( vvt.DEPDIRS[0] ) == 'testC'
-                assert os.path.basename( vvt.DEPDIRS[1] ) == 'testB'
-                assert os.path.exists( vvt.DEPDIRS[1] )
+            print ( 'DEPDIRS='+repr(vvt.DEPDIRS) )
+            for dp in vvt.DEPDIRS:
+                assert os.path.exists( dp )
             """ )
         util.writefile( 'testB.vvt', """
             import os, time
@@ -186,12 +181,45 @@ class dependency_result_expressions( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
+        def getDEPDIRS( vrun ):
+            lineL = vrun.greplogs( 'DEPDIRS=' )
+            assert len( lineL ) == 1
+            depdirs = eval( lineL[0].strip().split('DEPDIRS=',1)[1].strip() )
+            bnL = [ basename(dn) for dn in depdirs ]
+            bnL.sort()
+            return bnL
+
         for batch in [False,True]:
 
             vtu.remove_results()
 
+            # testC should not be in the DEPDIRS because it will not run
+
             vrun = vtu.runvvtest( '-vv -k testA/testB', batch=batch )
             vrun.assertCounts( total=3, npass=2, skip=1 )
+            tdir = vrun.resultsDir()
+            assert getDEPDIRS( vrun ) == ['testB']
+
+            vrun = vtu.runvvtest( '-vv -R -k testA', batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+            assert getDEPDIRS( vrun ) == ['testB']
+
+            vrun = vtu.runvvtest( '-vv -R -k testA', chdir=tdir, batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+            assert getDEPDIRS( vrun ) == ['testB']
+
+            # if testC is run at least once, it should show up in DEPDIRS
+
+            vrun = vtu.runvvtest( '-vv -k testC', batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+
+            vrun = vtu.runvvtest( '-vv -R -k testA/testB', batch=batch )
+            vrun.assertCounts( total=3, npass=2, skip=1 )
+            assert getDEPDIRS( vrun ) == ['testB','testC']
+
+            vrun = vtu.runvvtest( '-vv -R -k testA', chdir=tdir, batch=batch )
+            vrun.assertCounts( total=3, npass=1, skip=2 )
+            assert getDEPDIRS( vrun ) == ['testB','testC']
 
     def test_that_a_test_with_unmatched_dependencies_is_not_run(self):
         ""

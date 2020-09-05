@@ -53,7 +53,7 @@ class TestCase:
         ""
         append = True
         for i,tdep in enumerate( self.deps ):
-            if tdep.hasSameTestID( testdep ):
+            if tdep.getTestID() == testdep.getTestID():
                 # if same test ID, prefer the one with a TestExec
                 if not self.deps[i].hasTestExec():
                     self.deps[i] = testdep
@@ -63,8 +63,9 @@ class TestCase:
         if append:
             self.deps.append( testdep )
 
-            pat,depdir = testdep.getMatchDirectory()
-            self.addDepDirectory( pat, depdir )
+            if testdep.ranOrCouldRun():
+                pat,depdir = testdep.getMatchDirectory()
+                self.addDepDirectory( pat, depdir )
 
     def numDependencies(self):
         ""
