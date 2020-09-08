@@ -315,12 +315,14 @@ def _remotepython_add_module( modname, srclines ):
 def _remotepython_add_eval_linecache( lines ):
     ""
     global _remotepython_eval_count
-    if lines.startswith( '_remotepython_' ):
+    linelist = lines.splitlines()
+    if len(linelist) == 1 and lines.startswith( '_remotepython_' ):
+        # these one liners get a generic filename to avoid line cache growth
         filename = '<remotepython>'
     else:
         _remotepython_eval_count += 1
         filename = "<remotecode"+str(_remotepython_eval_count)+">"
-    _remotepython_linecache[ filename ] = lines.splitlines()
+    _remotepython_linecache[ filename ] = linelist
     return filename
 
 def _remotepython_eval_lines( lines ):

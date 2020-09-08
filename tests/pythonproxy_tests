@@ -62,7 +62,7 @@ class unit_tests( unittest.TestCase ):
             '    def __init__(self, *args):',
             '        pass',
             '    def func(self, **kwargs):',
-            '        pass' ] )
+            '        return 42' ] )
 
         sys.path.append( os.getcwd() )
         try:
@@ -74,6 +74,19 @@ class unit_tests( unittest.TestCase ):
                 '    print ( sys.path )' ] )
         finally:
             sys.path.pop()
+
+    def test_sending_bootstrap_code(self):
+        ""
+        remote = RemotePython( logfile='logfile')
+        remote.start()
+
+        err = pythonproxy.send_bootstrap_code( remote )
+        assert not err
+
+        # check that the remote is still alive
+        remote.execute(
+            'print ( "MARK="+str(_remotepython_try_except_code_lines) )' )
+        assert get_output_line( remote ).startswith( 'MARK=' )
 
     def test_sending_internal_utility_functions(self):
         ""
@@ -87,13 +100,14 @@ class unit_tests( unittest.TestCase ):
         remote = RemotePython( logfile='logfile')
         remote.start()
 
-        err = pythonproxy._send_internal_utilities( remote, 10 )
+        err = pythonproxy.send_internal_utilities( remote, 10 )
         assert not err
-        remote.execute( 'print ( "OBJS="+str(_pythonproxy_object_store) )'
-                                       '+str(_pythonproxy_construct_object)'
-                                       '+str(_pythonproxy_import_module)'
-                                       '+str(_pythonproxy_capture_traceback)' )
+
+        remote.execute( 'print ( "OBJS="+str(_remotepython_function_call)'
+                                       '+str(_remotepython_import_module)'
+                                       '+str(SerializationError) )' )
         assert get_output_line( remote ).startswith( 'OBJS=' )
+        remote.close()
 
         # get a function then remove the source so it won't be available
         sys.path.insert( 0, abspath( 'subdir' ) )
@@ -104,45 +118,29 @@ class unit_tests( unittest.TestCase ):
         shutil.rmtree( 'subdir' )
         time.sleep(1)
 
-        err = pythonproxy._send_internal_utilities( remote, 10, [afunc] )
+        remote = RemotePython( logfile='logfile')
+        remote.start()
+        err = pythonproxy.send_internal_utilities( remote, 10, [afunc] )
         assert 'Failed to get source code' in err and 'afunc' in err
-
-        # a failure causes the connection to be closed
-        time.sleep(1)
-        assert not remote.isAlive()
         remote.close()
 
         remote = RemotePython( logfile='logfile')
         remote.start()
-        err = pythonproxy._send_internal_utilities( remote, 10, ['foo=bar86'] )
-        assert 'connection lost' in err
+        err = pythonproxy.send_internal_utilities( remote, 10, [FakeDerivedClass] )
+        # print3( err )
+        assert 'RemoteExceptionError' in err
+        assert 'remote: NameError:' in err
 
         remote.close()
-        log = util.readfile( 'logfile' )
-        assert 'Traceback' in log and re.search( 'bar86.*not defined', log )
-
-    def test_composing_the_remote_command(self):
-        ""
-        saveargs = []
-        savekwargs = {}
-
-        def foo( *args, **kwargs ):
-            saveargs.extend( args )
-            savekwargs.update( kwargs )
-
-        cmd = pythonproxy.compose_remote_command( 'foo',
-                                                  ['a',1],
-                                                  {'bar':2, 'baz':3} )
-        print3( cmd )
-        eval( compile( cmd, '<unittest>', 'exec' ) )
-
-        assert saveargs == ['a',1]
-        assert savekwargs == {'bar':2, 'baz':3}
 
     def test_waiting_for_remote_return_value(self):
         ""
         remote = RemotePython( logfile='logfile')
         remote.start()
+
+        err = pythonproxy.send_internal_utilities( remote, 10 )
+        # print3( err )
+        assert not err
 
         remote.execute( dedent( '''
             import time
@@ -151,22 +149,15 @@ class unit_tests( unittest.TestCase ):
                 return "foobar"
             ''' ) )
 
-        cmd = pythonproxy.compose_remote_command( 'myfunc', [1], {} )
-        remote.execute( cmd )
+        val = pythonproxy.remote_function_call( remote, 5, 'myfunc', [1], {} )
+        assert val == 'foobar'
 
-        val = pythonproxy.wait_for_return_value( remote, 5 )
-        assert eval(val) == 'foobar'
-
-        cmd = pythonproxy.compose_remote_command( 'myfunc', [4], {} )
-        remote.execute( cmd )
-        val = pythonproxy.wait_for_return_value( remote, 5 )
-        assert eval(val) == 'foobar'
+        val = pythonproxy.remote_function_call( remote, 5, 'myfunc', [4], {} )
+        assert val == 'foobar'
 
         t0 = time.time()
-        cmd = pythonproxy.compose_remote_command( 'myfunc', [10], {} )
-        remote.execute( cmd )
         self.assertRaises( pythonproxy.RemoteTimeoutError,
-                           pythonproxy.wait_for_return_value, remote, 3 )
+            pythonproxy.remote_function_call, remote, 3, 'myfunc', [10], {} )
         t1 = time.time()
         assert t1-t0 > 2.5 and t1-t0 < 5
 
@@ -175,7 +166,7 @@ class unit_tests( unittest.TestCase ):
         remote = RemotePython( logfile='logfile')
         remote.start()
 
-        err = pythonproxy._send_internal_utilities( remote, 10 )
+        err = pythonproxy.send_internal_utilities( remote, 10 )
         assert not err
 
         remote.execute( dedent( '''
@@ -208,7 +199,7 @@ class unit_tests( unittest.TestCase ):
         remote = RemotePython( logfile='logfile')
         remote.start()
 
-        err = pythonproxy._send_internal_utilities( remote, 10 )
+        err = pythonproxy.send_internal_utilities( remote, 10 )
         assert not err
 
         remote.execute( dedent( '''
@@ -256,6 +247,7 @@ class startup_RemotePythonProxy( unittest.TestCase ):
         else:
             raise Exception( 'expected a FailedConnectionError exception' )
 
+        # print3( exc )
         assert 'I am not long to this world' in exc
         assert 'startup error' in exc
         assert 'Traceback' in exc and 'fake crash' in exc
@@ -272,71 +264,277 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
 
     def tearDown(self):
         ""
-        self.remote.close()
+        self.remote.shutdown()
 
-    def test_call_a_function_using_the_call_method(self):
+    def test_send_source_code_to_remote(self):
         ""
-        self.remote.execute( pythonproxy.get_source_code( somefunc ) )
-        rtn = self.remote.call( 'somefunc', ['abc'], key=3 )
+        self.remote.send( dedent( """\
+            def myfunc():
+                return 42
+            """ ) )
+        self.remote.send( 'myval = myfunc()',
+                          dedent( """\
+            with open( '"""+abspath('out.txt')+"""', 'wt' ) as fp:
+                fp.write( repr(myval) + os.linesep )
+            """ ) )
+        time.sleep(1)
 
-        val = ''.join( rtn.split() )
-        assert val == "arg0=['abc'],key=3" or val == 'arg0=["abc"],key=3'
+        assert util.readfile('out.txt').strip() == '42'
+
+    def test_errors_in_source_code_sent_to_remote(self):
+        ""
+        try:
+            self.remote.send( dedent( """\
+                import os
+                myvar =
+                dir(os)
+                """ ) )
+        except pythonproxy.RemoteExceptionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an error' )
+        # print3( exc )
+        assert 'caught remote exception' in exc
+        assert 'remote: SyntaxError:' in exc
+
+        try:
+            self.remote.send( dedent( """\
+                import os
+                myvar = some_non_existent_variable_4893473
+                dir(os)
+                """ ) )
+        except pythonproxy.RemoteExceptionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an error' )
+        # print3( exc )
+        assert 'caught remote exception' in exc
+        assert 'remote: NameError:' in exc
+
+    def test_call_a_remote_function(self):
+        ""
+        self.remote.send( dedent( """\
+            def myfunc1( arg="" ):
+                return "hello"+arg
+            """ ) )
+        assert self.remote.myfunc1() == 'hello'
+        assert self.remote.myfunc1( 'world' ) == 'helloworld'
+
+        self.remote.send( dedent( """\
+            def myfunc2( **kwargs ):
+                return "hello"+kwargs["foo"]
+            """ ) )
+        assert self.remote.myfunc2( foo='bar' ) == "hellobar"
+
+        # arguments must be reconstructable with eval(repr(arg))
+
+        # self.remote.myfunc( os )
+        self.assertRaises( pythonproxy.RemoteExceptionError,
+                           self.remote.myfunc1, os )
+
+        # self.remote.myfunc( foo=os )
+        self.assertRaises( pythonproxy.RemoteExceptionError,
+                           self.remote.myfunc2, foo=os )
+
+        # the return value must also be reconstructable with eval(repr(rtn))
+
+        self.remote.send( dedent( """\
+            def myfunc3():
+                return os
+            """ ) )
+        # self.remote.myfunc3()
+        self.assertRaises( pythonproxy.SerializationError, self.remote.myfunc3 )
+
+    def test_construct_and_use_a_remote_object(self):
+        ""
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        obj = self.remote.construct( 'open', abspath('foo.txt'), "wt" )
+        obj.write( 'hello world\n' )
+        obj.close()
+        assert util.readfile( 'foo.txt' ).strip() == 'hello world'
+
+        cwd = os.getcwd()
+        self.remote.send( 'os.chdir('+repr(abspath('subdir'))+')' )
+        assert os.path.samefile( cwd, os.getcwd() )
+
+        self.remote.assign( 'fp', 'open', 'bar.txt', "wt" )
+        self.remote.fp.write( 'hello mars\n' )
+        self.remote.fp.close()
+        assert util.readfile( 'subdir/bar.txt' ).strip() == 'hello mars'
 
     def test_sending_a_function_object(self):
         ""
         self.remote.send( somefunc )
-        rtn = self.remote.call( 'somefunc', 'foo' )
+        assert self.remote.somefunc( 'foo' ) == 'arg0=foo'
+        assert self.remote.somefunc( 'foo', key=42 ) == 'arg0=foo,key=42'
 
-        val = ''.join( rtn.split() )
-        assert val == "arg0=foo"
-
-    def test_construct_a_remote_object_and_manipulate_locally(self):
+    def test_sending_a_function_whose_source_is_not_available(self):
         ""
-        obj = self.remote.construct( 'open', abspath('foo.txt'), "wt" )
-        obj.write( 'hello world\n' )
-        obj.close()
-
-        assert util.readfile( 'foo.txt' ).strip() == 'hello world'
-
-    def test_import_a_remote_module_and_manipulate_locally(self):
-        ""
-        curdir = os.getcwd()
-        util.writefile( 'adir/foo.txt', "hello world\n" )
+        util.writefile( 'subdir/amod.py', """
+            import os, sys
+            def afunc():
+                return 'avalue'
+            """ )
         time.sleep(1)
 
-        obj = self.remote.module( 'os' )
-        obj.chdir( abspath( 'adir' ) )
-        fL = obj.listdir( '.' )
-        rwd = obj.getcwd()
-        pwd = os.getcwd()
-
-        print3( 'fL', fL, 'rwd', rwd )
-        assert rwd == abspath( 'adir' ) and pwd == curdir
-        assert fL == ['foo.txt']
-
-    def test_import_a_nested_module(self):
-        ""
-        curdir = os.getcwd()
-        util.writefile( 'adir/foo.txt', "hello world\n" )
+        # get a function then remove the source so it won't be available
+        sys.path.insert( 0, abspath( 'subdir' ) )
+        try:
+            from amod import afunc
+        finally:
+            sys.path.pop(0)
+        shutil.rmtree( 'subdir' )
         time.sleep(1)
 
-        obj = self.remote.module( 'os.path' )
-        self.remote.execute( 'import os',
-                             'os.chdir( "'+abspath('adir')+'" )' )
-        val1 = obj.exists( 'foo.txt' )
-        val2 = obj.isfile( 'foo.txt' )
-        val3 = obj.isdir( 'foo.txt' )
-        rwd = os.getcwd()
+        # self.remote.send( afunc )
+        self.assertRaises( pythonproxy.PythonProxyError, self.remote.send, afunc )
 
-        assert val1 == True
-        assert val2 == True
-        assert val3 == False
-        assert rwd == curdir
-
-    def could_probably_make_this_work(self):
+    def test_sending_a_class_type(self):
         ""
-        obj = self.remote.module( 'os' )
-        rtn = obj.path.exists( '/some/file/path' )
+        self.remote.send( SomeClass )
+
+        inst = self.remote.construct( 'SomeClass', 'nada' )
+        assert inst.func() == 42
+
+    def test_sending_a_class_type_with_an_error(self):
+        ""
+        try:
+            # the base class is not available on the remote side
+            self.remote.send( FakeDerivedClass )
+        except pythonproxy.RemoteExceptionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an exception' )
+
+        # print3( exc )
+        assert 'caught remote exception' in exc
+        assert 'remote: NameError:' in exc
+        assert 'FakeBaseClass' in exc
+
+    def test_sending_a_module(self):
+        ""
+        util.writefile( 'subdir/modA.py', """
+            def afunc():
+                return 'AFUNC RETURN'
+            """ )
+        time.sleep(1)
+
+        sys.path.insert( 0, abspath('subdir') )
+        try:
+            import modA as mA
+            self.remote.send( mA )
+        finally:
+            sys.path.pop( 0 )
+
+        self.remote.send( dedent( """\
+            def call_afunc():
+                import modA
+                return modA.afunc()
+            """ ) )
+        assert self.remote.call_afunc() == 'AFUNC RETURN'
+
+    def test_sending_a_module_with_an_error(self):
+        ""
+        util.writefile( 'subdir/modA.py', """
+            def afunc():
+                return 'AFUNC RETURN'
+            """ )
+        util.writefile( 'subdir/modB.py', """
+            import modA
+            def bfunc():
+                return modA.afunc()
+            """ )
+        time.sleep(1)
+
+        sys.path.insert( 0, abspath('subdir') )
+        try:
+            import modA as mA
+            import modB as mB
+            try:
+                # module modA is not available on the remote side
+                self.remote.send( mB )
+            except pythonproxy.RemoteExceptionError as e:
+                exc = str(e)
+            else:
+                raise Exception( 'expected an exception' )
+        finally:
+            sys.path.pop( 0 )
+
+        # print3( exc )
+        assert 'caught remote exception' in exc
+        assert 'remote: ImportError' in exc or \
+               'remote: ModuleNotFoundError' in exc
+
+        self.remote.dir()
+
+    def test_for_automatically_added_modules(self):
+        ""
+        util.writefile( 'subdir/file.txt', 'content' )
+        time.sleep(1)
+
+        self.remote.os.chdir( abspath('subdir') )
+        nb = self.remote.os.path.getsize( 'file.txt' )
+        assert nb == os.path.getsize('subdir/file.txt')
+
+        lim = self.remote.sys.getrecursionlimit()
+        assert lim and lim > 0
+
+    def test_importing_module_as_local_object(self):
+        ""
+        cwd = os.getcwd()
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        ros = self.remote.import_module( 'os' )
+        ros.chdir( abspath('subdir') )
+        rcwd = ros.getcwd()
+        assert os.path.samefile( rcwd, abspath('subdir') )
+        assert os.path.samefile( os.getcwd(), cwd )
+
+    def test_importing_module_adds_to_proxy_namespace(self):
+        ""
+        cwd = os.getcwd()
+        os.mkdir( 'subdir' )
+        time.sleep(1)
+
+        self.remote.import_module( 'os' )
+        self.remote.os.chdir( abspath('subdir') )
+        rcwd = self.remote.os.getcwd()
+        assert os.path.samefile( rcwd, abspath('subdir') )
+        assert os.path.samefile( os.getcwd(), cwd )
+
+    def test_importing_a_nested_module_name(self):
+        ""
+        util.writefile( 'subdir/file.txt', 'content' )
+        time.sleep(1)
+
+        rpath = self.remote.import_module( 'os.path' )
+        self.remote.os.chdir( abspath('subdir') )
+        assert self.remote.os.path.isfile( 'file.txt' )
+        nb = rpath.getsize( 'file.txt' )
+        assert nb == os.path.getsize( 'subdir/file.txt' )
+
+    def test_import_errors(self):
+        ""
+        try:
+            self.remote.import_module( 'no_exist_module_name_3894573' )
+        except pythonproxy.RemoteExceptionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an exception' )
+        assert 'remote: ImportError' in exc or \
+               'remote: ModuleNotFoundError' in exc
+
+        try:
+            self.remote.import_module( 'os.no_exist_submodule_3458' )
+        except pythonproxy.RemoteExceptionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an exception' )
+        assert 'remote: ImportError' in exc or \
+               'remote: ModuleNotFoundError' in exc
 
     def test_sending_modules_and_importing_them(self):
         ""
@@ -356,9 +554,8 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
             import modA as mA
             import modB as mB
             print3( 'names', mA.__name__, mB.__name__ )
-            self.remote.send( mA )
-            self.remote.send( mB )
-            mod = self.remote.module( 'modB' )
+            self.remote.send( mA, mB )
+            mod = self.remote.import_module( 'modB' )
             rtn = mod.bfunc()
         finally:
             sys.path.pop( 0 )
@@ -372,13 +569,13 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
 
         exc = None
         try:
-            self.remote.call( 'sys.exit', 0 )
+            self.remote.sys.exit(0)
         except pythonproxy.FailedConnectionError as e:
             exc = str(e)
 
         if not exc:
             try:
-                pythonproxy.FailedConnectionError( self.remote.call, 'os.getcwd' )
+                self.remote.os.getcwd()
             except pythonproxy.FailedConnectionError as e:
                 exc = str(e)
             else:
@@ -388,13 +585,13 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
 
     def test_calling_the_proxy_after_the_connection_is_closed(self):
         ""
-        cwd = self.remote.call( 'os.getcwd' )
+        cwd = self.remote.os.getcwd()
         assert os.path.samefile( cwd, os.getcwd() )
 
-        self.remote.close()
+        self.remote.shutdown()
 
         try:
-            cwd = self.remote.call( 'os.getcwd' )
+            cwd = self.remote.os.getcwd()
         except pythonproxy.FailedConnectionError as e:
             exc = str(e)
         else:
@@ -402,7 +599,7 @@ class tests_using_RemotePythonProxy_class( unittest.TestCase ):
         assert 'connection is not alive' in exc
 
         try:
-            self.remote.execute( 'print ( "hello" )' )
+            self.remote.send( 'print ( "hello" )' )
         except pythonproxy.FailedConnectionError as e:
             exc = str(e)
         else:
@@ -424,8 +621,8 @@ class using_the_context_manager( unittest.TestCase ):
         with pythonproxy.python_proxy( 'sparky',
                                         pythonexe=rpy,
                                         sshcmd=sshexe) as proxy:
-            proxy.call( 'os.chdir', abspath('adir') )
-            rd = proxy.call( 'os.getcwd' )
+            proxy.os.chdir( abspath('adir') )
+            rd = proxy.os.getcwd()
 
         assert os.path.samefile( rd, 'adir' )
 
@@ -442,7 +639,14 @@ class SomeClass:
     def __init__(self, *args):
         pass
     def func(self, **kwargs):
-        pass
+        return 42
+
+
+class FakeBaseClass:
+    pass
+
+class FakeDerivedClass( FakeBaseClass ):
+    pass
 
 
 def get_output_line( remote, timeout=5 ):

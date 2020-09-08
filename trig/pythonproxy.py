@@ -20,6 +20,9 @@ class RemoteTimeoutError( PythonProxyError ):
 class FailedConnectionError( PythonProxyError ):
     pass
 
+class SerializationError( PythonProxyError ):
+    pass
+
 
 class RemotePythonProxy:
     """
@@ -29,6 +32,26 @@ class RemotePythonProxy:
     To debug an interaction, provide a logfile to the constructor.  All
     messages to and from the remote python will be logged, including print
     statements being written by remote code.
+
+    magic: TODO:
+        - need a way to resolve conflicts between functions of this object
+          versus remote namespace symbols
+            - one way would be to define local methods with "pythonproxy_foobar"
+              to do the actual work
+            - the method "foobar" is also defined on this local object
+            - then the local symbol can forced with "pythonproxy_foobar"
+        - another way: the local symbol always takes precedence
+            - then need a way to say "call the remote symbol"
+        - YUK! I don't like either of these
+            - local method takes precedence
+            - to call a remote method of the same name, use "assign" first
+
+    - could have a timeout applied to the remote process
+        - set an alarm in the remote code at startup
+        - this could used to timeout the total interaction rather than on a
+          per function call basis
+        - may want a different exception raised to make it clear what timed out
+            - like CummulativeTimeoutError
     """
 
     def __init__(self, machine=None,
@@ -39,6 +62,9 @@ class RemotePythonProxy:
         self.timeout = None
         self.remote = RemotePython( machine, pythonexe, sshcmd, logfile )
 
+        self.objid = 0
+        self.objs = {}
+
     def start(self, timeout=30):
         """
         Establishes the connection, or raises FailedConnectionError on failure.
@@ -47,60 +73,27 @@ class RemotePythonProxy:
 
         ok = self.remote.start( timeout )
         if ok:
-            err = _send_internal_utilities( self.remote, timeout )
+            err = self._initialize_builtins( timeout )
 
         if not ok or err:
             msg = ( self.remote.getStartupOutput() + '\n' + err ).rstrip()
             raise FailedConnectionError( 'startup error:\n' + msg + '\n' )
 
-    def setRemoteTimeout(self, timeout):
+    def set_timeout(self, timeout):
         ""
+        # magic: maybe accept timeout values of zero or negative
+        #           - what happens in the algorithm if so?
+        #           - would have to change check to "if timeout == None"
+        #             for turning of the timeout
+        #   - note: could do a one-shot timeout by having this function
+        #           return an small object that remembers the previous timeout
+        #           and dispatches calls to self and afterwards sets the
+        #           timeout back; in this case, rename it to just "timeout()"
+
         if timeout == None or timeout < 0.001:
-            self.timeout = None
+            self.timeout = None  # turn off timeout mechanism
         else:
             self.timeout = timeout
-
-    def execute(self, *lines_of_python_code):
-        """
-        Lines of python code can be sent as strings with newlines and/or
-        as separate arguments.
-        """
-        if not self.remote.isAlive():
-            raise FailedConnectionError( 'connection is not alive' )
-
-        self.remote.execute( *lines_of_python_code )
-
-    def send(self, *objects):
-        """
-        Send the source code for an object to the remote. Function objects
-        and class types are added to the remote namespace. Module objects
-        are made available but must still be imported on the remote side.
-        An example,
-
-            def afunc( arg ):
-                print ( arg )
-            proxy.send( afunc )
-            proxy.call( 'afunc', 42 )
-        """
-        for obj in objects:
-            pycode = get_source_code(obj)
-            assert pycode != None, 'could not find source code for '+str(obj)
-            if type(obj) == types.ModuleType:
-                self.remote.addModule( obj.__name__, pycode )
-            else:
-                self.execute( pycode )
-
-    def call(self, funcname, *args, **kwargs):
-        ""
-        # magic: add pythonproxy_timeout to kwargs
-        rtn = remote_function_call( self.remote, self.timeout,
-                                    funcname, args, kwargs )
-        return rtn
-
-    # magic:
-    def assign(self, local_name, constructor, *args, **kwargs):
-        ""
-        pass
 
     def construct(self, constructor, *args, **kwargs):
         """
@@ -111,18 +104,71 @@ class RemotePythonProxy:
         of implicit types, such as strings, numbers, lists, and dictionaries
         (anything for which "eval(repr(obj))" reproduces obj).
         """
-        if not self.remote.isAlive():
-            raise FailedConnectionError( 'connection is not alive' )
+        self.objid += 1
+        name = '_pythonproxy_object_'+str(self.objid)
 
-        obj = ObjectProxy( self.remote, self.timeout,
-                           constructor, args, kwargs )
+        remote_function_call( self.remote, self.timeout,
+            '_remotepython_construct_object', (name,constructor,)+args, kwargs )
+
+        return ObjectProxy( self.remote, self.timeout, name )
+
+    # magic: could pass (proxy) objects into remote function calls
+    #           - would have to intercept the argument handling to send
+    #             the remote symbol name as the argument and access it on
+    #             the remote side
+    #           - obj = remote.construct( ... )
+    #             remote.myfunc( obj )
+
+    def assign(self, name, constructor, *args, **kwargs):
+        ""
+        obj = self.construct( constructor, *args, **kwargs )
+        self.objs[ name ] = obj
         return obj
 
-    def module(self, module_name):
+    # magic: is there an easy way to remote print ??
+    #           - and have the output as the return value
+    # magic: is there a way to get objects, such as sys.platform
+
+    def send(self, *code_or_objects):
         """
-        # magic: change name to import_module
-        # magic: add optional 'local_name' argument
-        # magic: allow argument to be a module object
+        Send raw python source code to the remote side, or the source code
+        defining objects. Objects can be functions, class types, and/or
+        modules. Module objects are made available on the remote side but
+        must still be imported. For example,
+
+            def afunc( arg ):
+                return 2*arg
+            proxy.send( afunc )
+            rtn = proxy.afunc( 42 )
+        """
+        for obj in code_or_objects:
+
+            if type(obj) == type(''):
+                pycode = obj
+            else:
+                pycode = get_source_code(obj)
+                if pycode == None:
+                    raise PythonProxyError(
+                                'could not find source code for '+str(obj) )
+
+            if type(obj) == types.ModuleType:
+                remote_code_execution( self.remote, self.timeout,
+                                       '_remotepython_add_module( ' + \
+                                                repr(obj.__name__)+',' + \
+                                                repr(pycode)+' )' )
+            else:
+                remote_code_execution( self.remote, self.timeout, pycode )
+
+    def import_module(self, module_name):
+        """
+        # could add arguments
+        #   - as_name=None : uses this name in the proxy and on the remote
+        #                    (and no module chaining)
+        #   - symbols=[]   : only import these symbols from the module
+        #                    (and no module chaining)
+        # could allow an optional argument giving lines of python code
+        #   - this would allow chunks of code to form remove modules
+        #   - and may help with namespacing (not in the global namespace)
 
         Import a Python module on the remote side and return a proxy object.
         For example,
@@ -133,23 +179,81 @@ class RemotePythonProxy:
 
             remote_os_path = proxy.module( 'os.path' )
             remote_os_path.isfile( 'foobar.txt' )
+
+        Note that sys, os, and os.path are automatically imported.
         """
+        names = []
+        parent = self
+        for name in module_name.strip().split('.'):
+
+            names.append( name )
+            modpath = '.'.join( names )
+
+            obj = self._make_import_object( modpath )
+
+            parent.objs[ name ] = obj
+            parent = obj
+
+        return obj
+
+    def shutdown(self):
+        ""
+        self.remote.close()
+
+    def _initialize_builtins(self, timeout):
+        ""
+        err = send_internal_utilities( self.remote, timeout )
+
+        if err:
+            self.remote.close()
+
+        else:
+            obj1 = ObjectProxy( self.remote, self.timeout, 'os' )
+            obj2 = ObjectProxy( self.remote, self.timeout, 'os.path' )
+            obj3 = ObjectProxy( self.remote, self.timeout, 'sys' )
+
+            self.objs[ 'os' ] = obj1
+            obj1.objs[ 'path' ] = obj2
+            self.objs[ 'sys' ] = obj3
+
+        return err
+
+    def _make_import_object(self, modpath):
+        ""
         if not self.remote.isAlive():
             raise FailedConnectionError( 'connection is not alive' )
 
-        obj = ObjectProxy( self.remote, self.timeout,
-                           '_pythonproxy_import_module', (module_name,), {} )
-        return obj
+        self.objid += 1
+        objname = '_pythonproxy_object_'+str(self.objid)
 
-    def close(self):
+        remote_function_call( self.remote, self.timeout,
+            '_remotepython_import_module', (objname,modpath,), {} )
+
+        return ObjectProxy( self.remote, self.timeout, objname )
+
+    def __getattr__(self, funcname):
+        """
+        This is called when an unknown class attribute is requested.  The
+        implementation here returns a function object that, when invoked,
+        dispatches a call to 'funcname' on the remote side, waits for the
+        remote return value, and returns that value on the local side.
+        """
+        if funcname in self.objs:
+            return self.objs[funcname]
+        return lambda *args, **kwargs: self._call_( funcname, args, kwargs )
+
+    def _call_(self, funcname, args, kwargs):
         ""
-        self.remote.close()
+        return remote_function_call( self.remote, self.timeout,
+                                     funcname, args, kwargs )
 
 
 class python_proxy:
     """
-    with python_proxy( 'sparky' ) as proxy:
-        pass
+    This is a context manager for a RemotePythonProxy object.
+
+        with python_proxy( 'sparky' ) as remote:
+            remote.os.chdir( '/some/path' )
     """
 
     def __init__(self, machname,
@@ -170,90 +274,82 @@ class python_proxy:
 
     def __exit__(self, type, value, traceback):
         ""
-        self.proxy.close()
+        self.proxy.shutdown()
 
 
 class ObjectProxy:
 
-    def __init__(self, pycmds, timeout, constructor, args, kwargs):
+    def __init__(self, remote, timeout, name):
         ""
-        self.remote = pycmds
+        self.remote = remote
         self.timeout = timeout
+        self.name = name
 
-        rtn = remote_function_call( self.remote, self.timeout,
-                '_pythonproxy_construct_object', (constructor,)+args, kwargs )
-
-        self.objid = repr( rtn )
-
-    def setRemoteTimeout(self, timeout):
-        ""
-        if timeout == None or timeout < 0.001:
-            self.timeout = None
-        else:
-            self.timeout = timeout
+        self.objs = {}
 
     def __getattr__(self, funcname):
-        """
-        This is called when an unknown class attribute is requested.  The
-        implementation here returns a function object that, when invoked,
-        dispatches a call to 'funcname' on the remote side, waits for the
-        remote return value, and returns that value on the local side.
-        """
+        ""
+        if funcname in self.objs:
+            return self.objs[funcname]
         return lambda *args, **kwargs: self._call_( funcname, args, kwargs )
 
     def _call_(self, funcname, args, kwargs):
         ""
-        func = '_pythonproxy_object_store['+self.objid+'].' + funcname
-        return remote_function_call( self.remote, self.timeout, func, args, kwargs )
+        return remote_function_call( self.remote, self.timeout,
+                                     self.name+'.'+funcname, args, kwargs )
 
 
-_return_value_marker          = '_pythonproxy_return_value='
-_len_return_value_marker      = len( _return_value_marker )
+_pythonproxy_return_marker    = '_pythonproxy_return='
+_len_return_value_marker      = len( _pythonproxy_return_marker )
 _pythonproxy_exception_marker = '_pythonproxy_exception='
 _len_exception_marker         = len( _pythonproxy_exception_marker )
 
 
-def remote_function_call( remote, timeout, funcname, args, kwargs ):
+def remote_code_execution( remote, timeout, codelines ):
     ""
-    cmd = compose_remote_command( funcname, args, kwargs )
-
     if not remote.isAlive():
         raise FailedConnectionError( 'connection is not alive' )
 
-    remote.execute( '_remotepython_try_except('+repr(cmd)+')' )
-
-    val = wait_for_return_value( remote, timeout )
-
-    return eval( val )
+    cmd = '_remotepython_try_except_code_lines('+repr(codelines)+')'
+    remote.execute( cmd )
+    wait_for_return_value( remote, timeout )
 
 
-def compose_remote_command( funcname, args, kwargs ):
+def remote_function_call( remote, timeout, funcname, args, kwargs ):
     ""
-    sig = []
+    if not remote.isAlive():
+        raise FailedConnectionError( 'connection is not alive' )
 
-    for arg in args:
-        sig.append( repr(arg) )
+    repr_args = [ repr(arg) for arg in args ]
+    repr_kwargs = [ (k,repr(v)) for k,v in kwargs.items() ]
 
-    for k,v in kwargs.items():
-        sig.append( k+'='+repr(v) )
+    cmd = '_remotepython_function_call(' + repr(funcname) + ',' + \
+                                           repr(repr_args) + ',' + \
+                                           repr(repr_kwargs) + ')'
 
-    call = funcname+'('+','.join(sig)+')'
-    cmd = 'print ( "'+_return_value_marker+'"+repr('+call+') )'
+    remote.execute( cmd )
 
-    return cmd
+    repr_rtn = wait_for_return_value( remote, timeout )
+
+    try:
+        rtn = eval( repr_rtn )
+    except Exception:
+        raise SerializationError( 'eval failed for return value: '+repr_rtn )
+
+    return rtn
 
 
 def wait_for_return_value( remote, timeout ):
     ""
     for out in remote_output_iterator( remote, timeout ):
 
-        if out.startswith( _return_value_marker ):
+        if out.startswith( _pythonproxy_return_marker ):
             val = out.strip()[_len_return_value_marker:]
             break
 
         elif out.startswith( _pythonproxy_exception_marker ):
             exc = eval( out.strip()[_len_exception_marker:] )
-            fmtexc = _format_remote_exception( exc )
+            fmtexc = format_remote_exception( exc )
             raise RemoteExceptionError( 'caught remote exception:\n'+fmtexc )
 
     return val
@@ -284,35 +380,12 @@ def remote_output_iterator( remote, timeout ):
             pause = min( pause * 2, 2 )
 
 
-def _pythonproxy_construct_object( constructor_funcname, *args, **kwargs ):
-    """
-    uses the global variable '_pythonproxy_object_store' to map ids to objects
-    """
-    obj = eval( constructor_funcname + '( *args, **kwargs )' )
-    objid = id( obj )
-    _pythonproxy_object_store[ objid ] = obj
-    return objid
-
-
-# this function is specially named .. it starts with "_remotepython_"
-# the remotepython.py coding will not (uniquely) line cache statements
-# that start with that string
-# we do this for try/except because it will be called many times and we
-# don't want to needlessly accumulate the line cache
-def _remotepython_try_except( statement ):
+def format_remote_exception( tbstring ):
     ""
-    try:
-        eval( compile( statement, "<pythonproxy>", "exec" ), globals() )
-    except Exception:
-        tb = _pythonproxy_capture_traceback( sys.exc_info() )
-        print ( _pythonproxy_exception_marker+repr(tb) )
-
-
-def _pythonproxy_import_module( module_name ):
-    ""
-    eval( compile( 'import '+module_name, "<rpycmdr>", "exec" ) )
-    obj = eval( module_name )
-    return obj
+    fmt = ''
+    for line in tbstring.splitlines():
+        fmt += 'remote: '+line+'\n'
+    return fmt
 
 
 def _pythonproxy_capture_traceback( excinfo ):
@@ -326,55 +399,117 @@ def _pythonproxy_capture_traceback( excinfo ):
     return tb
 
 
-_UTILITIES_LIST = [
-    'import sys',
-    'sys.dont_write_bytecode = True',
-    'sys.excepthook = sys.__excepthook__',
-    'import os',
-    '_pythonproxy_object_store = {}',
-    '_pythonproxy_exception_marker = '+repr(_pythonproxy_exception_marker),
-    _pythonproxy_construct_object,
-    _remotepython_try_except,
-    _pythonproxy_import_module,
-    _pythonproxy_capture_traceback,
-]
+def _remotepython_try_except_code_lines( codelines ):
+    ""
+    try:
+        filename = _remotepython_add_eval_linecache( codelines )
+        eval( compile( codelines, filename, "exec" ), globals() )
+        print ( _pythonproxy_return_marker+repr(None) )
 
-def _send_internal_utilities( remote, timeout, utils=_UTILITIES_LIST ):
+    except Exception:
+        tb = _pythonproxy_capture_traceback( sys.exc_info() )
+        print ( _pythonproxy_exception_marker+repr(tb) )
+
+
+def _remotepython_function_call( funcname, repr_args, repr_kwargs ):
+    ""
+    try:
+        args = [ _pythonproxy_eval_argument(rep) for rep in repr_args ]
+
+        kwargs = {}
+        for k,repr_val in repr_kwargs:
+            kwargs[k] = _pythonproxy_eval_argument( repr_val )
+
+        rtn = eval( funcname+'(*args,**kwargs)' )
+        print ( _pythonproxy_return_marker+repr(rtn) )
+
+    except Exception:
+        tb = _pythonproxy_capture_traceback( sys.exc_info() )
+        print ( _pythonproxy_exception_marker+repr(tb) )
+
+
+def _pythonproxy_eval_argument( repr_arg ):
+    ""
+    try:
+        arg = eval( repr_arg )
+    except Exception:
+        raise SerializationError( 'eval failed for arg: '+repr_arg )
+
+    return arg
+
+
+def _remotepython_construct_object( varname, constructor, *args, **kwargs ):
+    ""
+    obj = eval( constructor + '( *args, **kwargs )' )
+    globals()[ varname ] = obj
+
+
+def _remotepython_import_module( varname, module_name ):
+    ""
+    eval( compile( 'import '+module_name, "<rpycmdr>", "exec" ) )
+    globals()[ varname ] = eval( module_name )
+
+
+_boot_code = """\
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+_pythonproxy_return_marker="""+repr(_pythonproxy_return_marker)+"""
+_pythonproxy_exception_marker="""+repr(_pythonproxy_exception_marker)+"""
+"""
+
+def send_bootstrap_code( remote ):
     ""
     err = ''
 
     try:
-        for util in utils:
-            if type(util) == type(''):
-                pycode = util
-            else:
-                pycode = get_source_code( util )
-                if pycode == None:
-                    err = 'Failed to get source code for '+str(util)
-                    break
-            remote.execute( pycode )
-
-        if not err:
-            remote.execute( 'print ( "_pythonproxy_mark_" )' )
-            for out in remote_output_iterator( remote, timeout ):
-                if '_pythonproxy_mark_' in out:
-                    break
+        remote.execute( _boot_code )
+        send_a_function( remote, _pythonproxy_capture_traceback )
+        send_a_function( remote, _remotepython_try_except_code_lines )
 
     except Exception:
         err = _pythonproxy_capture_traceback( sys.exc_info() )
 
-    if err:
-        remote.close()
+    return err
+
+
+_UTILITIES_LIST = [
+    _remotepython_function_call,
+    _pythonproxy_eval_argument,
+    _remotepython_construct_object,
+    _remotepython_import_module,
+    PythonProxyError,
+    SerializationError,
+]
+
+def send_internal_utilities( remote, timeout, utils=_UTILITIES_LIST ):
+    ""
+    err = send_bootstrap_code( remote )
+
+    if not err:
+        try:
+            for obj in utils:
+
+                pycode = get_source_code( obj )
+                if pycode == None:
+                    err = 'Failed to get source code for '+str(obj)
+                    break
+
+                remote_code_execution( remote, timeout, pycode )
+
+        except Exception:
+            err = _pythonproxy_capture_traceback( sys.exc_info() )
 
     return err
 
 
-def _format_remote_exception( tbstring ):
+def send_a_function( remote, func ):
     ""
-    fmt = ''
-    for line in tbstring.splitlines():
-        fmt += 'remote: '+line+'\n'
-    return fmt
+    pycode = get_source_code( func )
+    if pycode == None:
+        raise Exception( 'Failed to get source code for '+str(func) )
+    remote.execute( pycode )
 
 
 _cwd_at_import = os.getcwd()

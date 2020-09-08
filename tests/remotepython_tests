@@ -272,6 +272,48 @@ class bootstrap_functions( trigutil.trigTestCase ):
         x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
         # print3( out )
 
+    def test_avoiding_line_cache_growth(self):
+        """
+        Each chunk of code gets a unique "function name" and the code lines are
+        inserted into a line cache dictionary. This allows the traceback module
+        to show the code lines in tracebacks. However, this means that simply
+        calling a function over and over again grows the line cache dictionary.
+        To alleviate this, the _remotepython_add_eval_linecache() function will
+        create a generic (non-unique) "function name" if the code chunk consists
+        of a single line that starts with "_remotepython_".
+        """
+        util.writefile( 'scr.py',
+            remotepython.bootstrap_preamble + \
+            dedent( """
+                def _remotepython_first_function():
+                    pass
+                def _remotepython_second_function():
+                    pass
+                def _another_example_function():
+                    pass
+
+                fn1 = _remotepython_add_eval_linecache( "import os" )
+                fn2 = _remotepython_add_eval_linecache( "import os" )
+                fn3 = _remotepython_add_eval_linecache( "_remotepython_first_function()" )
+                fn4 = _remotepython_add_eval_linecache( "_remotepython_second_function()" )
+                fn5 = _remotepython_add_eval_linecache( "_another_example_function()" )
+
+                lines = '''_remotepython_first_function()
+                import os
+                '''
+                fn6 = _remotepython_add_eval_linecache( lines )
+
+                assert fn1 != fn2
+                assert fn1 != fn3
+                assert fn3 == fn4
+                assert fn4 != fn5 and fn1 != fn5
+                assert fn1 != fn6 and fn3 != fn6 and fn5 != fn6
+                """ ) )
+        time.sleep(1)
+
+        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        # print3( out )
+
     def test_add_a_module_from_a_string(self):
         ""
         mymod = dedent( """
@@ -716,7 +758,7 @@ class integration_tests( unittest.TestCase ):
             rem.close()
 
         assert not out
-        print3( err )
+        # print3( err )
         accum = []
         for line in err.splitlines():
             line = line.strip()
