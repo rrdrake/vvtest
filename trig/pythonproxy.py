@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
 
 import sys, os
 import inspect
@@ -32,26 +37,6 @@ class RemotePythonProxy:
     To debug an interaction, provide a logfile to the constructor.  All
     messages to and from the remote python will be logged, including print
     statements being written by remote code.
-
-    magic: TODO:
-        - need a way to resolve conflicts between functions of this object
-          versus remote namespace symbols
-            - one way would be to define local methods with "pythonproxy_foobar"
-              to do the actual work
-            - the method "foobar" is also defined on this local object
-            - then the local symbol can forced with "pythonproxy_foobar"
-        - another way: the local symbol always takes precedence
-            - then need a way to say "call the remote symbol"
-        - YUK! I don't like either of these
-            - local method takes precedence
-            - to call a remote method of the same name, use "assign" first
-
-    - could have a timeout applied to the remote process
-        - set an alarm in the remote code at startup
-        - this could used to timeout the total interaction rather than on a
-          per function call basis
-        - may want a different exception raised to make it clear what timed out
-            - like CummulativeTimeoutError
     """
 
     def __init__(self, machine=None,
@@ -81,53 +66,10 @@ class RemotePythonProxy:
 
     def set_timeout(self, timeout):
         ""
-        # magic: maybe accept timeout values of zero or negative
-        #           - what happens in the algorithm if so?
-        #           - would have to change check to "if timeout == None"
-        #             for turning of the timeout
-        #   - note: could do a one-shot timeout by having this function
-        #           return an small object that remembers the previous timeout
-        #           and dispatches calls to self and afterwards sets the
-        #           timeout back; in this case, rename it to just "timeout()"
-
         if timeout == None or timeout < 0.001:
             self.timeout = None  # turn off timeout mechanism
         else:
             self.timeout = timeout
-
-    def construct(self, constructor, *args, **kwargs):
-        """
-        # magic: allow 'constructor' to be a function or class type
-
-        Create an object on the remote side and return a proxy object. These
-        proxy objects are constrained to function calls only with arguments
-        of implicit types, such as strings, numbers, lists, and dictionaries
-        (anything for which "eval(repr(obj))" reproduces obj).
-        """
-        self.objid += 1
-        name = '_pythonproxy_object_'+str(self.objid)
-
-        remote_function_call( self.remote, self.timeout,
-            '_remotepython_construct_object', (name,constructor,)+args, kwargs )
-
-        return ObjectProxy( self.remote, self.timeout, name )
-
-    # magic: could pass (proxy) objects into remote function calls
-    #           - would have to intercept the argument handling to send
-    #             the remote symbol name as the argument and access it on
-    #             the remote side
-    #           - obj = remote.construct( ... )
-    #             remote.myfunc( obj )
-
-    def assign(self, name, constructor, *args, **kwargs):
-        ""
-        obj = self.construct( constructor, *args, **kwargs )
-        self.objs[ name ] = obj
-        return obj
-
-    # magic: is there an easy way to remote print ??
-    #           - and have the output as the return value
-    # magic: is there a way to get objects, such as sys.platform
 
     def send(self, *code_or_objects):
         """
@@ -142,34 +84,32 @@ class RemotePythonProxy:
             rtn = proxy.afunc( 42 )
         """
         for obj in code_or_objects:
+            pycode = get_code_for_object_type( obj )
+            send_object_code( self.remote, self.timeout, obj, pycode )
 
-            if type(obj) == type(''):
-                pycode = obj
-            else:
-                pycode = get_source_code(obj)
-                if pycode == None:
-                    raise PythonProxyError(
-                                'could not find source code for '+str(obj) )
+    def construct(self, constructor, *args, **kwargs):
+        """
+        Create an object on the remote side and return a proxy object. These
+        proxy objects are constrained to function calls only with arguments
+        of implicit types, such as strings, numbers, lists, and dictionaries
+        (anything for which "eval(repr(obj))" reproduces obj).
+        """
+        self.objid += 1
+        name = '_pythonproxy_object_'+str(self.objid)
 
-            if type(obj) == types.ModuleType:
-                remote_code_execution( self.remote, self.timeout,
-                                       '_remotepython_add_module( ' + \
-                                                repr(obj.__name__)+',' + \
-                                                repr(pycode)+' )' )
-            else:
-                remote_code_execution( self.remote, self.timeout, pycode )
+        remote_function_call( self.remote, self.timeout,
+            '_remotepython_construct_object', (name,constructor,)+args, kwargs )
+
+        return ObjectProxy( self.remote, self.timeout, name )
+
+    def assign(self, name, constructor, *args, **kwargs):
+        ""
+        obj = self.construct( constructor, *args, **kwargs )
+        self.objs[ name ] = obj
+        return obj
 
     def import_module(self, module_name):
         """
-        # could add arguments
-        #   - as_name=None : uses this name in the proxy and on the remote
-        #                    (and no module chaining)
-        #   - symbols=[]   : only import these symbols from the module
-        #                    (and no module chaining)
-        # could allow an optional argument giving lines of python code
-        #   - this would allow chunks of code to form remove modules
-        #   - and may help with namespacing (not in the global namespace)
-
         Import a Python module on the remote side and return a proxy object.
         For example,
 
@@ -199,6 +139,8 @@ class RemotePythonProxy:
     def shutdown(self):
         ""
         self.remote.close()
+
+    ###################################################################
 
     def _initialize_builtins(self, timeout):
         ""
@@ -380,6 +322,15 @@ def remote_output_iterator( remote, timeout ):
             pause = min( pause * 2, 2 )
 
 
+def send_object_code( remote, timeout, obj, pycode ):
+    ""
+    if type(obj) == types.ModuleType:
+        cmd = '_remotepython_add_module('+repr(obj.__name__)+','+repr(pycode)+')'
+        remote_code_execution( remote, timeout, cmd )
+    else:
+        remote_code_execution( remote, timeout, pycode )
+
+
 def format_remote_exception( tbstring ):
     ""
     fmt = ''
@@ -510,6 +461,20 @@ def send_a_function( remote, func ):
     if pycode == None:
         raise Exception( 'Failed to get source code for '+str(func) )
     remote.execute( pycode )
+
+
+def get_code_for_object_type( obj ):
+    ""
+    if type(obj) == type(''):
+        pycode = obj
+
+    else:
+        pycode = get_source_code(obj)
+        if pycode == None:
+            raise PythonProxyError(
+                        'could not find source code for '+str(obj) )
+
+    return pycode
 
 
 _cwd_at_import = os.getcwd()
