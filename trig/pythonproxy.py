@@ -29,7 +29,7 @@ class SerializationError( PythonProxyError ):
     pass
 
 
-class RemotePythonProxy:
+class RemotePythonProxy( object ):
     """
     Uses the remotepython.RemotePython class to send python commands to a
     Python interpreter on a remote machine and return their output.
@@ -50,15 +50,15 @@ class RemotePythonProxy:
         self.objid = 0
         self.objs = {}
 
-    def start(self, timeout=30):
+    def start(self, startup_timeout=30):
         """
         Establishes the connection, or raises FailedConnectionError on failure.
         """
         err = ''
 
-        ok = self.remote.start( timeout )
+        ok = self.remote.start( startup_timeout )
         if ok:
-            err = self._initialize_builtins( timeout )
+            err = self._initialize_builtins( startup_timeout )
 
         if not ok or err:
             msg = ( self.remote.getStartupOutput() + '\n' + err ).rstrip()

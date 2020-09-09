@@ -157,7 +157,7 @@ def copy_files( files, to_dir,
     try:
         # check destination directory
         if wm == None: wdL = check_dir( wd )
-        else:          wdL = rmt.call( 'check_dir', wd )
+        else:          wdL = rmt.check_dir( wd )
         if not wdL[0]:
             raise Exception( "destination directory does not exist: "+to_dir )
         if not wdL[1]:
@@ -169,7 +169,7 @@ def copy_files( files, to_dir,
 
         # list source files
         if rm == None: rL,nL = glob_paths( fL )
-        else:          rL,nL = rmt.call( 'glob_paths', fL )
+        else:          rL,nL = rmt.glob_paths( fL )
         if len(nL) > 0:
             p = nL[0]
             if rm != None: p = rm+':'+p
@@ -202,7 +202,7 @@ def copy_files( files, to_dir,
     finally:
         if rmt != None:
             if timeout: rmt.setRemoteTimeout(timeout)
-            rmt.close()
+            rmt.shutdown()
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )
@@ -226,21 +226,23 @@ def create_remote_proxy( mach, sshexe, timeout, echo ):
         print3( 'Connecting to "'+mach+'"' )
     rmt.start()
 
-    rmt.execute( 'import glob',
-                 'import shutil',
-                 'import time' )
-    rmt.send( perms,
+    rmt.send( 'import glob',
+              'import shutil',
+              'import time',
+              perms,
               check_dir,
               glob_paths,
               follow_link,
               make_temp_dir,
               swap_paths,
               apply_permissions,
-              print3 )
-    rmt.execute( 'import perms' )
+              print3,
+              'import perms' )
+
+    rmt.import_module( 'shutil' )
 
     if timeout:
-        rmt.setRemoteTimeout(timeout)
+        rmt.set_timeout(timeout)
 
     return rmt
 
@@ -457,7 +459,7 @@ def local_to_remote_copy( mach, rmtpy, readL, destdir,
         dD[dirn] = dD.get(dirn,[]) + [basn]
 
     # create remote temporary directory
-    tmpd = rmtpy.call( 'make_temp_dir', destdir, time.time() )
+    tmpd = rmtpy.make_temp_dir( destdir, time.time() )
 
     for dirn,bfL in dD.items():
         # use tar sending output through a pipe to ssh on the remote machine
@@ -472,12 +474,12 @@ def local_to_remote_copy( mach, rmtpy, readL, destdir,
         assert x == 0, "Command failed: "+str(cmd)
 
     # apply permissions for the files in the remote temporary directory
-    rmtpy.call( 'apply_permissions', tmpd, tmpL, fperms, dperms, group )
+    rmtpy.apply_permissions( tmpd, tmpL, fperms, dperms, group )
 
-    rmtpy.call( 'swap_paths', readL, tmpd, destdir )
+    rmtpy.swap_paths(readL, tmpd, destdir )
 
     print3( 'rm -r '+mach+':'+tmpd )
-    rmtpy.call( 'shutil.rmtree', tmpd )
+    rmtpy.shutil.rmtree( tmpd )
 
 
 def print3( *args ):

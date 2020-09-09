@@ -491,20 +491,20 @@ class Job:
                 raise Exception( "Could not connect to "+mach )
 
             try:
-                rmt.setRemoteTimeout(30)
-                inf = rmt.call( 'get_machine_info' )
+                rmt.set_timeout(30)
+                inf = rmt.get_machine_info()
                 tprint( 'Remote info:', inf )
 
-                rusr = rmt.call( 'os.getuid' )
+                rusr = rmt.os.getuid()
 
-                rpid = rmt.call( 'background_command', pycmd, remotelogf,
-                                                       chdir=chd,
-                                                       timeout=timeout )
+                rpid = rmt.background_command( pycmd, remotelogf,
+                                               chdir=chd,
+                                               timeout=timeout )
 
                 self._monitor( rmt, rusr, rpid, timeout )
 
             finally:
-                rmt.close()
+                rmt.shutdown()
 
     def _connect(self, rmtpy, limit=10):
         """
@@ -520,9 +520,9 @@ class Job:
                 time.sleep( 2**i )
             rtn = None
             try:
-                rmtpy.setRemoteTimeout( 30 )
+                rmtpy.set_timeout( 30 )
                 rmtpy.start()
-                rmtpy.execute( remote_side_code )
+                rmtpy.send( remote_side_code )
             except:
                 # raise  # uncomment this when debugging connections
                 rtn = capture_traceback( sys.exc_info() )
@@ -563,9 +563,8 @@ class Job:
                 if not sharedlog:
                     self.updateFile( rmtpy, logf, logn )
 
-                rmtpy.setRemoteTimeout(30)
-                s = rmtpy.call( 'processes', pid=rpid, user=rusr,
-                                             fields='etime' )
+                rmtpy.set_timeout(30)
+                s = rmtpy.processes( pid=rpid, user=rusr, fields='etime' )
                 elapsed = s.strip()
 
                 # TODO: add a check that the elapsed time agrees
@@ -616,11 +615,11 @@ class Job:
         if os.path.exists( logname ):
             lcl_sz = os.path.getsize( logname )
 
-        rmtpy.setRemoteTimeout(30)
-        rmt_sz = rmtpy.call( 'file_size', logfile )
+        rmtpy.set_timeout(30)
+        rmt_sz = rmtpy.file_size( logfile )
 
         if lcl_sz != rmt_sz and rmt_sz >= 0:
-            rmtpy.setRemoteTimeout(10*60)
+            rmtpy.set_timeout(10*60)
             recv_file( rmtpy, logfile, logname )
 
     def scanExitStatus(self, logname):
@@ -930,9 +929,9 @@ JobRunner.inst = JobRunner()
 
 def recv_file( rmt, rf, wf ):
     ""
-    stats = rmt.call( 'get_file_stats', rf )
+    stats = rmt.get_file_stats( rf )
     fp = open( wf, 'wt' )
-    fp.write( rmt.call( 'readfile', rf ) )
+    fp.write( rmt.readfile( rf ) )
     fp.close()
     set_file_stats( wf, stats )
 

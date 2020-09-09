@@ -129,14 +129,14 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
         rL = long_list_files( rd, glob=glob, age=age )
     else:
         rmt = create_remote_proxy( rm, sshexe, timeout, echo )
-        rL = rmt.call( 'long_list_files', rd, glob=glob, age=age )
+        rL = rmt.long_list_files( rd, glob=glob, age=age )
 
     # list target files
     if wm == None:
         wL = long_list_files( wd, glob=glob, age=age )
     else:
         rmt = create_remote_proxy( wm, sshexe, timeout, echo )
-        wL = rmt.call( 'long_list_files', wd, glob=glob, age=age )
+        wL = rmt.long_list_files( wd, glob=glob, age=age )
 
     try:
         wD = {}
@@ -165,7 +165,7 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
             # copy files from remote machine to local
             for f,rf,wf in cpL:
                 if echo: print3( 'copy -p '+read_dir+'/'+f+' '+wf )
-                if timeout: rmt.setRemoteTimeout(timeout)
+                if timeout: rmt.set_timeout(timeout)
                 recv_file( rmt, rf, wf )
                 if permissions:
                     file_perms( wf, permissions )
@@ -182,8 +182,8 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
 
     finally:
         if rmt != None:
-            if timeout: rmt.setRemoteTimeout(timeout)
-            rmt.close()
+            if timeout: rmt.set_timeout(timeout)
+            rmt.shutdown()
 
     return [ T[0] for T in cpL ]
 
@@ -196,13 +196,13 @@ def create_remote_proxy( mach, sshexe, timeout, echo ):
         print3( 'Connecting to "'+mach+'"' )
     rmt.start()
 
-    rmt.execute( 'import glob',
-                 'import stat',
-                 'import shutil',
-                 'import time',
-                 'import hashlib',
-                 'import fnmatch' )
-    rmt.send( perms,
+    rmt.send( 'import glob',
+              'import stat',
+              'import shutil',
+              'import time',
+              'import hashlib',
+              'import fnmatch',
+              perms,
               list_files,
               long_list_files,
               get_file_stats,
@@ -210,10 +210,11 @@ def create_remote_proxy( mach, sshexe, timeout, echo ):
               readfile,
               filesha1,
               print3 )
-    rmt.execute( 'import perms' )
+
+    rmt.import_module( 'perms' )
 
     if timeout:
-        rmt.setRemoteTimeout(timeout)
+        rmt.set_timeout(timeout)
 
     return rmt
 
@@ -234,12 +235,12 @@ def file_perms( fname, permissions, remote=None ):
                 # assume 'permissions' is a tuple or list
                 perms.apply_chmod( fname, *permissions )
     else:
-        if remote.call( 'perms.i_own', fname ):
+        if remote.perms.i_own( fname ):
             if type(permissions) == type(''):
-                remote.call( 'perms.apply_chmod', fname, permissions )
+                remote.perms.apply_chmod( fname, permissions )
             else:
                 # assume 'permissions' is a tuple or list
-                remote.call( 'perms.apply_chmod', fname, *permissions )
+                remote.perms.apply_chmod( fname, *permissions )
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )
@@ -261,14 +262,14 @@ def send_file( rmt, rf, wf ):
     rfp = rmt.construct( 'open', wf, 'wt' )
     rfp.write( readfile( rf ) )
     rfp.close()
-    rmt.call( 'set_file_stats', wf, stats )
+    rmt.set_file_stats( wf, stats )
 
 
 def recv_file( rmt, rf, wf ):
     ""
-    stats = rmt.call( 'get_file_stats', rf )
+    stats = rmt.get_file_stats( rf )
     fp = open( wf, 'wt' )
-    fp.write( rmt.call( 'readfile', rf ) )
+    fp.write( rmt.readfile( rf ) )
     fp.close()
     set_file_stats( wf, stats )
 
