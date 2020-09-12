@@ -201,7 +201,7 @@ def copy_files( files, to_dir,
 
     finally:
         if rmt != None:
-            if timeout: rmt.setRemoteTimeout(timeout)
+            if timeout: rmt.set_timeout(timeout)
             rmt.shutdown()
 
 

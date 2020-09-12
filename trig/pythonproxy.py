@@ -16,19 +16,23 @@ from remotepython import RemotePython
 class PythonProxyError( Exception ):
     pass
 
+class FailedConnectionError( PythonProxyError ):
+    pass
+
 class RemoteExceptionError( PythonProxyError ):
     pass
 
-class RemoteTimeoutError( PythonProxyError ):
+class CommandTimeoutError( PythonProxyError ):
     pass
 
-class FailedConnectionError( PythonProxyError ):
+class SessionTimeoutError( PythonProxyError ):
     pass
 
 class SerializationError( PythonProxyError ):
     pass
 
 
+# magic: rename to PythonProxy
 class RemotePythonProxy( object ):
     """
     Uses the remotepython.RemotePython class to send python commands to a
@@ -44,7 +48,6 @@ class RemotePythonProxy( object ):
                        sshcmd='ssh',
                        logfile=None ):
         ""
-        self.timeout = None
         self.remote = RemotePython( machine, pythonexe, sshcmd, logfile )
 
         self.objid = 0
@@ -64,12 +67,25 @@ class RemotePythonProxy( object ):
             msg = ( self.remote.getStartupOutput() + '\n' + err ).rstrip()
             raise FailedConnectionError( 'startup error:\n' + msg + '\n' )
 
-    def set_timeout(self, timeout):
-        ""
-        if timeout == None or timeout < 0.001:
-            self.timeout = None  # turn off timeout mechanism
-        else:
-            self.timeout = timeout
+    def session_timeout(self, total_timeout):  # magic: after_num_seconds, at_time
+        """
+        This applies a timeout to the total time the remote session is alive.
+        A positive value starts a session timer, while None will cancel it.
+        If time expires during a call to this class, or has expired and a
+        call is made, a SessionTimeoutError is raised.
+        """
+        # magic: not done
+        self.send( '_remotepython_session_timeout('+str(total_timeout)+')' )
+
+    def timeout(self, num_seconds):
+        """
+        Apply a timeout to the next command. For example,
+
+            proxy.timeout(30).send( 'mylist = [1,2,3]' )
+            proxy.timeout(30).myfunc( 42 )
+            files = proxy.timeout(30).os.listdir('/path')
+        """
+        return TimeoutTemporary( num_seconds, self )
 
     def send(self, *code_or_objects):
         """
@@ -83,9 +99,7 @@ class RemotePythonProxy( object ):
             proxy.send( afunc )
             rtn = proxy.afunc( 42 )
         """
-        for obj in code_or_objects:
-            pycode = get_code_for_object_type( obj )
-            send_object_code( self.remote, self.timeout, obj, pycode )
+        self._timeout_send( None, *code_or_objects )
 
     def construct(self, constructor, *args, **kwargs):
         """
@@ -94,19 +108,11 @@ class RemotePythonProxy( object ):
         of implicit types, such as strings, numbers, lists, and dictionaries
         (anything for which "eval(repr(obj))" reproduces obj).
         """
-        self.objid += 1
-        name = '_pythonproxy_object_'+str(self.objid)
-
-        remote_function_call( self.remote, self.timeout,
-            '_remotepython_construct_object', (name,constructor,)+args, kwargs )
-
-        return ObjectProxy( self.remote, self.timeout, name )
+        return self._timeout_construct( None, constructor, *args, **kwargs )
 
     def assign(self, name, constructor, *args, **kwargs):
         ""
-        obj = self.construct( constructor, *args, **kwargs )
-        self.objs[ name ] = obj
-        return obj
+        return self._timeout_assign( None, name, constructor, *args, **kwargs )
 
     def import_module(self, module_name):
         """
@@ -122,19 +128,7 @@ class RemotePythonProxy( object ):
 
         Note that sys, os, and os.path are automatically imported.
         """
-        names = []
-        parent = self
-        for name in module_name.strip().split('.'):
-
-            names.append( name )
-            modpath = '.'.join( names )
-
-            obj = self._make_import_object( modpath )
-
-            parent.objs[ name ] = obj
-            parent = obj
-
-        return obj
+        return self._timeout_import_module( None, module_name )
 
     def shutdown(self):
         ""
@@ -150,9 +144,9 @@ class RemotePythonProxy( object ):
             self.remote.close()
 
         else:
-            obj1 = ObjectProxy( self.remote, self.timeout, 'os' )
-            obj2 = ObjectProxy( self.remote, self.timeout, 'os.path' )
-            obj3 = ObjectProxy( self.remote, self.timeout, 'sys' )
+            obj1 = ObjectProxy( self.remote, 'os' )
+            obj2 = ObjectProxy( self.remote, 'os.path' )
+            obj3 = ObjectProxy( self.remote, 'sys' )
 
             self.objs[ 'os' ] = obj1
             obj1.objs[ 'path' ] = obj2
@@ -160,7 +154,45 @@ class RemotePythonProxy( object ):
 
         return err
 
-    def _make_import_object(self, modpath):
+    def _timeout_send(self, timeout, *code_or_objects):
+        ""
+        for obj in code_or_objects:
+            pycode = get_code_for_object_type( obj )
+            send_object_code( self.remote, timeout, obj, pycode )
+
+    def _timeout_construct( self, timeout, constructor, *args, **kwargs):
+        ""
+        self.objid += 1
+        name = '_pythonproxy_object_'+str(self.objid)
+
+        remote_function_call( self.remote, timeout,
+            '_remotepython_construct_object', (name,constructor,)+args, kwargs )
+
+        return ObjectProxy( self.remote, name )
+
+    def _timeout_assign(self, timeout, name, constructor, *args, **kwargs):
+        ""
+        obj = self._timeout_construct( timeout, constructor, *args, **kwargs )
+        self.objs[ name ] = obj
+        return obj
+
+    def _timeout_import_module(self, timeout, module_name ):
+        ""
+        names = []
+        parent = self
+        for name in module_name.strip().split('.'):
+
+            names.append( name )
+            modpath = '.'.join( names )
+
+            obj = self._make_import_object( timeout, modpath )
+
+            parent.objs[ name ] = obj
+            parent = obj
+
+        return obj
+
+    def _make_import_object(self, timeout, modpath):
         ""
         if not self.remote.isAlive():
             raise FailedConnectionError( 'connection is not alive' )
@@ -168,10 +200,10 @@ class RemotePythonProxy( object ):
         self.objid += 1
         objname = '_pythonproxy_object_'+str(self.objid)
 
-        remote_function_call( self.remote, self.timeout,
+        remote_function_call( self.remote, timeout,
             '_remotepython_import_module', (objname,modpath,), {} )
 
-        return ObjectProxy( self.remote, self.timeout, objname )
+        return ObjectProxy( self.remote, objname )
 
     def __getattr__(self, funcname):
         """
@@ -180,14 +212,11 @@ class RemotePythonProxy( object ):
         dispatches a call to 'funcname' on the remote side, waits for the
         remote return value, and returns that value on the local side.
         """
-        if funcname in self.objs:
-            return self.objs[funcname]
-        return lambda *args, **kwargs: self._call_( funcname, args, kwargs )
+        return _compute_object_attribute( self, funcname, None )
 
-    def _call_(self, funcname, args, kwargs):
+    def _get_object(self, funcname):
         ""
-        return remote_function_call( self.remote, self.timeout,
-                                     funcname, args, kwargs )
+        return '', self.objs.get( funcname, None )
 
 
 class python_proxy:
@@ -219,26 +248,73 @@ class python_proxy:
         self.proxy.shutdown()
 
 
-class ObjectProxy:
+class ObjectProxy( object ):
 
-    def __init__(self, remote, timeout, name):
+    def __init__(self, remote, varname):
         ""
         self.remote = remote
-        self.timeout = timeout
-        self.name = name
+        self.varname = varname
 
         self.objs = {}
 
     def __getattr__(self, funcname):
         ""
-        if funcname in self.objs:
-            return self.objs[funcname]
-        return lambda *args, **kwargs: self._call_( funcname, args, kwargs )
+        return _compute_object_attribute( self, funcname, None )
 
-    def _call_(self, funcname, args, kwargs):
+    def _get_object(self, funcname):
         ""
-        return remote_function_call( self.remote, self.timeout,
-                                     self.name+'.'+funcname, args, kwargs )
+        return self.varname, self.objs.get( funcname, None )
+
+
+class TimeoutTemporary( object ):
+
+    def __init__(self, timeout, target):
+        ""
+        self.timeout = timeout
+        self.target = target
+
+    def __getattr__(self, funcname):
+        ""
+        return _compute_object_attribute( self.target, funcname, self.timeout )
+
+
+def _compute_object_attribute( target, funcname, timeout ):
+    """
+    returns a callable or a proxy object corresponding to 'funcname' relative
+    to the given 'target' (which is a RemotePythonProxy or an ObjectProxy)
+    """
+    # first look for a bound method starting with "_timeout_"
+    # (which only occurs in the RemotePythonProxy class)
+    if not funcname.startswith('_'):
+        try:
+            meth = target.__getattribute__( '_timeout_'+funcname )
+        except AttributeError:
+            meth = None
+        if meth:
+            return lambda *args, **kwargs: meth( timeout, *args, **kwargs )
+
+    # get the object variable name, and (if present) a sub-object for 'funcname'
+    varname,obj = target._get_object( funcname )
+
+    if obj != None:
+        if timeout == None:
+            # no reason to propogate the timeout
+            return obj
+        else:
+            # propogate the timeout to the next object in the chain
+            return TimeoutTemporary( timeout, obj )
+
+    # compose the remote function name with the remote variable name
+    if varname:
+        fn = varname+'.'+funcname
+    else:
+        fn = funcname
+
+    return lambda *args, **kwargs: remote_function_call( target.remote,
+                                                         timeout,
+                                                         fn,
+                                                         args,
+                                                         kwargs )
 
 
 _pythonproxy_return_marker    = '_pythonproxy_return='
@@ -283,7 +359,7 @@ def remote_function_call( remote, timeout, funcname, args, kwargs ):
 
 def wait_for_return_value( remote, timeout ):
     ""
-    for out in remote_output_iterator( remote, timeout ):
+    for out in remote_output_iterator( remote, timeout, None ):
 
         if out.startswith( _pythonproxy_return_marker ):
             val = out.strip()[_len_return_value_marker:]
@@ -297,7 +373,7 @@ def wait_for_return_value( remote, timeout ):
     return val
 
 
-def remote_output_iterator( remote, timeout ):
+def remote_output_iterator( remote, timeout, session_time ):
     ""
     tstart = time.time()
     pause = 0.1
@@ -311,7 +387,11 @@ def remote_output_iterator( remote, timeout ):
 
         elif timeout != None and time.time() - tstart > timeout:
             secs = "%.1f" % (time.time()-tstart)
-            raise RemoteTimeoutError( 'timed out after '+secs+' seconds' )
+            raise CommandTimeoutError( 'timed out after '+secs+' seconds' )
+
+        elif session_time != None and time.time() > session_time:
+            raise SessionTimeoutError( 'session timed out at ' + \
+                                       time.ctime(session_time) )
 
         elif not remote.isAlive():
             secs = "%.1f" % (time.time()-tstart)

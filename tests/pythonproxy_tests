@@ -32,11 +32,7 @@ rpy = sys.executable
 #rpy='/home/rrdrake/bin/Linux/py365/bin/python'
 
 
-class unit_tests( unittest.TestCase ):
-
-    def setUp(self):
-        ""
-        util.setup_test()
+class unit_tests( trigutil.trigTestCase ):
 
     def test_getting_source_code(self):
         ""
@@ -156,7 +152,7 @@ class unit_tests( unittest.TestCase ):
         assert val == 'foobar'
 
         t0 = time.time()
-        self.assertRaises( pythonproxy.RemoteTimeoutError,
+        self.assertRaises( pythonproxy.CommandTimeoutError,
             pythonproxy.remote_function_call, remote, 3, 'myfunc', [10], {} )
         t1 = time.time()
         assert t1-t0 > 2.5 and t1-t0 < 5
@@ -220,11 +216,39 @@ class unit_tests( unittest.TestCase ):
         assert t1-t0 >= 2 and t1-t0 < 5
         assert 'connection lost' in exc
 
+    def test_timeouts_in_the_output_iterator_function(self):
+        ""
+        class FakeRemote:
+            def getOutputLine(self): return None
+            def isAlive(self): return True
 
-class startup_RemotePythonProxy( unittest.TestCase ):
+        rem = FakeRemote()
 
-    def setUp(self):
-        util.setup_test()
+        t0 = time.time()
+        try:
+            for out in pythonproxy.remote_output_iterator( rem, 1, None ):
+                pass
+        except pythonproxy.CommandTimeoutError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an exception' )
+        t1 = time.time()
+        assert 'timed out after' in exc and t1-t0 > 0.9 and t1-t0 < 5
+
+        t0 = time.time()
+        tm = t0 + 2
+        try:
+            for out in pythonproxy.remote_output_iterator( rem, None, tm ):
+                pass
+        except pythonproxy.SessionTimeoutError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected an exception' )
+        t1 = time.time()
+        assert 'session timed out' in exc and t1-t0 > 1 and t1-t0 < 5
+
+
+class startup_RemotePythonProxy( trigutil.trigTestCase ):
 
     def test_normal_startup(self):
         ""
@@ -233,6 +257,7 @@ class startup_RemotePythonProxy( unittest.TestCase ):
 
         remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         remote.start()
+        remote.shutdown()
 
     def test_when_startup_fails(self):
         ""
@@ -252,12 +277,42 @@ class startup_RemotePythonProxy( unittest.TestCase ):
         assert 'startup error' in exc
         assert 'Traceback' in exc and 'fake crash' in exc
 
+    def test_some_startup_delay_is_fine(self):
+        ""
+        sshexe = write_fake_ssh_script( startup_delay=5 )
+        time.sleep(1)
 
-class tests_using_RemotePythonProxy_class( unittest.TestCase ):
+        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+
+        t0 = time.time()
+        remote.start()
+        t1 = time.time()
+
+        remote.shutdown()
+
+        assert t1-t0 > 4
+
+    def test_startup_that_takes_too_long_and_times_out(self):
+        ""
+        sshexe = write_fake_ssh_script( startup_delay=20 )
+        time.sleep(1)
+
+        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+        try:
+            remote.start( 5 )
+        except pythonproxy.FailedConnectionError as e:
+            exc = str(e)
+        else:
+            raise Exception( 'expected a FailedConnectionError exception' )
+
+        assert 'timeout' in exc
+
+
+class tests_using_RemotePythonProxy_class( trigutil.trigTestCase ):
 
     def setUp(self):
         ""
-        util.setup_test()
+        trigutil.trigTestCase.setUp( self )
 
         self.remote = RemotePythonProxy( pythonexe=rpy, logfile='logfile' )
         self.remote.start()
@@ -627,6 +682,126 @@ class using_the_context_manager( unittest.TestCase ):
         assert os.path.samefile( rd, 'adir' )
 
 
+class timeout_tests( trigutil.trigTestCase ):
+
+    def setUp(self):
+        ""
+        trigutil.trigTestCase.setUp( self )
+
+        self.remote = RemotePythonProxy( pythonexe=rpy, logfile='logfile' )
+        self.remote.start()
+
+    def tearDown(self):
+        ""
+        self.remote.shutdown()
+
+    def test_timeout_using_the_send_method(self):
+        ""
+        self.remote.send( 'import time' )
+        t0 = time.time()
+        # self.remote.timeout(2).send( 'time.sleep(10)' )
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).send, 'time.sleep(10)' )
+        t1 = time.time()
+        assert t1-t0 > 1.9 and t1-t0 < 7
+
+    def test_timeout_using_the_construct_method(self):
+        ""
+        self.remote.send( 'import time', Sleeper )
+        t0 = time.time()
+        # self.remote.timeout(2).construct( 'Sleeper' )
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).construct, 'Sleeper' )
+        t1 = time.time()
+        assert t1-t0 > 1.9 and t1-t0 < 7
+
+    def test_timeout_using_the_assign_method(self):
+        ""
+        self.remote.send( 'import time', Sleeper )
+        t0 = time.time()
+        # self.remote.timeout(2).assign( 'sleeper', 'Sleeper' )
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).assign, 'sleeper', 'Sleeper' )
+        t1 = time.time()
+        assert t1-t0 > 1.9 and t1-t0 < 7
+
+    def test_timeout_using_the_import_module_method(self):
+        ""
+        util.writefile( 'subdir/mymod.py', """
+            import time
+            time.sleep(10)
+            """ )
+        time.sleep(1)
+
+        t0 = time.time()
+        self.remote.send( 'sys.path.insert(0,'+repr(abspath('subdir'))+')' )
+        t1 = time.time()
+        # self.remote.timeout(2).import_module( 'mymod' )
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).import_module, 'mymod' )
+        t2 = time.time()
+        assert t1-t0 < 2 and t2-t1 > 1.9 and t2-t1 < 7
+
+    def test_timeout_a_call_to_an_object_method(self):
+        ""
+        t0 = time.time()
+        self.remote.import_module( 'time' )
+        # self.remote.timeout(2).time.sleep( 10 )
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).time.sleep, 10 )
+        t1 = time.time()
+        assert t1-t0 > 1.9 and t1-t0 < 7
+
+    def test_timeout_a_call_to_an_object_chain(self):
+        ""
+        util.writefile( 'subdir/top/__init__.py', '' )
+        util.writefile( 'subdir/top/lev/__init__.py', """
+            import time
+            def myfunc():
+                time.sleep(10)
+            """ )
+        time.sleep(1)
+
+        self.remote.send( 'sys.path.insert(0,'+repr(abspath('subdir'))+')' )
+        self.remote.import_module( 'top.lev' )
+        t0 = time.time()
+        # self.remote.timeout(2).top.lev.myfunc()
+        self.assertRaises( pythonproxy.CommandTimeoutError,
+                           self.remote.timeout(2).top.lev.myfunc )
+        t1 = time.time()
+        assert t1-t0 > 1.9 and t1-t0 < 7
+
+    def test_a_session_timeout_while_running_a_command(self):
+        ""
+        return # magic
+
+        t0 = time.time()
+
+        self.remote.session_timeout(4)
+        self.remote.import_module( 'time' )
+        self.remote.time.sleep(10)
+
+        t1 = time.time()
+        assert t1-t0 < 7
+
+    def test_the_session_timed_out_then_a_call_was_made(self):
+        ""
+        return # magic
+
+        t0 = time.time()
+
+        self.remote.session_timeout(4)
+        self.remote.import_module( 'time' )
+        self.remote.time.sleep(1)
+        time.sleep(4)
+
+        # should get an exception here
+        self.remote.os.getcwd()
+
+        t1 = time.time()
+        assert t1-t0 < 7
+
+
 def somefunc( arg0, key=None ):
     ""
     if key:
@@ -649,6 +824,11 @@ class FakeDerivedClass( FakeBaseClass ):
     pass
 
 
+class Sleeper:
+    def __init__(self):
+        time.sleep(10)
+
+
 def get_output_line( remote, timeout=5 ):
     ""
     tstart = time.time()
@@ -662,10 +842,13 @@ def get_output_line( remote, timeout=5 ):
         time.sleep(0.5)
 
 
-def write_fake_ssh_script( fake_crash=False ):
+def write_fake_ssh_script( fake_crash=False, startup_delay=None ):
     ""
     lineL = [ '#!'+sys.executable,
               'import sys, os, subprocess, shlex, time' ]
+
+    if startup_delay and startup_delay > 0:
+        lineL.append( 'time.sleep('+str(startup_delay)+')' )
 
     if fake_crash:
         lineL.append( 'print ( "Warning: I am not long to this world" )' )
