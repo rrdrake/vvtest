@@ -32,8 +32,7 @@ class SerializationError( PythonProxyError ):
     pass
 
 
-# magic: rename to PythonProxy
-class RemotePythonProxy( object ):
+class PythonProxy( object ):
     """
     Uses the remotepython.RemotePython class to send python commands to a
     Python interpreter on a remote machine and return their output.
@@ -52,6 +51,7 @@ class RemotePythonProxy( object ):
 
         self.objid = 0
         self.objs = {}
+        self.endtime = None
 
     def start(self, startup_timeout=30):
         """
@@ -67,15 +67,19 @@ class RemotePythonProxy( object ):
             msg = ( self.remote.getStartupOutput() + '\n' + err ).rstrip()
             raise FailedConnectionError( 'startup error:\n' + msg + '\n' )
 
-    def session_timeout(self, total_timeout):  # magic: after_num_seconds, at_time
+    def session_timeout(self, num_seconds=None):
         """
         This applies a timeout to the total time the remote session is alive.
         A positive value starts a session timer, while None will cancel it.
         If time expires during a call to this class, or has expired and a
         call is made, a SessionTimeoutError is raised.
         """
-        # magic: not done
-        self.send( '_remotepython_session_timeout('+str(total_timeout)+')' )
+        if num_seconds == None:
+            tm = None
+        else:
+            tm = time.time() + num_seconds
+
+        self._propogate_session_timeout( tm )
 
     def timeout(self, num_seconds):
         """
@@ -144,9 +148,9 @@ class RemotePythonProxy( object ):
             self.remote.close()
 
         else:
-            obj1 = ObjectProxy( self.remote, 'os' )
-            obj2 = ObjectProxy( self.remote, 'os.path' )
-            obj3 = ObjectProxy( self.remote, 'sys' )
+            obj1 = ObjectProxy( self.remote, 'os', self.endtime )
+            obj2 = ObjectProxy( self.remote, 'os.path', self.endtime )
+            obj3 = ObjectProxy( self.remote, 'sys', self.endtime )
 
             self.objs[ 'os' ] = obj1
             obj1.objs[ 'path' ] = obj2
@@ -158,17 +162,17 @@ class RemotePythonProxy( object ):
         ""
         for obj in code_or_objects:
             pycode = get_code_for_object_type( obj )
-            send_object_code( self.remote, timeout, obj, pycode )
+            send_object_code( self.remote, timeout, self.endtime, obj, pycode )
 
     def _timeout_construct( self, timeout, constructor, *args, **kwargs):
         ""
         self.objid += 1
         name = '_pythonproxy_object_'+str(self.objid)
 
-        remote_function_call( self.remote, timeout,
+        remote_function_call( self.remote, timeout, self.endtime,
             '_remotepython_construct_object', (name,constructor,)+args, kwargs )
 
-        return ObjectProxy( self.remote, name )
+        return ObjectProxy( self.remote, name, self.endtime )
 
     def _timeout_assign(self, timeout, name, constructor, *args, **kwargs):
         ""
@@ -200,10 +204,16 @@ class RemotePythonProxy( object ):
         self.objid += 1
         objname = '_pythonproxy_object_'+str(self.objid)
 
-        remote_function_call( self.remote, timeout,
+        remote_function_call( self.remote, timeout, self.endtime,
             '_remotepython_import_module', (objname,modpath,), {} )
 
-        return ObjectProxy( self.remote, objname )
+        return ObjectProxy( self.remote, objname, self.endtime )
+
+    def _propogate_session_timeout(self, endtime):
+        ""
+        self.endtime = endtime
+        for subobj in self.objs.values():
+            subobj._propogate_session_timeout( endtime )
 
     def __getattr__(self, funcname):
         """
@@ -216,12 +226,12 @@ class RemotePythonProxy( object ):
 
     def _get_object(self, funcname):
         ""
-        return '', self.objs.get( funcname, None )
+        return '', self.objs.get( funcname, None ), self.endtime
 
 
 class python_proxy:
     """
-    This is a context manager for a RemotePythonProxy object.
+    This is a context manager for a PythonProxy object.
 
         with python_proxy( 'sparky' ) as remote:
             remote.os.chdir( '/some/path' )
@@ -233,10 +243,9 @@ class python_proxy:
                        sshcmd='ssh',
                        logfile=None ):
         ""
-        self.proxy = RemotePythonProxy( machname,
-                                        pythonexe=pythonexe,
-                                        sshcmd=sshcmd,
-                                        logfile=logfile )
+        self.proxy = PythonProxy( machname, pythonexe=pythonexe,
+                                            sshcmd=sshcmd,
+                                            logfile=logfile )
         self.proxy.start( startup_timeout )
 
     def __enter__(self):
@@ -250,12 +259,19 @@ class python_proxy:
 
 class ObjectProxy( object ):
 
-    def __init__(self, remote, varname):
+    def __init__(self, remote, varname, endtime):
         ""
         self.remote = remote
         self.varname = varname
+        self.endtime = endtime
 
         self.objs = {}
+
+    def _propogate_session_timeout(self, endtime):
+        ""
+        self.endtime = endtime
+        for subobj in self.objs.values():
+            subobj._propogate_session_timeout( endtime )
 
     def __getattr__(self, funcname):
         ""
@@ -263,7 +279,7 @@ class ObjectProxy( object ):
 
     def _get_object(self, funcname):
         ""
-        return self.varname, self.objs.get( funcname, None )
+        return self.varname, self.objs.get( funcname, None ), self.endtime
 
 
 class TimeoutTemporary( object ):
@@ -281,10 +297,10 @@ class TimeoutTemporary( object ):
 def _compute_object_attribute( target, funcname, timeout ):
     """
     returns a callable or a proxy object corresponding to 'funcname' relative
-    to the given 'target' (which is a RemotePythonProxy or an ObjectProxy)
+    to the given 'target' (which is a PythonProxy or an ObjectProxy)
     """
     # first look for a bound method starting with "_timeout_"
-    # (which only occurs in the RemotePythonProxy class)
+    # (which only occurs in the PythonProxy class)
     if not funcname.startswith('_'):
         try:
             meth = target.__getattribute__( '_timeout_'+funcname )
@@ -294,7 +310,7 @@ def _compute_object_attribute( target, funcname, timeout ):
             return lambda *args, **kwargs: meth( timeout, *args, **kwargs )
 
     # get the object variable name, and (if present) a sub-object for 'funcname'
-    varname,obj = target._get_object( funcname )
+    varname,obj,endtime = target._get_object( funcname )
 
     if obj != None:
         if timeout == None:
@@ -312,6 +328,7 @@ def _compute_object_attribute( target, funcname, timeout ):
 
     return lambda *args, **kwargs: remote_function_call( target.remote,
                                                          timeout,
+                                                         endtime,
                                                          fn,
                                                          args,
                                                          kwargs )
@@ -323,17 +340,17 @@ _pythonproxy_exception_marker = '_pythonproxy_exception='
 _len_exception_marker         = len( _pythonproxy_exception_marker )
 
 
-def remote_code_execution( remote, timeout, codelines ):
+def remote_code_execution( remote, timeout, endtime, codelines ):
     ""
     if not remote.isAlive():
         raise FailedConnectionError( 'connection is not alive' )
 
     cmd = '_remotepython_try_except_code_lines('+repr(codelines)+')'
     remote.execute( cmd )
-    wait_for_return_value( remote, timeout )
+    wait_for_return_value( remote, timeout, endtime )
 
 
-def remote_function_call( remote, timeout, funcname, args, kwargs ):
+def remote_function_call( remote, timeout, endtime, funcname, args, kwargs ):
     ""
     if not remote.isAlive():
         raise FailedConnectionError( 'connection is not alive' )
@@ -347,7 +364,7 @@ def remote_function_call( remote, timeout, funcname, args, kwargs ):
 
     remote.execute( cmd )
 
-    repr_rtn = wait_for_return_value( remote, timeout )
+    repr_rtn = wait_for_return_value( remote, timeout, endtime )
 
     try:
         rtn = eval( repr_rtn )
@@ -357,9 +374,9 @@ def remote_function_call( remote, timeout, funcname, args, kwargs ):
     return rtn
 
 
-def wait_for_return_value( remote, timeout ):
+def wait_for_return_value( remote, timeout, endtime ):
     ""
-    for out in remote_output_iterator( remote, timeout, None ):
+    for out in remote_output_iterator( remote, timeout, endtime ):
 
         if out.startswith( _pythonproxy_return_marker ):
             val = out.strip()[_len_return_value_marker:]
@@ -373,7 +390,7 @@ def wait_for_return_value( remote, timeout ):
     return val
 
 
-def remote_output_iterator( remote, timeout, session_time ):
+def remote_output_iterator( remote, timeout, endtime ):
     ""
     tstart = time.time()
     pause = 0.1
@@ -389,9 +406,9 @@ def remote_output_iterator( remote, timeout, session_time ):
             secs = "%.1f" % (time.time()-tstart)
             raise CommandTimeoutError( 'timed out after '+secs+' seconds' )
 
-        elif session_time != None and time.time() > session_time:
+        elif endtime != None and time.time() > endtime:
             raise SessionTimeoutError( 'session timed out at ' + \
-                                       time.ctime(session_time) )
+                                       time.ctime(endtime) )
 
         elif not remote.isAlive():
             secs = "%.1f" % (time.time()-tstart)
@@ -402,13 +419,13 @@ def remote_output_iterator( remote, timeout, session_time ):
             pause = min( pause * 2, 2 )
 
 
-def send_object_code( remote, timeout, obj, pycode ):
+def send_object_code( remote, timeout, endtime, obj, pycode ):
     ""
     if type(obj) == types.ModuleType:
         cmd = '_remotepython_add_module('+repr(obj.__name__)+','+repr(pycode)+')'
-        remote_code_execution( remote, timeout, cmd )
+        remote_code_execution( remote, timeout, endtime, cmd )
     else:
-        remote_code_execution( remote, timeout, pycode )
+        remote_code_execution( remote, timeout, endtime, pycode )
 
 
 def format_remote_exception( tbstring ):
@@ -527,7 +544,7 @@ def send_internal_utilities( remote, timeout, utils=_UTILITIES_LIST ):
                     err = 'Failed to get source code for '+str(obj)
                     break
 
-                remote_code_execution( remote, timeout, pycode )
+                remote_code_execution( remote, timeout, None, pycode )
 
         except Exception:
             err = _pythonproxy_capture_traceback( sys.exc_info() )

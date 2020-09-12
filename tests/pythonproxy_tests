@@ -24,7 +24,7 @@ from testutils import print3
 from remotepython import RemotePython
 
 import pythonproxy
-from pythonproxy import RemotePythonProxy
+from pythonproxy import PythonProxy
 
 
 rpy = sys.executable
@@ -145,15 +145,18 @@ class unit_tests( trigutil.trigTestCase ):
                 return "foobar"
             ''' ) )
 
-        val = pythonproxy.remote_function_call( remote, 5, 'myfunc', [1], {} )
+        val = pythonproxy.remote_function_call( remote, 5, None,
+                                                'myfunc', [1], {} )
         assert val == 'foobar'
 
-        val = pythonproxy.remote_function_call( remote, 5, 'myfunc', [4], {} )
+        val = pythonproxy.remote_function_call( remote, 5, None,
+                                                'myfunc', [4], {} )
         assert val == 'foobar'
 
         t0 = time.time()
         self.assertRaises( pythonproxy.CommandTimeoutError,
-            pythonproxy.remote_function_call, remote, 3, 'myfunc', [10], {} )
+            pythonproxy.remote_function_call, remote, 3, None,
+                                              'myfunc', [10], {} )
         t1 = time.time()
         assert t1-t0 > 2.5 and t1-t0 < 5
 
@@ -172,11 +175,12 @@ class unit_tests( trigutil.trigTestCase ):
                 raise Exception( 'fake exception' )
             ''' ) )
 
-        val = pythonproxy.remote_function_call( remote, 5, 'foofunc', [], {} )
+        val = pythonproxy.remote_function_call( remote, 5, None,
+                                                'foofunc', [], {} )
         assert val == 'foobar'
 
         try:
-            pythonproxy.remote_function_call( remote, 5,
+            pythonproxy.remote_function_call( remote, 5, None,
                                               'raise_fake_exception', [], {} )
         except pythonproxy.RemoteExceptionError as e:
             exclines = str(e).splitlines()
@@ -207,7 +211,8 @@ class unit_tests( trigutil.trigTestCase ):
 
         t0 = time.time()
         try:
-            val = pythonproxy.remote_function_call( remote, 10, 'callexit', [2], {} )
+            val = pythonproxy.remote_function_call( remote, 10, None,
+                                                    'callexit', [2], {} )
         except pythonproxy.FailedConnectionError as e:
             exc = str(e)
         else:
@@ -248,14 +253,14 @@ class unit_tests( trigutil.trigTestCase ):
         assert 'session timed out' in exc and t1-t0 > 1 and t1-t0 < 5
 
 
-class startup_RemotePythonProxy( trigutil.trigTestCase ):
+class startup_PythonProxy( trigutil.trigTestCase ):
 
     def test_normal_startup(self):
         ""
         sshexe = write_fake_ssh_script()
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+        remote = PythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         remote.start()
         remote.shutdown()
 
@@ -264,7 +269,7 @@ class startup_RemotePythonProxy( trigutil.trigTestCase ):
         sshexe = write_fake_ssh_script( fake_crash=True )
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+        remote = PythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         try:
             remote.start()
         except pythonproxy.FailedConnectionError as e:
@@ -282,7 +287,7 @@ class startup_RemotePythonProxy( trigutil.trigTestCase ):
         sshexe = write_fake_ssh_script( startup_delay=5 )
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+        remote = PythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
 
         t0 = time.time()
         remote.start()
@@ -297,7 +302,7 @@ class startup_RemotePythonProxy( trigutil.trigTestCase ):
         sshexe = write_fake_ssh_script( startup_delay=20 )
         time.sleep(1)
 
-        remote = RemotePythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
+        remote = PythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         try:
             remote.start( 5 )
         except pythonproxy.FailedConnectionError as e:
@@ -308,13 +313,13 @@ class startup_RemotePythonProxy( trigutil.trigTestCase ):
         assert 'timeout' in exc
 
 
-class tests_using_RemotePythonProxy_class( trigutil.trigTestCase ):
+class tests_using_PythonProxy_class( trigutil.trigTestCase ):
 
     def setUp(self):
         ""
         trigutil.trigTestCase.setUp( self )
 
-        self.remote = RemotePythonProxy( pythonexe=rpy, logfile='logfile' )
+        self.remote = PythonProxy( pythonexe=rpy, logfile='logfile' )
         self.remote.start()
 
     def tearDown(self):
@@ -688,7 +693,7 @@ class timeout_tests( trigutil.trigTestCase ):
         ""
         trigutil.trigTestCase.setUp( self )
 
-        self.remote = RemotePythonProxy( pythonexe=rpy, logfile='logfile' )
+        self.remote = PythonProxy( pythonexe=rpy, logfile='logfile' )
         self.remote.start()
 
     def tearDown(self):
@@ -773,33 +778,52 @@ class timeout_tests( trigutil.trigTestCase ):
 
     def test_a_session_timeout_while_running_a_command(self):
         ""
-        return # magic
-
         t0 = time.time()
-
-        self.remote.session_timeout(4)
+        self.remote.session_timeout(3)
         self.remote.import_module( 'time' )
-        self.remote.time.sleep(10)
-
+        # self.remote.time.sleep(10)
+        self.assertRaises( pythonproxy.SessionTimeoutError,
+                           self.remote.time.sleep, 10 )
         t1 = time.time()
-        assert t1-t0 < 7
+        assert t1-t0 > 2.9 and t1-t0 < 7
 
-    def test_the_session_timed_out_then_a_call_was_made(self):
+    def test_a_session_times_out_then_a_call_is_made(self):
         ""
-        return # magic
-
         t0 = time.time()
 
-        self.remote.session_timeout(4)
-        self.remote.import_module( 'time' )
-        self.remote.time.sleep(1)
-        time.sleep(4)
+        self.remote.session_timeout(3)
+        self.remote.send( 'import time' )
+        self.remote.send( 'time.sleep(1)' )
+        time.sleep(3)
 
-        # should get an exception here
-        self.remote.os.getcwd()
+        # self.remote.send( 'print ( time.time() )' )
+        self.assertRaises( pythonproxy.SessionTimeoutError,
+                           self.remote.send, 'print ( time.time() )' )
 
         t1 = time.time()
-        assert t1-t0 < 7
+        assert t1-t0 > 3 and t1-t0 < 8
+
+    def test_a_session_timeout_propogates_to_existing_objects(self):
+        ""
+        t0 = time.time()
+        self.remote.import_module( 'time' )
+        self.remote.session_timeout( 3 )
+        # self.remote.time.sleep(10)
+        self.assertRaises( pythonproxy.SessionTimeoutError,
+                           self.remote.time.sleep, 10 )
+        t1 = time.time()
+        assert t1-t0 > 3 and t1-t0 < 8
+
+    def test_a_session_timeout_propogates_to_chained_objects(self):
+        ""
+        t0 = time.time()
+        self.remote.session_timeout( 3 )
+        time.sleep(3)
+        # self.remote.os.path.exists( 'foobar' )
+        self.assertRaises( pythonproxy.SessionTimeoutError,
+                           self.remote.os.path.exists, 'foobar' )
+        t1 = time.time()
+        assert t1-t0 > 3 and t1-t0 < 8
 
 
 def somefunc( arg0, key=None ):
