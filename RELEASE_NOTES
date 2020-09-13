@@ -1,6 +1,26 @@
 
 Improvements:
 
+    - 
+
+Fixes:
+
+    - 
+
+Changes:
+
+    - 
+
+
+==============================================================================
+
+Release 1.2
+-----------
+
+Sep 13, 2020
+
+Improvements:
+
     - A test can now exit with a special exit status that marks the test as
       a skip. The target use case is when a test cannot run due to the lack
       of a resource or product on the platform. If deciding such a thing
