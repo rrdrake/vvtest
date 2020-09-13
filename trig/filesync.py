@@ -38,7 +38,7 @@ OPTIONS:
     -h, --help             : this help
     -g <pattern>           : glob pattern of files to copy; may be repeated
     --age <seconds old>    : only files newer than this age are copied
-    -T <seconds>           : apply timeout to each remotepython command
+    -T <seconds>           : apply a timeout to the remote session
     --sshexe <path to ssh> : use this ssh
     --perms <spec>         : set or adjust file permissions on files placed
                              into the target location; may be repeated, and
@@ -165,7 +165,6 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
             # copy files from remote machine to local
             for f,rf,wf in cpL:
                 if echo: print3( 'copy -p '+read_dir+'/'+f+' '+wf )
-                if timeout: rmt.set_timeout(timeout)
                 recv_file( rmt, rf, wf )
                 if permissions:
                     file_perms( wf, permissions )
@@ -175,14 +174,12 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
             # copy files from local to remote machine
             for f,rf,wf in cpL:
                 if echo: print3( 'copy -p '+rf+' '+write_dir+'/'+f )
-                if timeout: rmt.setRemoteTimeout(timeout)
                 send_file( rmt, rf, wf )
                 if permissions:
                     file_perms( wf, permissions, remote=rmt )
 
     finally:
         if rmt != None:
-            if timeout: rmt.set_timeout(timeout)
             rmt.shutdown()
 
     return [ T[0] for T in cpL ]
@@ -190,7 +187,7 @@ def sync_directories( read_dir, write_dir, glob='*', age=None,
 
 def create_remote_proxy( mach, sshexe, timeout, echo ):
     ""
-    rmt = rpy.RemotePythonProxy( mach, sshcmd=sshexe )
+    rmt = rpy.PythonProxy( mach, sshcmd=sshexe )
 
     if echo:
         print3( 'Connecting to "'+mach+'"' )
@@ -214,7 +211,7 @@ def create_remote_proxy( mach, sshexe, timeout, echo ):
     rmt.import_module( 'perms' )
 
     if timeout:
-        rmt.set_timeout(timeout)
+        rmt.session_timeout(timeout)
 
     return rmt
 

@@ -463,11 +463,11 @@ class Job:
 
         mydir = os.path.dirname( os.path.abspath( __file__ ) )
 
-        from pythonproxy import RemotePythonProxy
+        from pythonproxy import PythonProxy
         if sshexe:
-            rmt = RemotePythonProxy( mach, sshcmd=sshexe )
+            rmt = PythonProxy( mach, sshcmd=sshexe )
         else:
-            rmt = RemotePythonProxy( mach )
+            rmt = PythonProxy( mach )
 
         tprint( 'Connect machine:', mach )
         tprint( 'Remote command:', shcmd )
@@ -491,11 +491,10 @@ class Job:
                 raise Exception( "Could not connect to "+mach )
 
             try:
-                rmt.set_timeout(30)
-                inf = rmt.get_machine_info()
+                inf = rmt.timeout(30).get_machine_info()
                 tprint( 'Remote info:', inf )
 
-                rusr = rmt.os.getuid()
+                rusr = rmt.timeout(30).os.getuid()
 
                 rpid = rmt.background_command( pycmd, remotelogf,
                                                chdir=chd,
@@ -520,9 +519,8 @@ class Job:
                 time.sleep( 2**i )
             rtn = None
             try:
-                rmtpy.set_timeout( 30 )
-                rmtpy.start()
-                rmtpy.send( remote_side_code )
+                rmtpy.start( 30 )
+                rmtpy.timeout(30).send( remote_side_code )
             except:
                 # raise  # uncomment this when debugging connections
                 rtn = capture_traceback( sys.exc_info() )
@@ -563,8 +561,7 @@ class Job:
                 if not sharedlog:
                     self.updateFile( rmtpy, logf, logn )
 
-                rmtpy.set_timeout(30)
-                s = rmtpy.processes( pid=rpid, user=rusr, fields='etime' )
+                s = rmtpy.timeout(30).processes( pid=rpid, user=rusr, fields='etime' )
                 elapsed = s.strip()
 
                 # TODO: add a check that the elapsed time agrees
@@ -615,12 +612,12 @@ class Job:
         if os.path.exists( logname ):
             lcl_sz = os.path.getsize( logname )
 
-        rmtpy.set_timeout(30)
-        rmt_sz = rmtpy.file_size( logfile )
+        rmt_sz = rmtpy.timeout(30).file_size( logfile )
 
         if lcl_sz != rmt_sz and rmt_sz >= 0:
-            rmtpy.set_timeout(10*60)
+            rmtpy.session_timeout(10*60)
             recv_file( rmtpy, logfile, logname )
+            rmtpy.session_timeout(None)
 
     def scanExitStatus(self, logname):
         """

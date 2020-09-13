@@ -218,9 +218,8 @@ class PythonProxy( object ):
     def __getattr__(self, funcname):
         """
         This is called when an unknown class attribute is requested.  The
-        implementation here returns a function object that, when invoked,
-        dispatches a call to 'funcname' on the remote side, waits for the
-        remote return value, and returns that value on the local side.
+        implementation here returns a callable or an object proxy, which
+        when called by the user code, will call into the remote python.
         """
         return _compute_object_attribute( self, funcname, None )
 

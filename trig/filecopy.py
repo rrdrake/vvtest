@@ -51,7 +51,7 @@ OPTIONS:
     --group                : change the group of all files and directories
                              when placed in the destination directory
 
-    -T <seconds>           : apply timeout to each remote command
+    -T <seconds>           : apply a timeout to the remote session
     --sshexe <path to ssh> : use this ssh
 """
 
@@ -120,9 +120,9 @@ def copy_files( files, to_dir,
 
     If 'echo' is True, the actions are printed to stdout as they occur.
 
-    If 'timeout' is not None, a time limit is applied to each remote python
-    operation, and if one times out, an exception is raised.  This does not
-    apply to file transfers that use ssh.
+    If 'timeout' is not None, a time limit is applied to the remote python
+    session, and if it times out, an exception is raised.  This will not,
+    however, interrupt the transfers that use ssh.
 
     The 'sshexe' option is passed through to the RemotePython constructor and
     is used to perform file transfers.
@@ -201,7 +201,6 @@ def copy_files( files, to_dir,
 
     finally:
         if rmt != None:
-            if timeout: rmt.set_timeout(timeout)
             rmt.shutdown()
 
 
@@ -220,7 +219,7 @@ def splitmach( path ):
 
 def create_remote_proxy( mach, sshexe, timeout, echo ):
     ""
-    rmt = rpy.RemotePythonProxy( mach, sshcmd=sshexe )
+    rmt = rpy.PythonProxy( mach, sshcmd=sshexe )
 
     if echo:
         print3( 'Connecting to "'+mach+'"' )
@@ -242,7 +241,7 @@ def create_remote_proxy( mach, sshexe, timeout, echo ):
     rmt.import_module( 'shutil' )
 
     if timeout:
-        rmt.set_timeout(timeout)
+        rmt.session_timeout(timeout)
 
     return rmt
 
