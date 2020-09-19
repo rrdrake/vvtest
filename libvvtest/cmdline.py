@@ -429,36 +429,25 @@ help_deprecated = """
 
 >DEPRECATED BUT STILL AVAILABLE:
 
-The -s option is now deprecated, which is the same as --search.
+The -s option is now deprecated. It is the same as --search.
 
 The -v option used to print the program version, but now means "verbose".
 Use --version instead to get the version.
-
-The --pipeline option is deprecated.  It is equivalent to --batch.
-
-The --check=<name> option activates optional sections in the test files.
-You should migrate use of this option to the --test-args option.
-The execution blocks in the test files may have an ifdef="CHECK_NAME" attribute,
-where the NAME portion is just upper case of <name>.  Those blocks
-are not active by default.  Using this option will cause those
-blocks to be executed as part of the test.
-
-The --qsub-limit option is being deprecated in favor of --batch-limit (with
-the same meaning).
-
-The --qsub-length option is being deprecated in favor of --batch-length (with
-the same meaning).
 
 >DEPRECATED AND REMOVED:
 
 The option --vg could be used to pass the -vg option to each test script.
 It has been replaced by the --test-args option.
 
-The -G option has been removed.  It is the same as -g.
+The -F option has been removed. It is the same as -R.
 
-The -F option is now an error; it has been replaced with -R.
+The --pipeline option has been removed. It is the same as --batch.
 
-The -H option has been removed.  It is the same as --help.
+The --qsub-limit option has been removed. It is the same as --batch-limit.
+
+The --qsub-length option has been removed. It is the same as --batch-length.
+
+The --check=<name> option has been removed. Use --test-args instead.
 """
 
 
@@ -492,8 +481,6 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '-R', dest='dash_R', action='store_true',
         help='Rerun tests.  Normally tests are not run if they previously '
              'completed.' )
-    grp.add_argument( '-F', dest='dash_F', action='store_true',
-        help='Deprecated; use -R.' )
 
     # parameter filtering
     grp.add_argument( '-p', dest='dash_p', action='append',
@@ -572,8 +559,6 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '-a', '--analyze', dest='analyze', action='store_true',
         help='Causes the option --execute-analysis-sections to be given to '
              'each test invocation.  Only makes sense in combination with -R.' )
-    grp.add_argument( '--check', action='append',
-        help='This option is deprecated (subhelp: deprecated).' )
     grp.add_argument( '--test-args', metavar='ARGS', action='append',
         help='Pass options and/or arguments to each test script.' )
     grp.add_argument( '--encode-exit-status', action='store_true',
@@ -632,19 +617,13 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--batch', action='store_true',
         help='Groups tests, submits to the batch queue manager, and '
              'monitors for completion.' )
-    grp.add_argument( '--pipeline', action='store_true',
-        help='Deprecated.  Use --batch instead.' )
     grp.add_argument( '--batch-limit', type=int,
         help='Limit the number of batch jobs in the queue at any one time. '
              'Default is 5.' )
-    grp.add_argument( '--qsub-limit', type=int,
-        help='Deprecated; use --batch-limit.' )
     grp.add_argument( '--batch-length', type=int,
         help='Limit the number of tests in each job group such that the '
              'sum of their runtimes is less than the given value. '
              'Default is 30 minutes.' )
-    grp.add_argument( '--qsub-length', type=int,
-        help='Deprecated; use --batch-length.' )
     psr.add_argument( '--qsub-id', type=int, help=argutil.SUPPRESS )
 
     # results
@@ -729,30 +708,10 @@ def check_print_version( opts, vvtest_version ):
 
 def check_deprecated_option_use( opts ):
     ""
-    if opts.dash_F:
-        errprint( '*** error: the -F option is deprecated (use -R instead).' )
-        sys.exit(1)
-
-    if opts.qsub_limit and opts.batch_limit:
-        errprint( '*** error: cannot use --qsub-limit and --batch-limit '
-                  'at the same time; --qsub-limit is deprecated.' )
-        sys.exit(1)
-
-    if opts.qsub_length and opts.batch_length:
-        errprint( '*** error: cannot use --qsub-length and --batch-length '
-                  'at the same time; --qsub-length is deprecated.' )
-        sys.exit(1)
-
-    if opts.pipeline:
-        opts.batch = True  # --pipeline replaced with --batch
-
-    if opts.qsub_limit:
-        # --qsub-limit replaced with --batch-limit
-        opts.batch_limit = opts.qsub_limit
-
-    if opts.qsub_length:
-        # --batch-limit replaced with --batch-limit
-        opts.batch_length = opts.qsub_length
+    # keep this block as an example of a deprecated but functional option
+    # if opts.qsub_limit:
+    #     # --qsub-limit replaced with --batch-limit
+    #     opts.batch_limit = opts.qsub_limit
 
     if opts.dash_s:
         if opts.search == None:

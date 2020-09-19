@@ -15,6 +15,25 @@ Changes:
       case "x" was unconditionally converted to an upper case "X". This no
       longer happens.
 
+    - The previously deprecated TIMEOUT environment variable, which is set for
+      each test prior to execution, has been removed. Use VVTEST_TIMEOUT
+      instead.
+
+    - The previously deprecated -F option is no longer recognized. Use -R
+      instead.
+
+    - The previously deprecated --pipeline option is no longer recognized.
+      Use --batch instead.
+
+    - The previously deprecated --qsub-limit option is no longer recognized.
+      Use --batch-limit instead.
+
+    - The previously deprecated --qsub-length option is no longer recognized.
+      Use --batch-length instead.
+
+    - The previously deprecated --check option is no longer recognized. Use
+      the --test-args option for a similar behavior.
+
 
 ==============================================================================
 

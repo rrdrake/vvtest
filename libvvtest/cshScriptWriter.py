@@ -83,7 +83,7 @@ def writeScript( testcase, xdb, plat, \
         '      echo "MPI_OPT=$MPI_OPT"',
         '      breaksw',
         '    case --execute-analysis-sections:',
-        '    case --execute_analysis_sections:',
+        '    case --execute_analysis_sections:', # remove after vvtest 1.3.0
         '      set analyze = 1',
         '      breaksw',
         '  endsw',

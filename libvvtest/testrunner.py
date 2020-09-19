@@ -163,8 +163,6 @@ class ExecutionHandler:
             if timeout < 120: t = timeout * 1.4
             else: t = timeout * 1.2
 
-            # [Apr 2019] using TIMEOUT is deprecated
-            os.environ['TIMEOUT'] = str( int( t ) )
             os.environ['VVTEST_TIMEOUT'] = str( int( t ) )
 
     def check_run_postclean(self):
@@ -245,6 +243,7 @@ class ExecutionHandler:
 
             if self.rtconfig.getAttr('analyze'):
                 cmdL.append('--execute-analysis-sections')
+                # remove --execute_analysis_sections after vvtest 1.3.0
                 cmdL.append('--execute_analysis_sections')
 
             cmdL.extend( self.rtconfig.getAttr( 'testargs' ) )

@@ -75,11 +75,6 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     construct_runtime_info( rtdata, argv, vvtestdir, opts, start_epoch )
     create_configuration( rtdata.rtconfig, opts, optD, vvtestdir, configdirs )
 
-    # this is scheduled for deprecation
-    if opts.check:
-        for n in opts.check:
-            os.environ[ 'CHECK_' + n.upper() ] = ''
-
     construct_platform( rtdata, vvtestdir, opts, optD )
     construct_testcase_constructor( rtdata, opts )
     compute_testing_directory( rtdata, opts, optD )
@@ -876,8 +871,6 @@ class CacheFileHandler:
                                        str(self.opts.timeout_multiplier).strip() + '\n' )
             if self.opts.dash_e:
                 fp.write( 'USE_ENV=1\n' )
-            if self.opts.check:
-                fp.write( 'CHECK=' + ' '.join( self.opts.check ) + '\n' )
             if self.opts.short_xdirs:
                 fp.write( 'SHORT_XDIRS='+self.opts.short_xdirs + '\n' )
 
@@ -917,8 +910,6 @@ class CacheFileHandler:
                         self.rtconfig.setAttr( 'multiplier', self.opts.timeout_multiplier )
                 elif kvpair[0] == 'USE_ENV':
                     self.opts.dash_e = True
-                elif kvpair[0] == 'CHECK':
-                    self.opts.check = kvpair[1].split()
                 elif kvpair[0] == 'SHORT_XDIRS':
                     if not self.opts.short_xdirs:
                         self.opts.short_xdirs = kvpair[1]
