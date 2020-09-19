@@ -788,11 +788,20 @@ class redirect_output:
             self.filep2.close()
 
 
+def get_filemode( path ):
+    ""
+    return stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
+
+
+def has_owner_read( path ):
+    ""
+    fm = stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
+    return int( fm & stat.S_IRUSR ) != 0
+
 def has_owner_execute( path ):
     ""
     fm = stat.S_IMODE( os.stat(path)[stat.ST_MODE] )
     return int( fm & stat.S_IXUSR ) != 0
-
 
 def has_no_group_permissions( path ):
     ""

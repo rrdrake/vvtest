@@ -14,6 +14,7 @@ from os.path import dirname
 import time
 import subprocess as sp
 import unittest
+import stat
 
 import trigtestutils as trigutil
 import testutils as util
@@ -26,6 +27,637 @@ permscmd = sys.executable+' '+trigutil.trigdir+'/perms.py'
 
 
 #######################################################################
+
+class implementation_tests( trigutil.trigTestCase ):
+
+    def test_removing_filemode_bits(self):
+        ""
+        util.writefile( 'tmpfile', 'content' )
+        fm = util.get_filemode( 'tmpfile' )
+        fm |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        fm |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        os.chmod( 'tmpfile', fm )
+        time.sleep(1)
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert util.has_world_execute( 'tmpfile' )
+        assert util.has_owner_read( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_world_read( 'tmpfile' )
+
+        ps = perms.PermSpec()
+        ps.bitsoff = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        ps.apply( 'tmpfile' )
+
+        assert not util.has_owner_execute( 'tmpfile' )
+        assert not util.has_group_execute( 'tmpfile' )
+        assert not util.has_world_execute( 'tmpfile' )
+        assert util.has_owner_read( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_world_read( 'tmpfile' )
+
+    def test_adding_filemode_bits(self):
+        ""
+        util.writefile( 'tmpfile', 'content' )
+        fm = util.get_filemode( 'tmpfile' )
+        fm &= ( ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) )
+        fm |= stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+        os.chmod( 'tmpfile', fm )
+        time.sleep(1)
+
+        assert not util.has_owner_execute( 'tmpfile' )
+        assert not util.has_group_execute( 'tmpfile' )
+        assert not util.has_world_execute( 'tmpfile' )
+        assert util.has_owner_read( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_world_read( 'tmpfile' )
+
+        ps = perms.PermSpec()
+        ps.bitson = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+        ps.apply( 'tmpfile' )
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert util.has_world_execute( 'tmpfile' )
+        assert util.has_owner_read( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_world_read( 'tmpfile' )
+
+    def test_adding_execute_bits(self):
+        ""
+        util.writefile( 'tmpfile', 'content' )
+        fm = util.get_filemode( 'tmpfile' )
+        fm &= ( ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) )
+        fm |= stat.S_IXUSR
+        os.chmod( 'tmpfile', fm )
+
+        util.writefile( 'tmpfile2', 'content' )
+        fm = util.get_filemode( 'tmpfile2' )
+        fm &= ( ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) )
+        os.chmod( 'tmpfile2', fm )
+
+        os.mkdir( 'tmpdir' )
+        fm = util.get_filemode( 'tmpdir' )
+        fm &= ( ~(stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH) )
+        os.chmod( 'tmpdir', fm )
+
+        time.sleep(1)
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert not util.has_group_execute( 'tmpfile' )
+        assert not util.has_world_execute( 'tmpfile' )
+
+        ps = perms.PermSpec()
+        ps.xbits = stat.S_IXGRP
+        ps.apply( 'tmpfile' )
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert not util.has_world_execute( 'tmpfile' )
+
+        ps = perms.PermSpec()
+        ps.xbits = stat.S_IXOTH
+        ps.apply( 'tmpfile' )
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert util.has_world_execute( 'tmpfile' )
+
+        # the xbit is applied if one of user/group/other has execute
+
+        assert not util.has_owner_execute( 'tmpfile2' )
+        assert not util.has_group_execute( 'tmpfile2' )
+        assert not util.has_world_execute( 'tmpfile2' )
+
+        ps = perms.PermSpec()
+        ps.xbits = stat.S_IXOTH
+        ps.apply( 'tmpfile2' )
+
+        assert not util.has_owner_execute( 'tmpfile2' )
+        assert not util.has_group_execute( 'tmpfile2' )
+        assert not util.has_world_execute( 'tmpfile2' )
+
+        # the xbit is applied if the path is a directory
+
+        assert not util.has_owner_execute( 'tmpdir' )
+        assert not util.has_group_execute( 'tmpdir' )
+        assert not util.has_world_execute( 'tmpdir' )
+
+        ps = perms.PermSpec()
+        ps.xbits = ( stat.S_IXUSR | stat.S_IXGRP )
+        ps.apply( 'tmpdir' )
+
+        assert util.has_owner_execute( 'tmpdir' )
+        assert util.has_group_execute( 'tmpdir' )
+        assert not util.has_world_execute( 'tmpdir' )
+
+    def test_working_with_umask(self):
+        ""
+        msk1 = perms.get_umask()
+        msk2 = perms.get_umask()
+        print3( 'umask', oct(msk1), oct(msk2) )
+        assert msk1 == msk2
+
+        try:
+            msk3 = os.umask( 0 )
+
+            with open( 'file1.txt', 'wt' ) as fp:
+                fp.write( 'content\n' )
+            assert util.has_group_write( 'file1.txt' )
+            assert util.has_world_read( 'file1.txt' )
+            assert util.has_world_write( 'file1.txt' )
+            assert not util.has_world_execute( 'file1.txt' )
+
+            msk4 = os.umask( stat.S_IWGRP|stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH )
+            with open( 'file2.txt', 'wt' ) as fp:
+                fp.write( 'content\n' )
+            assert not util.has_group_write( 'file2.txt' )
+            assert not util.has_world_read( 'file2.txt' )
+            assert not util.has_world_write( 'file2.txt' )
+            assert not util.has_world_execute( 'file2.txt' )
+
+        finally:
+            msk5 = os.umask( msk1 )
+
+        assert msk4 == 0
+        assert msk5 == (stat.S_IWGRP|stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH)
+
+    def test_setting_the_group(self):
+        ""
+        grpidL = os.getgroups()
+        grp1,grp2 = grpidL[-2],grpidL[-1]
+        assert grp1 != grp2
+
+        util.writefile( 'tmpfile', 'content' )
+        uid = os.stat( 'tmpfile' ).st_uid
+        os.chown( 'tmpfile', uid, grp1 )
+
+        time.sleep(1)
+
+        assert os.stat( 'tmpfile' ).st_gid == grp1
+
+        gs = perms.GroupSpec( grp2 )
+        gs.apply( 'tmpfile' )
+
+        assert os.stat( 'tmpfile' ).st_gid == grp2
+
+    def test_parse_specifications_for_setting_user_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'u=' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=r' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == stat.S_IRUSR and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=w' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == stat.S_IWUSR and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=x' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == stat.S_IXUSR and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=rwx' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR)
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=X' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == 0 and spec.xbits == stat.S_IXUSR
+
+        spec = perms.parse_string_spec( 'u=rX' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == stat.S_IRUSR and spec.xbits == stat.S_IXUSR
+
+        spec = perms.parse_string_spec( 'u=s' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == stat.S_ISUID and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u=rwxs' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR|stat.S_ISUID)
+        assert spec.xbits == 0
+
+        # the "restricted deletion" or sticky bit is ignored if applied to user
+        spec = perms.parse_string_spec( 'u=rwt' )
+        assert spec.bitsoff == stat.S_IRWXU
+        assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR)
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_setting_group_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'g=' )
+        assert spec.bitsoff == stat.S_IRWXG
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g=rwxs' )
+        assert spec.bitsoff == stat.S_IRWXG
+        assert spec.bitson == (stat.S_IRGRP|stat.S_IWGRP|stat.S_IXGRP|stat.S_ISGID)
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g=rX' )
+        assert spec.bitsoff == stat.S_IRWXG
+        assert spec.bitson == stat.S_IRGRP and spec.xbits == stat.S_IXGRP
+
+        # the "restricted deletion" or sticky bit is ignored if applied to group
+        spec = perms.parse_string_spec( 'g=rwt' )
+        assert spec.bitsoff == stat.S_IRWXG
+        assert spec.bitson == (stat.S_IRGRP|stat.S_IWGRP)
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_setting_other_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'o=' )
+        assert spec.bitsoff == stat.S_IRWXO
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # the setgid bit is ignored if applied to other
+        spec = perms.parse_string_spec( 'o=rwxs' )
+        assert spec.bitsoff == stat.S_IRWXO
+        assert spec.bitson == (stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH)
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'o=rX' )
+        assert spec.bitsoff == stat.S_IRWXO
+        assert spec.bitson == stat.S_IROTH and spec.xbits == stat.S_IXOTH
+
+        spec = perms.parse_string_spec( 'o=rwt' )
+        assert spec.bitsoff == stat.S_IRWXO
+        assert spec.bitson == (stat.S_IROTH|stat.S_IWOTH|stat.S_ISVTX)
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_adding_user_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'u+' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u+r' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IRUSR and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u+rwx' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR)
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u+rXs' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == (stat.S_IRUSR|stat.S_ISUID)
+        assert spec.xbits == stat.S_IXUSR
+
+        # 't' is ignored for user
+        spec = perms.parse_string_spec( 'u+rt' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IRUSR
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_adding_group_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'g+' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g+w' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IWGRP and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g+rXs' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == (stat.S_IRGRP|stat.S_ISGID)
+        assert spec.xbits == stat.S_IXGRP
+
+        # 't' is ignored for group
+        spec = perms.parse_string_spec( 'g+rt' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IRGRP
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_adding_other_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'o+' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'o+x' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IXOTH and spec.xbits == 0
+
+        # 's' bit ignored for other
+        spec = perms.parse_string_spec( 'o+rXs' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_IROTH
+        assert spec.xbits == stat.S_IXOTH
+
+        spec = perms.parse_string_spec( 'o+rt' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == (stat.S_IROTH|stat.S_ISVTX)
+        assert spec.xbits == 0
+
+    def test_parse_specifications_for_removing_user_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'u-' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u-w' )
+        assert spec.bitsoff == stat.S_IWUSR
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u-rwx' )
+        assert spec.bitsoff == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'u-s' )
+        assert spec.bitsoff == stat.S_ISUID
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # removing 'X' unconditionally turns off execute
+        spec = perms.parse_string_spec( 'u-X' )
+        assert spec.bitsoff == stat.S_IXUSR
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # 't' is ignored for user
+        spec = perms.parse_string_spec( 'u-t' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+    def test_parse_specifications_for_removing_group_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'g-' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g-wx' )
+        assert spec.bitsoff == (stat.S_IWGRP|stat.S_IXGRP)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'g-s' )
+        assert spec.bitsoff == stat.S_ISGID
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # removing 'X' unconditionally turns off execute
+        spec = perms.parse_string_spec( 'g-wX' )
+        assert spec.bitsoff == (stat.S_IWGRP|stat.S_IXGRP)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # 't' is ignored for group
+        spec = perms.parse_string_spec( 'g-t' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+    def test_parse_specifications_for_removing_other_perms(self):
+        ""
+        spec = perms.parse_string_spec( 'o-' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'o-wx' )
+        assert spec.bitsoff == (stat.S_IWOTH|stat.S_IXOTH)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # 's' is ignored for other
+        spec = perms.parse_string_spec( 'o-rs' )
+        assert spec.bitsoff == stat.S_IROTH
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        # removing 'X' unconditionally turns off execute
+        spec = perms.parse_string_spec( 'o-wX' )
+        assert spec.bitsoff == (stat.S_IWOTH|stat.S_IXOTH)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'o-t' )
+        assert spec.bitsoff == stat.S_ISVTX
+        assert spec.bitson == 0 and spec.xbits == 0
+
+    def test_parse_specifications_combining_user_group_other(self):
+        ""
+        spec = perms.parse_string_spec( 'og-' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'og-x' )
+        assert spec.bitsoff == (stat.S_IXGRP|stat.S_IXOTH)
+        assert spec.bitson == 0 and spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'go=rX' )
+        assert spec.bitsoff == (stat.S_IRWXG|stat.S_IRWXO)
+        assert spec.bitson == (stat.S_IRGRP|stat.S_IROTH)
+        assert spec.xbits == (stat.S_IXGRP|stat.S_IXOTH)
+
+        spec = perms.parse_string_spec( 'a-wX' )
+        assert spec.bitsoff == (stat.S_IWUSR|stat.S_IXUSR|
+                                stat.S_IWGRP|stat.S_IXGRP|
+                                stat.S_IWOTH|stat.S_IXOTH)
+        assert spec.bitson == 0
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'a+s' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == (stat.S_ISUID|stat.S_ISGID)
+        assert spec.xbits == 0
+
+        spec = perms.parse_string_spec( 'a+t' )
+        assert spec.bitsoff == 0
+        assert spec.bitson == stat.S_ISVTX
+        assert spec.xbits == 0
+
+    def test_parse_specifications_with_umask(self):
+        """
+        from the chmod man page:
+            when no 'ugoa' is given, the effect is as if 'a' were given, but
+            bits that are set in the umask are not affected.
+        """
+        msk = ( stat.S_IWGRP|stat.S_IROTH|stat.S_IWOTH|stat.S_IXOTH )
+        save = os.umask( msk )
+
+        try:
+            spec = perms.parse_string_spec( '+r' )
+            assert spec.bitsoff == 0
+            assert spec.bitson == (stat.S_IRUSR|stat.S_IRGRP)
+            assert spec.xbits == 0
+
+            spec = perms.parse_string_spec( '-r' )
+            assert spec.bitsoff == (stat.S_IRUSR|stat.S_IRGRP|stat.S_IROTH)
+            assert spec.bitson == 0
+            assert spec.xbits == 0
+
+            spec = perms.parse_string_spec( '+rwX' )
+            assert spec.bitsoff == 0
+            assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP)
+            assert spec.xbits == (stat.S_IXUSR|stat.S_IXGRP)
+
+            spec = perms.parse_string_spec( 'a+rwX' )
+            assert spec.bitsoff == 0
+            assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|
+                                   stat.S_IRGRP|stat.S_IWGRP|
+                                   stat.S_IROTH|stat.S_IWOTH)
+            assert spec.xbits == (stat.S_IXUSR|stat.S_IXGRP|stat.S_IXOTH)
+
+            spec = perms.parse_string_spec( '+st' )
+            assert spec.bitsoff == 0
+            assert spec.bitson == (stat.S_ISUID|stat.S_ISGID|stat.S_ISVTX)
+            assert spec.xbits == 0
+
+            spec = perms.parse_string_spec( '=rwX' )
+            assert spec.bitsoff == (stat.S_IRWXU|stat.S_IRWXG|stat.S_IRWXO)
+            assert spec.bitson == (stat.S_IRUSR|stat.S_IWUSR|stat.S_IRGRP)
+            assert spec.xbits == (stat.S_IXUSR|stat.S_IXGRP)
+
+        finally:
+            os.umask( save )
+
+    def test_parse_group_specification(self):
+        ""
+        import grp
+
+        grpidL = os.getgroups()
+        grpid1,grpid2 = grpidL[-2],grpidL[-1]
+        grp1 = grp.getgrgid( grpid1 ).gr_name
+        grp2 = grp.getgrgid( grpid2 ).gr_name
+
+        spec = perms.parse_string_spec( grp1 )
+        if spec.groupid != grpid1:
+            # try group 2 in case group 1 looks like a chmod specification
+            spec = perms.parse_string_spec( grp2 )
+            assert spec.groupid == grpid2
+
+        # a numerical group id is accepted
+        spec = perms.parse_string_spec( str(grpid1) )
+        assert spec.groupid == grpid1
+
+        gid = find_invalid_groupid( grpidL )
+        self.assertRaises( perms.PermissionSpecificationError,
+                           perms.parse_string_spec, str(gid) )
+
+        self.assertRaises( perms.PermissionSpecificationError,
+                           perms.parse_string_spec, 'no_exist_group_19348473' )
+
+    def test_set_permissions_and_group_on_a_path(self):
+        ""
+        grp1,grp2 = util.probe_for_two_different_groups()
+        util.writefile( 'file.txt', 'content' )
+        time.sleep(1)
+
+        spec = perms.parse_string_spec( 'go+r' )
+        spec.apply( 'file.txt' )
+        assert util.has_group_read( 'file.txt' )
+        assert util.has_world_read( 'file.txt' )
+
+        spec = perms.parse_string_spec( 'o-r' )
+        spec.apply( 'file.txt' )
+        assert util.has_group_read( 'file.txt' )
+        assert not util.has_world_read( 'file.txt' )
+
+        if grp1 == util.get_file_group( 'file.txt' ):
+            grp = grp2
+        else:
+            grp = grp1
+
+        spec = perms.parse_string_spec( grp )
+        spec.apply( 'file.txt' )
+        assert util.get_file_group( 'file.txt' ) == grp
+
+
+class interface_tests( trigutil.trigTestCase ):
+
+    def test_using_the_permissions_object(self):
+        ""
+        util.writefile( 'tmpfile', 'content' )
+        util.writefile( 'dir1/dir2/file.txt', 'content' )
+        time.sleep(1)
+
+        pspec = perms.PermissionSpecifications( 'u+x', 'g=rX', 'o-rw' )
+        pspec.apply( 'tmpfile' )
+
+        assert util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert not util.has_world_read( 'tmpfile' )
+        assert not util.has_world_write( 'tmpfile' )
+
+        pspec = perms.PermissionSpecifications( 'u-x', 'g+s' )
+        pspec.apply( 'tmpfile' )
+
+        assert not util.has_owner_execute( 'tmpfile' )
+        assert util.has_group_read( 'tmpfile' )
+        assert util.has_group_execute( 'tmpfile' )
+        assert util.has_group_sticky( 'tmpfile' )
+        assert not util.has_world_read( 'tmpfile' )
+        assert not util.has_world_write( 'tmpfile' )
+
+        grp1,grp2 = util.probe_for_two_different_groups()
+
+        pspec = perms.PermissionSpecifications( '+rX', grp1 )
+        pspec.apply( 'dir1', recurse=True )
+        assert util.has_group_execute( 'dir1/dir2' )
+        assert not util.has_group_execute( 'dir1/dir2/file.txt' )
+        assert util.get_file_group( 'dir1' ) == grp1
+        assert util.get_file_group( 'dir1/dir2' ) == grp1
+        assert util.get_file_group( 'dir1/dir2/file.txt' ) == grp1
+
+        pspec = perms.PermissionSpecifications( grp2, 'go-rw', 'g+S' )
+        pspec.apply( 'dir1', recurse=True )
+        assert not util.has_group_read( 'dir1/dir2' )
+        assert not util.has_group_write( 'dir1/dir2' )
+        assert not util.has_group_read( 'dir1/dir2/file.txt' )
+        assert not util.has_group_write( 'dir1/dir2/file.txt' )
+        assert util.has_group_execute( 'dir1/dir2' )
+        assert not util.has_group_execute( 'dir1/dir2/file.txt' )
+        assert util.get_file_group( 'dir1' ) == grp2
+        assert util.get_file_group( 'dir1/dir2' ) == grp2
+        assert util.get_file_group( 'dir1/dir2/file.txt' ) == grp2
+        assert util.has_group_sticky( 'dir1' )
+        assert util.has_group_sticky( 'dir1/dir2' )
+        assert not util.has_group_sticky( 'dir1/dir2/file.txt' )
+
+        gid = find_invalid_groupid( os.getgroups() )
+        self.assertRaises( perms.PermissionSpecificationError,
+                           perms.PermissionSpecifications, str(gid) )
+
+    def test_using_the_apply_entry_point(self):
+        ""
+        util.writefile( 'dir1/file.txt', 'content' )
+        util.writefile( 'dir2/file2.txt', 'content' )
+        os.symlink( '../dir2', 'dir1/lnkdir' )
+        fm = util.get_filemode( 'dir2/file2.txt' )
+        os.chmod( 'dir1/file.txt', fm & ( ~stat.S_IROTH ) )
+        os.chmod( 'dir2/file2.txt', fm & ( ~stat.S_IROTH ) )
+        time.sleep(1)
+
+        perms.apply( 'dir1', 'g+rXS', 'o=rX', recurse=True )
+
+        assert     util.has_group_read(    'dir1' )
+        assert     util.has_group_execute( 'dir1' )
+        assert     util.has_group_sticky(  'dir1' )
+        assert     util.has_world_read(    'dir1' )
+        assert not util.has_world_write(   'dir1' )
+        assert     util.has_world_execute( 'dir1' )
+
+        assert     util.has_group_read(    'dir1/file.txt' )
+        assert not util.has_group_execute( 'dir1/file.txt' )
+        assert     util.has_world_read(    'dir1/file.txt' )
+        assert not util.has_world_write(   'dir1/file.txt' )
+        assert not util.has_world_execute( 'dir1/file.txt' )
+        assert not util.has_world_read(    'dir2/file2.txt' )
+
+
+def find_invalid_groupid( grpidL ):
+    ""
+    import grp
+
+    gid = grpidL[0]
+    while True:
+        if gid not in grpidL:
+            break
+        gid += 1
+
+    return gid
+
 
 class catchall( unittest.TestCase ):
 
