@@ -17,7 +17,7 @@ from . import pathutil
 
 class PermissionSetter:
     
-    def __init__(self, topdir, spec):
+    def __init__(self, topdir, speclist):
         """
         The 'spec' can be a list or a comma separate string, which is sent
         into the perms.py module for processing.  The only difference here
@@ -31,11 +31,11 @@ class PermissionSetter:
         assert os.path.isabs( topdir )
 
         self.topdir = topdir
-        self.spec = spec
+        self.specs = None
         self.cache = set()
 
-        if spec:
-            self.speclist = parse_permission_specifications( spec )
+        if speclist:
+            self.specs = make_permission_specs( speclist )
 
     def apply(self, path):
         """
@@ -48,7 +48,7 @@ class PermissionSetter:
         An instance of this class caches the paths that have had their
         permissions set and will not set them more than once.
         """
-        if not self.spec:
+        if not self.specs:
             return
 
         if os.path.isabs( path ):
@@ -58,7 +58,7 @@ class PermissionSetter:
             path = normpath( path )
 
             if not pathutil.is_subdir( self.topdir, path ):
-                self._setperms( path )
+                self.specs.apply( path )
                 return
 
         else:
@@ -74,7 +74,7 @@ class PermissionSetter:
             if path in self.cache:
                 break
 
-            self._setperms( path )
+            self.specs.apply( path )
             self.cache.add( path )
 
             if os.path.samefile( path, self.topdir ):
@@ -93,57 +93,26 @@ class PermissionSetter:
         to the each entry in the directory.  Soft links are left untouched
         and not followed.
         """
-        if not self.spec:
+        if not self.specs:
             return
 
-        if os.path.isdir( path ):
-            
-            if not os.path.islink( path ):
-                self._setperms( path )
+        if not os.path.islink( path ):
 
-            def walker( arg, dirname, dirs, files ):
-                ""
-                for f in itertools.chain( dirs, files ):
-                    p = pjoin( dirname, f )
-                    if not os.path.islink(p):
-                        arg._setperms(p)
-
-            for root,dirs,files in os.walk( path ):
-                walker( self, root, dirs, files )
-
-        elif not os.path.islink( path ):
-            self._setperms( path )
-
-    def _setperms(self, path):
-        ""
-        perms.apply_chmod( path, *self.speclist )
-
-
-def parse_permission_specifications( string_or_list ):
-    ""
-    if type(string_or_list) == type(''):
-        speclist = [ string_or_list ]
-    else:
-        speclist = string_or_list
-
-    specL = []
-    for spec_string in speclist:
-        for spec in split_by_space_and_comma( spec_string ):
-            if len(spec) >= 2 and spec[0] in 'ugo' and spec[1] in '=+-':
-                try:
-                    perms.change_filemode( 0, spec )
-                    spec = change_x_perms_to_capital_X( spec )
-                    specL.append( spec )
-                except perms.PermissionSpecificationError as e:
-                    raise FatalError( 'invalid permission specification "' + \
-                                      spec+'" '+str(e) )
+            if os.path.isdir( path ):
+                self.specs.apply( path, recurse=True )
             else:
-                if not perms.can_map_group_name_to_group_id( spec ):
-                    raise FatalError( 'invalid permission specification "' + \
-                                      spec+'"' )
-                specL.append( spec )
+                self.specs.apply( path )
 
-    return specL
+
+def make_permission_specs( speclist ):
+    ""
+    try:
+        specs = perms.PermissionSpecifications( *speclist )
+    except perms.PermissionSpecificationError as e:
+        raise FatalError(
+                'invalid permission specification or group name: ' + str(e) )
+
+    return specs
 
 
 def change_x_perms_to_capital_X( spec ):

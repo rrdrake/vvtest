@@ -312,7 +312,7 @@ def make_temp_dir( parent_dir, itime ):
     sd = os.path.join( parent_dir, 'filecopy_'+dt+'_p'+pid )
     print3( 'mkdir '+os.uname()[1]+':'+sd )
     os.mkdir( sd )
-    perms.apply_chmod( sd, 'u=rwx', 'g=---', 'o=---' )
+    perms.apply( sd, 'u=rwx', 'g=', 'o=' )
     return sd
 
 
@@ -341,10 +341,12 @@ def apply_permissions( directory, fileL, fperms, dperms, group ):
         if os.path.islink(wf):
             pass
         elif os.path.isdir(wf):
-            perms.chmod_recurse( wf, fperms, dperms, group )
+            perms.apply( wf, *dperms )
+            if group: perms.apply( wf, group )
+            apply_permissions( wf, os.listdir(wf), fperms, dperms, group )
         else:
-            if fperms: perms.apply_chmod( wf, *fperms )
-            if group: perms.apply_chmod( wf, group )
+            if fperms: perms.apply( wf, *fperms )
+            if group: perms.apply( wf, group )
 
 
 def check_unique( readmach, readL, writemach, writedir ):
@@ -388,12 +390,14 @@ def local_copy( readL, destdir, fperms=[], dperms=[], group=None ):
         elif os.path.isdir(rf):
             print3( 'cp -r', rf, wf )
             shutil.copytree( rf, wf, symlinks=True )
-            perms.chmod_recurse( wf, fperms, dperms, group )
+            perms.apply( wf, *dperms )
+            if group: perms.apply( wf, group )
+            apply_permissions( wf, os.listdir(wf), fperms, dperms, group )
         else:
             print3( 'cp -p', rf, wf )
             shutil.copy2( rf, wf )
-            if fperms: perms.apply_chmod( wf, *fperms )
-            if group: perms.apply_chmod( wf, group )
+            if fperms: perms.apply( wf, *fperms )
+            if group: perms.apply( wf, group )
 
     swap_paths( readL, tmpd, destdir )
 

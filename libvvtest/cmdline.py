@@ -221,14 +221,14 @@ in the test directory are removed.  Turning this option on
 will prevent a test script that exists from being overwritten
 and the test directory will not be cleaned out.
 
-The --perms option will apply permission settings to files and directories in
-the test execution area.  Multiple --perms options can be used and/or the
-specifications can be comma separated.  If the specification starts
-with "g=" then the group permissions are set.  If it starts with
-"o=" then the world permissions are set.  If not one of these,
-then it must be the name of a UNIX group, and the files and
-directories have their group set.  Examples are "o=-", "g=rx,o=",
-"wg-alegra,g=rws,o=---".
+The --perms option will apply permission settings and/or a group name to
+files and directories in the test execution area.  Multiple --perms options
+can be used and/or the specifications can be comma separated.
+A permission specification mimics the UNIX chmod command, such as "+rX",
+"g=rwX", and "o=". One notable difference compared to chmod is that while
+"g+s" sets the setgid bit on files and directories, the string "g+S" will
+only set the setgid bit for directories. If the specification is not a valid
+permission setting, then a UNIX group is assumed, such as "my-cool-group".
 
 The -C or --postclean option will clean out the test directory of each test
 after it shows a "pass".  Only those tests that "pass" are cleaned out after
@@ -555,8 +555,8 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '-m', dest='dash_m', action='store_true',
         help='Do not clean out test result directories before running.' )
     grp.add_argument( '--perms', action='append',
-        help='Apply permission settings to files and directories in the '
-             'test execution area.' )
+        help='Apply permission settings and/or a group name to files and '
+             'directories in the test execution area.' )
     grp.add_argument( '-C', '--postclean', dest='postclean', action='store_true',
         help='Clean the test execution directory after a "pass".' )
     grp.add_argument( '--force', action='store_true',

@@ -451,6 +451,25 @@ world_bits['r-x'] = world_bits['rx']
 world_bits['-wx'] = world_bits['wx']
 
 
+def get_user_name( path=None ):
+    """
+    Returns the owner of the given pathname, or the owner of the current
+    process if 'path' is not given. If the numeric user id cannot be mapped
+    to a user name, the numeric id is returned as a string.
+    """
+    if path:
+        uid = os.stat( path ).st_uid
+    else:
+        uid = os.getuid()
+
+    try:
+        name = pwd.getpwuid( uid )[0]
+    except Exception:
+        name = str(uid)
+
+    return name
+
+
 def apply( path, *stringspecs, **kwargs ):
     """
     Parse and apply group and/or file mode specifications to a path. The
@@ -477,7 +496,9 @@ class PermissionSpecifications:
 
     def __init__(self, *stringspecs):
         ""
-        self.specs = [ parse_string_spec(sspec) for sspec in stringspecs ]
+        self.specs = []
+        for sspec in split_specs_by_commas( stringspecs ):
+            self.specs.append( parse_string_spec(sspec) )
 
     def apply(self, path, recurse=False):
         ""
@@ -490,6 +511,19 @@ class PermissionSpecifications:
                     for fn in os.listdir( path ):
                         fp = os.path.join( path, fn )
                         self.apply( fp, recurse=True )
+
+
+def split_specs_by_commas( stringspecs ):
+    ""
+    sL = []
+
+    for sspec in stringspecs:
+        for s in sspec.split(','):
+            s = s.strip()
+            if s:
+                sL.append(s)
+
+    return sL
 
 
 class PermSpec:
@@ -632,7 +666,8 @@ def parse_group_string_spec( strspec ):
         try:
             gid = grp.getgrnam( strspec ).gr_gid
         except Exception:
-            raise PermissionSpecificationError( 'Invalid group: "'+strspec+'"' )
+            raise PermissionSpecificationError(
+                    'Invalid specification or group name: "'+strspec+'"' )
 
     spec = GroupSpec( gid )
 
@@ -642,7 +677,8 @@ def parse_group_string_spec( strspec ):
         try:
             spec.apply( tmpd )
         except Exception:
-            raise PermissionSpecificationError( 'Invalid group: "'+strspec+'"' )
+            raise PermissionSpecificationError(
+                    'Invalid specification or group name: "'+strspec+'"' )
     finally:
         os.rmdir( tmpd )
 

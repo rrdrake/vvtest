@@ -225,19 +225,19 @@ def file_perms( fname, permissions, remote=None ):
     process and the user of the file are the same.
     """
     if remote == None:
-        if perms.i_own( fname ):
+        if perms.get_user_name( fname ) == perms.get_user_name():
             if type(permissions) == type(''):
-                perms.apply_chmod( fname, permissions )
+                perms.apply( fname, permissions )
             else:
                 # assume 'permissions' is a tuple or list
-                perms.apply_chmod( fname, *permissions )
+                perms.apply( fname, *permissions )
     else:
-        if remote.perms.i_own( fname ):
+        if remote.perms.get_user_name( fname ) == remote.perms.get_user_name():
             if type(permissions) == type(''):
-                remote.perms.apply_chmod( fname, permissions )
+                remote.perms.apply( fname, permissions )
             else:
                 # assume 'permissions' is a tuple or list
-                remote.perms.apply_chmod( fname, *permissions )
+                remote.perms.apply( fname, *permissions )
 
 
 _machine_prefix_pat = re.compile( '[0-9a-zA-Z_.-]+?:' )

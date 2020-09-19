@@ -600,7 +600,7 @@ class interface_tests( trigutil.trigTestCase ):
         assert util.get_file_group( 'dir1/dir2' ) == grp1
         assert util.get_file_group( 'dir1/dir2/file.txt' ) == grp1
 
-        pspec = perms.PermissionSpecifications( grp2, 'go-rw', 'g+S' )
+        pspec = perms.PermissionSpecifications( grp2, 'go-rw,g+S' )
         pspec.apply( 'dir1', recurse=True )
         assert not util.has_group_read( 'dir1/dir2' )
         assert not util.has_group_write( 'dir1/dir2' )
@@ -657,6 +657,26 @@ def find_invalid_groupid( grpidL ):
         gid += 1
 
     return gid
+
+
+class auxiliary_function_tests( trigutil.trigTestCase ):
+
+    def test_getting_the_user_name(self):
+        ""
+        import pwd
+
+        util.writefile( 'file.txt', 'content' )
+        time.sleep(1)
+
+        uid = os.getuid()
+        nam = pwd.getpwuid( uid )[0]
+
+        usr = perms.get_user_name()
+        assert usr == nam
+
+        usr = perms.get_user_name( 'file.txt' )
+        print3( usr )
+        assert usr == nam
 
 
 class catchall( unittest.TestCase ):

@@ -1,7 +1,9 @@
 
 Improvements:
 
-    - 
+    - Using --perms "g+s" will set the setgid bit on files and directories.
+      A capital "S" is now allowed, such as --perms "g+S", which will only
+      set the setgid bit on directories.
 
 Fixes:
 
@@ -9,7 +11,9 @@ Fixes:
 
 Changes:
 
-    - 
+    - Using the command line option --perms changed slightly. A value of lower
+      case "x" was unconditionally converted to an upper case "X". This no
+      longer happens.
 
 
 ==============================================================================
