@@ -45,9 +45,20 @@ class PythonProxy( object ):
     def __init__(self, machine=None,
                        pythonexe='python',
                        sshcmd='ssh',
+                       bashlogin=False,
                        logfile=None ):
-        ""
-        self.remote = RemotePython( machine, pythonexe, sshcmd, logfile )
+        """
+        If 'machine' is given, use ssh to run python on that machine.
+        The 'pythonexe' is the remote python interpreter.
+        The 'sshcmd' can contain options.
+        If 'bashlogin' is True, run python under "/bin/bash -l" (a login shell).
+        The 'logfile' can be a filename or a file-like object.
+        """
+        self.remote = RemotePython( machine=machine,
+                                    pythonexe=pythonexe,
+                                    sshcmd=sshcmd,
+                                    bashlogin=bashlogin,
+                                    logfile=logfile )
 
         self.objid = 0
         self.objs = {}
@@ -240,10 +251,12 @@ class python_proxy:
                        startup_timeout=30,
                        pythonexe='python',
                        sshcmd='ssh',
+                       bashlogin=False,
                        logfile=None ):
         ""
         self.proxy = PythonProxy( machname, pythonexe=pythonexe,
                                             sshcmd=sshcmd,
+                                            bashlogin=bashlogin,
                                             logfile=logfile )
         self.proxy.start( startup_timeout )
 

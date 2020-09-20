@@ -19,13 +19,14 @@ class RemotePython:
     def __init__(self, machine=None,
                        pythonexe='python',
                        sshcmd='ssh',
+                       bashlogin=False,
                        logfile=None ):
         ""
         self.started = False
 
         logfp = _check_open_logfile( logfile )
 
-        self.cmdL = bootstrap_command( pythonexe, machine, sshcmd )
+        self.cmdL = bootstrap_command( pythonexe, machine, sshcmd, bashlogin )
 
         if logfp != None:
             logfp.write( 'CMD: '+str(self.cmdL)+'\n' )
@@ -260,7 +261,7 @@ else:
     def make_string( buf ): return buf.decode()
 
 
-def bootstrap_command( pythonexe, machine, sshcmd ):
+def bootstrap_command( pythonexe, machine, sshcmd, bashlogin ):
     ""
     cmdL = [
         pythonexe, '-u', '-E', '-c',
@@ -271,11 +272,16 @@ def bootstrap_command( pythonexe, machine, sshcmd ):
                        '"<remotepython_from_'+os.uname()[1]+'>", '
                        '"exec" ) )'
     ]
+    pycmd = ' '.join( [ pipes.quote( arg ) for arg in cmdL ] )
 
     if machine:
-        remote_cmd = ' '.join( [ pipes.quote( arg ) for arg in cmdL ] )
         cmdL = shlex.split( sshcmd )
-        cmdL.extend( [ machine, remote_cmd ] )
+        if bashlogin:
+            cmdL.extend( [ machine, '/bin/bash -l -c ' + pipes.quote(pycmd) ] )
+        else:
+            cmdL.extend( [ machine, pycmd ] )
+    elif bashlogin:
+        cmdL = [ '/bin/bash', '-l', '-c', pycmd ]
 
     return cmdL
 

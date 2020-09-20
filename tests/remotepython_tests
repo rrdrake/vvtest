@@ -426,22 +426,25 @@ class integration_tests( unittest.TestCase ):
 
     def test_connect_and_print_hello(self):
         ""
-        rem = RemotePython( pythonexe=rpy )
-        try:
-            ok = rem.start(5)
-            assert ok
-            rem.execute( 'import os, sys',
-                         'print ( "hello stdout" )',
-                         'sys.stderr.write( "hello stderr"+os.linesep )',
-                         'sys.stderr.flush()' )
-            out1,err1 = get_line_from_remote( rem )
-            out2,err2 = get_line_from_remote( rem )
-        finally:
-            rem.close()
+        for bashlogin in [False,True]:
+            rem = RemotePython( pythonexe=rpy,
+                                bashlogin=bashlogin,
+                                logfile='logfile' )
+            try:
+                ok = rem.start(5)
+                assert ok
+                rem.execute( 'import os, sys',
+                             'print ( "hello stdout" )',
+                             'sys.stderr.write( "hello stderr"+os.linesep )',
+                             'sys.stderr.flush()' )
+                out1,err1 = get_line_from_remote( rem )
+                out2,err2 = get_line_from_remote( rem )
+            finally:
+                rem.close()
 
-        assert out1 != out2 and err1 != err2
-        assert out1 == 'hello stdout\n' or out2 == 'hello stdout\n'
-        assert err1 == 'hello stderr\n' or err2 == 'hello stderr\n'
+            assert out1 != out2 and err1 != err2
+            assert out1 == 'hello stdout\n' or out2 == 'hello stdout\n'
+            assert err1 == 'hello stderr\n' or err2 == 'hello stderr\n'
 
     def test_timing_out_waiting_on_a_command(self):
         ""
@@ -485,24 +488,55 @@ class integration_tests( unittest.TestCase ):
         assert out1.strip() == 'foobar' and not err1
         assert not out2 and 'fake failure' in err2
 
+    def test_generating_the_bootstrap_command(self):
+        ""
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               None,
+                                               'foobar',
+                                               False )
+        assert 'foobar' not in ''.join( cmdL )
+        assert cmdL[0] == '/opt/super py'
+
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               None,
+                                               'foobar',
+                                               True )
+        assert 'foobar' not in ''.join( cmdL )
+        assert cmdL[0] == '/bin/bash'
+        assert len( filter( lambda s: '/opt/super py' in s, cmdL ) ) == 1
+
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               'sparky',
+                                               '/opt/foobar -o baz',
+                                               False )
+        assert cmdL[:4] == [ '/opt/foobar', '-o', 'baz', 'sparky' ]
+        assert '/opt/super py' in ''.join( cmdL )
+
+        cmdL = remotepython.bootstrap_command( '/opt/super py',
+                                               'sparky',
+                                               '/opt/foobar -o baz',
+                                               True )
+        assert '/opt/super py' in ''.join( cmdL )
+        assert len( filter( lambda s: s.startswith('/bin/bash'), cmdL ) ) == 1
+
     def test_connecting_with_ssh_but_using_a_fake_ssh_script(self):
         ""
         fakessh = write_fake_ssh_script()
         time.sleep(1)
 
-        cmdL = remotepython.bootstrap_command( '/opt/super py',
-                                               None,
-                                               'foobar' )
-        assert 'foobar' not in ''.join( cmdL )
-        assert cmdL[0] == '/opt/super py'
-
-        cmdL = remotepython.bootstrap_command( '/opt/super py',
-                                               'sparky',
-                                               '/opt/foobar -o baz' )
-        assert cmdL[:4] == [ '/opt/foobar', '-o', 'baz', 'sparky' ]
-        assert '/opt/super py' in ''.join( cmdL )
-
         rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ("hello")' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        assert out.strip() == 'hello' and not err
+
+        rem = RemotePython( 'sparky', pythonexe=rpy,
+                                      sshcmd=fakessh,
+                                      bashlogin=True,
+                                      logfile='logfile' )
         try:
             rem.start( timeout=5 )
             rem.execute( 'print ("hello")' )
