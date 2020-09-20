@@ -20,6 +20,8 @@ USAGE:
     perms.py [OPTIONS] [ path [ path ... ]
 
 SYNOPSIS:
+    Running this file as a program is deprecated. Use chperms instead.
+
     This script sets file and directory permissions and group.  Its main use
 is as a python module for file & directory manipulation utilities.  The command
 line interface is similar in functionality to the shell commands chmod and

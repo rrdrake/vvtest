@@ -24,6 +24,7 @@ from testutils import print3
 import perms
 
 permscmd = sys.executable+' '+trigutil.trigdir+'/perms.py'
+chpermscmd = sys.executable+' '+trigutil.trigdir+'/chperms'
 
 
 #######################################################################
@@ -677,6 +678,72 @@ class auxiliary_function_tests( trigutil.trigTestCase ):
         usr = perms.get_user_name( 'file.txt' )
         print3( usr )
         assert usr == nam
+
+
+class chperms_tests( trigutil.trigTestCase ):
+
+    def test_exercise_the_help_option(self):
+        ""
+        x,out = util.runcmd( chpermscmd+' -h', verbose=2 )
+        assert 'SYNOPSIS' in out
+
+        x,out = util.runcmd( chpermscmd+' --help', verbose=2 )
+        assert 'SYNOPSIS' in out
+
+    def test_default_path_is_current_working_directory(self):
+        ""
+        util.writefile( 'adir/file.txt', 'content' )
+        time.sleep(1)
+
+        util.runcmd( chpermscmd+' -p g=rX -p o=', chdir='adir' )
+
+        assert     util.has_group_read   ( 'adir' )
+        assert     util.has_group_execute( 'adir' )
+        assert not util.has_world_read   ( 'adir' )
+        assert not util.has_world_write  ( 'adir' )
+        assert not util.has_world_execute( 'adir' )
+
+        util.runcmd( chpermscmd+' -p g-rwX', chdir='adir' )
+
+        assert not util.has_group_read   ( 'adir' )
+        assert not util.has_group_write  ( 'adir' )
+        assert not util.has_group_execute( 'adir' )
+        assert not util.has_world_read   ( 'adir' )
+        assert not util.has_world_write  ( 'adir' )
+        assert not util.has_world_execute( 'adir' )
+
+    def test_multiple_paths_and_using_the_recurse_option(self):
+        ""
+        util.writefile( 'adir/file.txt', 'content' )
+        time.sleep(1)
+
+        util.runcmd( chpermscmd+' -p g= adir adir/file.txt' )
+        util.runcmd( chpermscmd+' -p g+rX adir adir/file.txt' )
+
+        assert     util.has_group_read   ( 'adir' )
+        assert not util.has_group_write  ( 'adir' )
+        assert     util.has_group_execute( 'adir' )
+        assert     util.has_group_read   ( 'adir/file.txt' )
+        assert not util.has_group_write  ( 'adir/file.txt' )
+        assert not util.has_group_execute( 'adir/file.txt' )
+
+        util.runcmd( chpermscmd+' -p g-rX adir' )
+
+        assert not util.has_group_read   ( 'adir' )
+        assert not util.has_group_write  ( 'adir' )
+        assert not util.has_group_execute( 'adir' )
+        assert     util.has_group_read   ( 'adir/file.txt' )
+        assert not util.has_group_write  ( 'adir/file.txt' )
+        assert not util.has_group_execute( 'adir/file.txt' )
+
+        util.runcmd( chpermscmd+' -R -p g-rX adir' )
+
+        assert not util.has_group_read   ( 'adir' )
+        assert not util.has_group_write  ( 'adir' )
+        assert not util.has_group_execute( 'adir' )
+        assert not util.has_group_read   ( 'adir/file.txt' )
+        assert not util.has_group_write  ( 'adir/file.txt' )
+        assert not util.has_group_execute( 'adir/file.txt' )
 
 
 class catchall( unittest.TestCase ):

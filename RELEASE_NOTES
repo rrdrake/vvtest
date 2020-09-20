@@ -11,6 +11,9 @@ Fixes:
 
 Changes:
 
+    - In the trig subdirectory, using the file perms.py as a script is now
+      deprecated. Use chperms instead.
+
     - Using the command line option --perms changed slightly. A value of lower
       case "x" was unconditionally converted to an upper case "X". This no
       longer happens.
