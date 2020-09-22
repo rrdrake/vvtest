@@ -54,6 +54,9 @@ class PythonProxy( object ):
         If 'bashlogin' is True, run python under "/bin/bash -l" (a login shell).
         The 'logfile' can be a filename or a file-like object.
         """
+        self.mach = machine
+        self.sshcmd = sshcmd
+
         self.remote = RemotePython( machine=machine,
                                     pythonexe=pythonexe,
                                     sshcmd=sshcmd,
@@ -63,6 +66,9 @@ class PythonProxy( object ):
         self.objid = 0
         self.objs = {}
         self.endtime = None
+
+    def get_machine_name(self): return self.mach
+    def get_ssh_command(self): return self.sshcmd
 
     def start(self, startup_timeout=30):
         """

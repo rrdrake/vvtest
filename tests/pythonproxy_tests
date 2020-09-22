@@ -262,6 +262,8 @@ class startup_PythonProxy( trigutil.trigTestCase ):
 
         remote = PythonProxy( 'sparky', pythonexe=rpy, sshcmd=sshexe )
         remote.start()
+        assert remote.get_machine_name() == 'sparky'
+        assert remote.get_ssh_command() == sshexe
         remote.shutdown()
 
     def test_when_startup_fails(self):
