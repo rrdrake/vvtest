@@ -504,15 +504,15 @@ class PermissionSpecifications:
 
     def apply(self, path, recurse=False):
         ""
-        for spec in self.specs:
-            if os.path.islink( path ):
-                pass
-            else:
+        if not os.path.islink( path ):
+
+            for spec in self.specs:
                 spec.apply( path )
-                if recurse and os.path.isdir( path ):
-                    for fn in os.listdir( path ):
-                        fp = os.path.join( path, fn )
-                        self.apply( fp, recurse=True )
+
+            if recurse and os.path.isdir( path ):
+                for fn in os.listdir( path ):
+                    fp = os.path.join( path, fn )
+                    self.apply( fp, recurse )
 
 
 def split_specs_by_commas( stringspecs ):
