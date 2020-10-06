@@ -352,6 +352,9 @@ class exclude_tests( vtu.vvtestTestCase ):
         util.writefile( 'red.vvt', """
             #VVT: enable (platforms=XBox)
             """ )
+        util.writefile( 'red2.vvt', """
+            #VVT: enable ( platforms = XBox )
+            """ )
         util.writefile( 'green1.vvt', """
             #VVT: enable
             """ )
@@ -389,6 +392,13 @@ class exclude_tests( vtu.vvtestTestCase ):
         assert not exprL[0].evaluate( lambda word: True )
 
         inst = vtu.make_simple_script_parse_instance( 'red.vvt' )
+        parsevvt.parse_enable( inst )
+        exprL = inst.tfile.getPlatformEnableExpressions()
+        assert len( exprL ) == 1
+        assert     exprL[0].evaluate( lambda word: word == 'XBox' )
+        assert not exprL[0].evaluate( lambda word: word == 'PS2' )
+
+        inst = vtu.make_simple_script_parse_instance( 'red2.vvt' )
         parsevvt.parse_enable( inst )
         exprL = inst.tfile.getPlatformEnableExpressions()
         assert len( exprL ) == 1

@@ -246,7 +246,7 @@ def parse_attr_string_into_dict( attrstr, info ):
             raise TestSpecError( \
                     'invalid attribute specification, ' + info )
         elif i > 0:
-            n = s[:i]
+            n = s[:i].strip()
             v = s[i+1:].strip().strip('"')
             D[n] = v
         elif s:
