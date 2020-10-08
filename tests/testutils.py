@@ -159,7 +159,7 @@ def setup_test( cleanout=True ):
 
     if cleanout:
         rmallfiles()
-        time.sleep(1)
+        # time.sleep(1)
 
 
 def make_working_directory( test_filename ):

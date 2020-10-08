@@ -138,14 +138,15 @@ class PythonProxy( object ):
     def import_module(self, module_name):
         """
         Import a Python module on the remote side and return a proxy object.
-        For example,
+        The module is also placed in the proxy namespace. For example,
 
-            remote_os = proxy.module( 'os' )
-            remote_os.chdir( 'subdir' )
-            remote_os.getpwd()
+            mod = proxy.import_module( 'os' )
+            mod.chdir( 'subdir' )
+            proxy.os.getpwd()
 
-            remote_os_path = proxy.module( 'os.path' )
-            remote_os_path.isfile( 'foobar.txt' )
+            mod = proxy.import_module( 'os.path' )
+            mod.isfile( 'foobar.txt' )
+            proxy.os.path.exists( 'foobar.txt' )
 
         Note that sys, os, and os.path are automatically imported.
         """
