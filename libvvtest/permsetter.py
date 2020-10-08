@@ -19,14 +19,12 @@ class PermissionSetter:
     
     def __init__(self, topdir, speclist):
         """
-        The 'spec' can be a list or a comma separate string, which is sent
-        into the perms.py module for processing.  The only difference here
-        is that (for backward compatibility), g= o= g+ and o+ specifications
-        will have little x replaced with capital X.
+        The 'speclist' can be a list or a comma separate string, which is sent
+        into the perms.py module for processing.  For example,
 
-        Examples of 'spec': "wg-alegra,g=r-x,o=---"
-                            ['wg-alegra','g=rx','o=']
-                            ['wg-alegra', 'g=rx,o=rx']
+            wg-alegra,g=rX,o=
+            [ 'wg-alegra', 'g=rX', 'o=' ]
+            [ 'wg-alegra', 'g=rX,o=rX' ]
         """
         assert os.path.isabs( topdir )
 
@@ -113,24 +111,3 @@ def make_permission_specs( speclist ):
                 'invalid permission specification or group name: ' + str(e) )
 
     return specs
-
-
-def change_x_perms_to_capital_X( spec ):
-    ""
-    if len(spec) >= 3 and spec[0] in 'go' and spec[1] in '=+':
-        spec = spec.replace( 'x', 'X' )
-
-    return spec
-
-
-def split_by_space_and_comma( spec_string ):
-    ""
-    sL = []
-
-    for s1 in spec_string.strip().split():
-        for s2 in s1.split( ',' ):
-            s2 = s2.strip()
-            if s2:
-                sL.append( s2 )
-
-    return sL
