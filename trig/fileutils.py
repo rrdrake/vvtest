@@ -66,10 +66,7 @@ def is_subpath( path, subpath ):
 
 def local_path_copy( srcpath, destpath, permissions ):
     ""
-    check_copy_tree_subpath( srcpath, destpath )
-
-    # magic: check that srcpath exists
-    # magic: check that destdir exists
+    check_paths_for_local_copy( srcpath, destpath )
 
     srcdir,srcfname = split_sourcepath( srcpath )
     destdir,filename = split_destination( destpath )
@@ -228,18 +225,33 @@ def random_string( numchars=10 ):
     return ''.join( cL )
 
 
-def check_copy_tree_subpath( srcpath, destpath ):
+def check_paths_for_local_copy( srcpath, destpath ):
     ""
-    sub = False
+    check_raise_existence( srcpath )
+    check_raise_existence( dirname(destpath) )
 
-    if os.path.islink( destpath ):
-        tmp = pjoin( dirname( destpath ), random_string() )
-        if is_subpath( srcpath, tmp ) or is_subpath( tmp, srcpath ):
-            sub = True
-    elif is_subpath( srcpath, destpath ) or is_subpath( destpath, srcpath ):
-        sub = True
-
-    if sub:
+    if invalid_subpath( srcpath, destpath ):
         raise FileUtilsError(
             "'srcpath' cannot be a parent nor subdirectory of 'destpath': "
             "srcpath="+repr(srcpath)+", destpath="+repr(destpath) )
+
+
+def check_raise_existence( path ):
+    ""
+    if not path:
+        path = '.'
+
+    if not os.path.exists( path ):
+        raise FileUtilsError( "path does not exist: "+repr(path) )
+
+
+def invalid_subpath( srcpath, destpath ):
+    ""
+    if os.path.islink( destpath ):
+        tmp = pjoin( dirname( destpath ), random_string() )
+        if is_subpath( srcpath, tmp ) or is_subpath( tmp, srcpath ):
+            return True
+    elif is_subpath( srcpath, destpath ) or is_subpath( destpath, srcpath ):
+        return True
+
+    return False

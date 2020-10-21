@@ -115,16 +115,16 @@ class is_subpath_tests( unittest.TestCase ):
         time.sleep(1)
 
         self.assertRaises( fileutils.FileUtilsError,
-                           fileutils.check_copy_tree_subpath, 'sub1', 'sub1/dest' )
+                           fileutils.check_paths_for_local_copy, 'sub1', 'sub1/dest' )
         self.assertRaises( fileutils.FileUtilsError,
-                           fileutils.check_copy_tree_subpath, 'sub1', 'sub1/sub2' )
+                           fileutils.check_paths_for_local_copy, 'sub1', 'sub1/sub2' )
         self.assertRaises( fileutils.FileUtilsError,
-                           fileutils.check_copy_tree_subpath, 'sub1/sub2', 'sub1' )
+                           fileutils.check_paths_for_local_copy, 'sub1/sub2', 'sub1' )
         self.assertRaises( fileutils.FileUtilsError,
-                           fileutils.check_copy_tree_subpath, 'sub3', 'sub1' )
+                           fileutils.check_paths_for_local_copy, 'sub3', 'sub1' )
 
         # ok because 'sub3' is a soft link
-        fileutils.check_copy_tree_subpath( 'sub1', 'sub3' )
+        fileutils.check_paths_for_local_copy( 'sub1', 'sub3' )
 
 
 class using_tar_to_copy_files( unittest.TestCase ):
