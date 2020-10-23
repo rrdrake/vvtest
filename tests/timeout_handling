@@ -16,7 +16,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.timeout as timeout
+import libvvtest.timehandler as timehandler
 from libvvtest.fmtresults import LookupCache
 
 
@@ -204,11 +204,11 @@ def make_timeout_handler( cmdline_timeout=None,
     plug = vtu.make_user_plugin( platname='XBox' )
     cache = LookupCache( 'XBox', 'gcc' )
 
-    th = timeout.TimeHandler( plug,
-                              cmdline_timeout,
-                              timeout_multiplier,
-                              max_timeout,
-                              cache )
+    th = timehandler.TimeHandler( plug,
+                                  cmdline_timeout,
+                                  timeout_multiplier,
+                                  max_timeout,
+                                  cache )
 
     return th
 
