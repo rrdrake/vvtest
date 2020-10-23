@@ -42,6 +42,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     platname = plat.getName()
     cplrname = plat.getCompiler()
 
+    timeout = testcase.getStat().getAttr( 'timeout', -1 )
+
     dep_list = testcase.getDepDirectories()
 
     w = LineWriter()
@@ -59,7 +61,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                'PROJECT = "'+projdir+'"',
                'OPTIONS = '+repr( onopts ),
                'OPTIONS_OFF = '+repr( offopts ),
-               'SRCDIR = "'+srcdir+'"' )
+               'SRCDIR = "'+srcdir+'"',
+               'TIMEOUT = '+repr(timeout) )
 
         w.add( 'CONFIGDIR = '+repr(configdirs) )
 
@@ -129,9 +132,9 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
             NUMCMDLINE=0
             CMDLINE_VARS=
             for arg in "$@" ; do
-              NUMCMDLINE=$((NUMCMDLINE+1))
-              eval CMDLINE_${NUMCMDLINE}='$arg'
-              CMDLINE_VARS="$CMDLINE_VARS CMDLINE_${NUMCMDLINE}"
+                NUMCMDLINE=$((NUMCMDLINE+1))
+                eval CMDLINE_${NUMCMDLINE}='$arg'
+                CMDLINE_VARS="$CMDLINE_VARS CMDLINE_${NUMCMDLINE}"
             done
 
             # this function returns true if the given string was an
@@ -162,6 +165,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
                'OPTIONS="'+' '.join( onopts )+'"',
                'OPTIONS_OFF="'+' '.join( offopts )+'"',
                'SRCDIR="'+srcdir+'"',
+               'TIMEOUT="'+str(timeout)+'"',
                'PYTHONEXE="'+sys.executable+'"' )
 
         w.add( 'CONFIGDIR="'+':'.join( configdirs )+'"' )

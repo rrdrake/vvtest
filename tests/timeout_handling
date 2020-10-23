@@ -20,7 +20,7 @@ import libvvtest.timeout as timeout
 from libvvtest.fmtresults import LookupCache
 
 
-class the_tests( vtu.vvtestTestCase ):
+class timeout_handler_tests( vtu.vvtestTestCase ):
 
     def setUp(self):
         ""
@@ -29,72 +29,72 @@ class the_tests( vtu.vvtestTestCase ):
     def test_TimeoutHandler_construct_and_load(self):
         ""
         th = make_timeout_handler()
-        th.load( MockTestList() )
+        th.setTimeouts( [ vtu.make_fake_TestCase() ] )
 
     def test_a_timeout_specified_by_the_test(self):
         ""
         th = make_timeout_handler()
-        tlist = make_test_list( timeout=281 )
+        tL = make_test_list( timeout=281 )
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 281
 
     def test_a_timeout_maximum(self):
         ""
         th = make_timeout_handler( max_timeout=200 )
-        tlist = make_test_list( timeout=281 )
+        tL = make_test_list( timeout=281 )
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 200
 
     def test_a_timeout_multiplier(self):
         ""
         th = make_timeout_handler( timeout_multiplier=2.5 )
-        tlist = make_test_list( timeout=11 )
+        tL = make_test_list( timeout=11 )
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert abs( tstat.getAttr( 'timeout' ) - 11*2.5 ) < 2
 
     def test_a_command_line_timeout(self):
         ""
         th = make_timeout_handler( cmdline_timeout=42 )
-        tlist = make_test_list( timeout=281 )
+        tL = make_test_list( timeout=281 )
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 42
 
     def test_that_max_timeout_takes_precedence(self):
         ""
         th = make_timeout_handler( cmdline_timeout=42, max_timeout=31 )
-        tlist = make_test_list( timeout=281 )
+        tL = make_test_list( timeout=281 )
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 31
 
     def test_default_timeout_is_one_hour_or_5_hours_for_long(self):
         ""
         th = make_timeout_handler()
-        tlist = make_test_list()
+        tL = make_test_list()
 
-        th.load( tlist )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 60*60
 
-        tlist = make_test_list( keyword='long' )
-        th.load( tlist )
+        tL = make_test_list( keyword='long' )
+        th.setTimeouts( tL )
 
-        tstat = tlist.getTests()[0].getStat()
+        tstat = tL[0].getStat()
         assert tstat.getAttr( 'timeout' ) == 5*60*60
 
     def test_the_timeout_table_from_a_previous_runtime(self):
@@ -125,27 +125,99 @@ class the_tests( vtu.vvtestTestCase ):
         assert abs( tm - 5*24*60*60 ) < 10
 
 
+class test_timeouts( vtu.vvtestTestCase ):
+
+    def check_timeout_setting(self, filename, timeout_value,
+                                    cmdline_timeout=None,
+                                    timeout_multiplier=None,
+                                    max_timeout=None ):
+        ""
+        tL = vtu.create_tests_from_file( filename )
+        assert len( tL ) == 1
+
+        th = make_timeout_handler( cmdline_timeout=cmdline_timeout,
+                                   timeout_multiplier=timeout_multiplier,
+                                   max_timeout=max_timeout )
+        th.setTimeouts( tL )
+
+        tm = tL[0].getStat().getAttr('timeout')
+        if tm != timeout_value:
+            raise Exception( 'Expected timeout '+str(timeout_value)+\
+                             ' but got '+str(tm) )
+
+    def test_ways_that_timeout_is_set_on_a_test(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout = 5
+            pass
+            """ )
+        util.writefile( 'btest.xml', """
+            <rtest name="btest">
+              <timeout value="3"/>
+            </rtest>""" )
+        util.writefile( 'ctest.vvt', """
+            pass
+            """ )
+        time.sleep(1)
+
+        self.check_timeout_setting( 'atest.vvt', 5 )
+        self.check_timeout_setting( 'btest.xml', 3 )
+        self.check_timeout_setting( 'ctest.vvt', 3600 )  # the default timeout
+        self.check_timeout_setting( 'atest.vvt', 30, cmdline_timeout=30 )
+        self.check_timeout_setting( 'atest.vvt', 15, timeout_multiplier=3 )
+        self.check_timeout_setting( 'atest.vvt', 40, cmdline_timeout=4,
+                                                     timeout_multiplier=10 )
+        self.check_timeout_setting( 'atest.vvt', 30, cmdline_timeout=4,
+                                                     timeout_multiplier=10,
+                                                     max_timeout=30 )
+
+        self.check_timeout_setting( 'atest.vvt', 0, cmdline_timeout=0 )
+        # self.check_timeout_setting( 'atest.vvt', 0, cmdline_timeout=-1 )
+
+    def test_timeouts_are_reevaluated_in_restart_mode(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout = 2
+            import vvtest_util as vvt
+            print ( 'atestTIMEOUT='+repr(vvt.TIMEOUT) )
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '--timeout-multiplier 10' )
+        vrun.assertCounts( total=1, npass=1 )
+        tdir = vrun.resultsDir()
+        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
+        assert tmo == 20
+
+        vrun = vtu.runvvtest( '-R --timeout-multiplier 5', chdir=tdir )
+        vrun.assertCounts( total=1, npass=1 )
+        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
+        assert tmo == 10
+
+
+###########################################################################
+
 def make_timeout_handler( cmdline_timeout=None,
                           timeout_multiplier=None,
                           max_timeout=None ):
     ""
     plug = vtu.make_user_plugin( platname='XBox' )
-    platobj = MockPlatform()
+    cache = LookupCache( 'XBox', 'gcc' )
 
     th = timeout.TimeHandler( plug,
                               cmdline_timeout,
                               timeout_multiplier,
                               max_timeout,
-                              make_lookup_cache() )
+                              cache )
 
     return th
 
 
 def make_test_list( timeout=None, keyword=None ):
     ""
-    tlist = MockTestList()
+    tL = [ vtu.make_fake_TestCase() ]
 
-    tspec = tlist.getTests()[0].getSpec()
+    tspec = tL[0].getSpec()
 
     if timeout != None:
         tspec.setTimeout( timeout )
@@ -153,44 +225,13 @@ def make_test_list( timeout=None, keyword=None ):
     if keyword != None:
         add_keyword_to_test( tspec, keyword )
 
-    return tlist
+    return tL
 
 
 def add_keyword_to_test( tspec, keyword ):
     ""
     kwL = tspec.getKeywords( include_implicit=False ) + [ keyword ]
     tspec.setKeywordList( kwL )
-
-
-class MockTestList:
-
-    def __init__(self):
-        ""
-        self.tlist = [ vtu.make_fake_TestCase() ]
-
-    def getTests(self):
-        ""
-        return self.tlist
-
-
-class MockPlatform:
-
-    def getName(self): return 'XBox'
-    def getCompiler(self): return 'gcc'
-    def testingDirectory(self): return '/foo/bar/timings'
-
-
-def make_lookup_cache():
-    ""
-    plat = MockPlatform()
-
-    pname = plat.getName()
-    cplr = plat.getCompiler()
-    tdir = plat.testingDirectory()
-
-    cache = LookupCache( pname, cplr, tdir )
-
-    return cache
 
 
 ########################################################################

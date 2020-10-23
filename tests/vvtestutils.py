@@ -679,6 +679,22 @@ def parse_time( colon_time_string ):
     return tval
 
 
+def create_tests_from_file( filename, platname=core_platform_name() ):
+    ""
+    creator = testcreator.TestCreator( platname )
+
+    assert not os.path.isabs( filename )
+    assert not os.path.normpath(filename).startswith('..')
+
+    dname,fname = os.path.split( filename )
+
+    tL = []
+    for tspec in creator.fromFile( dname, fname, None ):
+        tL.append( testcase.TestCase( tspec ) )
+
+    return tL
+
+
 def make_simple_script_parse_instance( srcfile ):
     ""
     from libvvtest.ScriptReader import ScriptReader

@@ -304,8 +304,8 @@ the batching system, such as "--platopt ppn=4" to set the number of
 processors per node to an artificial value of 4.
 
 The -T option will apply a timeout value in seconds to each test.
-Zero means no timeout.  In batch mode, note that the time given to the
-batch queue for each batch job is the sum of the timeouts of each test
+Zero or negative means no timeout.  In batch mode, note that the time given
+to the batch queue for each batch job is the sum of the timeouts of each test
 in the batch job.
 
 The --timeout-multiplier option will apply a float multiplier to the
@@ -591,7 +591,8 @@ def create_parser( argvlist, vvtest_version ):
         help='Pass through name=value settings to the platform, such '
              'as "--platopt ppn=4".' )
     grp.add_argument( '-T', dest='dash_T',
-        help='Apply timeout in seconds to each test.' )
+        help='Apply a timeout in seconds to each test; zero or negative '
+             'means do not apply a timeout.' )
     grp.add_argument( '--timeout-multiplier', type=float,
         help='Apply a float multiplier to the timeout value for each test.' )
     grp.add_argument( '--max-timeout',

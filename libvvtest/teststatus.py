@@ -305,7 +305,7 @@ def copy_test_results( to_tstat, from_tstat ):
     from_attrs = from_tstat.getAttrs()
 
     for k,v in from_attrs.items():
-        if k in ['state','xtime','xdate','xvalue','result']:
+        if k in ['state','xtime','xdate','xvalue','result','timeout']:
             to_tstat.setAttr( k, v )
 
     if 'skip' in from_attrs:

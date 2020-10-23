@@ -615,7 +615,7 @@ def generate_test_list( opts, optD, rtdata ):
     rtdata.loc.createTestingDirectory( rtdata.perms )
     rtdata.cash.writeCache( rtdata.perms )
     rtdata.scanner.scanPaths( tlist )
-    rtdata.timehandler.load( tlist )
+    rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
     rtdata.selector.applyPermanentFilters( tlist )
     rtdata.tlm.writeTestList()
 
@@ -643,7 +643,7 @@ def extract_test_files( scan_type, param_dict, target_dir, rtdata ):
 
     rtdata.scanner.scanPaths( tlist )
     rtdata.tlm.readTestList()
-    rtdata.timehandler.load( tlist )
+    rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
     rtdata.selector.applyPermanentFilters( tlist )
 
     extract.copy_out_test_files( target_dir, tlist.getActiveTests() )
@@ -664,11 +664,12 @@ def run_tests( opts, optD, rtdata ):
 
     rtdata.scanner.scanPaths( tlist )
     rtdata.tlm.readAndMergePreviouslyRunTests()
-    rtdata.timehandler.load( tlist )
+    rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
     rtdata.selector.applyPermanentFilters( tlist )
     rtdata.tlm.writeTestList()
     rtdata.selector.applyRuntimeFilters( tlist )
     rtdata.scanner.completeTestParsing( tlist )
+    rtdata.timehandler.setTimeouts( tlist.getTests() )
 
     tlist.setResultsDate()
 
@@ -697,9 +698,10 @@ def restart_tests( opts, optD, rtdata ):
     if batchid == None:
         rtdata.tlm.readTestList()
         rtdata.tlm.readAndMergePreviouslyRunTests()
-        rtdata.timehandler.load( tlist )
+        rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
         rtdata.selector.applyRuntimeFilters( tlist )
         rtdata.scanner.completeTestParsing( tlist )
+        rtdata.timehandler.setTimeouts( tlist.getTests() )
         tlist.setResultsDate()
     else:
         rtdata.tlm.readTestList()
@@ -754,7 +756,7 @@ def information_output( opts, optD, rtdata ):
     if not rtdata.isrestart and ( opts.keys or opts.files ):
         rtdata.scanner.scanPaths( tlist )
         rtdata.tlm.readTestList()
-        rtdata.timehandler.load( tlist )
+        rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
         rtdata.selector.applyPermanentFilters( tlist )
 
     elif have_cache:
@@ -796,17 +798,18 @@ def output_timings( opts, optD, rtdata ):
 
         rtdata.scanner.scanPaths( tlist )
         rtdata.tlm.readAndMergePreviouslyRunTests()
-        rtdata.timehandler.load( tlist )
+        rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
         rtdata.selector.applyPermanentFilters( tlist )
 
     else:
         adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
 
         rtdata.tlm.readAndMergePreviouslyRunTests()
-        rtdata.timehandler.load( tlist )
+        rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
 
     rtdata.selector.applyRuntimeFilters( tlist )
     rtdata.scanner.completeTestParsing( tlist )
+    rtdata.timehandler.setTimeouts( tlist.getTests() )
     tlist.setResultsDate()
 
     cwriter = construct_console_writer( rtdata.testdir, opts, optD )

@@ -19,16 +19,33 @@ class TimeHandler:
         self.maxtime = max_timeout
         self.cache = cache
 
-    def load(self, tlist):
+    def loadExternalRuntimes(self, tcaselist):
         """
         For each test, a 'runtimes' file will be read (if it exists) and the
         run time for this platform extracted.  This run time is saved as the
-        test execute time.  Also, a timeout is calculated for each test and
-        placed in the 'timeout' attribute.
+        test execute time.
         """
         self.cache.load()
 
-        for tcase in tlist.getTests():
+        for tcase in tcaselist:
+
+            tspec = tcase.getSpec()
+            tstat = tcase.getStat()
+
+            tlen,tresult = self.cache.getRunTime( tspec )
+
+            if tlen != None:
+
+                rt = tstat.getRuntime( None )
+                if rt == None:
+                    tstat.setRuntime( int(tlen) )
+
+    def setTimeouts(self, tcaselist):
+        """
+        A timeout is calculated for each test and placed in the 'timeout'
+        attribute.
+        """
+        for tcase in tcaselist:
 
             tspec = tcase.getSpec()
             tstat = tcase.getStat()
@@ -43,10 +60,6 @@ class TimeHandler:
 
             if tlen != None:
 
-                rt = tstat.getRuntime( None )
-                if rt == None:
-                    tstat.setRuntime( int(tlen) )
-
                 if tout == None:
                     if tresult == "timeout":
                         tout = self._timeout_if_test_timed_out( tspec, tlen )
@@ -58,8 +71,7 @@ class TimeHandler:
 
             tout = self._apply_timeout_options( tout )
 
-            if tstat.getAttr( 'timeout', None ) == None:
-                tstat.setAttr( 'timeout', tout )
+            tstat.setAttr( 'timeout', tout )
 
     def _timeout_if_test_timed_out(self, tspec, runtime):
         ""

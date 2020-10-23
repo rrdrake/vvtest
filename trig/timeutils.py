@@ -116,7 +116,7 @@ def seconds_since_midnight( time_spec ):
             assert not time_spec < 0 and time_spec < 24
             nsecs = int(time_spec)*60*60
 
-    except:
+    except Exception:
         raise Exception( "invalid time-of-day specification: "+str(orig) )
 
     return nsecs
@@ -180,7 +180,7 @@ def hours_minutes_seconds( time_spec ):
             sc = L2[2]
             assert sc < 60
 
-    except:
+    except Exception:
         raise Exception( "invalid time-of-day specification: "+str(orig) )
 
     return hr,mn,sc
@@ -239,17 +239,6 @@ def next_day_of_week( dow, tsecs ):
         tsecs += 24*60*60
 
     raise Exception( 'the algorithm failed' )
-
-
-#########################################################################
-
-def print3( *args ):
-    """
-    Python 2 & 3 compatible print function.
-    """
-    s = ' '.join( [ str(x) for x in args ] )
-    sys.stdout.write( s + '\n' )
-    sys.stdout.flush()
 
 
 #########################################################################
