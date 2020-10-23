@@ -127,12 +127,17 @@ class timeout_handler_tests( vtu.vvtestTestCase ):
 
 class test_timeouts( vtu.vvtestTestCase ):
 
-    def check_timeout_setting(self, filename, timeout_value,
-                                    cmdline_timeout=None,
-                                    timeout_multiplier=None,
-                                    max_timeout=None ):
+    def check_timeout(self, filename, timeout_value,
+                            cmdline_timeout=None,
+                            timeout_multiplier=None,
+                            max_timeout=None,
+                            platform_name=None ):
         ""
-        tL = vtu.create_tests_from_file( filename )
+        plt = platform_name
+        if not plt:
+            plt = vtu.core_platform_name()
+
+        tL = vtu.create_tests_from_file( filename, platname=plt )
         assert len( tL ) == 1
 
         th = make_timeout_handler( cmdline_timeout=cmdline_timeout,
@@ -147,6 +152,8 @@ class test_timeouts( vtu.vvtestTestCase ):
 
     def test_ways_that_timeout_is_set_on_a_test(self):
         ""
+        platname = vtu.core_platform_name()
+
         util.writefile( 'atest.vvt', """
             #VVT: timeout = 5
             pass
@@ -158,21 +165,42 @@ class test_timeouts( vtu.vvtestTestCase ):
         util.writefile( 'ctest.vvt', """
             pass
             """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: timeout = 5
+            #VVT: timeout (platforms="""+platname+"""): 50
+            pass
+            """ )
+        util.writefile( 'etest.xml', '''
+            <rtest name="etest">
+              <timeout value="3"/>
+              <timeout platforms="'''+platname+'''" value="30"/>
+            </rtest>''' )
+        util.writefile( 'ftest.vvt', """
+            #VVT: timeout = 0
+            pass
+            """ )
         time.sleep(1)
 
-        self.check_timeout_setting( 'atest.vvt', 5 )
-        self.check_timeout_setting( 'btest.xml', 3 )
-        self.check_timeout_setting( 'ctest.vvt', 3600 )  # the default timeout
-        self.check_timeout_setting( 'atest.vvt', 30, cmdline_timeout=30 )
-        self.check_timeout_setting( 'atest.vvt', 15, timeout_multiplier=3 )
-        self.check_timeout_setting( 'atest.vvt', 40, cmdline_timeout=4,
-                                                     timeout_multiplier=10 )
-        self.check_timeout_setting( 'atest.vvt', 30, cmdline_timeout=4,
-                                                     timeout_multiplier=10,
-                                                     max_timeout=30 )
+        self.check_timeout( 'atest.vvt', 5 )
+        self.check_timeout( 'btest.xml', 3 )
+        self.check_timeout( 'ctest.vvt', 3600 )  # the default timeout
+        self.check_timeout( 'atest.vvt', 30, cmdline_timeout=30 )
+        self.check_timeout( 'atest.vvt', 15, timeout_multiplier=3 )
+        self.check_timeout( 'atest.vvt', 40, cmdline_timeout=4,
+                                             timeout_multiplier=10 )
+        self.check_timeout( 'atest.vvt', 30, cmdline_timeout=4,
+                                             timeout_multiplier=10,
+                                             max_timeout=30 )
 
-        self.check_timeout_setting( 'atest.vvt', 0, cmdline_timeout=0 )
-        # self.check_timeout_setting( 'atest.vvt', 0, cmdline_timeout=-1 )
+        self.check_timeout( 'atest.vvt', 0, cmdline_timeout=0 )
+        # self.check_timeout( 'atest.vvt', 0, cmdline_timeout=-1 )
+
+        self.check_timeout( 'dtest.vvt', 50 )
+        self.check_timeout( 'etest.xml', 30 )
+        self.check_timeout( 'dtest.vvt', 5, platform_name='XBox' )
+        self.check_timeout( 'etest.xml', 3, platform_name='XBox' )
+
+        self.check_timeout( 'ftest.vvt', 0 )
 
     def test_timeouts_are_reevaluated_in_restart_mode(self):
         ""
@@ -193,6 +221,31 @@ class test_timeouts( vtu.vvtestTestCase ):
         vrun.assertCounts( total=1, npass=1 )
         tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
         assert tmo == 10
+
+    def test_timeout_integration(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout : 2
+            import time
+            time.sleep(10)
+            """ )
+        util.writefile( 'btest.xml', """
+            <rtest name="btest">
+              <timeout value="2"/>
+              <execute>sleep 10</execute>
+            </rtest>""" )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            t0 = time.time()
+            vrun = vtu.runvvtest()
+            vrun.assertCounts( total=2, timeout=2 )
+            t1 = time.time()
+
+            assert t1-t0 < 9
 
 
 ###########################################################################
