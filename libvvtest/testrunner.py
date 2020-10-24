@@ -292,7 +292,8 @@ class ExecutionHandler:
 
         script_file = pjoin( rundir, 'runscript' )
 
-        if self.rtconfig.getAttr('refresh') or not os.path.exists( script_file ):
+        if self.rtconfig.getAttr('preclean') or \
+           not os.path.exists( script_file ):
 
             troot = tspec.getRootpath()
             assert os.path.isabs( troot )
@@ -322,7 +323,9 @@ class ExecutionHandler:
 
             script_file = pjoin( rundir, 'vvtest_util.'+lang )
 
-            if self.rtconfig.getAttr('refresh') or not os.path.exists( script_file ):
+            if self.rtconfig.getAttr('preclean') or \
+               not os.path.exists( script_file ):
+
                 ScriptWriter.writeScript( self.tcase,
                                           script_file,
                                           lang,

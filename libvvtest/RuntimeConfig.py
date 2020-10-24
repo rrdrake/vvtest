@@ -16,19 +16,16 @@ from . import FilterExpressions
 
 class RuntimeConfig:
 
-    defaults = {
+    attr_init = {
         'vvtestdir'  : None,  # the top level vvtest directory
         'configdir'  : [],    # the configuration directory(ies)
         'exepath'    : None,  # the path to the executables
         'onopts'     : [],
         'offopts'    : [],
-        'refresh'    : 1,
-        'postclean'  : 0,
-        'timeout'    : None,
-        'multiplier' : 1.0,
-        'preclean'   : 1,
-        'analyze'    : 0,
-        'logfile'    : 1,
+        'preclean'   : True,
+        'postclean'  : False,
+        'analyze'    : False,
+        'logfile'    : True,
         'testargs'   : [],
     }
 
@@ -59,7 +56,7 @@ class RuntimeConfig:
         self.runtime_range = None
         self.runtime_sum = None
 
-        for n,v in RuntimeConfig.defaults.items():
+        for n,v in RuntimeConfig.attr_init.items():
             self.setAttr( n, v )
 
         for k,v in kwargs.items():
@@ -69,6 +66,7 @@ class RuntimeConfig:
         """
         Set the value of an attribute name (which must be known).
         """
+        assert name in RuntimeConfig.attr_init
         self.attrs[name] = value
 
     def getAttr(self, name, *default):

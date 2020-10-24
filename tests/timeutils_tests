@@ -23,7 +23,66 @@ import timeutils
 
 #######################################################################
 
-class catchall( unittest.TestCase ):
+class parsing_functions( unittest.TestCase ):
+
+    def setUp(self):
+        ""
+        util.setup_test( cleanout=False )
+
+    def test_parse_length_of_time_string(self):
+        ""
+        assert timeutils.parse_num_seconds( None ) == None
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, ' ' )
+
+        assert timeutils.parse_num_seconds( '3' ) == 3
+        assert floateq( timeutils.parse_num_seconds( '3.1' ), 3.1 )
+
+        assert timeutils.parse_num_seconds( '3.1', round_to_int=True ) == 3
+        assert timeutils.parse_num_seconds( '3.6', round_to_int=True ) == 4
+
+        assert timeutils.parse_num_seconds( '-1', negatives=True ) == -1
+        assert floateq(
+                timeutils.parse_num_seconds( '-1.1', negatives=True ), -1.1 )
+        assert timeutils.parse_num_seconds( ' 1', negatives=True ) == 1
+        assert floateq(
+                timeutils.parse_num_seconds( ' 1.6', negatives=True ), 1.6 )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '-1' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '-1.1' )
+
+        assert timeutils.parse_num_seconds( '17s' ) == 17
+        assert timeutils.parse_num_seconds( '17s ' ) == 17
+        assert timeutils.parse_num_seconds( '17m' ) == 17*60
+        assert timeutils.parse_num_seconds( ' 17m' ) == 17*60
+        assert timeutils.parse_num_seconds( '17h' ) == 17*60*60
+        assert timeutils.parse_num_seconds( '17d' ) == 17*24*60*60
+        assert floateq( timeutils.parse_num_seconds( '17.2m' ), 17.2*60 )
+        assert timeutils.parse_num_seconds( '17h 5s' ) == 17*60*60 + 5
+        assert timeutils.parse_num_seconds( '17h 3m 5s' ) == 17*60*60 + 3*60 + 5
+        assert timeutils.parse_num_seconds( '17d 1m' ) == 17*24*60*60 + 60
+
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '17ss' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, 'sm' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, 'h' )
+
+        assert timeutils.parse_num_seconds( '0:10' ) == 10
+        assert floateq( timeutils.parse_num_seconds( '0:10.123' ), 10.123 )
+        assert timeutils.parse_num_seconds( '5:10' ) == 5*60+10
+        assert floateq( timeutils.parse_num_seconds( '5:10.1' ), 5*60+10.1 )
+        assert timeutils.parse_num_seconds( '23:59:59' ) == 23*60*60+59*60+59
+        assert timeutils.parse_num_seconds( '36:00:01' ) == 36*60*60+1
+
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '23:60' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '23:60:59' )
+        self.assertRaises( Exception, timeutils.parse_num_seconds, '60:59' )
+
+
+def floateq( val, answer ):
+    ""
+    return abs( val - answer ) < 1.e-12
+
+
+class util_functions( unittest.TestCase ):
 
     def setUp(self):
         ""

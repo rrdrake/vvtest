@@ -6,6 +6,8 @@
 
 import os, sys
 
+import timeutils
+
 
 class TimeHandler:
 
@@ -116,13 +118,65 @@ class TimeHandler:
     def _apply_timeout_options(self, timeout):
         ""
         if self.cmdline_timeout != None:
-            timeout = int( float(self.cmdline_timeout) )
+            timeout = self.cmdline_timeout
 
-        if self.tmult != None:
-            timeout = int( float(timeout) * self.tmult )
+        if self.tmult != None and timeout and timeout > 0:
+            timeout = max( 1, int( float(timeout) * self.tmult + 0.5 ) )
 
-        if self.maxtime != None:
-            timeout = min( timeout, float(self.maxtime) )
+        if self.maxtime != None and timeout:
+            timeout = min( timeout, self.maxtime )
 
         return timeout
 
+
+def parse_timeout_value( value ):
+    """
+    A negative value is snapped to zero (an integer). A positive value will
+    result in an integer greater than or equal to one.
+    """
+    err = ''
+    nsecs = None
+
+    try:
+        nsecs = timeutils.parse_num_seconds( value, negatives=True )
+    except Exception as e:
+        err = str(e)
+    else:
+        if nsecs != None:
+            if nsecs < 0 or not nsecs > 0.0:
+                nsecs = 0
+            else:
+                nsecs = int( max( 1, nsecs ) + 0.5 )
+
+    return nsecs,err
+
+
+def parse_timeout_multiplier( value ):
+    ""
+    val,err = timeutils.parse_number( value )
+    if not err and val != None and ( val < 0 or not val > 0.0 ):
+        err = 'cannot be negative or zero: '+repr(value)
+
+    return val,err
+
+
+def parse_max_timeout( value ):
+    """
+    Negative values and zero will be None. A positive value will result in
+    an integer greater than or equal to one.
+    """
+    err = ''
+    nsecs = None
+
+    try:
+        nsecs = timeutils.parse_num_seconds( value, negatives=True )
+    except Exception as e:
+        err = str(e)
+    else:
+        if nsecs != None:
+            if nsecs < 0 or not nsecs > 0.0:
+                nsecs = None
+            else:
+                nsecs = int( max( 1, nsecs ) + 0.5 )
+
+    return nsecs,err

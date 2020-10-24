@@ -124,6 +124,98 @@ class timeout_handler_tests( vtu.vvtestTestCase ):
         tm = th._timeout_if_test_timed_out( tcase.getSpec(), 6*24*60*60 )
         assert abs( tm - 5*24*60*60 ) < 10
 
+    def test_parsing_timeout_multiplier(self):
+        ""
+        val,err = timehandler.parse_timeout_multiplier( None )
+        assert val == None and not err
+
+        val,err = timehandler.parse_timeout_multiplier( '3' )
+        assert val == 3 and not err
+        val,err = timehandler.parse_timeout_multiplier( '3.3' )
+        assert abs(val-3.3) < 1.e-12 and not err
+
+        val,err = timehandler.parse_timeout_multiplier( '10s' )
+        assert err
+
+        val,err = timehandler.parse_timeout_multiplier( '0' )
+        assert err
+        val,err = timehandler.parse_timeout_multiplier( '0.0' )
+        assert err
+        val,err = timehandler.parse_timeout_multiplier( '-1' )
+        assert err
+        val,err = timehandler.parse_timeout_multiplier( '-0.5' )
+        assert err
+
+    def test_parsing_timeout_value(self):
+        ""
+        val,err = timehandler.parse_timeout_value( None )
+        assert val == None and not err
+
+        val,err = timehandler.parse_timeout_value( '3' )
+        assert val == 3 and not err
+        val,err = timehandler.parse_timeout_value( '3.3' )
+        assert val == 3 and not err
+        val,err = timehandler.parse_timeout_value( '3.7' )
+        assert val == 4 and not err
+        val,err = timehandler.parse_timeout_value( '0' )
+        assert val == 0 and not err
+        val,err = timehandler.parse_timeout_value( '-1' )
+        assert val == 0 and not err
+        val,err = timehandler.parse_timeout_value( '-0.1' )
+        assert val == 0 and not err
+        val,err = timehandler.parse_timeout_value( '0.0' )
+        assert val == 0 and not err
+        val,err = timehandler.parse_timeout_value( '0.0001' )
+        assert val == 1 and not err
+        val,err = timehandler.parse_timeout_value( '0.4' )
+        assert val == 1 and not err
+        val,err = timehandler.parse_timeout_value( '0.8' )
+        assert val == 1 and not err
+
+        val,err = timehandler.parse_timeout_value( '3h 2m 59s' )
+        assert val == 3*60*60+2*60+59 and not err
+
+        val,err = timehandler.parse_timeout_value( '3:02:59' )
+        assert val == 3*60*60+2*60+59 and not err
+
+        val,err = timehandler.parse_timeout_value( '3:62:59' )
+        assert err
+
+    def test_parsing_timeout_value(self):
+        ""
+        val,err = timehandler.parse_max_timeout( None )
+        assert val == None and not err
+
+        val,err = timehandler.parse_max_timeout( '3' )
+        assert val == 3 and not err
+        val,err = timehandler.parse_max_timeout( '3.3' )
+        assert val == 3 and not err
+        val,err = timehandler.parse_max_timeout( '3.7' )
+        assert val == 4 and not err
+        val,err = timehandler.parse_max_timeout( '0' )
+        assert val == None and not err
+        val,err = timehandler.parse_max_timeout( '-1' )
+        assert val == None and not err
+        val,err = timehandler.parse_max_timeout( '-0.1' )
+        assert val == None and not err
+        val,err = timehandler.parse_max_timeout( '0.0' )
+        assert val == None and not err
+        val,err = timehandler.parse_max_timeout( '0.0001' )
+        assert val == 1 and not err
+        val,err = timehandler.parse_max_timeout( '0.4' )
+        assert val == 1 and not err
+        val,err = timehandler.parse_max_timeout( '0.8' )
+        assert val == 1 and not err
+
+        val,err = timehandler.parse_max_timeout( '3h 2m 59s' )
+        assert val == 3*60*60+2*60+59 and not err
+
+        val,err = timehandler.parse_max_timeout( '3:02:59' )
+        assert val == 3*60*60+2*60+59 and not err
+
+        val,err = timehandler.parse_max_timeout( '3:62:59' )
+        assert err
+
 
 class test_timeouts( vtu.vvtestTestCase ):
 
@@ -202,26 +294,6 @@ class test_timeouts( vtu.vvtestTestCase ):
 
         self.check_timeout( 'ftest.vvt', 0 )
 
-    def test_timeouts_are_reevaluated_in_restart_mode(self):
-        ""
-        util.writefile( 'atest.vvt', """
-            #VVT: timeout = 2
-            import vvtest_util as vvt
-            print ( 'atestTIMEOUT='+repr(vvt.TIMEOUT) )
-            """ )
-        time.sleep(1)
-
-        vrun = vtu.runvvtest( '--timeout-multiplier 10' )
-        vrun.assertCounts( total=1, npass=1 )
-        tdir = vrun.resultsDir()
-        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
-        assert tmo == 20
-
-        vrun = vtu.runvvtest( '-R --timeout-multiplier 5', chdir=tdir )
-        vrun.assertCounts( total=1, npass=1 )
-        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
-        assert tmo == 10
-
     def test_timeout_integration(self):
         ""
         util.writefile( 'atest.vvt', """
@@ -246,6 +318,43 @@ class test_timeouts( vtu.vvtestTestCase ):
             t1 = time.time()
 
             assert t1-t0 < 9
+
+    def test_timeouts_are_reevaluated_in_restart_mode(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout = 2
+            import vvtest_util as vvt
+            print ( 'atestTIMEOUT='+repr(vvt.TIMEOUT) )
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '--timeout-multiplier 10' )
+        vrun.assertCounts( total=1, npass=1 )
+        tdir = vrun.resultsDir()
+        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
+        assert tmo == 20
+
+        vrun = vtu.runvvtest( '-R --timeout-multiplier 5.9', chdir=tdir )
+        vrun.assertCounts( total=1, npass=1 )
+        tmo = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
+        assert tmo == 12
+
+    def test_some_invalid_timeouts(self):
+        ""
+        vrun = vtu.runvvtest( '--timeout-multiplier -1', raise_on_error=False )
+        assert vrun.x != 0
+
+        vrun = vtu.runvvtest( '--timeout-multiplier foo', raise_on_error=False )
+        assert vrun.x != 0
+
+        vrun = vtu.runvvtest( '-T 3:62', raise_on_error=False )
+        assert vrun.x != 0
+
+        vrun = vtu.runvvtest( '-T nonsense', raise_on_error=False )
+        assert vrun.x != 0
+
+        vrun = vtu.runvvtest( '--max-timeout 36hr', raise_on_error=False )
+        assert vrun.x != 0
 
 
 ###########################################################################

@@ -214,17 +214,10 @@ def create_configuration( rtconfig, opts, optD, vvtestdir, configdirs ):
 
     rtconfig.setAttr( 'configdir', configdirs )
 
-    rtconfig.setAttr( 'refresh', not opts.dash_m )
-    rtconfig.setAttr( 'postclean', opts.postclean == True )
-
-    if opts.dash_T != None:
-        rtconfig.setAttr( 'timeout', opts.dash_T )
-    if opts.timeout_multiplier != None:
-        rtconfig.setAttr( 'multiplier', opts.timeout_multiplier )
-
-    rtconfig.setAttr( 'preclean', not opts.dash_m )
-    rtconfig.setAttr( 'analyze', opts.analyze == True )
-    rtconfig.setAttr( 'logfile', not opts.dash_L )
+    if opts.dash_m:    rtconfig.setAttr( 'preclean', False )
+    if opts.postclean: rtconfig.setAttr( 'postclean', True )
+    if opts.analyze:   rtconfig.setAttr( 'analyze', True )
+    if opts.dash_L:    rtconfig.setAttr( 'logfile', False )
 
     if opts.test_args:
         argL = []
@@ -351,17 +344,34 @@ def construct_test_selector( rtdata ):
 
 def construct_test_time_handler( rtdata, opts ):
     ""
-    from libvvtest.timehandler import TimeHandler
+    import libvvtest.timehandler as timehandler
+
+    tmo,err = timehandler.parse_timeout_value( opts.dash_T )
+    if err:
+        raise FatalError( 'Invalid timeout value: '+err )
+
+    mult,err = timehandler.parse_timeout_multiplier( opts.timeout_multiplier )
+    if err:
+        raise FatalError( 'Invalid timeout multiplier: '+err )
+
+    maxtmo = get_max_timeout( opts.max_timeout )
 
     tcache = construct_runtime_lookup_cache( rtdata.plat )
 
-    timehandler = TimeHandler( rtdata.plugin,
-                               opts.dash_T,
-                               opts.timeout_multiplier,
-                               opts.max_timeout,
-                               tcache )
+    hnd = timehandler.TimeHandler( rtdata.plugin, tmo, mult, maxtmo, tcache )
 
-    rtdata.timehandler = timehandler
+    rtdata.timehandler = hnd
+
+
+def get_max_timeout( value ):
+    ""
+    import libvvtest.timehandler as timehandler
+
+    maxtmo,err = timehandler.parse_max_timeout( value )
+    if err:
+        raise FatalError( 'Invalid max timeout value: '+err )
+
+    return maxtmo
 
 
 def construct_runtime_lookup_cache( plat ):
@@ -868,10 +878,10 @@ class CacheFileHandler:
             if self.optD['offopts']:
                 fp.write( 'OFFOPTS=' + '+'.join( self.optD['offopts'] ) + '\n' )
             if self.opts.dash_T != None:
-                fp.write( 'TIMEOUT=' + str(self.opts.dash_T).strip() + '\n' )
+                fp.write( 'TIMEOUT=' + str(self.opts.dash_T) + '\n' )
             if self.opts.timeout_multiplier != None:
                 fp.write( 'TIMEOUT_MULTIPLIER=' + \
-                                       str(self.opts.timeout_multiplier).strip() + '\n' )
+                                str(self.opts.timeout_multiplier).strip() + '\n' )
             if self.opts.dash_e:
                 fp.write( 'USE_ENV=1\n' )
             if self.opts.short_xdirs:
@@ -906,11 +916,9 @@ class CacheFileHandler:
                     # do not replace if the command line contains -T
                     if self.opts.dash_T == None:
                         self.opts.dash_T = kvpair[1]
-                        self.rtconfig.setAttr( 'timeout', float(self.opts.dash_T) )
                 elif kvpair[0] == 'TIMEOUT_MULTIPLIER':
                     if not self.opts.timeout_multiplier:
-                        self.opts.timeout_multiplier = float(kvpair[1])
-                        self.rtconfig.setAttr( 'multiplier', self.opts.timeout_multiplier )
+                        self.opts.timeout_multiplier = kvpair[1]
                 elif kvpair[0] == 'USE_ENV':
                     self.opts.dash_e = True
                 elif kvpair[0] == 'SHORT_XDIRS':
@@ -1029,11 +1037,13 @@ def create_Batcher( opts, optD, rtdata, namer,
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
                                            batchitf, namer )
 
+    maxtmo = get_max_timeout( opts.max_timeout )
+
     batch = batchutils.Batcher( vvtestcmd,
                                 tlist, xlist, perms,
                                 qsublimit,
                                 opts.batch_length,
-                                opts.max_timeout,
+                                maxtmo,
                                 namer, jobhandler,
                                 rtdata.tctor )
 

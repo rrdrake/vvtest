@@ -214,12 +214,11 @@ with a results keyword (such as notrun or fail), will also prevent
 To only scan for and filter tests, use -g.  This creates the test results
 directories, but does not run the tests.
 
-
-The -m option means do not overwrite existing scripts and no clean out.  By
-default, the generated test scripts are always overritten and all files
-in the test directory are removed.  Turning this option on
-will prevent a test script that exists from being overwritten
-and the test directory will not be cleaned out.
+The -m option means do not clean out the test results directory before
+running the test (by default, all files in the results directory are
+removed prior to execution).
+It also prevents the vvtest generated script files from being overwitten
+(i.e., the vvtest_util.py, vvtest_util.sh, and runscript).
 
 The --perms option will apply permission settings and/or a group name to
 files and directories in the test execution area.  Multiple --perms options
@@ -308,12 +307,13 @@ Zero or negative means no timeout.  In batch mode, note that the time given
 to the batch queue for each batch job is the sum of the timeouts of each test
 in the batch job.
 
-The --timeout-multiplier option will apply a float multiplier to the
+The --timeout-multiplier option will apply a multiplier to the
 timeout value for each test.
 
-The --max-timeout option will apply a maximum timeout value for each
-test and for batch jobs.  It is the last operation performed when computing
-timeouts.
+The --max-timeout option will cap the timeout value for each
+test and for batch jobs. A value of zero or negative means no maximum.
+It is the last operation performed when computing timeouts. No max is
+applied by default, except that in batch mode, a maximum job length is imposed.
 """
 
 
@@ -590,13 +590,17 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--platopt', action='append',
         help='Pass through name=value settings to the platform, such '
              'as "--platopt ppn=4".' )
-    grp.add_argument( '-T', dest='dash_T',
-        help='Apply a timeout in seconds to each test; zero or negative '
-             'means do not apply a timeout.' )
-    grp.add_argument( '--timeout-multiplier', type=float,
-        help='Apply a float multiplier to the timeout value for each test.' )
-    grp.add_argument( '--max-timeout',
-        help='Maximum timeout value for each test and for batch jobs.' )
+    grp.add_argument( '-T', metavar='SECONDS', dest='dash_T',
+        help='Apply a timeout to each test (number of seconds or 10m or '
+             '2h or MM:SS or HH:MM:SS). A zero or negative value means '
+             'do not apply a timeout.' )
+    grp.add_argument( '--timeout-multiplier', metavar='NUMBER',
+        help='Apply a multiplier to the timeout value for each test. '
+             'Can be a positive integer or float.' )
+    grp.add_argument( '--max-timeout', metavar='SECONDS',
+        help='Maximum timeout value for each test and for batch jobs '
+             '(number of seconds or 10m or 2h or HH:MM:SS). A zero '
+             'or negative value means no maximum.' )
 
     # config
     grp = psr.add_argument_group( 'Runtime configuration (subhelp: config)' )
@@ -788,18 +792,6 @@ def adjust_options_and_create_derived_options( opts ):
 
         errtype = 'max devices'
         if opts.max_devices != None and float(opts.max_devices) <= 0:
-            raise Exception( 'must be positive' )
-
-        errtype = 'timeout'
-        if opts.dash_T and float(opts.dash_T) < 0.0:
-            opts.dash_T = 0.0
-
-        errtype = 'timeout multiplier'
-        if opts.timeout_multiplier and not float(opts.timeout_multiplier) > 0.0:
-            raise Exception( 'must be positive' )
-
-        errtype = 'max timeout'
-        if opts.max_timeout and not float(opts.max_timeout) > 0.0:
             raise Exception( 'must be positive' )
 
         errtype = 'tmin/tmax/tsum'
