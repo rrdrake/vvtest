@@ -1,6 +1,17 @@
 
 Improvements:
 
+    - Add convenience formats for specifying time lengths on the command line
+      and in test specification files. The -T and --max-timeout options now
+      understand "10m", "10:00", "2h 30m 5s", and "2:30:05". This format is
+      also available in test specifications:
+
+          #VVT: timeout = 2h
+
+    - Add TIMEOUT to the variables in the vvtest_util.py and vvtest_util.sh
+      test helpers. This contains the timeout value used by vvtest to kill
+      the test if it takes too long.
+
     - Using --perms "g+s" will set the setgid bit on files and directories.
       A capital "S" is now allowed, such as --perms "g+S", which will only
       set the setgid bit on directories.
@@ -10,6 +21,14 @@ Fixes:
     - 
 
 Changes:
+
+    - The value of the VVTEST_TIMEOUT environment variable made available to
+      each test execution adds a "bump factor". This bump factor is now
+      deprecated - in the future it will be the exact timeout value. The
+      timeout has been used to cause processes spawned by mpiexec to die even
+      if they are not children processes of the test. The reason for the bump
+      factor was to make sure vvtest recognizes a timeout rather than a
+      normal completion (although probably a fail result).
 
     - In the trig subdirectory, using the file perms.py as a script is now
       deprecated. Use chperms instead.

@@ -460,6 +460,29 @@ class test_timeouts( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '--max-timeout 36hr', raise_on_error=False )
         assert vrun.x != 0
 
+    def test_the_VVTEST_TIMEOUT_environ_variable(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout = 5h
+            import os
+            print ( 'atestTIMEOUT='+os.environ['VVTEST_TIMEOUT'] )
+            """ )
+        util.writefile( 'btest.xml', """
+            <rtest name="btest">
+              <timeout value="7h"/>
+              <execute>echo "btestTIMEOUT=$VVTEST_TIMEOUT"</execute>
+            </rtest>""" )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=2, npass=2 )
+        aval = int( vrun.greplogs( 'atestTIMEOUT=' )[0].split('=',1)[1] )
+        bval = int( vrun.greplogs( 'btestTIMEOUT=' )[0].split('=',1)[1] )
+
+        # a bump factor is added; however, doing so is now deprecated [Oct 2020]
+        assert aval >= 5*60*60
+        assert bval >= 7*60*60
+
 
 ###########################################################################
 

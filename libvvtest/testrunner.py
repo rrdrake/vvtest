@@ -159,6 +159,8 @@ class ExecutionHandler:
         """
         if timeout > 0:
 
+            # [Oct 2020] deprecated the bump factor in this environ variable
+
             if timeout < 30: t = 60
             if timeout < 120: t = timeout * 1.4
             else: t = timeout * 1.2
