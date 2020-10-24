@@ -682,13 +682,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
 
         self.assertRaises( TestSpecError, create_tests, 'bad17.xml' )
 
-        util.writefile( 'bad18.xml', """
-            <rtest name="atest">
-              <timeout value="-1"/>
-            </rtest>""" )
-
-        self.assertRaises( TestSpecError, create_tests, 'bad18.xml' )
-
         util.writefile( 'ok20.xml', """
             <rtest name="atest">
               <timeout value="240"/>

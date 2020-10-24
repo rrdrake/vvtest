@@ -484,6 +484,16 @@ class test_timeouts( vtu.vvtestTestCase ):
         assert bval >= 7*60*60
 
 
+class total_timeout( vtu.vvtestTestCase ):
+
+    def test_magic(self):
+        ""
+        # option --total-timeout
+        # add total time checks
+        #   - in the batch monitor loop
+        #   - in the local monitor loop
+
+
 ###########################################################################
 
 def make_timeout_handler( cmdline_timeout=None,
