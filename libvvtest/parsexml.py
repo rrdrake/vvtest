@@ -10,6 +10,7 @@ import re
 from .errors import TestSpecError
 from . import xmlwrapper
 from . import FilterExpressions
+from . import timehandler
 
 from .parseutil import variable_expansion
 from .parseutil import evauate_testname_expr
@@ -423,13 +424,11 @@ def parse_timeouts( inst ):
             to = None
             if nd.hasAttr('value'):
                 val = nd.getAttr("value").strip()
-                try: to = int(val)
-                except:
-                    raise TestSpecError( 'timeout value must be an integer: "' + \
-                                         val + '", line ' + str(nd.getLineNumber()) )
-                if to < 0:
-                    raise TestSpecError( 'timeout value must be non-negative: "' + \
-                                         val + '", line ' + str(nd.getLineNumber()) )
+
+                to,err = timehandler.parse_timeout_value( val )
+
+                if err:
+                    raise TestSpecError( 'invalid timeout value: '+err )
 
             if to != None:
                 inst.tfile.setTimeout( to )
@@ -468,7 +467,7 @@ def parse_analyze( tname, filedoc, evaluator ):
         if not skip:
             try:
                 content = str( nd.getContent() )
-            except:
+            except Exception:
                 raise TestSpecError( 'the content in an <analyze> block must be ' + \
                                      'ASCII characters, line ' + str(nd.getLineNumber()) )
             if analyze_spec == None:

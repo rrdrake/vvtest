@@ -9,6 +9,7 @@ import re
 
 from .errors import TestSpecError
 from . import FilterExpressions
+from . import timehandler
 
 from .ScriptReader import check_parse_attributes_section
 
@@ -466,17 +467,19 @@ def collect_filenames( spec, flist, tname, paramD, evaluator ):
 def parse_timeouts( inst ):
     """
       #VVT: timeout : 3600
+      #VVT: timeout : 2h 30m 5s
+      #VVT: timeout : 2:30:05
       #VVT: timeout (testname=vvfull, platforms=Linux) : 3600
     """
     for spec in inst.source.getSpecList( 'timeout' ):
         if attr_filter( spec.attrs, inst, spec.lineno ):
             sval = spec.value
-            try:
-                ival = int(sval)
-                assert ival >= 0
-            except:
-                raise TestSpecError( 'timeout value must be a positive ' + \
-                            'integer: "'+sval+'", line ' + str(spec.lineno) )
+
+            ival,err = timehandler.parse_timeout_value( sval )
+
+            if err:
+                raise TestSpecError( 'invalid timeout value: '+err )
+
             inst.tfile.setTimeout( ival )
 
 

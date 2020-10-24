@@ -186,6 +186,18 @@ class timing_output_tests( vtu.vvtestTestCase ):
         tL,tsum = vrun.getTimeoutInfoSection()
         check_times( tL, tsum, subdir='' )
 
+        vrun = vtu.runvvtest( '--config '+myconfig+' -T 0 -i -t', chdir=tdir )
+        tL,tsum = vrun.getTimeoutInfoSection()
+        assert tL[0][0] == 0 and tL[1][0] == 0 and tL[2][0] == 0
+
+        vrun = vtu.runvvtest( '--config '+myconfig+' -T -1 -i -t', chdir=tdir )
+        tL,tsum = vrun.getTimeoutInfoSection()
+        assert tL[0][0] == 0 and tL[1][0] == 0 and tL[2][0] == 0
+
+        vrun = vtu.runvvtest( '--config '+myconfig+' -T -1 -i -t' )
+        tL,tsum = vrun.getTimeoutInfoSection()
+        assert tL[0][0] == 0 and tL[1][0] == 0 and tL[2][0] == 0
+
 
 def make_fake_TestExecList():
     ""

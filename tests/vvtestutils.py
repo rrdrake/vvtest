@@ -712,6 +712,23 @@ def make_simple_script_parse_instance( srcfile ):
     return inst
 
 
+def make_simple_xml_parse_instance( srcfile ):
+    ""
+    from libvvtest.parsexml import read_xml_file
+
+    evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
+    xdoc = read_xml_file( srcfile )
+    testname = os.path.splitext(srcfile)[0]
+    ts = TestConstructor().makeTestSpec( testname, os.getcwd(), srcfile )
+
+    inst = testcreator.ParsingInstance( testname=testname,
+                                        tfile=ts,
+                                        source=xdoc,
+                                        evaluator=evaluator )
+
+    return inst
+
+
 def make_fake_TestSpec( name='atest', keywords=['key1','key2'], tctor=None ):
     ""
     if tctor == None:

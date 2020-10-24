@@ -271,6 +271,14 @@ class test_timeouts( vtu.vvtestTestCase ):
             #VVT: timeout = 0
             pass
             """ )
+        util.writefile( 'gtest.vvt', """
+            #VVT: timeout = 5h
+            pass
+            """ )
+        util.writefile( 'htest.xml', """
+            <rtest name="htest">
+              <timeout value="3:30"/>
+            </rtest>""" )
         time.sleep(1)
 
         self.check_timeout( 'atest.vvt', 5 )
@@ -285,7 +293,6 @@ class test_timeouts( vtu.vvtestTestCase ):
                                              max_timeout=30 )
 
         self.check_timeout( 'atest.vvt', 0, cmdline_timeout=0 )
-        # self.check_timeout( 'atest.vvt', 0, cmdline_timeout=-1 )
 
         self.check_timeout( 'dtest.vvt', 50 )
         self.check_timeout( 'etest.xml', 30 )
@@ -293,6 +300,103 @@ class test_timeouts( vtu.vvtestTestCase ):
         self.check_timeout( 'etest.xml', 3, platform_name='XBox' )
 
         self.check_timeout( 'ftest.vvt', 0 )
+
+        self.check_timeout( 'gtest.vvt', 5*60*60 )
+        self.check_timeout( 'htest.xml', 3*60+30 )
+
+    def test_parsing_timeout_in_xml_specification_files(self):
+        ""
+        import libvvtest.parsexml as parsexml
+        import libvvtest.testcreator as testcreator
+
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+              <timeout value="5"/>
+            </rtest>""" )
+        util.writefile( 'btest.xml', """
+            <rtest name="btest">
+              <timeout value="5:30"/>
+            </rtest>""" )
+        util.writefile( 'ctest.xml', """
+            <rtest name="ctest">
+              <timeout value="2h 30m"/>
+            </rtest>""" )
+        util.writefile( 'dtest.xml', """
+            <rtest name="dtest">
+              <timeout value="2:62:04"/>
+            </rtest>""" )
+        util.writefile( 'etest.xml', """
+            <rtest name="etest">
+              <timeout value="-1"/>
+            </rtest>""" )
+        time.sleep(1)
+
+        inst = vtu.make_simple_xml_parse_instance( 'atest.xml' )
+        parsexml.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 5
+
+        inst = vtu.make_simple_xml_parse_instance( 'btest.xml' )
+        parsexml.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 5*60+30
+
+        inst = vtu.make_simple_xml_parse_instance( 'ctest.xml' )
+        parsexml.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 2*60*60 + 30*60
+
+        inst = vtu.make_simple_xml_parse_instance( 'dtest.xml' )
+        self.assertRaises( testcreator.TestSpecError,
+                           parsexml.parse_timeouts, inst )
+
+        inst = vtu.make_simple_xml_parse_instance( 'etest.xml' )
+        parsexml.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 0
+
+    def test_parsing_timeout_in_vvt_specification_files(self):
+        ""
+        import libvvtest.parsevvt as parsevvt
+        import libvvtest.testcreator as testcreator
+
+        util.writefile( 'atest.vvt', """
+            #VVT: timeout = 5
+            pass
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: timeout = 5:30
+            pass
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: timeout = 2h 30m
+            pass
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: timeout = 2:62:04
+            pass
+            """ )
+        util.writefile( 'etest.vvt', """
+            #VVT: timeout = -1
+            pass
+            """ )
+        time.sleep(1)
+
+        inst = vtu.make_simple_script_parse_instance( 'atest.vvt' )
+        parsevvt.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 5
+
+        inst = vtu.make_simple_script_parse_instance( 'btest.vvt' )
+        parsevvt.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 5*60+30
+
+        inst = vtu.make_simple_script_parse_instance( 'ctest.vvt' )
+        parsevvt.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 2*60*60 + 30*60
+
+        inst = vtu.make_simple_script_parse_instance( 'dtest.vvt' )
+        self.assertRaises( testcreator.TestSpecError,
+                           parsevvt.parse_timeouts, inst )
+
+        inst = vtu.make_simple_script_parse_instance( 'etest.vvt' )
+        parsevvt.parse_timeouts( inst )
+        assert inst.tfile.getTimeout() == 0
 
     def test_timeout_integration(self):
         ""
