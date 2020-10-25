@@ -160,7 +160,7 @@ def parse_timeout_multiplier( value ):
     return val,err
 
 
-def parse_max_timeout( value ):
+def parse_max_time( value ):
     """
     Negative values and zero will be None. A positive value will result in
     an integer greater than or equal to one.

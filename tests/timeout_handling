@@ -183,37 +183,37 @@ class timeout_handler_tests( vtu.vvtestTestCase ):
 
     def test_parsing_timeout_value(self):
         ""
-        val,err = timehandler.parse_max_timeout( None )
+        val,err = timehandler.parse_max_time( None )
         assert val == None and not err
 
-        val,err = timehandler.parse_max_timeout( '3' )
+        val,err = timehandler.parse_max_time( '3' )
         assert val == 3 and not err
-        val,err = timehandler.parse_max_timeout( '3.3' )
+        val,err = timehandler.parse_max_time( '3.3' )
         assert val == 3 and not err
-        val,err = timehandler.parse_max_timeout( '3.7' )
+        val,err = timehandler.parse_max_time( '3.7' )
         assert val == 4 and not err
-        val,err = timehandler.parse_max_timeout( '0' )
+        val,err = timehandler.parse_max_time( '0' )
         assert val == None and not err
-        val,err = timehandler.parse_max_timeout( '-1' )
+        val,err = timehandler.parse_max_time( '-1' )
         assert val == None and not err
-        val,err = timehandler.parse_max_timeout( '-0.1' )
+        val,err = timehandler.parse_max_time( '-0.1' )
         assert val == None and not err
-        val,err = timehandler.parse_max_timeout( '0.0' )
+        val,err = timehandler.parse_max_time( '0.0' )
         assert val == None and not err
-        val,err = timehandler.parse_max_timeout( '0.0001' )
+        val,err = timehandler.parse_max_time( '0.0001' )
         assert val == 1 and not err
-        val,err = timehandler.parse_max_timeout( '0.4' )
+        val,err = timehandler.parse_max_time( '0.4' )
         assert val == 1 and not err
-        val,err = timehandler.parse_max_timeout( '0.8' )
+        val,err = timehandler.parse_max_time( '0.8' )
         assert val == 1 and not err
 
-        val,err = timehandler.parse_max_timeout( '3h 2m 59s' )
+        val,err = timehandler.parse_max_time( '3h 2m 59s' )
         assert val == 3*60*60+2*60+59 and not err
 
-        val,err = timehandler.parse_max_timeout( '3:02:59' )
+        val,err = timehandler.parse_max_time( '3:02:59' )
         assert val == 3*60*60+2*60+59 and not err
 
-        val,err = timehandler.parse_max_timeout( '3:62:59' )
+        val,err = timehandler.parse_max_time( '3:62:59' )
         assert err
 
 
@@ -486,12 +486,27 @@ class test_timeouts( vtu.vvtestTestCase ):
 
 class total_timeout( vtu.vvtestTestCase ):
 
-    def test_magic(self):
+    def test_timing_out_vvtest_itself(self):
         ""
-        # option --total-timeout
-        # add total time checks
-        #   - in the batch monitor loop
-        #   - in the local monitor loop
+        util.writefile( 'atest.vvt', """
+            import time
+            time.sleep(20)
+            """ )
+        time.sleep(1)
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            t0 = time.time()
+            vrun = vtu.runvvtest( '--total-timeout 3', batch=batch )
+            vrun.assertCounts( total=1, notdone=1 )
+            t1 = time.time()
+
+            assert t1-t0 < 10
+
+            vrun = vtu.runvvtest( '-vv -i' )
+            vrun.assertCounts( total=1, notdone=1 )
 
 
 ###########################################################################

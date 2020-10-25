@@ -123,9 +123,6 @@ class Batcher:
             - a list of the tests that did not run, each of which is a
               pair (a test, failed dependency test)
         """
-        # should not be here if there are jobs currently running
-        assert self.numInProgress() == 0
-
         jobL = self.jobhandler.markNotStartedJobsAsDone()
 
         notrunL = []

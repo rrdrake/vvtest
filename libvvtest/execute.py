@@ -16,7 +16,8 @@ from .outpututils import XstatusString, pretty_time
 class TestListRunner:
 
     def __init__(self, test_dir, tlist, xlist, perms,
-                       rtinfo, results_writer, plat):
+                       rtinfo, results_writer, plat,
+                       total_timeout):
         ""
         self.test_dir = test_dir
         self.tlist = tlist
@@ -25,15 +26,36 @@ class TestListRunner:
         self.rtinfo = rtinfo
         self.results_writer = results_writer
         self.plat = plat
+        self.total_timeout = total_timeout
+
+    def setup(self):
+        ""
+        self.starttime = time.time()
+        print3( "Start time:", time.ctime() )
+
+        rfile = self.tlist.initializeResultsFile( **(self.rtinfo.asDict()) )
+        self.perms.apply( os.path.abspath( rfile ) )
+
+        self.cwd = os.getcwd()
+
+    def total_time_expired(self):
+        ""
+        if self.total_timeout and self.total_timeout > 0:
+            if time.time() - self.starttime > self.total_timeout:
+                print3( '\n*** vvtest: total timeout expired:',
+                        self.total_timeout, '\n' )
+                return True
+        return False
 
 
 class BatchRunner( TestListRunner ):
 
     def __init__(self, test_dir, tlist, xlist, perms,
-                       rtinfo, results_writer, plat):
+                       rtinfo, results_writer, plat,
+                       total_timeout):
         ""
         TestListRunner.__init__( self, test_dir, tlist, xlist, perms,
-                                 rtinfo, results_writer, plat )
+                                 rtinfo, results_writer, plat, total_timeout )
         self.batch = None
 
     def setBatcher(self, batch):
@@ -42,6 +64,8 @@ class BatchRunner( TestListRunner ):
 
     def startup(self):
         ""
+        self.setup()
+
         self.plat.display( isbatched=True )
 
         self.tlist.setResultsDate()
@@ -52,14 +76,6 @@ class BatchRunner( TestListRunner ):
         self.info = TestInformationPrinter( sys.stdout, self.tlist, self.batch )
 
         print3( 'Maximum concurrent batch jobs:', self.batch.getMaxJobs() )
-
-        self.starttime = time.time()
-        print3( "Start time:", time.ctime() )
-
-        self.cwd = os.getcwd()
-
-        rfile = self.tlist.initializeResultsFile( **(self.rtinfo.asDict()) )
-        self.perms.apply( os.path.abspath( rfile ) )
 
     def run(self):
         ""
@@ -88,6 +104,9 @@ class BatchRunner( TestListRunner ):
                 self.results_writer.midrun( self.tlist, self.rtinfo )
 
                 self.print_progress( doneL )
+
+                if self.total_time_expired():
+                    break
 
             # any remaining tests cannot be run, so flush them
             NS, NF, nrL = self.batch.flush()
@@ -139,10 +158,11 @@ class BatchRunner( TestListRunner ):
 class DirectRunner( TestListRunner ):
 
     def __init__(self, test_dir, tlist, xlist, perms,
-                       rtinfo, results_writer, plat):
+                       rtinfo, results_writer, plat,
+                       total_timeout):
         ""
         TestListRunner.__init__( self, test_dir, tlist, xlist, perms,
-                                 rtinfo, results_writer, plat )
+                                 rtinfo, results_writer, plat, total_timeout )
         self.qsub_id = None
 
     def setQsubID(self, qsub_id):
@@ -151,16 +171,11 @@ class DirectRunner( TestListRunner ):
 
     def startup(self):
         ""
+        self.setup()
+
         self.plat.display()
-        self.starttime = time.time()
-        print3( "Start time:", time.ctime() )
 
         self.info = TestInformationPrinter( sys.stdout, self.xlist )
-
-        rfile = self.tlist.initializeResultsFile( **(self.rtinfo.asDict()) )
-        self.perms.apply( os.path.abspath( rfile ) )
-
-        self.cwd = os.getcwd()
 
     def run(self):
         ""
@@ -189,6 +204,9 @@ class DirectRunner( TestListRunner ):
 
                 if showprogress:
                     self.print_progress()
+
+                if self.total_time_expired():
+                    break
 
             nrL = self.xlist.popRemaining()  # these tests cannot be run
 

@@ -601,6 +601,10 @@ def create_parser( argvlist, vvtest_version ):
         help='Maximum timeout value for each test and for batch jobs '
              '(number of seconds or 10m or 2h or HH:MM:SS). A zero '
              'or negative value means no maximum.' )
+    grp.add_argument( '--total-timeout', metavar='SECONDS',
+        help='Stop running tests but exit normally after this amount of time '
+             '(number of seconds or 10m or 2h or HH:MM:SS). A zero '
+             'or negative value means no timeout, which is the default.' )
 
     # config
     grp = psr.add_argument_group( 'Runtime configuration (subhelp: config)' )

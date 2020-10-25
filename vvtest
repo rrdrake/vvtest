@@ -367,11 +367,22 @@ def get_max_timeout( value ):
     ""
     import libvvtest.timehandler as timehandler
 
-    maxtmo,err = timehandler.parse_max_timeout( value )
+    maxtmo,err = timehandler.parse_max_time( value )
     if err:
         raise FatalError( 'Invalid max timeout value: '+err )
 
     return maxtmo
+
+
+def get_total_timeout( value ):
+    ""
+    import libvvtest.timehandler as timehandler
+
+    totaltime,err = timehandler.parse_max_time( value )
+    if err:
+        raise FatalError( 'Invalid total timeout value: '+err )
+
+    return totaltime
 
 
 def construct_runtime_lookup_cache( plat ):
@@ -996,10 +1007,14 @@ def run_test_exec_list( opts, optD, rtdata ):
         xlist = TestExecList( tlist, runner )
         xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
 
+        totaltime = get_total_timeout( opts.total_timeout )
+
         if not opts.batch:
-            tlrun = construct_direct_runner( rtdata, tlist, xlist, opts.qsub_id )
+            tlrun = construct_direct_runner( rtdata, tlist, xlist,
+                                             opts.qsub_id, totaltime )
         else:
-            tlrun = construct_batch_runner( rtdata, tlist, xlist, opts, optD )
+            tlrun = construct_batch_runner( rtdata, tlist, xlist, totaltime,
+                                            opts, optD )
 
         xstat = tlrun.run()
 
@@ -1010,11 +1025,11 @@ def run_test_exec_list( opts, optD, rtdata ):
     return xstat
 
 
-def construct_direct_runner( rtdata, tlist, xlist, qsub_id ):
+def construct_direct_runner( rtdata, tlist, xlist, qsub_id, totaltime ):
     ""
     drun = execute.DirectRunner( rtdata.testdir, tlist, xlist, rtdata.perms,
                                  rtdata.rtinfo, rtdata.results_writer,
-                                 rtdata.plat )
+                                 rtdata.plat, totaltime )
 
     if qsub_id != None:
         drun.setQsubID( qsub_id )
@@ -1022,11 +1037,11 @@ def construct_direct_runner( rtdata, tlist, xlist, qsub_id ):
     return drun
 
 
-def construct_batch_runner( rtdata, tlist, xlist, opts, optD ):
+def construct_batch_runner( rtdata, tlist, xlist, totaltime, opts, optD ):
     ""
     brun = execute.BatchRunner( rtdata.testdir, tlist, xlist, rtdata.perms,
                                 rtdata.rtinfo, rtdata.results_writer,
-                                rtdata.plat )
+                                rtdata.plat, totaltime )
 
     namer = rtdata.tlm.getFileNamer()
     batch = create_Batcher( opts, optD, rtdata, namer,

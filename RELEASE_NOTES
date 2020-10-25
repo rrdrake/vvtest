@@ -1,6 +1,12 @@
 
 Improvements:
 
+    - Add --total-timeout command line option, which shuts down vvtest after
+      some length of time. It is a controlled shutdown so that test results
+      are finalized, for example. The total timeout value can be negative or
+      zero for no shutdown, or a positive value for a timeout. Formats
+      are the same as for --max-timeout.
+
     - Add convenience formats for specifying time lengths on the command line
       and in test specification files. The -T and --max-timeout options now
       understand "10m", "10:00", "2h 30m 5s", and "2:30:05". This format is
