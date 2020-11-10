@@ -52,7 +52,7 @@ def platform( opts ):
         return 'IBMidp'
 
     if base_match( [nodename,pbshost,cluster],
-                   ['solo','serrano','cayenne','ghost','eclipse','attaway'] ):
+                   ['solo','serrano','cayenne','ghost','eclipse','attaway','manzano'] ):
         # Capacity Technology System, running TOSS
         return 'CTS1'
 
