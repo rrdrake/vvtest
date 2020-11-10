@@ -34,7 +34,10 @@ def initialize( plat ):
         plat.setBatchSystem( "slurm", 16 )
 
     elif platname == "CTS1":
-        plat.setBatchSystem( "slurm", 36 )
+        if os.environ.get("SNLCLUSTER", "") == "manzano":
+            plat.setBatchSystem( "slurm", 48 )
+        else:
+            plat.setBatchSystem( "slurm", 36 )
 
     elif platname == "ASTRA":
         plat.setBatchSystem( "slurm", 2 * 28 )
