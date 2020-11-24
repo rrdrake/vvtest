@@ -94,6 +94,7 @@ def check_test_name_attributes( attrD, lineno ):
 
         checkD.pop( 'depends on', None )
         checkD.pop( 'result', None )
+        checkD.pop( 'expect', None )
 
         if len( checkD ) > 0:
             raise TestSpecError( 'unexpected attributes: ' + \
@@ -577,7 +578,7 @@ def parse_dependencies( inst ):
         if name == inst.testname:
 
             wx = create_dependency_result_expression( attrD )
-            exp = parse_expect_criterion( spec.attrs, spec.lineno )
+            exp = parse_expect_criterion( attrD, spec.lineno )
 
             for depname in attrD.get( 'depends on', '' ).split():
                 inst.tfile.addDependency( depname, wx, exp )

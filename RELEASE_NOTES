@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - Add "expect" trailing attribute to "testname" directive, such as
+
+          #VVT: testname = pluto (depends on=charon.*, expect=1)
+
     - Add --total-timeout command line option, which shuts down vvtest after
       some length of time. It is a controlled shutdown so that test results
       are finalized, for example. The total timeout value can be negative or

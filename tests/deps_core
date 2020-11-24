@@ -587,6 +587,25 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         assert deps[0][0] == 'red' and deps[0][2] == '2'
         assert deps[1][0] == 'pink' and deps[0][2] == '2'
 
+    def test_using_testname_with_trailing_depends_on_attributes(self):
+        ""
+        util.writefile( 'mars.vvt', """
+            #VVT: testname = venus (depends on=pluto.*, result=*, expect=3)
+            """ )
+        time.sleep(1)
+
+        tL = vtu.create_tests_from_file( 'mars.vvt' )
+
+        assert len(tL) == 1
+        tspec = tL[0].getSpec()
+        assert tspec.getName() == 'venus'
+        deps = tspec.getDependencies()
+        assert len(deps) == 1
+        pat,res,exp = deps[0]
+        assert pat == 'pluto.*'
+        assert res != None
+        assert exp == '3'
+
     def test_depends_on_match_criterion(self):
         ""
         depL = []
