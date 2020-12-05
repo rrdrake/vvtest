@@ -74,12 +74,10 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
         for d in configdirs[::-1]:
             w.add( 'sys.path.insert( 0, "'+d+'" )' )
 
-        # remove use of --execute_analysis_sections after vvtest 1.3.0
         w.add( '',
                'diff_exit_status = '+str(DIFF_EXIT_STATUS),
                'skip_exit_status = '+str(SKIP_EXIT_STATUS),
-               'opt_analyze = "--execute_analysis_sections" in sys.argv[1:] ' + \
-                          'or "--execute-analysis-sections" in sys.argv[1:]' )
+               'opt_analyze = "--execute-analysis-sections" in sys.argv[1:]' )
 
         platenv = plat.getEnvironment()
         w.add( '',
@@ -149,10 +147,8 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
             }
 
             opt_analyze=0
-            cmdline_option --execute_analysis_sections && opt_analyze=1
             cmdline_option --execute-analysis-sections && opt_analyze=1
             """ )
-        # remove use of --execute_analysis_sections after vvtest 1.3.0
 
         w.add( '',
                'NAME="'+tname+'"',

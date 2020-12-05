@@ -32,6 +32,10 @@ Fixes:
 
 Changes:
 
+    - The option given to a test script when the command line -a or --analyze
+      option was given to vvtest is '--execute-analysis-sections'. The old
+      option name has been removed: '--execute_analysis_sections'.
+
     - The value of the VVTEST_TIMEOUT environment variable made available to
       each test execution adds a "bump factor". This bump factor is now
       deprecated - in the future it will be the exact timeout value. The
@@ -250,12 +254,12 @@ Changes:
     - The -s option is now deprecated in favor of --search, which is a
       synomym.
 
-    - The behavior of "-P <expression>" has changed a little.  Since "-p
+    - The behavior of "-P <expression>" has changed slightly.  Since "-p
       np<4" means 'np' is a parameter in the test and np<4, it made sense
-      for "-P np<4" to mean 'np' is not a parameter in the test or np>=4.
+      for "-P np<4" to mean 'np' is NOT a parameter in the test OR np>=4.
       (Before this change, "-P np<4" was equivalent to "-p np>=4", which
-      meant if 'np' was not a parameter in the test, then the test would
-      not get run.)
+      meant the test would get excluded if 'np' was not a parameter in the
+      test.)
 
     - The console test list output default has changed for vvtest -i.  It
       now defaults to just writing the non-pass tests (the same as the
