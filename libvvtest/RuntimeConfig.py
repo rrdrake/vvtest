@@ -137,7 +137,7 @@ class RuntimeConfig:
         if self.keyexpr == None:
             self.keyexpr = FilterExpressions.WordExpression( add_expr )
         elif not self.keyexpr.containsResultsKeywords():
-            self.keyexpr.append( add_expr, 'and' )
+            self.keyexpr.append( add_expr )
 
     def satisfies_keywords(self, keyword_list, include_results=True):
         ""
@@ -145,9 +145,9 @@ class RuntimeConfig:
             return self.keyexpr.evaluate( keyword_list.count, include_results )
         return True
 
-    def setParameterExpression(self, string_expr_list):
+    def setParameterExpression(self, param_expr):
         ""
-        self.paramexpr = FilterExpressions.ParamFilter( string_expr_list )
+        self.paramexpr = param_expr
 
     def evaluate_parameters(self, paramD):
         ""

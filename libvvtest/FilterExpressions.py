@@ -43,18 +43,16 @@ class WordExpression:
         if expr != None:
             self.append( expr )
 
-    def append(self, expr, operator='or'):
+    def append(self, expr):
         """
-        Appends the given expression string using an 'and' or 'or' operator.
+        Extends the given expression string using the AND operator.
         """
-        assert operator in ['or','and']
-
         if expr != None:
 
             expr = expr.strip()
 
             if self.expr != None:
-                expr = combine_two_expressions( self.expr, expr, operator )
+                expr = combine_two_expressions( self.expr, expr )
 
             self.expr = expr
 
@@ -110,33 +108,68 @@ class WordExpression:
     def __str__(self): return self.__repr__()
 
 
-def combine_two_expressions( expr1, expr2, operator ):
+def combine_two_expressions( expr1, expr2 ):
     ""
-    if operator == 'or':
-
-        if expr1 and expr2:
-            expr = expr1 + ' or ' + conditional_paren_wrap( expr2 )
-        elif expr1:
-            expr = expr1
-        else:
-            expr = expr2
-
+    if expr1 and expr2:
+        expr = expr1 + ' and ' + conditional_paren_wrap( expr2 )
     else:
-        if expr1 and expr2:
-            expr = expr1 + ' and ' + conditional_paren_wrap( expr2 )
-        else:
-            # one expression is empty, which is always false,
-            # so replace the whole thing with an empty expr
-            expr = ''
+        # one expression is empty, which is always false,
+        # so replace the whole thing with an empty expr
+        expr = ''
 
     return expr
 
 
 def conditional_paren_wrap( expr ):
     ""
-    if ' ' in expr:
-        return '( '+expr+' )'
+    if expr:
+        expr = expr.strip()
+        px = parenthetical_tokenize( expr )
+        if px.numTokens() > 1:
+            return '( '+expr+' )'
+
     return expr
+
+
+class ParenExpr:
+
+    def __init__(self):
+        ""
+        self.toks = []
+
+    def parse(self, toklist, tok_idx):
+        ""
+        while tok_idx < len(toklist):
+            tok = toklist[tok_idx]
+            tok_idx += 1
+
+            if tok == '(':
+                sub = ParenExpr()
+                self.toks.append( sub )
+                tok_idx = sub.parse( toklist, tok_idx )
+            elif tok == ')':
+                break
+            else:
+                self.toks.append( tok )
+
+        return tok_idx
+
+    def numTokens(self): return len( self.toks )
+
+
+def parenthetical_tokenize( expr ):
+    """
+    Parse the given expression into a single ParenExpr object. Each ParenExpr
+    contains a list of string tokens and ParenExpr objects (which are created
+    when a paren is encountered.
+    """
+    assert expr and expr.strip()
+
+    toklist = separate_expression_into_tokens( expr )
+    px = ParenExpr()
+    px.parse( toklist, 0 )
+
+    return px
 
 
 def parse_word_expression( expr, wordset=None ):
@@ -288,8 +321,14 @@ def separate_expression_into_tokens( expr ):
             for lptok in split_but_retain_separator( whitetok, '(' ):
                 for rptok in split_but_retain_separator( lptok, ')' ):
                     rptok = rptok.strip()
-                    if rptok:
-                        toklist.append( rptok )
+                    if rptok == '!':
+                        toklist.append( 'not' )
+                    elif rptok:
+                        if rptok.startswith('!'):
+                            toklist.append( 'not' )
+                            toklist.append( rptok[1:] )
+                        else:
+                            toklist.append( rptok )
 
     else:
         toklist.append( '' )
@@ -312,20 +351,86 @@ def split_but_retain_separator( expr, separator ):
     return seplist
 
 
+def replace_forward_slashes( expr, negate=False ):
+    """
+    Convert a simple expression with forward slashes '/' to one with
+    operator "or"s instead.
+
+        "A/B" -> "A or B"
+        "A/B/!C" -> "A or B or !C"
+        "A/B" with negate=True -> "not A or not B"
+
+    A ValueError is raised if both '/' and a paren is in the expression, or
+    if '/' and the operators "and" or "or" are in the expression.
+    """
+    if '/' in expr:
+        if '(' in expr or ')' in expr:
+            raise ValueError( 'a "/" and parenthesis cannot be in the '
+                              'same expression: '+repr(expr) )
+
+        rtnL = []
+        for tok in expr.strip().split('/'):
+            tok = tok.strip()
+            if tok:
+
+                sL = tok.split()
+                if 'and' in sL or 'or' in sL or 'not' in sL:
+                    raise ValueError( 'a "/" and a boolean operator '
+                                      '("and" "or" "not") cannot be in the '
+                                      'same expression: '+repr(expr) )
+
+                if negate:
+                    rtnL.append( 'not '+tok )
+                else:
+                    rtnL.append( tok )
+
+        return ' or '.join( rtnL )
+
+    elif negate:
+        return 'not '+conditional_paren_wrap( expr )
+
+    else:
+        return expr
+
+
+def join_expressions_with_AND( expr_list ):
+    ""
+    final = None
+
+    for expr in expr_list:
+        expr = expr.strip()
+
+        if expr:
+            if len(expr_list) > 1:
+                expr = conditional_paren_wrap( expr )
+
+            if final is None:
+                final = expr
+            else:
+                final = final + ' and ' + expr
+
+        else:
+            # because empty expressions evaluate to False, the entire
+            # expression will always evaluate to False
+            return ''
+
+    return final
+
+
 ##############################################################################
 
 class ParamFilter:
 
-    def __init__(self, expr=None):
+    def __init__(self, *expr):
         """
         If 'expr' is not None, load() is called.
         """
         self.wexpr = None
         self.wordD = {}
-        if expr != None:
+        if len( expr ) > 0:
             self.load(expr)
 
-    def load(self, expr):
+    def load(self, expr_list):
         """
         Loads the parameter specifications.  The 'expr' argument can be either
         a string word expression or a list of strings.
@@ -349,19 +454,9 @@ class ParamFilter:
 
         Raises a ValueError if the expression contains a syntax error.
         """
-        if type(expr) == type([]):
-            # 'expr' is a list of strings that are AND'ed together
-            self.wexpr = WordExpression()
-            for ors in expr:
-                # the divide character is used as an OR operator
-                L = []
-                for s in ors.split('/'):
-                    if s.strip():
-                        L.append(s)
-                x = ' or '.join( L )
-                self.wexpr.append(x, 'and')
-        else:
-            self.wexpr = WordExpression(expr)
+        self.wexpr = WordExpression()
+        for expr in expr_list:
+            self.wexpr.append( expr )
 
         # map each word that appears to an evaluation function object instance
         self.wordD = {}

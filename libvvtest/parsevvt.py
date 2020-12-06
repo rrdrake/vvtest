@@ -650,7 +650,7 @@ def attr_filter( attrs, inst, lineno ):
                         return False
 
                 elif name in ["parameter","parameters"]:
-                    pf = FilterExpressions.ParamFilter(value)
+                    pf = FilterExpressions.ParamFilter( value )
                     if not pf.evaluate( inst.params ):
                         return False
 

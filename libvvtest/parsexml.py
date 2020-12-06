@@ -112,7 +112,7 @@ def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
             return True, evaluator.evaluate_option_expr( wx )
 
         elif attrname in ["parameter","parameters"]:
-            pf = FilterExpressions.ParamFilter(attrvalue)
+            pf = FilterExpressions.ParamFilter( attrvalue )
             return True, pf.evaluate( paramD )
 
     except ValueError:

@@ -148,14 +148,23 @@ class create_derived_options( vtu.vvtestTestCase ):
 
     def test_creating_keyword_expression(self):
         ""
-        expr = cmdline.create_keyword_expression( None, None )
+        expr = cmdline.create_word_expression( None, None )
         assert expr == None
 
-        expr = cmdline.create_keyword_expression( ['pass'], None )
+        expr = cmdline.create_word_expression( ['pass'], None )
         assert expr.getWordList() == [ 'pass' ]
 
-        expr = cmdline.create_keyword_expression( None, ['fail'] )
+        expr = cmdline.create_word_expression( None, ['fail'] )
         assert expr.getWordList() == [ 'fail' ]
+
+        self.assertRaises( Exception,
+                cmdline.create_word_expression, ['foo )'], None )
+        self.assertRaises( Exception,
+                cmdline.create_word_expression, None, ['foo )'] )
+        self.assertRaises( Exception,
+                cmdline.create_word_expression, ['foo!bar'], None )
+        self.assertRaises( Exception,
+                cmdline.create_word_expression, None, ['foo!bar'] )
 
     def test_error_in_keyword_specification(self):
         ""
@@ -165,19 +174,23 @@ class create_derived_options( vtu.vvtestTestCase ):
         assert 'command line problem with keyword options' in err
         assert 'Traceback' in err and 'SystemExit' in err
 
-    def test_creating_unified_parameter_list(self):
+    def test_creating_unified_parameter_expression(self):
         ""
-        pL = cmdline.create_parameter_list( None, None )
-        assert pL == None
+        pf = cmdline.create_parameter_list( None, None )
+        assert pf == None
 
-        pL = cmdline.create_parameter_list( ['np=1'], None )
-        assert pL == [ 'np=1' ]
+        pf = cmdline.create_parameter_list( ['np=1'], None )
+        assert pf.evaluate( {'np':'1'} )
 
-        pL = cmdline.create_parameter_list( None, ['np=1'] )
-        assert pL == [ '!np=1' ]
+        pf = cmdline.create_parameter_list( None, ['np=1'] )
+        assert not pf.evaluate( {'np':'1'} )
 
-        pL = cmdline.create_parameter_list( ['np<8'], ['np=1/np=4'] )
-        assert pL == [ 'np<8', '!np=1/!np=4' ]
+        pf = cmdline.create_parameter_list( ['np<8'], ['np=1/ndevice'] )
+        assert     pf.evaluate( {'np':'2'} )
+        assert     pf.evaluate( {'np':'1'} )
+        assert not pf.evaluate( {'np':'1', 'ndevice':'1'} )
+        assert     pf.evaluate( {'np':'2', 'ndevice':'1'} )
+        assert not pf.evaluate( {'np':'9', 'ndevice':'1'} )
 
     def test_creating_parameter_dictionary(self):
         ""

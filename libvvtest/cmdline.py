@@ -9,7 +9,9 @@ import re
 import time
 
 from . import argutil
-from . import FilterExpressions
+from .FilterExpressions import WordExpression, ParamFilter
+from .FilterExpressions import replace_forward_slashes
+from .FilterExpressions import join_expressions_with_AND
 
 
 def parse_command_line( argvlist, vvtest_version=None ):
@@ -736,7 +738,7 @@ def adjust_options_and_create_derived_options( opts ):
     try:
 
         errtype = 'keyword options'
-        expr = create_keyword_expression( opts.dash_k, opts.dash_K )
+        expr = create_word_expression( opts.dash_k, opts.dash_K )
         derived_opts['keyword_expr'] = expr
 
         errtype = 'parameter options'
@@ -752,7 +754,7 @@ def adjust_options_and_create_derived_options( opts ):
         derived_opts['search_regexes'] = rxL
 
         errtype = 'platform options'
-        expr = create_platform_expression( opts.dash_x, opts.dash_X )
+        expr = create_word_expression( opts.dash_x, opts.dash_X )
         derived_opts['platform_expr'] = expr
 
         errtype = 'the sort option'
@@ -820,125 +822,60 @@ def adjust_options_and_create_derived_options( opts ):
     return derived_opts
 
 
-def create_keyword_expression( keywords, not_keywords ):
+def create_word_expression( keywords, not_keywords ):
     ""
-    # construction will check for validity
+    exprL = []
+
     if keywords:
         for kws in keywords:
-            FilterExpressions.WordExpression( convert_from_k_format([kws]) )
+            exprL.append( clean_up_word_expression(kws) )
+
     if not_keywords:
         for kws in not_keywords:
-            FilterExpressions.WordExpression( convert_from_k_format([kws]) )
+            exprL.append( clean_up_word_expression( kws, negate=True ) )
 
-    keywL = []
-
-    if keywords:
-        keywL.extend( keywords )
-
-    # change -K into -k expressions by using the '!' operator
-    if not_keywords:
-        for s in not_keywords:
-            bangL = map( lambda k: '!'+k, s.split('/') )
-            keywL.append( '/'.join( bangL ) )
-
-    if len( keywL ) > 0:
-        words = convert_from_k_format(keywL)
-        return FilterExpressions.WordExpression( words )
+    if len( exprL ) > 0:
+        return WordExpression( join_expressions_with_AND( exprL ) )
 
     return None
 
 
+def clean_up_word_expression( expr, negate=False ):
+    ""
+    ex = replace_forward_slashes( expr, negate )
+
+    wx = WordExpression( ex )
+
+    # magic: would like this check to be in the WordExpression class
+    for wrd in wx.getWordList():
+        if not allowable_word( wrd ):
+            raise ValueError( 'invalid word: "'+str(wrd)+'"' )
+
+    return ex
+
+
 def create_parameter_list( params, not_params ):
     ""
-    # construction will check for validity
-    FilterExpressions.ParamFilter( params )
-    FilterExpressions.ParamFilter( not_params )
+    # construction will check validity
 
-    plist = []
+    exprL = []
 
     if params:
-        plist.extend( params )
+        for expr in params:
+            ex = replace_forward_slashes( expr )
+            ParamFilter( ex )
+            exprL.append( ex )
 
     if not_params:
-        # convert -P values into -p values
-        for s in not_params:
-            s = s.strip()
-            if s:
-                orL = []
-                for p in s.split('/'):
-                    p = p.strip()
-                    if p:
-                        orL.append( '!' + p )
+        for expr in not_params:
+            ex = replace_forward_slashes( expr, negate=True )
+            ParamFilter( ex )
+            exprL.append( ex )
 
-                if len(orL) > 0:
-                    plist.append( '/'.join( orL ) )
+    if len( exprL ) > 0:
+        return ParamFilter( join_expressions_with_AND( exprL ) )
 
-    if len( plist ) == 0:
-        return None
-    else:
-        return plist
-
-
-def create_platform_expression( platforms, not_platforms ):
-    ""
-    if platforms:
-        strexpr = convert_from_k_format( platforms )
-        expr = FilterExpressions.WordExpression( strexpr )
-    elif not_platforms:
-        expr = FilterExpressions.WordExpression()
-    else:
-        expr = None
-
-    if not_platforms:
-        # convert -X values into -x values
-        exprL = []
-        for s in not_platforms:
-            s = s.strip()
-            if s:
-                orL = []
-                for p in s.split('/'):
-                    p = p.strip()
-                    if p:
-                        orL.append( '!' + p )
-
-                if len( orL ) > 0:
-                    exprL.append( '/'.join( orL ) )
-
-        if len( exprL ) > 0:
-            expr.append( convert_from_k_format(exprL), 'and' )
-
-    return expr
-
-
-def convert_from_k_format( expr_list ):
-    """
-    The 'expr_list' is, for example, ["key1/key2", "!key3"] and comes from a
-    command line such as "-k key1/key2 -k !key3".  A string expression is
-    returned.
-    """
-    S = ''
-    for grp in expr_list:
-
-        L = []
-        for k in grp.split('/'):
-            k = k.strip()
-
-            bang = ''
-            while k[:1] == '!':
-                k = k[1:].strip()
-                if bang: bang = ''  # two bangs in a row cancel out
-                else: bang = 'not '
-
-            if k and allowable_word(k):
-                L.append( bang + k )
-            else:
-                raise ValueError( 'invalid word: "'+str(k)+'"' )
-
-        if len(L) > 0:
-            if S: S += ' and '
-            S += '( ' + ' or '.join(L) + ' )'
-    
-    return ' '.join( S.split() )
+    return None
 
 
 allowable_chars = set( 'abcdefghijklmnopqrstuvwxyz' + \

@@ -23,6 +23,10 @@ from libvvtest.FilterExpressions import split_but_retain_separator
 from libvvtest.FilterExpressions import separate_expression_into_tokens
 from libvvtest.FilterExpressions import convert_token_list_into_eval_string
 from libvvtest.FilterExpressions import parse_non_results_expression
+from libvvtest.FilterExpressions import replace_forward_slashes
+from libvvtest.FilterExpressions import join_expressions_with_AND
+from libvvtest.FilterExpressions import conditional_paren_wrap
+from libvvtest.FilterExpressions import parenthetical_tokenize
 
 
 class word_expression_tests( vtu.vvtestTestCase ):
@@ -83,39 +87,26 @@ class word_expression_tests( vtu.vvtestTestCase ):
 
         ex.append("")
         print3( ex )
-        assert str(ex) == 'WordExpression="hello"'
+        assert str(ex) == 'WordExpression=""'
         assert not ex.evaluate( list().count )
-        assert ex.evaluate( list(['hello']).count )
+        assert not ex.evaluate( list(['hello']).count )
         assert not ex.evaluate( list(['world']).count )
 
         ex.append("  ")
         print3( ex )
-        assert str(ex) == 'WordExpression="hello"'
+        assert str(ex) == 'WordExpression=""'
         assert not ex.evaluate( list().count )
-        assert ex.evaluate( list(['hello']).count )
+        assert not ex.evaluate( list(['hello']).count )
         assert not ex.evaluate( list(['world']).count )
 
         ex.append("world")
         print3( ex )
-        assert str(ex) == 'WordExpression="hello or world"'
+        assert str(ex) == 'WordExpression=""'
         assert not ex.evaluate( list().count )
-        assert ex.evaluate( list(['hello']).count )
-        assert ex.evaluate( list(['world']).count )
-        assert ex.evaluate( list(['hello','world']).count )
-        assert not ex.evaluate( list(['the','next']).count )
-
-        ex.append( "period", operator="and" )
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello or world and period"'
-        assert not ex.evaluate( list().count )
-        assert     ex.evaluate( list(['hello']).count )
+        assert not ex.evaluate( list(['hello']).count )
         assert not ex.evaluate( list(['world']).count )
-        assert     ex.evaluate( list(['hello','world']).count )
+        assert not ex.evaluate( list(['hello','world']).count )
         assert not ex.evaluate( list(['the','next']).count )
-        assert not ex.evaluate( list(['period']).count )
-        assert     ex.evaluate( list(['hello','period']).count )
-        assert     ex.evaluate( list(['world','period']).count )
-        assert     ex.evaluate( list(['hello','world','period']).count )
 
     def test_expression_and_or_precedence(self):
         ""
@@ -362,6 +353,174 @@ class word_expression_tests( vtu.vvtestTestCase ):
         assert     ex.evaluate( ['foo','notrun'].count )
         assert not ex.evaluate( ['foo','notrun'].count, include_results=False )
 
+    def test_an_exclamation_point_means_NOT(self):
+        ""
+        for expr in ['!foo','! foo','not foo']:
+            ex = WordExpression( expr )
+            assert not ex.evaluate( ['foo'].count )
+            assert     ex.evaluate( ['bar'].count )
+
+        for expr in ['foo or !bar','foo or ! bar']:
+            ex = WordExpression( expr )
+            assert     ex.evaluate( ['foo'].count )
+            assert not ex.evaluate( ['bar'].count )
+            assert     ex.evaluate( ['foo','bar'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+        for expr in ['!(foo or bar)','! (foo or bar)']:
+            ex = WordExpression( expr )
+            assert not ex.evaluate( ['foo'].count )
+            assert not ex.evaluate( ['bar'].count )
+            assert not ex.evaluate( ['foo','bar'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+        for expr in ['!(foo and bar)','! (foo and bar)']:
+            ex = WordExpression( expr )
+            assert     ex.evaluate( ['foo'].count )
+            assert     ex.evaluate( ['bar'].count )
+            assert not ex.evaluate( ['foo','bar'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+    def test_replace_forward_slashes(self):
+        ""
+        assert replace_forward_slashes( 'foo' ) == 'foo'
+        assert replace_forward_slashes( 'foo', True ) == 'not foo'
+        assert replace_forward_slashes( 'foo and bar' ) == 'foo and bar'
+        assert replace_forward_slashes( 'foo and bar', True ) == \
+                                            'not ( foo and bar )'
+
+        assert replace_forward_slashes( 'foo/bar' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo/ bar' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo / bar' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo /bar' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo/bar/baz' ) == 'foo or bar or baz'
+        assert replace_forward_slashes( 'foo/!bar/baz' ) == 'foo or !bar or baz'
+
+        assert replace_forward_slashes( 'foo', True ) == 'not foo'
+        assert replace_forward_slashes( 'foo/bar', True ) == 'not foo or not bar'
+        assert replace_forward_slashes( 'foo/!bar/baz', True ) == \
+                                            'not foo or not !bar or not baz'
+
+        assert replace_forward_slashes( '/foo/bar' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo/bar/' ) == 'foo or bar'
+
+        self.assertRaises( ValueError, replace_forward_slashes, 'foo/(not bar)' )
+        self.assertRaises( ValueError, replace_forward_slashes, 'foo/not bar' )
+        self.assertRaises( ValueError, replace_forward_slashes, 'foo or bar / baz' )
+        self.assertRaises( ValueError, replace_forward_slashes, 'foo / bar and baz' )
+        self.assertRaises( ValueError, replace_forward_slashes, 'foo/(bar)' )
+
+    def test_parenthetical_tokenize(self):
+        ""
+        px = parenthetical_tokenize( 'foo' ) ; assert px.toks == ['foo']
+        px = parenthetical_tokenize( 'not foo' ) ; assert px.toks == ['not','foo']
+        px = parenthetical_tokenize( '! foo' ) ; assert px.toks == ['not','foo']
+        px = parenthetical_tokenize( '!foo' ) ; assert px.toks == ['not','foo']
+
+        px = parenthetical_tokenize( 'foo or bar' )
+        assert px.toks == ['foo','or','bar']
+
+        px = parenthetical_tokenize( '(foo)' )
+        assert px.numTokens() == 1
+        assert px.toks[0].toks == ['foo']
+
+        px = parenthetical_tokenize( '(foo or bar)' )
+        assert px.numTokens() == 1
+        assert px.toks[0].toks == ['foo','or','bar']
+
+        px = parenthetical_tokenize( '!(foo or bar)' )
+        assert px.numTokens() == 2
+        assert px.toks[0] == 'not'
+        assert px.toks[1].toks == ['foo','or','bar']
+
+        px = parenthetical_tokenize( 'foo or (bar and baz)' )
+        assert px.numTokens() == 3
+        assert px.toks[:2] == ['foo','or']
+        assert px.toks[2].toks == ['bar','and','baz']
+
+        px = parenthetical_tokenize( '(foo) or (bar)' )
+        assert px.numTokens() == 3
+        assert px.toks[0].toks == ['foo']
+        assert px.toks[1] == 'or'
+        assert px.toks[2].toks == ['bar']
+
+        px = parenthetical_tokenize( '((foo or bar))' )
+        assert px.numTokens() == 1
+        assert px.toks[0].numTokens() == 1
+        assert px.toks[0].toks[0].toks == ['foo','or','bar']
+
+    def test_conditional_paren_wrap(self):
+        ""
+        assert conditional_paren_wrap( 'foo' ) == 'foo'
+        assert conditional_paren_wrap( 'foo or bar' ) == '( foo or bar )'
+        assert conditional_paren_wrap( '(foo)' ) == '(foo)'
+        assert conditional_paren_wrap( '( foo )' ) == '( foo )'
+        assert conditional_paren_wrap( '(foo or bar)' ) == '(foo or bar)'
+        assert conditional_paren_wrap( '( foo or bar )' ) == '( foo or bar )'
+
+    def test_join_expressions_with_AND(self):
+        ""
+        assert join_expressions_with_AND( [] ) == None
+        assert join_expressions_with_AND( [''] ) == ''
+        assert join_expressions_with_AND( ['foo',''] ) == ''
+        assert join_expressions_with_AND( ['','foo'] ) == ''
+        assert join_expressions_with_AND( ['foo','bar'] ) == 'foo and bar'
+        assert join_expressions_with_AND( ['foo or bar'] ) == 'foo or bar'
+        assert join_expressions_with_AND( ['foo or bar','baz'] ) == \
+                                                '( foo or bar ) and baz'
+        assert join_expressions_with_AND( ['foo','bar or baz'] ) == \
+                                                'foo and ( bar or baz )'
+        assert join_expressions_with_AND( ['( foo or bar )'] ) == \
+                                                '( foo or bar )'
+        assert join_expressions_with_AND( ['( foo or bar ) and baz'] ) == \
+                                                '( foo or bar ) and baz'
+        assert join_expressions_with_AND( ['( foo or bar ) and baz','yep'] ) == \
+                                    '( ( foo or bar ) and baz ) and yep'
+
+    def magic_test_processing_forward_slash_and_negation(self):
+        ""
+        for expr in ['foo/bar','foo / bar','foo/ bar','foo /bar']:
+            ex = WordExpression( expr )
+            assert     ex.evaluate( ['foo'].count )
+            assert     ex.evaluate( ['bar'].count )
+            assert     ex.evaluate( ['bar','foo'].count )
+            assert not ex.evaluate( ['baz'].count )
+
+        for expr in ['!foo/bar','!foo / bar','!foo/ bar','!foo /bar',
+                     'not foo/bar','not foo / bar','not foo/ bar','not foo /bar' ]:
+            ex = WordExpression( expr )
+            assert not ex.evaluate( ['foo'].count )
+            assert not ex.evaluate( ['bar'].count )
+            assert not ex.evaluate( ['bar','foo'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+        for expr in ['(!foo)/bar','(!foo) / bar','(!foo)/ bar','(!foo) /bar',
+                     '(not foo)/bar','(not foo) / bar','(not foo)/ bar','(not foo) /bar' ]:
+            ex = WordExpression( expr )
+            assert not ex.evaluate( ['foo'].count )
+            assert     ex.evaluate( ['bar'].count )
+            assert     ex.evaluate( ['bar','foo'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+        for expr in ['foo/!bar','foo / !bar','foo/ !bar','foo /!bar',
+                     'foo/not bar','foo / not bar','foo/ not bar','foo /not bar' ]:
+            ex = WordExpression( expr )
+            assert     ex.evaluate( ['foo'].count )
+            assert not ex.evaluate( ['bar'].count )
+            assert     ex.evaluate( ['bar','foo'].count )
+            assert     ex.evaluate( ['baz'].count )
+
+        # magic: these should error out
+        #   - cannot have '/' in an expr with parens
+        for expr in ['not ( foo/bar and baz )','! (foo/bar and baz)',
+                     'not( foo/bar and baz )','!(foo/bar and baz)']:
+            ex = WordExpression( expr )
+        # magic: these should error out
+        #   - cannot have '/' in an expr with AND or OR
+        for expr in ['foo/bar and baz','foo/bar or baz',
+                     'baz and foo/bar','baz or foo/bar']:
+            ex = WordExpression( expr )
+
 
 class cmd_line_word_expression_tests( vtu.vvtestTestCase ):
 
@@ -419,7 +578,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
     def test_ParamFilters_with_integer_param_types(self):
         ""
-        pf = ParamFilter( ['np=4'] )
+        pf = ParamFilter( 'np=4' )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'np':2} )
@@ -427,7 +586,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert     pf.evaluate( {'size':"10", 'np':4} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( ['np=1/np=4'] )
+        pf = ParamFilter( replace_forward_slashes('np=1/np=4') )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
@@ -436,60 +595,60 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10", 'np':3} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( ['np=1/!np'] )
+        pf = ParamFilter( replace_forward_slashes('np=1/!np') )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1/np!='] )
+        pf = ParamFilter( replace_forward_slashes('np=1/np!=') )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['!np'] )
+        pf = ParamFilter( '!np' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1', 'size'] )
+        pf = ParamFilter( 'np=1', 'size' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':4} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1', 'size='] )
+        pf = ParamFilter( 'np=1', 'size=' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':4} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np!=1', 'np!=4'] )
+        pf = ParamFilter( 'np!=1', 'np!=4' )
         assert not pf.evaluate( {'np':1} )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':2} )
 
-        pf = ParamFilter( ['np<=13'] )
+        pf = ParamFilter( 'np<=13' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':14} )
         assert     pf.evaluate( {'np':13} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np>=13'] )
+        pf = ParamFilter( 'np>=13' )
         assert not pf.evaluate( {'np':2} )
         assert     pf.evaluate( {'np':13} )
         assert     pf.evaluate( {'np':14} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np<13'] )
+        pf = ParamFilter( 'np<13' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':14} )
         assert not pf.evaluate( {'np':15} )
@@ -497,7 +656,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np>13'] )
+        pf = ParamFilter( 'np>13' )
         assert not pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':13} )
         assert     pf.evaluate( {'np':14} )
@@ -506,7 +665,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
     def test_ParamFilters_with_string_param_types(self):
         ""
-        pf = ParamFilter( ['np=4'] )
+        pf = ParamFilter( 'np=4' )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'np':'2'} )
@@ -514,7 +673,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert     pf.evaluate( {'size':"10", 'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( ['np=1/np=4'] )
+        pf = ParamFilter( replace_forward_slashes('np=1/np=4') )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
@@ -523,60 +682,60 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10", 'np':'3'} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( ['np=1/!np'] )
+        pf = ParamFilter( replace_forward_slashes('np=1/!np') )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1/np!='] )
+        pf = ParamFilter( replace_forward_slashes('np=1/np!=') )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['!np'] )
+        pf = ParamFilter( '!np' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1', 'size'] )
+        pf = ParamFilter( 'np=1', 'size' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':'4'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np=1', 'size='] )
+        pf = ParamFilter( 'np=1', 'size=' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':'4'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np!=1', 'np!=4'] )
+        pf = ParamFilter( 'np!=1', 'np!=4' )
         assert not pf.evaluate( {'np':'1'} )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'2'} )
 
-        pf = ParamFilter( ['np<=13'] )
+        pf = ParamFilter( 'np<=13' )
         assert     pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'20'} )
         assert     pf.evaluate( {'np':'13'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np>=13'] )
+        pf = ParamFilter( 'np>=13' )
         assert not pf.evaluate( {'np':'2'} )
         assert     pf.evaluate( {'np':'13'} )
         assert     pf.evaluate( {'np':'20'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np<13'] )
+        pf = ParamFilter( 'np<13' )
         assert     pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'20'} )
         assert not pf.evaluate( {'np':'15'} )
@@ -584,7 +743,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( ['np>13'] )
+        pf = ParamFilter( 'np>13' )
         assert not pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'13'} )
         assert     pf.evaluate( {'np':'14'} )
@@ -593,88 +752,89 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
     def test_ParamFilters_with_mixed_types(self):
         ""
-        pf = ParamFilter( ['np=13'] )
+        pf = ParamFilter( 'np=13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np=ab'] )
+        pf = ParamFilter( 'np=ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np=ab'] )
+        pf = ParamFilter( 'np=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( ['np!=13'] )
+        pf = ParamFilter( 'np!=13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np!=ab'] )
+        pf = ParamFilter( 'np!=ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np!=ab'] )
+        pf = ParamFilter( 'np!=ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( ['np<=13'] )
+        pf = ParamFilter( 'np<=13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np<=13'] )
+        pf = ParamFilter( 'np<=13' )
         assert     pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( ['np<=ab'] )
+        pf = ParamFilter( 'np<=ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np<=ab'] )
+        pf = ParamFilter( 'np<=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( ['np>=13'] )
+        pf = ParamFilter( 'np>=13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np>=13'] )
+        pf = ParamFilter( 'np>=13' )
         assert not pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( ['np>=ab'] )
+        pf = ParamFilter( 'np>=ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np>=ab'] )
+        pf = ParamFilter( 'np>=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( ['np<13'] )
+        pf = ParamFilter( 'np<13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np<13'] )
+        pf = ParamFilter( 'np<13' )
         assert     pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( ['np<ab'] )
+        pf = ParamFilter( 'np<ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np<ab'] )
+        pf = ParamFilter( 'np<ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( ['np>13'] )
+        pf = ParamFilter( 'np>13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( ['np>13'] )
+        pf = ParamFilter( 'np>13' )
         assert not pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( ['np>ab'] )
+        pf = ParamFilter( 'np>ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( ['np>ab'] )
+        pf = ParamFilter( 'np>ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
-    def test_using_word_expressions_instead_of_a_list(self):
+    def test_behavior_of_the_NOT_operator_on_param_expressions(self):
         ""
         pf = ParamFilter( 'np' )
         assert not pf.evaluate( {} )
         assert not pf.evaluate( { 'foo':5 } )
         assert     pf.evaluate( { 'np':2 } )
 
-        pf = ParamFilter( '!np' )
-        assert     pf.evaluate( {} )
-        assert     pf.evaluate( { 'foo':5 } )
-        assert not pf.evaluate( { 'np':2 } )
+        for expr in [ '!np', ' not np' ]:
+            pf = ParamFilter( expr )
+            assert     pf.evaluate( {} )
+            assert     pf.evaluate( { 'foo':5 } )
+            assert not pf.evaluate( { 'np':2 } )
 
         pf = ParamFilter( 'np>2' )
         assert not pf.evaluate( {} )
@@ -687,7 +847,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         #           (np is defined) AND (np<=2)
         #       and therefore !np<=2 actually means
         #           NOT [ (np is defined) AND (np<=2) ]
-        #       or
+        #       which equals
         #           (np is not defined) OR (np>2)
 
         pf = ParamFilter( 'np<=2' )
@@ -696,17 +856,19 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {} )
         assert not pf.evaluate( { 'foo':5 } )
 
-        pf = ParamFilter( '!np>2' )
-        assert     pf.evaluate( {'np':2} )
-        assert not pf.evaluate( {'np':3} )
-        assert     pf.evaluate( {} )
-        assert     pf.evaluate( { 'foo':5 } )
+        for expr in [ '!np>2', 'not np>2' ]:
+            pf = ParamFilter( expr )
+            assert     pf.evaluate( {'np':2} )
+            assert not pf.evaluate( {'np':3} )
+            assert     pf.evaluate( {} )
+            assert     pf.evaluate( { 'foo':5 } )
 
-        pf = ParamFilter( '!np>3 and np!=1' )
-        assert not pf.evaluate( {'np':1} )
-        assert     pf.evaluate( {'np':2} )
-        assert     pf.evaluate( {'np':3} )
-        assert not pf.evaluate( {'np':4} )
+        for expr in [ '!np>3 and np!=1', 'not np>3 and np!=1' ]:
+            pf = ParamFilter( expr )
+            assert not pf.evaluate( {'np':1} )
+            assert     pf.evaluate( {'np':2} )
+            assert     pf.evaluate( {'np':3} )
+            assert not pf.evaluate( {'np':4} )
 
 
 ############################################################################
