@@ -9,9 +9,8 @@ import re
 import time
 
 from . import argutil
-from .FilterExpressions import WordExpression, ParamFilter
-from .FilterExpressions import replace_forward_slashes
-from .FilterExpressions import join_expressions_with_AND
+from .FilterExpressions import create_word_expression
+from .FilterExpressions import create_parameter_filter
 
 
 def parse_command_line( argvlist, vvtest_version=None ):
@@ -742,7 +741,7 @@ def adjust_options_and_create_derived_options( opts ):
         derived_opts['keyword_expr'] = expr
 
         errtype = 'parameter options'
-        params = create_parameter_list( opts.dash_p, opts.dash_P )
+        params = create_parameter_filter( opts.dash_p, opts.dash_P )
         derived_opts['param_list'] = params
 
         errtype = 'setting paramters'
@@ -820,71 +819,6 @@ def adjust_options_and_create_derived_options( opts ):
         sys.exit(1)
 
     return derived_opts
-
-
-def create_word_expression( keywords, not_keywords ):
-    ""
-    exprL = []
-
-    if keywords:
-        for kws in keywords:
-            exprL.append( clean_up_word_expression(kws) )
-
-    if not_keywords:
-        for kws in not_keywords:
-            exprL.append( clean_up_word_expression( kws, negate=True ) )
-
-    if len( exprL ) > 0:
-        return WordExpression( join_expressions_with_AND( exprL ) )
-
-    return None
-
-
-def clean_up_word_expression( expr, negate=False ):
-    ""
-    ex = replace_forward_slashes( expr, negate )
-
-    wx = WordExpression( ex )
-
-    # magic: would like this check to be in the WordExpression class
-    for wrd in wx.getWordList():
-        if not allowable_word( wrd ):
-            raise ValueError( 'invalid word: "'+str(wrd)+'"' )
-
-    return ex
-
-
-def create_parameter_list( params, not_params ):
-    ""
-    # construction will check validity
-
-    exprL = []
-
-    if params:
-        for expr in params:
-            ex = replace_forward_slashes( expr )
-            ParamFilter( ex )
-            exprL.append( ex )
-
-    if not_params:
-        for expr in not_params:
-            ex = replace_forward_slashes( expr, negate=True )
-            ParamFilter( ex )
-            exprL.append( ex )
-
-    if len( exprL ) > 0:
-        return ParamFilter( join_expressions_with_AND( exprL ) )
-
-    return None
-
-
-allowable_chars = set( 'abcdefghijklmnopqrstuvwxyz' + \
-                       'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + \
-                       '0123456789_' + '-+=#@%^:.~' )
-
-def allowable_word(s):
-    ""
-    return set(s).issubset( allowable_chars )
 
 
 def create_search_regex_list( pattern_list ):

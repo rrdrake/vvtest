@@ -417,6 +417,47 @@ def join_expressions_with_AND( expr_list ):
     return final
 
 
+def create_word_expression( word_expr_list, not_word_expr_list ):
+    ""
+    exprL = []
+
+    if word_expr_list:
+        for expr in word_expr_list:
+            exprL.append( clean_up_word_expression(expr) )
+
+    if not_word_expr_list:
+        for expr in not_word_expr_list:
+            exprL.append( clean_up_word_expression( expr, negate=True ) )
+
+    if len( exprL ) > 0:
+        return WordExpression( join_expressions_with_AND( exprL ) )
+
+    return None
+
+
+def clean_up_word_expression( expr, negate=False ):
+    ""
+    ex = replace_forward_slashes( expr, negate )
+
+    wx = WordExpression( ex )
+
+    # magic: would like this check to be in the WordExpression class
+    for wrd in wx.getWordList():
+        if not allowable_word( wrd ):
+            raise ValueError( 'invalid word: "'+str(wrd)+'"' )
+
+    return ex
+
+
+allowable_chars = set( 'abcdefghijklmnopqrstuvwxyz' + \
+                       'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + \
+                       '0123456789_' + '-+=#@%^:.~' )
+
+def allowable_word(s):
+    ""
+    return set(s).issubset( allowable_chars )
+
+
 ##############################################################################
 
 class ParamFilter:
@@ -626,6 +667,30 @@ class EvalGT( EvalOperator ):
             return 1
         except Exception: pass
         return v > self.v
+
+
+def create_parameter_filter( param_expr_list, not_param_expr_list ):
+    ""
+    # construction will check validity
+
+    exprL = []
+
+    if param_expr_list:
+        for expr in param_expr_list:
+            ex = replace_forward_slashes( expr )
+            ParamFilter( ex )
+            exprL.append( ex )
+
+    if not_param_expr_list:
+        for expr in not_param_expr_list:
+            ex = replace_forward_slashes( expr, negate=True )
+            ParamFilter( ex )
+            exprL.append( ex )
+
+    if len( exprL ) > 0:
+        return ParamFilter( join_expressions_with_AND( exprL ) )
+
+    return None
 
 
 ######################################################################

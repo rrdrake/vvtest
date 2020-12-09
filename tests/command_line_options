@@ -19,9 +19,6 @@ from testutils import print3
 import libvvtest.cmdline as cmdline
 
 
-#vvtestmod = util.create_module_from_filename( vtu.vvtest_file )
-
-
 class help_page_tests( vtu.vvtestTestCase ):
 
     def setUp(self):
@@ -173,24 +170,6 @@ class create_derived_options( vtu.vvtestTestCase ):
         #print3( err )
         assert 'command line problem with keyword options' in err
         assert 'Traceback' in err and 'SystemExit' in err
-
-    def test_creating_unified_parameter_expression(self):
-        ""
-        pf = cmdline.create_parameter_list( None, None )
-        assert pf == None
-
-        pf = cmdline.create_parameter_list( ['np=1'], None )
-        assert pf.evaluate( {'np':'1'} )
-
-        pf = cmdline.create_parameter_list( None, ['np=1'] )
-        assert not pf.evaluate( {'np':'1'} )
-
-        pf = cmdline.create_parameter_list( ['np<8'], ['np=1/ndevice'] )
-        assert     pf.evaluate( {'np':'2'} )
-        assert     pf.evaluate( {'np':'1'} )
-        assert not pf.evaluate( {'np':'1', 'ndevice':'1'} )
-        assert     pf.evaluate( {'np':'2', 'ndevice':'1'} )
-        assert not pf.evaluate( {'np':'9', 'ndevice':'1'} )
 
     def test_creating_parameter_dictionary(self):
         ""

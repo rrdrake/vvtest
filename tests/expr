@@ -27,6 +27,7 @@ from libvvtest.FilterExpressions import replace_forward_slashes
 from libvvtest.FilterExpressions import join_expressions_with_AND
 from libvvtest.FilterExpressions import conditional_paren_wrap
 from libvvtest.FilterExpressions import parenthetical_tokenize
+from libvvtest.FilterExpressions import create_parameter_filter
 
 
 class word_expression_tests( vtu.vvtestTestCase ):
@@ -869,6 +870,24 @@ class param_expression_tests( vtu.vvtestTestCase ):
             assert     pf.evaluate( {'np':2} )
             assert     pf.evaluate( {'np':3} )
             assert not pf.evaluate( {'np':4} )
+
+    def test_creating_unified_parameter_expression(self):
+        ""
+        pf = create_parameter_filter( None, None )
+        assert pf == None
+
+        pf = create_parameter_filter( ['np=1'], None )
+        assert pf.evaluate( {'np':'1'} )
+
+        pf = create_parameter_filter( None, ['np=1'] )
+        assert not pf.evaluate( {'np':'1'} )
+
+        pf = create_parameter_filter( ['np<8'], ['np=1/ndevice'] )
+        assert     pf.evaluate( {'np':'2'} )
+        assert     pf.evaluate( {'np':'1'} )
+        assert not pf.evaluate( {'np':'1', 'ndevice':'1'} )
+        assert     pf.evaluate( {'np':'2', 'ndevice':'1'} )
+        assert not pf.evaluate( {'np':'9', 'ndevice':'1'} )
 
 
 ############################################################################
