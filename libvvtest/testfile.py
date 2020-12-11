@@ -23,7 +23,7 @@ class TestFile:
                                    # or 'xml' or 'script'
 
         self.enabled = True
-        self.plat_enable = []      # list of WordExpression
+        self.enable_expr = None    # a WordExpression
         self.option_enable = []    # list of WordExpression
         self.keywords = set()      # set of strings
         self.paramset = ParameterSet()
@@ -78,13 +78,13 @@ class TestFile:
         else:
             self.enabled = False
 
-    def addEnablePlatformExpression(self, word_expression):
+    def setEnablePlatformExpression(self, word_expression):
         ""
-        self.plat_enable.append( word_expression )
+        self.enable_expr = word_expression
 
-    def getPlatformEnableExpressions(self):
+    def getPlatformEnableExpression(self):
         ""
-        return self.plat_enable
+        return self.enable_expr
 
     def addEnableOptionExpression(self, word_expression):
         ""

@@ -952,6 +952,7 @@ def make_RuntimeConfig( platname='XBox', options=[] ):
 
     if platname:
         rtconfig.setPlatformName( platname )
+        rtconfig.setPlatformExpression( None, platname )
     if options:
         rtconfig.setOptionList( options )
 

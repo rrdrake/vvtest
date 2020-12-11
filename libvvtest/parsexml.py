@@ -16,6 +16,7 @@ from .parseutil import variable_expansion
 from .parseutil import evauate_testname_expr
 from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
+from .parseutil import create_platform_expression
 
 
 def read_xml_file( filename, strict=False ):
@@ -504,6 +505,8 @@ def parse_include_platform( inst ):
 
        <include platforms="SunOS Linux"/>
     """
+    platexprL = []
+
     for nd in inst.source.matchNodes(['include$']):
 
         if nd.hasAttr( 'parameters' ) or nd.hasAttr( 'parameter' ):
@@ -517,13 +520,9 @@ def parse_include_platform( inst ):
         platexpr = nd.getAttr( 'platforms', nd.getAttr( 'platform', None ) )
         if platexpr != None:
             platexpr = platexpr.strip()
+            create_platform_expression( [platexpr], nd.getLineNumber() )
+            platexprL.append( platexpr )
 
-            if '/' in platexpr:
-                raise TestSpecError( 'invalid "platforms" attribute content '
-                                     ', line ' + str(nd.getLineNumber()) )
-
-            wx = FilterExpressions.WordExpression( platexpr )
-            inst.tfile.addEnablePlatformExpression( wx )
 
         opexpr = nd.getAttr( 'options', nd.getAttr( 'option', None ) )
         if opexpr != None:
@@ -531,6 +530,9 @@ def parse_include_platform( inst ):
             if opexpr:
                 wx = FilterExpressions.WordExpression( opexpr )
                 inst.tfile.addEnableOptionExpression( wx )
+
+    wx = create_platform_expression( platexprL, 1 )
+    inst.tfile.setEnablePlatformExpression( wx )
 
 
 def parse_keywords( inst ):

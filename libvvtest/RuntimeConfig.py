@@ -81,35 +81,35 @@ class RuntimeConfig:
     def setPlatformName(self, name):
         ""
         self.platname = name
-        # by default, the current platform is used as the expression
-        self.default_platexpr = FilterExpressions.WordExpression( name )
 
     def getPlatformName(self):
         ""
         return self.platname
 
-    def setPlatformExpression(self, expr):
-        ""
-        self.platexpr = expr
+    def setPlatformExpression(self, expr, platname):
+        """
+        Use 'expr' as the platform expression, unless it is None. If None,
+        use the expression "platname" (a single word expression whose word
+        is the given platform name).
+        """
+        if expr is None:
+            self.platexpr = FilterExpressions.WordExpression( platname )
+        else:
+            self.platexpr = expr
 
     def applyPlatformExpression(self, true_or_false):
         ""
         self.apply_platexpr = true_or_false
 
-    def evaluate_platform_include(self, list_of_platform_expr):
+    def evaluate_platform_include(self, platform_expr):
         ""
         ok = True
 
         if self.apply_platexpr:
-            if self.platexpr:
-                expr = self.platexpr
-            else:
-                expr = self.default_platexpr
-
             # to evaluate the command line expression, each platform name in the
             # expression is evaluated using PlatformEvaluator.satisfies_platform()
-            pev = PlatformEvaluator( list_of_platform_expr )
-            ok = expr.evaluate( pev.satisfies_platform )
+            pev = PlatformEvaluator( platform_expr )
+            ok = self.platexpr.evaluate( pev.satisfies_platform )
 
         return ok
 
@@ -260,13 +260,13 @@ class PlatformEvaluator:
 
         "Would the test run on the given platform name?"
     """
-    def __init__(self, list_of_word_expr):
-        self.exprL = list_of_word_expr
+    def __init__(self, word_expr):
+        self.expr = word_expr
 
     def satisfies_platform(self, plat_name):
         ""
-        for wx in self.exprL:
-            if not wx.evaluate( lambda tok: tok == plat_name ):
+        if self.expr is not None:
+            if not self.expr.evaluate( lambda tok: tok == plat_name ):
                 return False
         return True
 

@@ -19,6 +19,7 @@ from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
+from .parseutil import create_platform_expression
 
 
 def parse_vvt_test( inst ):
@@ -678,6 +679,8 @@ def parse_enable( inst ):
     ANDed together.  If more than one "enable" block is given, each must
     result in True for the test to be included.
     """
+    platexprL = []
+
     for spec in inst.source.getSpecList( 'enable' ):
 
         platexpr = None
@@ -697,12 +700,8 @@ def parse_enable( inst ):
                                        spec.attrs.get( 'platform', None ) )
             if platexpr != None:
                 platexpr = platexpr.strip()
-                if '/' in platexpr:
-                    raise TestSpecError( \
-                            'invalid "platforms" attribute value '
-                            ', line ' + str(spec.lineno) )
-                wx = FilterExpressions.WordExpression( platexpr )
-                inst.tfile.addEnablePlatformExpression( wx )
+                create_platform_expression( [platexpr], spec.lineno )
+                platexprL.append( platexpr )
 
             opexpr = spec.attrs.get( 'options',
                                      spec.attrs.get( 'option', None ) )
@@ -724,3 +723,6 @@ def parse_enable( inst ):
                     'options attributes cannot specify "false", line ' + \
                     str(spec.lineno) )
             inst.tfile.setEnabled( val == 'true' )
+
+    wx = create_platform_expression( platexprL, 1 )
+    inst.tfile.setEnablePlatformExpression( wx )

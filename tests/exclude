@@ -387,23 +387,20 @@ class exclude_tests( vtu.vvtestTestCase ):
         inst = vtu.make_simple_script_parse_instance( 'blue.vvt' )
         parsevvt.parse_enable( inst )
         assert inst.tfile.isEnabled()
-        exprL = inst.tfile.getPlatformEnableExpressions()
-        assert len( exprL ) == 1
-        assert not exprL[0].evaluate( lambda word: True )
+        expr = inst.tfile.getPlatformEnableExpression()
+        assert not expr.evaluate( lambda word: True )
 
         inst = vtu.make_simple_script_parse_instance( 'red.vvt' )
         parsevvt.parse_enable( inst )
-        exprL = inst.tfile.getPlatformEnableExpressions()
-        assert len( exprL ) == 1
-        assert     exprL[0].evaluate( lambda word: word == 'XBox' )
-        assert not exprL[0].evaluate( lambda word: word == 'PS2' )
+        expr = inst.tfile.getPlatformEnableExpression()
+        assert     expr.evaluate( lambda word: word == 'XBox' )
+        assert not expr.evaluate( lambda word: word == 'PS2' )
 
         inst = vtu.make_simple_script_parse_instance( 'red2.vvt' )
         parsevvt.parse_enable( inst )
-        exprL = inst.tfile.getPlatformEnableExpressions()
-        assert len( exprL ) == 1
-        assert     exprL[0].evaluate( lambda word: word == 'XBox' )
-        assert not exprL[0].evaluate( lambda word: word == 'PS2' )
+        expr = inst.tfile.getPlatformEnableExpression()
+        assert     expr.evaluate( lambda word: word == 'XBox' )
+        assert not expr.evaluate( lambda word: word == 'PS2' )
 
         inst = vtu.make_simple_script_parse_instance( 'green1.vvt' )
         parsevvt.parse_enable( inst )

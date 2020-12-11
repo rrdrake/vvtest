@@ -153,3 +153,25 @@ def create_dependency_result_expression( attrs ):
             wx = FilterExpressions.WordExpression( result )
 
     return wx
+
+
+def create_platform_expression( exprL, lineno ):
+    ""
+    wx = None
+    err = False
+
+    for expr in exprL:
+        if '/' in expr:
+            err = True
+
+    if not err:
+        try:
+            wx = FilterExpressions.create_word_expression( exprL, None )
+        except Exception:
+            err = True
+
+    if err:
+        raise TestSpecError( 'invalid "platforms" attribute value '
+                             ', line ' + str(lineno) )
+
+    return wx

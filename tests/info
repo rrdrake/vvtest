@@ -468,7 +468,7 @@ class info_tests( vtu.vvtestTestCase ):
         tf = TestFilter( vtu.make_RuntimeConfig( 'atari', [] ), None )
         tf.checkPlatform( tcase )
         assert len( list( tf.getSkipped() ) ) == 0
-        tcase.getSpec().addEnablePlatformExpression( WordExpression( 'XBox' ) )
+        tcase.getSpec().setEnablePlatformExpression( WordExpression( 'XBox' ) )
         tf.checkPlatform( tcase )
         tL = list( tf.getSkipped() )
         assert len(tL) == 1 and id( tL[0] ) == id( tcase )

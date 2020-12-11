@@ -1367,12 +1367,12 @@ def create_test_and_eval_platform_expr( filename, platname, boolean_result,
     if option_list:
         rtcfg.setOptionList( option_list )
     rtcfg.setPlatformName( platname )
-    rtcfg.setPlatformExpression( platform_expr )
+    rtcfg.setPlatformExpression( platform_expr, platname )
 
     tL = create_tests( filename, platname, option_list )
 
-    exprL = tL[0].getPlatformEnableExpressions()
-    pval = rtcfg.evaluate_platform_include( exprL )
+    expr = tL[0].getPlatformEnableExpression()
+    pval = rtcfg.evaluate_platform_include( expr )
 
     if option_list != None:
         exprL = tL[0].getOptionEnableExpressions()

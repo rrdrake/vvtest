@@ -44,8 +44,8 @@ class TestFilter:
         ""
         tspec = tcase.getSpec()
 
-        exprlist = tspec.getPlatformEnableExpressions()
-        ok = self.rtconfig.evaluate_platform_include( exprlist )
+        wx = tspec.getPlatformEnableExpression()
+        ok = self.rtconfig.evaluate_platform_include( wx )
 
         if not ok:
             tcase.getStat().markSkipByPlatform()
