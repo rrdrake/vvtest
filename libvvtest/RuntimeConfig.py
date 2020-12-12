@@ -11,7 +11,7 @@ import os
 import fnmatch
 import re
 
-from . import FilterExpressions
+from .FilterExpressions import WordExpression, NonResultsWordExpression
 
 
 class RuntimeConfig:
@@ -39,6 +39,7 @@ class RuntimeConfig:
         self.apply_platexpr = True
 
         self.keyexpr = None
+        self.keyexpr_nr = None
 
         self.paramexpr = None
 
@@ -93,7 +94,7 @@ class RuntimeConfig:
         is the given platform name).
         """
         if expr is None:
-            self.platexpr = FilterExpressions.WordExpression( platname )
+            self.platexpr = WordExpression( platname )
         else:
             self.platexpr = expr
 
@@ -127,6 +128,7 @@ class RuntimeConfig:
     def setKeywordExpression(self, word_expr):
         ""
         self.keyexpr = word_expr
+        self._make_non_results_expression()
 
     def addResultsKeywordExpression(self, add_expr):
         """
@@ -134,15 +136,27 @@ class RuntimeConfig:
         results keywords (such as "diff" or "notdone"), then do nothing.
         Otherwise AND the new expression to the existing.
         """
-        if self.keyexpr == None:
-            self.keyexpr = FilterExpressions.WordExpression( add_expr )
-        elif not self.keyexpr.containsResultsKeywords():
+        if self.keyexpr is None:
+            self.keyexpr = WordExpression( add_expr )
+        elif not self.keyexpr_nr.containsResultsKeywords():
             self.keyexpr.append( add_expr )
+        self._make_non_results_expression()
+
+    def _make_non_results_expression(self):
+        ""
+        if self.keyexpr is None:
+            self.keyexpr_nr = None
+        else:
+            expr = self.keyexpr.getExpression()
+            self.keyexpr_nr = NonResultsWordExpression( expr )
 
     def satisfies_keywords(self, keyword_list, include_results=True):
         ""
-        if self.keyexpr:
-            return self.keyexpr.evaluate( keyword_list.count, include_results )
+        if include_results:
+            if self.keyexpr:
+                return self.keyexpr.evaluate( keyword_list.count )
+        elif self.keyexpr_nr:
+            return self.keyexpr_nr.evaluate( keyword_list.count )
         return True
 
     def setParameterExpression(self, param_expr):

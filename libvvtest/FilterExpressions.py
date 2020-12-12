@@ -38,12 +38,15 @@ class WordExpression:
         self.words = set()   # the words in the expression
 
         self.evalexpr = None
-        self.nr_evalexpr = None
 
         if expr != None:
             self.append( expr )
 
-    def append(self, expr):
+    def getExpression(self):
+        ""
+        return self.expr
+
+    def append(self, expr, magic_do_nr=True):
         """
         Extends the given expression string using the AND operator.
         """
@@ -56,8 +59,11 @@ class WordExpression:
 
             self.expr = expr
 
-            self.evalexpr = parse_word_expression( self.expr, self.words )
-            self.nr_evalexpr = parse_non_results_expression( self.expr )
+            self.evalexpr = self.create_eval_expression( self.expr, self.words )
+
+    def create_eval_expression(self, string_expr, wordset):
+        ""
+        return parse_word_expression( string_expr, wordset )
 
     def getWordList(self):
         """
@@ -65,39 +71,27 @@ class WordExpression:
         """
         return list( self.words )
 
-    def containsResultsKeywords(self):
-        ""
-        return len( set( RESULTS_KEYWORDS ).intersection( self.words ) ) > 0
-
     def keywordEvaluate(self, keyword_list):
         """
         Returns the evaluation of the expression against a simple keyword list.
         """
         return self.evaluate( lambda k: k in keyword_list )
 
-    def evaluate(self, evaluator_func, include_results=True):
+    def evaluate(self, evaluator_func):
         """
         Evaluates the expression from left to right using the given
         'evaluator_func' to evaluate True/False of each word.  If the original
         expression string is empty, false is returned.  If no expression was
         set in this object, true is returned.
-
-        If 'include_results' is False, the original expression is stripped
-        of results keywords and the resulting expression is evaluated.
         """
-        if include_results:
-            evex = self.evalexpr
-        else:
-            evex = self.nr_evalexpr
-
-        if evex == None:
+        if self.evalexpr == None:
             return True
 
         def evalfunc(tok):
             if evaluator_func(tok): return True
             return False
 
-        r = eval( evex )
+        r = eval( self.evalexpr )
 
         return r
 
@@ -106,6 +100,17 @@ class WordExpression:
         return 'WordExpression="' + self.expr + '"'
 
     def __str__(self): return self.__repr__()
+
+
+class NonResultsWordExpression( WordExpression ):
+
+    def create_eval_expression(self, string_expr, wordset):
+        ""
+        return parse_non_results_expression( string_expr, wordset )
+
+    def containsResultsKeywords(self):
+        ""
+        return len( set( RESULTS_KEYWORDS ).intersection( self.words ) ) > 0
 
 
 def combine_two_expressions( expr1, expr2 ):
@@ -172,7 +177,7 @@ def parenthetical_tokenize( expr ):
     return px
 
 
-def parse_word_expression( expr, wordset=None ):
+def parse_word_expression( expr, wordset ):
     """
     Throws a ValueError if the string is an invalid expression.
     Returns the final expression string (which may be modified from the
@@ -184,8 +189,7 @@ def parse_word_expression( expr, wordset=None ):
     toklist = separate_expression_into_tokens( expr )
     evalexpr = convert_token_list_into_eval_string( toklist )
 
-    if wordset != None:
-        add_words_to_set( toklist, wordset )
+    add_words_to_set( toklist, wordset )
 
     def evalfunc(tok):
         return True
@@ -199,14 +203,13 @@ def parse_word_expression( expr, wordset=None ):
     return evalexpr
 
 
-def parse_non_results_expression( expr ):
+def parse_non_results_expression( expr, wordset=None ):
     ""
-    nrmod = NonResultsExpressionModifier( expr )
+    nrmod = NonResultsExpressionModifier( expr, wordset )
     toklist = nrmod.getNonResultsTokenList()
 
     if len( toklist ) == 0:
         return None
-
     else:
         evalexpr = convert_token_list_into_eval_string( toklist )
         return evalexpr
@@ -214,9 +217,11 @@ def parse_non_results_expression( expr ):
 
 class NonResultsExpressionModifier:
 
-    def __init__(self, expr):
+    def __init__(self, expr, wordset):
         ""
         self.toklist = separate_expression_into_tokens( expr )
+        add_words_to_set( self.toklist, wordset )
+
         self.toki = 0
 
         self.nonresults_toklist = self.parse_subexpr()
@@ -306,9 +311,10 @@ def convert_token_list_into_eval_string( toklist ):
 
 def add_words_to_set( toklist, wordset ):
     ""
-    for tok in toklist:
-        if tok and tok not in _OPERATOR_LIST:
-            wordset.add( tok )
+    if wordset != None:
+        for tok in toklist:
+            if tok and tok not in _OPERATOR_LIST:
+                wordset.add( tok )
 
 
 def separate_expression_into_tokens( expr ):
@@ -499,7 +505,7 @@ class ParamFilter:
         for expr in expr_list:
             self.wexpr.append( expr )
 
-        # map each word that appears to an evaluation function object instance
+        # map each word that appears to be an evaluation function object instance
         self.wordD = {}
         for w in self.wexpr.getWordList():
             self.wordD[w] = self._make_func(w)
