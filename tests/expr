@@ -527,55 +527,6 @@ class word_expression_tests( vtu.vvtestTestCase ):
             ex = WordExpression( expr )
 
 
-class cmd_line_word_expression_tests( vtu.vvtestTestCase ):
-
-    def setUp(self):
-        vtu.vvtestTestCase.setUp( self )
-
-    def write_filter_test_script(self, filename, args_true, args_false):
-        ""
-        util.writescript( filename, """
-            #!"""+sys.executable+"""
-            import sys, subprocess
-
-            cmd = '"""+sys.executable +"""'
-            cmd += ' """+vtu.topdir+"""/libvvtest/FilterExpressions.py'
-            cmd_true = cmd + ' """+args_true+"""'
-            cmd_false = cmd + ' """+args_false+"""'
-
-            pop = subprocess.Popen( cmd_true, shell=True, stdout=subprocess.PIPE )
-            out,err = pop.communicate()
-            assert pop.returncode == 0
-            if sys.version_info[0] >= 3:
-                out = out.decode()
-            assert out.strip() == 'true'
-
-            pop = subprocess.Popen( cmd_false, shell=True, stdout=subprocess.PIPE )
-            out,err = pop.communicate()
-            assert pop.returncode == 0
-            if sys.version_info[0] >= 3:
-                out = out.decode()
-            assert out.strip() == 'false'
-            """ )
-
-    def test_invoking_FilterExpressions_as_an_executable(self):
-        ""
-        self.write_filter_test_script( 'run_platform_expr',
-                '-f "Linux or Darwin" Linux',
-                '-f "Linux or Darwin" IRIX' )
-        self.write_filter_test_script( 'run_param_expr',
-                '-p "AA<101" "AA/11 BB/22"',
-                '-p "AA<101" "AA/102 BB/22"' )
-        self.write_filter_test_script( 'run_option_expr',
-                '-o "debug or gcc" "debug intel"',
-                '-o "debug or gcc" "intel"' )
-        time.sleep(1)
-
-        util.runcmd( './run_platform_expr' )
-        util.runcmd( './run_param_expr' )
-        util.runcmd( './run_option_expr' )
-
-
 class param_expression_tests( vtu.vvtestTestCase ):
 
     def setUp(self):

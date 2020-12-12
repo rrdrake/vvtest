@@ -4,17 +4,8 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import sys
-sys.dont_write_bytecode = True
-sys.excepthook = sys.__excepthook__
-import os
-import re
-import fnmatch
 
-try:
-    from teststatus import RESULTS_KEYWORDS
-except ImportError:
-    from .teststatus import RESULTS_KEYWORDS
+from .teststatus import RESULTS_KEYWORDS
 
 
 class WordExpression:
@@ -46,7 +37,7 @@ class WordExpression:
         ""
         return self.expr
 
-    def append(self, expr, magic_do_nr=True):
+    def append(self, expr):
         """
         Extends the given expression string using the AND operator.
         """
@@ -697,42 +688,3 @@ def create_parameter_filter( param_expr_list, not_param_expr_list ):
         return ParamFilter( join_expressions_with_AND( exprL ) )
 
     return None
-
-
-######################################################################
-
-if __name__ == "__main__":
-
-    # this component is called as a 
-
-    import getopt
-    optL,argL = getopt.getopt( sys.argv[1:], "p:o:f:" )
-    for n,v in optL:
-        if n == '-p':
-            pD = {}
-            for param,value in [ s.split('/') for s in argL[0].split() ]:
-                pD[param] = value
-            pf = ParamFilter( v )
-            if pf.evaluate( pD ):
-                sys.stdout.write( 'true' )
-            else:
-                sys.stdout.write( 'false' )
-            break
-
-        elif n == '-f':
-            wx = WordExpression( v )
-            if wx.evaluate( lambda wrd: wrd == argL[0] ):
-                sys.stdout.write( 'true' )
-            else:
-                sys.stdout.write( 'false' )
-            break
-
-        elif n == '-o':
-            opts = argL[0].split()
-            wx = WordExpression( v )
-            if wx.evaluate( opts.count ):
-                sys.stdout.write( 'true' )
-            else:
-                sys.stdout.write( 'false' )
-            break
-

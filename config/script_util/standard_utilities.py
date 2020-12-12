@@ -13,6 +13,7 @@ import glob
 import shutil
 
 from .deputils import save_test_data, read_test_data
+from .exprutils import platform_expr, parameter_expr, option_expr
 
 
 def analyze_only():
@@ -24,42 +25,6 @@ def analyze_only():
     import vvtest_util as vvt
     return vvt.opt_analyze
 
-
-def platform_expr( expr ):
-    '''
-    Evaluates the given word expression against the current
-    platform name.  For example, the expression could be
-    "Linux or Darwin" and would be true if the current platform
-    name is "Linux" or if it is "Darwin".
-    '''
-    import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    wx = filt.WordExpression( expr )
-    return wx.evaluate( lambda wrd: wrd == vvt.PLATFORM )
-
-def parameter_expr( expr ):
-    '''
-    Evaluates the given parameter expression against the parameters
-    defined for the current test.  For example, the expression
-    could be "dt<0.01 and dh=0.1" where dt and dh are parameters
-    defined in the test.
-    '''
-    import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    pf = filt.ParamFilter( expr )
-    return pf.evaluate( vvt.PARAM_DICT )
-
-def option_expr( expr ):
-    '''
-    Evaluates the given option expression against the options
-    given on the vvtest command line.  For example, the expression
-    could be "not dbg and not intel", which would be false if
-    "-o dbg" or "-o intel" were given on the command line.
-    '''
-    import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    wx = filt.WordExpression( expr )
-    return wx.evaluate( vvt.OPTIONS.count )
 
 ############################################################################
 

@@ -29,7 +29,6 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
 
     tdir = rtconfig.getAttr('vvtestdir')
     assert tdir
-    vvtlib = pjoin( tdir, 'libvvtest' )
 
     trigdir = pjoin( tdir, 'trig' )
 

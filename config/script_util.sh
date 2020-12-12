@@ -23,8 +23,8 @@ platform_expr() {
     # name is "Linux" or if it is "Darwin".
     # Returns 0 (zero) if the expression evaluates to true,
     # otherwise non-zero.
-    
-    result=`"$PYTHONEXE" "$VVTESTSRC/libvvtest/FilterExpressions.py" -f "$1" "$PLATFORM"`
+
+    result=`"$PYTHONEXE" "$VVTESTSRC/config/exprutil" -f "$1"`
     xval=$?
     if [ $xval -ne 0 ]
     then
@@ -43,8 +43,8 @@ parameter_expr() {
     # parameters defined in the test.
     # Returns 0 (zero) if the expression evaluates to true,
     # otherwise non-zero.
-    
-    result=`"$PYTHONEXE" "$VVTESTSRC/libvvtest/FilterExpressions.py" -p "$1" "$PARAM_DICT"`
+
+    result=`"$PYTHONEXE" "$VVTESTSRC/config/exprutil" -p "$1"`
     xval=$?
     if [ $xval -ne 0 ]
     then
@@ -63,8 +63,8 @@ option_expr() {
     # "-o dbg" or "-o intel" were given on the command line.
     # Returns 0 (zero) if the expression evaluates to true,
     # otherwise non-zero.
-    
-    result=`"$PYTHONEXE" "$VVTESTSRC/libvvtest/FilterExpressions.py" -o "$1" "$OPTIONS"`
+
+    result=`"$PYTHONEXE" "$VVTESTSRC/config/exprutil" -o "$1"`
     xval=$?
     if [ $xval -ne 0 ]
     then
