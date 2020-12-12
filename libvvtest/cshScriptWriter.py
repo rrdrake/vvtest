@@ -99,7 +99,7 @@ def writeScript( testcase, xdb, plat, \
         'set NAME = "' + tspec.getName() + '"',
         'set PLATFORM = ' + plat.getName(),
         'echo "PLATFORM = $PLATFORM"',
-        'set COMPILER = ' + plat.getCompiler(),
+        'set COMPILER = ' + (plat.getCompiler() or ''),
         'echo "COMPILER = $COMPILER"',
         'set VVTESTSRC = ' + vvtestdir,
         'echo "VVTESTSRC = $VVTESTSRC"' ] )

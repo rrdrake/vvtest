@@ -108,7 +108,11 @@ class ListWriter:
         pname = rtinfo.getInfo( 'platform' )
         cplr = rtinfo.getInfo( 'compiler' )
 
-        opL = [ cplr ]
+        if cplr:
+            opL = [ cplr ]
+        else:
+            opL = []
+
         for op in self.onopts:
             if op != cplr:
                 opL.append( op )

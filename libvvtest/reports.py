@@ -1017,7 +1017,7 @@ def write_testrun_entry( fp, plug, results_key, fdate, tr, detailed ):
         '<li><b>Description:</b> '+html_escape(desc)+'</li>\n' )
     fp.write(
         '<li><b>Machine:</b> '+tr.machine()+'</li>\n' + \
-        '<li><b>Compiler:</b> '+tr.compiler()+'</li>\n' + \
+        '<li><b>Compiler:</b> '+(tr.compiler() or '')+'</li>\n' + \
         '<li><b>Test Directory:</b> '+tr.testdir()+'</li>\n' )
     if log:
         fp.write(

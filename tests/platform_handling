@@ -91,7 +91,7 @@ class loading_idplatform( vtu.vvtestTestCase ):
             plat2,cplr2 = vvplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
         finally:
             sys.path[:] = savepath
-        assert plat1 == os.uname()[0] and cplr1 == 'gcc'
+        assert plat1 == os.uname()[0] and not cplr1
         assert plat2 == 'foo' and cplr2 == 'bar'
 
         savepath = adjust_sys_path_for_unit_testing()

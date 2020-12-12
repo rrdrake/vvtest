@@ -589,7 +589,10 @@ def read_file_header( filename ):
         cnt += 1
         L = line.split('=',1)
         if len(L) == 2 and L[0].strip():
-          hdr[ L[0].strip() ] = L[1].strip()
+            if L[1].strip() == 'None':
+                hdr[ L[0].strip() ] = None
+            else:
+                hdr[ L[0].strip() ] = L[1].strip()
       elif cnt > 0:
         break
       line = fp.readline()
@@ -694,11 +697,6 @@ def _svn_rootrel(tdir):
         relurl = os.path.normpath( relurl )
         assert not os.path.isabs(relurl)
 
-    # magic: remove this backup
-    if repo == None:
-      # this shouldn't happen, but if it does, then assume alegra repo
-      repo = "https://teamforge.sandia.gov/svn/repos/alegranevada"
-
     # remove leading URL specification; the 'X' trick is because normpath()
     # does not seem to reduce a leading '//' to just a single '/'
     repo = os.path.normpath( 'X'+repo.split(':',1)[-1] )[1:]
@@ -776,7 +774,11 @@ class LookupCache:
           1. The TESTING_DIRECTORY directory multiplatform results file
           2. A test source tree runtimes file
         """
-        platid = self.platname+'/'+self.cplrname
+        assert self.platname
+        if self.cplrname:
+            platid = self.platname+'/'+self.cplrname
+        else:
+            platid = self.platname
 
         testkey = make_test_key( testspec )
         tdir = testspec.getDirectory()
@@ -928,11 +930,14 @@ def merge_results_file( multi, filename, warnL, dcut, xopt, wopt ):
     if tr != None:
         plat = tr.platform()
         cplr = tr.compiler()
-        if plat == None or cplr == None:
+        if plat == None:
             warnL.append( "skipping results file "+filename + \
-                          ": platform and/or compiler not defined" )
+                          ": platform not defined" )
         else:
-            pc = plat+'/'+cplr
+            if cplr:
+                pc = plat+'/'+cplr
+            else:
+                pc = plat
             for d in tr.dirList():
                 tL = tr.testList(d)
                 for tn in tL:
@@ -1065,7 +1070,7 @@ def read_results_file( filename, warnL ):
         tr = TestResults( filename )
 
         # the file header contains the platform & compiler names
-        assert tr.platform() != None and tr.compiler() != None
+        assert tr.platform() != None
 
     except Exception:
         warnL.append( "skipping results file: " + filename + \

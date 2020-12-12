@@ -236,7 +236,10 @@ def get_results_platform_compiler_id( filename ):
 
     platname,cplrname = tr.platform(), tr.compiler()
 
-    platcplr = platname+'/'+cplrname
+    if cplrname:
+        platcplr = platname+'/'+cplrname
+    else:
+        platcplr = platname
 
     return platcplr
 

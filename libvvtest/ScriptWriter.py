@@ -40,7 +40,7 @@ def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
     offopts = rtconfig.getAttr('offopts')
 
     platname = plat.getName()
-    cplrname = plat.getCompiler()
+    cplrname = plat.getCompiler() or ''
 
     timeout = testcase.getStat().getAttr( 'timeout', -1 )
 

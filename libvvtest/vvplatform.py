@@ -420,8 +420,6 @@ def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
     if not cplrname:
         if idplatform != None and hasattr( idplatform, "compiler" ):
             cplrname = idplatform.compiler( platname, optdict )
-        if not cplrname:
-            cplrname = 'gcc'
 
     return platname, cplrname
 

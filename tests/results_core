@@ -240,7 +240,10 @@ class integration_tests( vtu.vvtestTestCase ):
         resultsfname = util.globfile('results.*')
         tr = fmtresults.TestResults( resultsfname )
         platname,cplrname = tr.platform(), tr.compiler()
-        platid = platname+'/'+cplrname
+        if cplrname:
+            platid = platname+'/'+cplrname
+        else:
+            platid = platname
 
         util.runcmd( vtu.resultspy + ' merge ' + resultsfname )
 

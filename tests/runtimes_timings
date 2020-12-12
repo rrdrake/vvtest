@@ -172,10 +172,10 @@ class runtimes_and_timings( vtu.vvtestTestCase ):
             tdir = vrun.resultsDir()
 
             # create a timings file
-            util.runcmd( vtu.resultspy + ' save', chdir='tests' )
+            util.runcmd( vtu.resultspy + ' save', chdir='tests', verbose=2 )
             vtu.runvvtest( '-i --save-results', chdir=tdir )
             resultsfname = util.globfile('results.*')
-            util.runcmd( vtu.resultspy + ' merge -x '+resultsfname )
+            util.runcmd( vtu.resultspy + ' merge -x '+resultsfname, verbose=2 )
 
             # select tests based on the timings file
             vtu.remove_results()
