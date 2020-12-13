@@ -11,7 +11,8 @@ import os
 import fnmatch
 import re
 
-from .FilterExpressions import WordExpression, NonResultsWordExpression
+from .FilterExpressions import PlatformExpression
+from .FilterExpressions import KeywordExpression, NonResultsKeywordExpression
 
 
 class RuntimeConfig:
@@ -94,7 +95,7 @@ class RuntimeConfig:
         is the given platform name).
         """
         if expr is None:
-            self.platexpr = WordExpression( platname )
+            self.platexpr = PlatformExpression( platname )
         else:
             self.platexpr = expr
 
@@ -104,15 +105,10 @@ class RuntimeConfig:
 
     def evaluate_platform_include(self, platform_expr):
         ""
-        ok = True
-
         if self.apply_platexpr:
-            # to evaluate the command line expression, each platform name in the
-            # expression is evaluated using PlatformEvaluator.satisfies_platform()
-            pev = PlatformEvaluator( platform_expr )
-            ok = self.platexpr.evaluate( pev.satisfies_platform )
-
-        return ok
+            return self.platexpr.evaluate( platform_expr )
+        else:
+            return True
 
     def setOptionList(self, list_of_options):
         ""
@@ -128,7 +124,7 @@ class RuntimeConfig:
     def setKeywordExpression(self, word_expr):
         ""
         self.keyexpr = word_expr
-        self._make_non_results_expression()
+        self._make_non_results_keyword_expression()
 
     def addResultsKeywordExpression(self, add_expr):
         """
@@ -137,26 +133,26 @@ class RuntimeConfig:
         Otherwise AND the new expression to the existing.
         """
         if self.keyexpr is None:
-            self.keyexpr = WordExpression( add_expr )
+            self.keyexpr = KeywordExpression( add_expr )
         elif not self.keyexpr_nr.containsResultsKeywords():
             self.keyexpr.append( add_expr )
-        self._make_non_results_expression()
+        self._make_non_results_keyword_expression()
 
-    def _make_non_results_expression(self):
+    def _make_non_results_keyword_expression(self):
         ""
         if self.keyexpr is None:
             self.keyexpr_nr = None
         else:
             expr = self.keyexpr.getExpression()
-            self.keyexpr_nr = NonResultsWordExpression( expr )
+            self.keyexpr_nr = NonResultsKeywordExpression( expr )
 
     def satisfies_keywords(self, keyword_list, include_results=True):
         ""
         if include_results:
             if self.keyexpr:
-                return self.keyexpr.evaluate( keyword_list.count )
+                return self.keyexpr.evaluate( keyword_list )
         elif self.keyexpr_nr:
-            return self.keyexpr_nr.evaluate( keyword_list.count )
+            return self.keyexpr_nr.evaluate( keyword_list )
         return True
 
     def setParameterExpression(self, param_expr):
@@ -265,24 +261,6 @@ class RuntimeConfig:
             return self.filesearch.search( testfilename, name, params, files )
         else:
             return True
-
-
-class PlatformEvaluator:
-    """
-    Tests can use platform expressions to enable/disable the test.  This class
-    caches the expressions and provides a function that answers the question
-
-        "Would the test run on the given platform name?"
-    """
-    def __init__(self, word_expr):
-        self.expr = word_expr
-
-    def satisfies_platform(self, plat_name):
-        ""
-        if self.expr is not None:
-            if not self.expr.evaluate( lambda tok: tok == plat_name ):
-                return False
-        return True
 
 
 class FileSearcher:

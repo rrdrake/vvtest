@@ -150,12 +150,12 @@ def create_dependency_result_expression( attrs ):
         if result == '*':
             wx = FilterExpressions.WordExpression()
         else:
-            wx = FilterExpressions.WordExpression( result )
+            wx = FilterExpressions.create_word_expression( [result] )
 
     return wx
 
 
-def create_platform_expression( exprL, lineno ):
+def parse_to_word_expression( exprL, lineno ):
     ""
     wx = None
     err = False
@@ -166,7 +166,7 @@ def create_platform_expression( exprL, lineno ):
 
     if not err:
         try:
-            wx = FilterExpressions.create_word_expression( exprL, None )
+            wx = FilterExpressions.create_word_expression( exprL )
         except Exception:
             err = True
 

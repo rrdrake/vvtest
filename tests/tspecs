@@ -389,7 +389,7 @@ class XML_test_specifications( vtu.vvtestTestCase ):
 
     def expr(self, string_expr):
         ""
-        expr = FilterExpressions.WordExpression( string_expr )
+        expr = FilterExpressions.PlatformExpression( string_expr )
         return expr
 
     def test_platform_specifications(self):

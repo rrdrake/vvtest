@@ -9,7 +9,8 @@ import re
 import time
 
 from . import argutil
-from .FilterExpressions import create_word_expression
+from .FilterExpressions import create_keyword_expression
+from .FilterExpressions import create_platform_expression
 from .FilterExpressions import create_parameter_filter
 
 
@@ -737,7 +738,7 @@ def adjust_options_and_create_derived_options( opts ):
     try:
 
         errtype = 'keyword options'
-        expr = create_word_expression( opts.dash_k, opts.dash_K )
+        expr = create_keyword_expression( opts.dash_k, opts.dash_K )
         derived_opts['keyword_expr'] = expr
 
         errtype = 'parameter options'
@@ -753,7 +754,7 @@ def adjust_options_and_create_derived_options( opts ):
         derived_opts['search_regexes'] = rxL
 
         errtype = 'platform options'
-        expr = create_word_expression( opts.dash_x, opts.dash_X )
+        expr = create_platform_expression( opts.dash_x, opts.dash_X )
         derived_opts['platform_expr'] = expr
 
         errtype = 'the sort option'

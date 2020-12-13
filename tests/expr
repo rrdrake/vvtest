@@ -17,7 +17,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.FilterExpressions import WordExpression, NonResultsWordExpression
+from libvvtest.FilterExpressions import WordExpression, NonResultsKeywordExpression
 from libvvtest.FilterExpressions import ParamFilter
 from libvvtest.FilterExpressions import split_but_retain_separator
 from libvvtest.FilterExpressions import separate_expression_into_tokens
@@ -321,42 +321,42 @@ class word_expression_tests( vtu.vvtestTestCase ):
     def test_removing_results_keywords_from_expressions(self):
         ""
         ex = WordExpression( "foo and bar" )
-        nrex = NonResultsWordExpression( "foo and bar" )
+        nrex = NonResultsKeywordExpression( "foo and bar" )
         assert not nrex.containsResultsKeywords()
         assert not ex.evaluate( ['foo'].count )
-        assert not nrex.evaluate( ['foo'].count )
+        assert not nrex.evaluate( ['foo'] )
         assert     ex.evaluate( ['foo','bar'].count )
-        assert     nrex.evaluate( ['foo','bar'].count )
+        assert     nrex.evaluate( ['foo','bar'] )
 
         ex = WordExpression( "notrun or notdone" )
-        nrex = NonResultsWordExpression( "notrun or notdone" )
+        nrex = NonResultsKeywordExpression( "notrun or notdone" )
         assert     nrex.containsResultsKeywords()
         assert     ex.evaluate( ['aword','notdone'].count )
         assert not ex.evaluate( ['aword','pass'].count )
-        assert     nrex.evaluate( ['aword','pass'].count )
+        assert     nrex.evaluate( ['aword','pass'] )
 
         ex = WordExpression( "notrun and word" )
-        nrex = NonResultsWordExpression( "notrun and word" )
+        nrex = NonResultsKeywordExpression( "notrun and word" )
         assert     nrex.containsResultsKeywords()
         assert     ex.evaluate( ['word','notrun'].count )
-        assert     nrex.evaluate( ['word','notrun'].count )
+        assert     nrex.evaluate( ['word','notrun'] )
         assert not ex.evaluate( ['word','pass'].count )
-        assert     nrex.evaluate( ['word','pass'].count )
+        assert     nrex.evaluate( ['word','pass'] )
 
         ex = WordExpression( "not pass and not ( foo or bar )" )
-        nrex = NonResultsWordExpression( "not pass and not ( foo or bar )" )
+        nrex = NonResultsKeywordExpression( "not pass and not ( foo or bar )" )
         assert     nrex.containsResultsKeywords()
         assert     ex.evaluate( ['foobar','notrun'].count )
-        assert     nrex.evaluate( ['foobar','notrun'].count )
+        assert     nrex.evaluate( ['foobar','notrun'] )
         assert not ex.evaluate( ['foobar','pass'].count )
         assert not ex.evaluate( ['foobar','pass'].count )
-        assert     nrex.evaluate( ['foobar','pass'].count )
+        assert     nrex.evaluate( ['foobar','pass'] )
 
         ex = WordExpression( "not pass or not ( foo or bar )" )
-        nrex = NonResultsWordExpression( "not pass or not ( foo or bar )" )
+        nrex = NonResultsKeywordExpression( "not pass or not ( foo or bar )" )
         assert     nrex.containsResultsKeywords()
         assert     ex.evaluate( ['foo','notrun'].count )
-        assert not nrex.evaluate( ['foo','notrun'].count )
+        assert not nrex.evaluate( ['foo','notrun'] )
 
     def test_an_exclamation_point_means_NOT(self):
         ""

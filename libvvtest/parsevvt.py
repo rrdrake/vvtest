@@ -19,7 +19,7 @@ from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
-from .parseutil import create_platform_expression
+from .parseutil import parse_to_word_expression
 
 
 def parse_vvt_test( inst ):
@@ -700,7 +700,7 @@ def parse_enable( inst ):
                                        spec.attrs.get( 'platform', None ) )
             if platexpr != None:
                 platexpr = platexpr.strip()
-                create_platform_expression( [platexpr], spec.lineno )
+                parse_to_word_expression( [platexpr], spec.lineno )
                 platexprL.append( platexpr )
 
             opexpr = spec.attrs.get( 'options',
@@ -724,5 +724,5 @@ def parse_enable( inst ):
                     str(spec.lineno) )
             inst.tfile.setEnabled( val == 'true' )
 
-    wx = create_platform_expression( platexprL, 1 )
+    wx = parse_to_word_expression( platexprL, 1 )
     inst.tfile.setEnablePlatformExpression( wx )

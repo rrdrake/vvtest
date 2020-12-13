@@ -16,7 +16,7 @@ from .parseutil import variable_expansion
 from .parseutil import evauate_testname_expr
 from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
-from .parseutil import create_platform_expression
+from .parseutil import parse_to_word_expression
 
 
 def read_xml_file( filename, strict=False ):
@@ -520,7 +520,7 @@ def parse_include_platform( inst ):
         platexpr = nd.getAttr( 'platforms', nd.getAttr( 'platform', None ) )
         if platexpr != None:
             platexpr = platexpr.strip()
-            create_platform_expression( [platexpr], nd.getLineNumber() )
+            parse_to_word_expression( [platexpr], nd.getLineNumber() )
             platexprL.append( platexpr )
 
 
@@ -531,7 +531,7 @@ def parse_include_platform( inst ):
                 wx = FilterExpressions.WordExpression( opexpr )
                 inst.tfile.addEnableOptionExpression( wx )
 
-    wx = create_platform_expression( platexprL, 1 )
+    wx = parse_to_word_expression( platexprL, 1 )
     inst.tfile.setEnablePlatformExpression( wx )
 
 
