@@ -86,7 +86,8 @@ class CDashWriter:
                 self._write_file( fmtr, fname )
 
                 assert self.dspecs.project, 'CDash project name not set'
-                sub = self.submitter( self.dspecs.url, self.dspecs.project )
+                sub = self.submitter( self.dspecs.url, self.dspecs.project,
+                                      method=self.dspecs.method )
                 print3( 'Sending CDash file to:', self.dspecs.url + ',',
                         'project='+self.dspecs.project )
                 sub.send( fname )
@@ -159,6 +160,7 @@ def construct_destination_specs( destination, project=None,
         dspecs.group = specs.get( 'group', None )
         dspecs.site  = specs.get( 'site', None )
         dspecs.name  = specs.get( 'name', None )
+        dspecs.method = specs.get( 'method', None )
 
         if not err:
             err = check_fill_files_attr( dspecs, specs.get( 'files', None ) )
@@ -265,6 +267,7 @@ class DestinationSpecs:
         self.name = None
         self.files = 'nonpass'
         self.filemax = 100
+        self.method = None
 
 
 def set_global_data( fmtr, dspecs, rtinfo ):

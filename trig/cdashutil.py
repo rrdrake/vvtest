@@ -93,12 +93,14 @@ class TestResultsFormatter:
 
 class FileSubmitter:
 
-    def __init__(self, cdash_url, project_name, method='urllib'):
+    def __init__(self, cdash_url, project_name, method=None):
         ""
         self.url = cdash_url
         self.proj = project_name
 
-        assert method in ['urllib','curl']
+        if not method:
+            method = 'urllib'
+        assert method.startswith('urllib') or method.startswith('curl')
         self.meth = method
 
     def send(self, filename):
@@ -109,10 +111,10 @@ class FileSubmitter:
         with set_environ( http_proxy='', HTTP_PROXY='',
                           https_proxy='', HTTPS_PROXY='' ):
 
-            if self.meth == 'urllib':
+            if self.meth.startswith('urllib'):
                 self.urllib_submit( submit_url, filename )
             else:
-                self.curl_submit( submit_url, filename )
+                self.curl_submit( self.meth, submit_url, filename )
 
     def urllib_submit(self, submit_url, filename):
         ""
@@ -129,9 +131,10 @@ class FileSubmitter:
             hnd = urlopen( submit_url, data=content )
             check_submit_response( hnd.getcode(), hnd.info() )
 
-    def curl_submit(self, submit_url, filename):
+    def curl_submit(self, curlcmd, submit_url, filename):
         ""
-        cmd = 'curl -T '+filename+' '+submit_url
+        cmd = curlcmd+' -T '+filename+' '+submit_url
+        print ( cmd )
         subprocess.check_call( cmd, shell=True )
 
 

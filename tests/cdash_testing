@@ -71,6 +71,10 @@ class uploading_a_file( trigutil.trigTestCase ):
         ""
         self.run_upload_file_test( 'curl' )
 
+    def test_upload_file_using_curl_with_options(self):
+        ""
+        self.run_upload_file_test( 'curl -v' )
+
     def test_upload_file_using_urllib_module(self):
         ""
         self.run_upload_file_test( 'urllib' )

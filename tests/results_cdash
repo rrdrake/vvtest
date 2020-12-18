@@ -108,8 +108,8 @@ class unit_tests( vtu.vvtestTestCase ):
         class OverrideFileSubmitter( cdashutil.FileSubmitter ):
             def urllib_submit(self, submit_url, filename):
                 records.append( ('urllib',submit_url,filename) )
-            def curl_submit(self, submit_url, filename):
-                records.append( ('curl',submit_url,filename) )
+            def curl_submit(self, curlcmd, submit_url, filename):
+                records.append( (curlcmd,submit_url,filename) )
 
         testlist = TestList()
 
@@ -126,8 +126,18 @@ class unit_tests( vtu.vvtestTestCase ):
         wr.postrun( testlist, RuntimeInfo() )
 
         assert len( records ) == 1
+        assert records[0][0] == 'urllib'
         assert records[0][1].startswith( 'http://localhost/cdash/' )
         assert records[0][1].endswith( 'project=CoolProj' )
+
+        wr = make_CDashWriter( 'http://localhost2/cdash,method=curl',
+                               subclass_submitter=OverrideFileSubmitter,
+                               project='CoolProj' )
+        wr.postrun( testlist, RuntimeInfo() )
+
+        assert len( records ) == 2
+        assert records[1][0] == 'curl'
+        assert records[1][1].startswith( 'http://localhost2/cdash/' )
 
     def test_parse_destination_specifications(self):
         ""
@@ -288,6 +298,25 @@ class unit_tests( vtu.vvtestTestCase ):
 
         dspecs,err = cdashwriter.construct_destination_specs( 'afile, filemax=10-100' )
         assert err and 'invalid' in err
+
+    def test_submission_method_specifications(self):
+        ""
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile' )
+        assert not err
+        assert dspecs.method == None
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, method=curl' )
+        assert not err
+        assert dspecs.method == 'curl'
+
+        dspecs,err = cdashwriter.construct_destination_specs( 'afile, method=curl -v -k' )
+        assert not err
+        assert dspecs.method == 'curl -v -k'
+
+        dspecs,err = cdashwriter.construct_destination_specs(
+                                    'afile, method=curl -v, file=1TB' )
+        assert not err
+        assert dspecs.method == 'curl -v'
 
     def test_a_URL_without_a_project_name_is_an_error(self):
         ""

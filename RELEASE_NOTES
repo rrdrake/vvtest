@@ -1,6 +1,13 @@
 
 Improvements:
 
+    - The curl program can now be used to submit CDash results data. Add
+      "method=curl" to your --cdash attributes, such as
+
+          --cdash 'http://my.com/cdash,project=Proj,method=curl'
+
+      Options can be added, such as "method=curl -v -k".
+
     - Add "expect" trailing attribute to "testname" directive, such as
 
           #VVT: testname = pluto (depends on=charon.*, expect=1)
