@@ -4,9 +4,6 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import sys
-sys.dont_write_bytecode = True
-sys.excepthook = sys.__excepthook__
 import os
 import subprocess
 import time
@@ -93,7 +90,13 @@ class TestResultsFormatter:
 
 class FileSubmitter:
 
-    def __init__(self, cdash_url, project_name, method=None):
+    def __init__(self):
+        ""
+        self.url = None
+        self.proj = None
+        self.meth = None
+
+    def setDestination(self, cdash_url, project_name, method=None):
         ""
         self.url = cdash_url
         self.proj = project_name

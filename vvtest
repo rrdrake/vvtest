@@ -519,8 +519,8 @@ def construct_cdash_writer( test_dir, opts, optD, perms ):
 
     cdashobj = cdashwriter.CDashWriter( test_dir, perms )
 
-    cdashobj.setCDashFormatter( cdashutil.TestResultsFormatter,
-                                cdashutil.FileSubmitter )
+    cdashobj.setFormatter( cdashutil.TestResultsFormatter() )
+    cdashobj.setSubmitter( cdashutil.FileSubmitter() )
 
     err = cdashobj.initialize( opts.cdash,
                                project=opts.cdash_project,

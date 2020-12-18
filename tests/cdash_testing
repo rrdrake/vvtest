@@ -23,7 +23,7 @@ from testutils import print3
 import cdashutil
 
 
-class uploading_a_file( trigutil.trigTestCase ):
+class submitting_files( trigutil.trigTestCase ):
 
     def test_send_file_to_a_web_server_using_curl(self):
         ""
@@ -56,11 +56,11 @@ class uploading_a_file( trigutil.trigTestCase ):
         time.sleep(2)
 
         try:
+            sub = cdashutil.FileSubmitter()
             if method:
-                sub = cdashutil.FileSubmitter( srv.getURL(), 'CoolProj',
-                                               method=method )
+                sub.setDestination( srv.getURL(), 'CoolProj', method=method )
             else:
-                sub = cdashutil.FileSubmitter( srv.getURL(), 'CoolProj' )
+                sub.setDestination( srv.getURL(), 'CoolProj' )
             sub.send( 'sub.txt' )
         finally:
             srv.shutdown()

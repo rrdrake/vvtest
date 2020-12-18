@@ -18,18 +18,21 @@ class CDashWriter:
 
     def __init__(self, results_test_dir, permsetter):
         ""
-        self.formatter = None
-        self.submitter = None
+        self.fmtr = None
+        self.subm = None
 
         self.testdir = results_test_dir
         self.permsetter = permsetter
 
         self.dspecs = None
 
-    def setCDashFormatter(self, formatter_type, submitter_type):
+    def setFormatter(self, formatter):
         ""
-        self.formatter = formatter_type
-        self.submitter = submitter_type
+        self.fmtr = formatter
+
+    def setSubmitter(self, submitter):
+        ""
+        self.subm = submitter
 
     def initialize(self, destination, project=None,
                                       datestamp=None,
@@ -58,22 +61,20 @@ class CDashWriter:
 
     def postrun(self, atestlist, rtinfo):
         ""
-        fmtr = self._create_and_fill_formatter( atestlist, rtinfo )
-        self._write_data( fmtr, rtinfo )
+        self._create_and_fill_formatter( atestlist, rtinfo )
+        self._write_data( self.fmtr, rtinfo )
 
     def info(self, atestlist, rtinfo):
         ""
-        fmtr = self._create_and_fill_formatter( atestlist, rtinfo )
-        self._write_data( fmtr, rtinfo )
+        self._create_and_fill_formatter( atestlist, rtinfo )
+        self._write_data( self.fmtr, rtinfo )
 
     def _create_and_fill_formatter(self, atestlist, rtinfo):
         ""
         print3( '\nComposing CDash submission data...' )
 
-        fmtr = self.formatter()
-        set_global_data( fmtr, self.dspecs, rtinfo )
-        set_test_list( fmtr, self.dspecs, atestlist, self.testdir )
-        return fmtr
+        set_global_data( self.fmtr, self.dspecs, rtinfo )
+        set_test_list( self.fmtr, self.dspecs, atestlist, self.testdir )
 
     def _write_data(self, fmtr, rtinfo):
         ""
@@ -86,11 +87,12 @@ class CDashWriter:
                 self._write_file( fmtr, fname )
 
                 assert self.dspecs.project, 'CDash project name not set'
-                sub = self.submitter( self.dspecs.url, self.dspecs.project,
-                                      method=self.dspecs.method )
+                self.subm.setDestination( self.dspecs.url,
+                                          self.dspecs.project,
+                                          method=self.dspecs.method )
                 print3( 'Sending CDash file to:', self.dspecs.url + ',',
                         'project='+self.dspecs.project )
-                sub.send( fname )
+                self.subm.send( fname )
 
                 print3()
 

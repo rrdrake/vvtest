@@ -114,14 +114,14 @@ class unit_tests( vtu.vvtestTestCase ):
         testlist = TestList()
 
         wr = make_CDashWriter( 'file.xml',
-                               subclass_submitter=OverrideFileSubmitter )
+                               subclass_submitter=OverrideFileSubmitter() )
         wr.postrun( testlist, RuntimeInfo() )
 
         assert os.path.isfile( 'file.xml' )
         assert len( records ) == 0
 
         wr = make_CDashWriter( 'http://localhost/cdash',
-                               subclass_submitter=OverrideFileSubmitter,
+                               subclass_submitter=OverrideFileSubmitter(),
                                project='CoolProj' )
         wr.postrun( testlist, RuntimeInfo() )
 
@@ -131,7 +131,7 @@ class unit_tests( vtu.vvtestTestCase ):
         assert records[0][1].endswith( 'project=CoolProj' )
 
         wr = make_CDashWriter( 'http://localhost2/cdash,method=curl',
-                               subclass_submitter=OverrideFileSubmitter,
+                               subclass_submitter=OverrideFileSubmitter(),
                                project='CoolProj' )
         wr.postrun( testlist, RuntimeInfo() )
 
@@ -675,12 +675,11 @@ def make_CDashWriter( destination, subclass_submitter=None,
 
     wr = cdashwriter.CDashWriter( os.getcwd(), perms )
 
+    wr.setFormatter( cdashutil.TestResultsFormatter() )
     if subclass_submitter:
-        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
-                              subclass_submitter )
+        wr.setSubmitter( subclass_submitter )
     else:
-        wr.setCDashFormatter( cdashutil.TestResultsFormatter,
-                              cdashutil.FileSubmitter )
+        wr.setSubmitter( cdashutil.FileSubmitter() )
 
     wr.initialize( destination, project=project, datestamp=datestamp )
 
