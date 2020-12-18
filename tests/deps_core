@@ -688,7 +688,8 @@ def make_TestExec_test_case( name ):
 
 def create_tests( relpath, platname=None ):
     ""
-    creator = testcreator.TestCreator( platname )
+    tctor = TestConstructor()
+    creator = testcreator.TestCreator( tctor, platname )
     tL = creator.fromFile( '.', relpath, None )
 
     return tL

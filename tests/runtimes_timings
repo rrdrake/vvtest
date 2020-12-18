@@ -16,6 +16,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.testctor import TestConstructor
 from libvvtest.testcreator import TestCreator
 
 import results_util as ru
@@ -57,7 +58,8 @@ class runtimes_and_timings( vtu.vvtestTestCase ):
         ru.create_runtimes_and_results_file( tdir, 'tests' )
 
         # even though a rootrel directory could be determined, no runtime is available
-        tL = TestCreator().fromFile( tests, 'dir1/one.xml', None )
+        tctor = TestConstructor()
+        tL = TestCreator(tctor).fromFile( tests, 'dir1/one.xml', None )
         tst = tL[0]
         cache = fmtresults.LookupCache( platname, 'cplr' )
         cache.load()

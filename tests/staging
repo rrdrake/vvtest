@@ -579,7 +579,7 @@ class staged_parameters( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tc = TestCreator()
+        tc = TestCreator( TestConstructor() )
         tL1 = tc.fromFile( os.getcwd(), 'd1/red.vvt' )
         tL2 = tc.fromFile( os.getcwd(), 'd2/red.vvt' )
 
@@ -693,7 +693,8 @@ def reparse_test_string( stringid ):
     ""
     tcase = tio.string_to_test( stringid, TestConstructor() )
 
-    TestCreator().reparse( tcase.getSpec() )
+    tctor = TestConstructor()
+    TestCreator(tctor).reparse( tcase.getSpec() )
 
     return tcase
 

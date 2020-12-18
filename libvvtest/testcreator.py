@@ -21,15 +21,10 @@ from .paramset import ParameterSet
 
 class TestCreator:
 
-    def __init__(self, platname=os.uname()[0], optionlist=[], testctor=None):
+    def __init__(self, testctor, platname=os.uname()[0], optionlist=[]):
         ""
-        self.evaluator = ExpressionEvaluator( platname, optionlist )
-
-        if testctor == None:
-            from .testctor import TestConstructor
-            testctor = TestConstructor()
-
         self.tctor = testctor
+        self.evaluator = ExpressionEvaluator( platname, optionlist )
 
     def fromFile(self, rootpath, relpath, force_params=None):
         """

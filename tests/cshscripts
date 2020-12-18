@@ -21,6 +21,7 @@ import libvvtest.CommonSpec as CommonSpec
 import libvvtest.xmlwrapper as xmlwrapper
 import libvvtest.cshScriptWriter as cshScriptWriter
 from libvvtest.testcreator import TestCreator
+from libvvtest.testctor import TestConstructor
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.testcase import TestCase
 
@@ -55,7 +56,8 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
         xdb = CommonSpec.CommonSpecDB()
         CommonSpec.scanCommonSpecs( xdoc, xdb )
 
-        tL = TestCreator().fromFile( '.', 't1.xml', None )
+        tctor = TestConstructor()
+        tL = TestCreator(tctor).fromFile( '.', 't1.xml', None )
         assert len(tL) == 1
 
         plat = FakePlatform()

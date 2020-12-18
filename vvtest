@@ -292,9 +292,9 @@ def construct_testcase_creator( rtdata ):
     ""
     from libvvtest.testcreator import TestCreator
 
-    creator = TestCreator( rtdata.rtconfig.getPlatformName(),
-                           rtdata.rtconfig.getOptionList(),
-                           rtdata.tctor )
+    creator = TestCreator( rtdata.tctor,
+                           rtdata.rtconfig.getPlatformName(),
+                           rtdata.rtconfig.getOptionList() )
 
     rtdata.creator = creator
 

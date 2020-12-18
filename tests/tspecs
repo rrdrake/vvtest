@@ -1282,14 +1282,15 @@ def reparse_test_string( stringid ):
     ""
     tcase = tio.string_to_test( stringid, TestConstructor() )
 
-    TestCreator().reparse( tcase.getSpec() )
+    TestCreator(None).reparse( tcase.getSpec() )
 
     return tcase
 
 
 def parse_create_analyze_test( filename ):
     ""
-    tL = TestCreator().fromFile( '.', filename, None )
+    tctor = TestConstructor()
+    tL = TestCreator(tctor).fromFile( '.', filename )
 
     analyzeL = list( filter( lambda ts: ts.isAnalyze(), tL ) )
     assert len( analyzeL ) == 1
@@ -1301,7 +1302,8 @@ def parse_create_analyze_test( filename ):
 
 def create_tests( relpath, platname='dummy', optlist=[] ):
     ""
-    creator = TestCreator( platname, optlist )
+    tctor = TestConstructor()
+    creator = TestCreator( tctor, platname, optlist )
     tL = creator.fromFile( os.getcwd(), relpath, None )
     sortL = [ (ts.getDisplayString(),ts) for ts in tL ]
     sortL.sort()
@@ -1326,7 +1328,7 @@ def reparse_test( testobj ):
 
     testobj = tests[0].getSpec()
 
-    TestCreator().reparse( testobj )
+    TestCreator(None).reparse( testobj )
 
 
 def paramGather(testL):

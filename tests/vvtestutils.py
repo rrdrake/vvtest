@@ -681,7 +681,8 @@ def parse_time( colon_time_string ):
 
 def create_tests_from_file( filename, platname=core_platform_name() ):
     ""
-    creator = testcreator.TestCreator( platname )
+    tctor = TestConstructor()
+    creator = testcreator.TestCreator( tctor, platname )
 
     assert not os.path.isabs( filename )
     assert not os.path.normpath(filename).startswith('..')
@@ -897,7 +898,8 @@ def scan_to_make_TestExecList( path, timeout_attr=None ):
     ""
     tlist = TestList()
 
-    tc = testcreator.TestCreator( 'XBox', [] )
+    tctor = TestConstructor()
+    tc = testcreator.TestCreator( tctor, 'XBox', [] )
     scan = TestFileScanner( tc )
     scan.scanPath( tlist, path )
 

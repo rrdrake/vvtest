@@ -28,6 +28,7 @@ from testutils import print3
 import libvvtest.gitlabwriter as gitlabwriter
 from libvvtest.gitlabwriter import make_submit_info
 
+from libvvtest.testctor import TestConstructor
 from libvvtest.testcreator import TestCreator
 from libvvtest.teststatus import TestStatus, DIFF_EXIT_STATUS
 from libvvtest.testcase import TestCase
@@ -513,7 +514,8 @@ class gitlab_output_format_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest()
         vrun.assertCounts( total=5, npass=2, diff=2, fail=1 )
 
-        creator = TestCreator( vrun.platformName() )
+        tctor = TestConstructor()
+        creator = TestCreator( tctor, vrun.platformName() )
         tL = creator.fromFile( '.', 'DiffTest.vvt', None )
         tst = tL[0]
 
