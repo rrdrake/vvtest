@@ -10,25 +10,18 @@ from os.path import join as pjoin
 
 import hashlib
 
+DEFAULT_MAX_NAME_LENGTH = 100
+
 
 class TestID:
 
-    def __init__(self, testname, filepath, params, staged_names):
+    def __init__(self, testname, filepath, params, staged_names, idtraits={}):
         ""
         self.name = testname
         self.filepath = filepath
         self.params = params
         self.staged = staged_names
-
-        self.short = 100
-
-    def setShorten(self, value):
-        ""
-        self.short = value
-
-    def getStageNames(self):
-        ""
-        return self.staged
+        self.idtraits = idtraits
 
     def computeExecuteDirectory(self, shorten=True):
         ""
@@ -101,7 +94,9 @@ class TestID:
 
     def _compute_shortened_name(self, fullname):
         ""
-        if self.short and len(fullname) > self.short:
+        nchar = self.idtraits.get( 'numchars', DEFAULT_MAX_NAME_LENGTH )
+
+        if nchar and len(fullname) > nchar:
             hsh = _compute_hash( fullname )[:10]
             return self.name[:20] + '.' + hsh
         else:
@@ -116,22 +111,3 @@ else:
     def _compute_hash( astring ):
         ""
         return hashlib.sha1( astring.encode() ).hexdigest()
-
-
-class IDGenerator:
-
-    def __init__(self, numchars):
-        ""
-        if numchars:
-            self.nchars = int( numchars )
-        else:
-            self.nchars = numchars
-
-    def makeID(self, testname, filepath, params, staged_names):
-        ""
-        tid = TestID( testname, filepath, params, staged_names )
-
-        if self.nchars != None:
-            tid.setShorten( self.nchars )
-
-        return tid

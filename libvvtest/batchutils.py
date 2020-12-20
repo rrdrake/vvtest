@@ -22,17 +22,15 @@ class Batcher:
                        tlist, xlist, perms,
                        qsublimit,
                        batch_length, max_timeout,
-                       namer, jobhandler,
-                       testctor ):
+                       namer, jobhandler ):
         ""
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
         self.jobhandler = jobhandler
-        self.tctor = testctor
 
-        self.results = ResultsHandler( tlist, xlist, self.tctor )
+        self.results = ResultsHandler( tlist, xlist )
 
         self.rundate = tlist.getResultsDate()
         self.vvtestcmd = vvtestcmd
@@ -153,7 +151,7 @@ class Batcher:
         ""
         fn = self.namer.getBatchPath( batchid )
 
-        tl = TestList.TestList( fn, self.tctor )
+        tl = TestList.TestList( fn )
 
         tl.setResultsDate( self.rundate )
 
@@ -430,11 +428,10 @@ def apply_queue_timeout_bump_factor( qtime ):
 
 class ResultsHandler:
 
-    def __init__(self, tlist, xlist, testctor):
+    def __init__(self, tlist, xlist):
         ""
         self.tlist = tlist
         self.xlist = xlist
-        self.tctor = testctor
 
     def addResultsInclude(self, bjob):
         ""
@@ -454,7 +451,7 @@ class ResultsHandler:
 
             try:
                 tlr = testlistio.TestListReader( rfile )
-                tlr.read( self.tctor )
+                tlr.read()
                 jobtests = tlr.getTests()
             except Exception:
                 # file system race condition can cause corruption, ignore

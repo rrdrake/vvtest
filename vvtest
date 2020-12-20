@@ -45,7 +45,6 @@ class RuntimeData:
         self.isrestart      = False  # True if inside a test results tree
         self.perms          = None   # Permissions object
         self.results_writer = None   # ResultsWriters object
-        self.tctor          = None   # TestConstructor object
         self.creator        = None   # TestCreator object
         self.scanner        = None   # TestFileScanner object
         self.selector       = None   # TestSelector object
@@ -72,15 +71,14 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     insert_configdirs_into_sys_path( vvtestdir, configdirs )
     construct_runtime_config( rtdata, opts, optD )
     construct_and_process_cache_file( rtdata, opts, optD )
-    construct_runtime_info( rtdata, argv, vvtestdir, opts, start_epoch )
+    construct_runtime_info( rtdata, argv, vvtestdir, start_epoch )
     create_configuration( rtdata.rtconfig, opts, optD, vvtestdir, configdirs )
 
     construct_platform( rtdata, vvtestdir, opts, optD )
-    construct_testcase_constructor( rtdata, opts )
     compute_testing_directory( rtdata, opts, optD )
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
-    construct_testcase_creator( rtdata )
+    construct_testcase_creator( rtdata, opts )
     construct_test_scanner( rtdata, scandirs, opts, optD )
     import_plugin_module( rtdata )
     construct_test_selector( rtdata )
@@ -182,7 +180,7 @@ def check_options_not_allowed_for_restart( opts, optD ):
         raise FatalError( 'cannot use -g in a TestResults directory' )
 
 
-def construct_runtime_info( rtdata, argv, vvtestdir, opts, start_epoch ):
+def construct_runtime_info( rtdata, argv, vvtestdir, start_epoch ):
     ""
     from libvvtest.runinfo import RuntimeInfo
 
@@ -190,9 +188,6 @@ def construct_runtime_info( rtdata, argv, vvtestdir, opts, start_epoch ):
                           cmdline=argv,
                           vvtestdir=vvtestdir,
                           curdir=rtdata.curdir )
-
-    if opts.short_xdirs:
-        rtinfo.setInfo( shortxdirs=opts.short_xdirs )
 
     rtdata.rtinfo = rtinfo
 
@@ -254,19 +249,6 @@ def construct_platform( rtdata, vvtestdir, opts, optD ):
     rtdata.plat = plat
 
 
-def construct_testcase_constructor( rtdata, opts ):
-    ""
-    from libvvtest.testctor import TestConstructor
-
-    tctor = TestConstructor()
-
-    # magic: check and print error if this fails to cast to int
-    if opts.short_xdirs:
-        tctor.setShorten( int( opts.short_xdirs ) )
-
-    rtdata.tctor = tctor
-
-
 def compute_testing_directory( rtdata, opts, optD ):
     ""
     td = rtdata.loc.setTestingDirectory( opts.run_dir,
@@ -288,15 +270,29 @@ def construct_permission_setter( rtdata, opts ):
     rtdata.perms = perms
 
 
-def construct_testcase_creator( rtdata ):
+def construct_testcase_creator( rtdata, opts ):
     ""
     from libvvtest.testcreator import TestCreator
 
-    creator = TestCreator( rtdata.tctor,
+    creator = TestCreator( make_idtraits( opts ),
                            rtdata.rtconfig.getPlatformName(),
                            rtdata.rtconfig.getOptionList() )
 
     rtdata.creator = creator
+
+
+def make_idtraits( opts ):
+    ""
+    idtraits = {}
+    if opts.short_xdirs:
+        try:
+            nchars = int( opts.short_xdirs )
+        except Exception:
+            raise FatalError( 'invalid --short-xdirs value: ' + \
+                              repr(opts.short_xdirs) )
+        idtraits['numchars'] = nchars
+
+    return idtraits
 
 
 def construct_test_scanner( rtdata, scandirs, opts, optD ):
@@ -406,7 +402,6 @@ def construct_test_list_manager( rtdata ):
     namer = BatchFileNamer( rtdata.testdir )
 
     rtdata.tlm = TestListManager( namer=namer,
-                                  tctor=rtdata.tctor,
                                   rtinfo=rtdata.rtinfo,
                                   perms=rtdata.perms )
 
@@ -568,12 +563,11 @@ def get_testing_directory( opts, platobj ):
 
 class TestListManager:
 
-    def __init__(self, namer, tctor, rtinfo, perms):
+    def __init__(self, namer, rtinfo, perms):
         ""
         self.tlist = None
 
         self.namer = namer
-        self.tctor = tctor
         self.rtinfo = rtinfo
         self.perms = perms
 
@@ -589,7 +583,7 @@ class TestListManager:
         ""
         fn = self.namer.getFilePath( batchid )
 
-        self.tlist = TestList.TestList( fn, self.tctor )
+        self.tlist = TestList.TestList( fn )
 
         return self.tlist
 
@@ -600,7 +594,7 @@ class TestListManager:
     def readAndMergePreviouslyRunTests(self):
         ""
         fn = self.namer.getFilePath()
-        prev_tlist = TestList.TestList( fn, self.tctor )
+        prev_tlist = TestList.TestList( fn )
 
         attrs = prev_tlist.readTestResults()
 
@@ -1085,8 +1079,7 @@ def create_Batcher( opts, optD, rtdata, namer,
                                 qsublimit,
                                 opts.batch_length,
                                 maxtmo,
-                                namer, jobhandler,
-                                rtdata.tctor )
+                                namer, jobhandler )
 
     return batch
 

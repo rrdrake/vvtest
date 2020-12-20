@@ -8,6 +8,7 @@ import os
 from os.path import basename
 
 from .testfile import TestFile
+from .testid import TestID
 
 
 class TestSpec( TestFile ):
@@ -16,7 +17,7 @@ class TestSpec( TestFile ):
     realizations (instances) of the test.
     """
 
-    def __init__(self, name, rootpath, filepath, idgenerator):
+    def __init__(self, name, rootpath, filepath, idtraits={}):
         """
         A test object always needs a root path and file path, where the file
         path must be a relative path name.
@@ -33,7 +34,7 @@ class TestSpec( TestFile ):
         self.first_stage = True
         self.last_stage = True
 
-        self.idgen = idgenerator
+        self.idtraits = idtraits
         self._set_identifiers()
 
     def getName(self):
@@ -109,6 +110,10 @@ class TestSpec( TestFile ):
             return stage_name+'='+stage_value
 
         return None
+
+    def getStageNames(self):
+        ""
+        return self.staged
 
     def isFirstStage(self):
         """
@@ -192,17 +197,18 @@ class TestSpec( TestFile ):
         constructs and returns a TestID object; this object is used to
         determine the exec dir, the ID, and the display string
         """
-        return self.idgen.makeID( self.name, self.getFilepath(),
-                                  self.params, self.staged )
+        return TestID( self.name, self.getFilepath(),
+                       self.params, self.staged,
+                       self.idtraits )
 
-    def resetIDGenerator(self, idgenerator):
+    def getIDTraits(self):
         ""
-        self.idgen = idgenerator
+        return self.idtraits
+
+    def setIDTraits(self, idtraits):
+        ""
+        self.idtraits = idtraits
         self._set_identifiers()
-
-    def getIDGenerator(self):
-        ""
-        return self.idgen
 
     def _set_identifiers(self):
         ""

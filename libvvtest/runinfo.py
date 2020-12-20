@@ -24,7 +24,6 @@ class RuntimeInfo:
         'hostname',
         'rundir',  # the test results directory
         'curdir',
-        'shortxdirs', # the --short-xdirs value, if any
         'python',  # the python executable path
         'vvtestdir',  # the (real) directory containing the vvtest script
         'PYTHONPATH',

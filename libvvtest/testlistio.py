@@ -12,8 +12,9 @@ import shutil
 from . import testspec
 from .paramset import ParameterSet
 from .testcase import TestCase
+from .testspec import TestSpec
 
-version = 34
+version = 35
 
 
 class TestListWriter:
@@ -70,7 +71,7 @@ class TestListReader:
         self.incl = set()
         self.tests = {}
 
-    def read(self, testctor):
+    def read(self):
         ""
         for key,val in self._iterate_file_lines():
             try:
@@ -88,17 +89,17 @@ class TestListReader:
                 elif key == 'Finish':
                     self.finish = eval( val )[1]
                 else:
-                    tcase = string_to_test( val, testctor )
+                    tcase = string_to_test( val )
                     self.tests[ tcase.getSpec().getID() ] = tcase
 
             except Exception:
                 pass
 
-        assert self.vers in [32, 33, 34], \
+        assert self.vers in [32, 33, 34, 35], \
             'corrupt test list file or older format: '+str(self.filename)
 
         for incl_file in self.incl:
-            self._read_include_file( incl_file, testctor )
+            self._read_include_file( incl_file )
 
     def getFileVersion(self):
         ""
@@ -162,7 +163,7 @@ class TestListReader:
                 except Exception:
                     pass
 
-    def _read_include_file(self, fname, testctor):
+    def _read_include_file(self, fname):
         ""
         if not os.path.isabs( fname ):
             # include file is relative to self.filename
@@ -171,7 +172,7 @@ class TestListReader:
         if os.path.exists( fname ):
 
             tlr = TestListReader( fname )
-            tlr.read( testctor )
+            tlr.read()
             self.tests.update( tlr.getTests() )
 
 
@@ -208,6 +209,10 @@ def test_to_string( tcase, extended=False ):
 
     testdict = {}
 
+    idtraits = tspec.getIDTraits()
+    if idtraits:
+        testdict['idtraits'] = idtraits
+
     testdict['name'] = tspec.getName()
     testdict['root'] = tspec.getRootpath()
     testdict['path'] = tspec.getFilepath()
@@ -228,18 +233,20 @@ def test_to_string( tcase, extended=False ):
     return s
 
 
-def string_to_test( strid, testctor ):
+def string_to_test( strid ):
     """
     Creates and returns a partially filled TestSpec object from a string
     produced by the test_to_string() method.
     """
     testdict = eval( strid.strip() )
 
+    idtraits = testdict.get( 'idtraits', {} )
+
     name = testdict['name']
     root = testdict['root']
     path = testdict['path']
 
-    tspec = testctor.makeTestSpec( name, root, path )
+    tspec = TestSpec( name, root, path, idtraits )
 
     if 'paramset' in testdict:
         pset = tspec.getParameterSet()

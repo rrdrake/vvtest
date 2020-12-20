@@ -17,7 +17,6 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.testctor import TestConstructor
 from libvvtest.testcreator import TestCreator
 from libvvtest.errors import TestSpecError
 import libvvtest.FilterExpressions as FilterExpressions
@@ -1249,11 +1248,11 @@ class test_file_reparse( vtu.vvtestTestCase ):
         tcase.setHasDependent()
 
         sid = tio.test_to_string( tcase )
-        tcase2 = tio.string_to_test( sid, TestConstructor() )
+        tcase2 = tio.string_to_test( sid )
         assert not tcase2.hasDependent()
 
         sid = tio.test_to_string( tcase, extended=True )
-        tcase3 = tio.string_to_test( sid, TestConstructor() )
+        tcase3 = tio.string_to_test( sid )
         assert tcase3.hasDependent()
 
     def test_transfer_dep_dirs_through_string_write_read(self):
@@ -1263,7 +1262,7 @@ class test_file_reparse( vtu.vvtestTestCase ):
         tcase.addDepDirectory( 'B*', 'bar/Btest' )
 
         sid = tio.test_to_string( tcase, extended=True )
-        tcase2 = tio.string_to_test( sid, TestConstructor() )
+        tcase2 = tio.string_to_test( sid )
 
         matchL = tcase2.getDepDirectories()
         assert len( matchL ) == 2
@@ -1280,17 +1279,16 @@ class test_file_reparse( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid, TestConstructor() )
+    tcase = tio.string_to_test( stringid )
 
-    TestCreator(None).reparse( tcase.getSpec() )
+    TestCreator().reparse( tcase.getSpec() )
 
     return tcase
 
 
 def parse_create_analyze_test( filename ):
     ""
-    tctor = TestConstructor()
-    tL = TestCreator(tctor).fromFile( '.', filename )
+    tL = TestCreator().fromFile( '.', filename )
 
     analyzeL = list( filter( lambda ts: ts.isAnalyze(), tL ) )
     assert len( analyzeL ) == 1
@@ -1302,8 +1300,7 @@ def parse_create_analyze_test( filename ):
 
 def create_tests( relpath, platname='dummy', optlist=[] ):
     ""
-    tctor = TestConstructor()
-    creator = TestCreator( tctor, platname, optlist )
+    creator = TestCreator( {}, platname, optlist )
     tL = creator.fromFile( os.getcwd(), relpath, None )
     sortL = [ (ts.getDisplayString(),ts) for ts in tL ]
     sortL.sort()
@@ -1322,13 +1319,13 @@ def reparse_test( testobj ):
     tw.finish()
 
     tr = tio.TestListReader( 'tmplist' )
-    tr.read( TestConstructor() )
+    tr.read()
     tests = list( tr.getTests().values() )
     assert len( tests ) == 1
 
     testobj = tests[0].getSpec()
 
-    TestCreator(None).reparse( testobj )
+    TestCreator().reparse( testobj )
 
 
 def paramGather(testL):

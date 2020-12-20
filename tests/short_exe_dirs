@@ -23,7 +23,6 @@ from testutils import print3
 
 import libvvtest.testid as testid
 import libvvtest.outpututils as outpututils
-from libvvtest.testctor import TestConstructor
 
 
 class TestID_tests( unittest.TestCase ):
@@ -48,7 +47,6 @@ class TestID_tests( unittest.TestCase ):
             assert tid.computeExecuteDirectory() == 'bar/foo'
             assert tid.computeDisplayString() == 'bar/foo'
             assert tid.computeID()
-            assert not tid.getStageNames()
 
         assert tid1.computeID() != tid2.computeID()
 
@@ -59,7 +57,6 @@ class TestID_tests( unittest.TestCase ):
         assert tid.computeExecuteDirectory() == 'bar/foo.A=13.B=14'
         assert tid.computeDisplayString() == 'bar/foo.A=13.B=14'
         assert tid.computeID()
-        assert not tid.getStageNames()
 
         tid2 = testid.TestID( 'foo', 'bar/foo.vvt', {'A':'13','B':'13'}, [] )
         assert tid.computeID() != tid2.computeID()
@@ -75,7 +72,6 @@ class TestID_tests( unittest.TestCase ):
         assert tid1.computeExecuteDirectory() == 'bar/foo.A'
         assert tid1.computeDisplayString() == 'bar/foo.A stage=1(A=1)'
         assert tid1.computeID()
-        assert tid1.getStageNames() == ['stage','A']
 
         pD = {'stage':'1','A':'2'}
         tid2 = testid.TestID( 'foo', 'bar/foo.vvt', pD, ['stage','A'] )
@@ -83,7 +79,6 @@ class TestID_tests( unittest.TestCase ):
         assert tid2.computeExecuteDirectory() == 'bar/foo.A'
         assert tid2.computeDisplayString() == 'bar/foo.A stage=1(A=2)'
         assert tid2.computeID()
-        assert tid2.getStageNames() == ['stage','A']
 
         assert tid1.computeID() != tid2.computeID()
 
@@ -93,7 +88,6 @@ class TestID_tests( unittest.TestCase ):
         assert tid3.computeExecuteDirectory() == 'bar/foo.A'
         assert tid3.computeDisplayString() == 'bar/foo.A stage=2(A=2)'
         assert tid3.computeID()
-        assert tid3.getStageNames() == ['stage','A']
 
         assert tid1.computeID() != tid3.computeID()
         assert tid2.computeID() != tid3.computeID()
@@ -129,15 +123,13 @@ class TestID_tests( unittest.TestCase ):
         assert xdir.startswith( 'bar/foobarbaz_foobarbaz_.' )
         assert displ.startswith( tid3.computeExecuteDirectory(shorten=False) )
 
-    def test_the_ID_generator_can_be_reset(self):
+    def test_resetting_the_ID_traits(self):
         ""
-        tctor = TestConstructor()
-        tspec = vtu.make_fake_TestSpec( tctor=tctor )
+        tspec = vtu.make_fake_TestSpec()
 
         xdir1 = tspec.getExecuteDirectory()
 
-        idgen2 = tctor.makeIDGenerator( 5 )
-        tspec.resetIDGenerator( idgen2 )
+        tspec.setIDTraits( {'numchars':5} )
 
         xdir2 = tspec.getExecuteDirectory()
 
@@ -159,9 +151,7 @@ class using_short_xdirs( vtu.vvtestTestCase ):
         lds = outpututils.location_display_string( tspec, trpath, cwd )
         assert lds == 'sdir/atest.np=4'
 
-        tctor = TestConstructor()
-        tctor.setShorten( 5 )
-        tspec = vtu.make_fake_TestSpec( tctor=tctor )
+        tspec = vtu.make_fake_TestSpec( idtraits={'numchars':5} )
 
         xdir = tspec.getExecuteDirectory()
         displ = tspec.getDisplayString()

@@ -16,12 +16,10 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.testctor import TestConstructor
 from libvvtest.testcreator import TestCreator, ExpressionEvaluator
 from libvvtest.errors import TestSpecError
 
 from libvvtest.paramset import ParameterSet
-from libvvtest.testctor import TestConstructor
 from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testlistio as tio
@@ -560,8 +558,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert tmap['dx'] == float
         assert tmap['dy'] == float
 
-        tctor = TestConstructor()
-        tL = TestCreator(tctor).fromFile( os.getcwd(), 'blue.vvt', None )
+        tL = TestCreator().fromFile( os.getcwd(), 'blue.vvt', None )
         assert len( tL ) == 2*2*2*2
 
         tspec = tL[3]
@@ -610,10 +607,9 @@ class script_tests( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid, TestConstructor() )
+    tcase = tio.string_to_test( stringid )
 
-    tctor = TestConstructor()
-    TestCreator(tctor).reparse( tcase.getSpec() )
+    TestCreator().reparse( tcase.getSpec() )
 
     return tcase
 

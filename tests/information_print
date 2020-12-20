@@ -31,7 +31,6 @@ import batch.batching as batching
 from batch.namer import BatchFileNamer
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
-from libvvtest.testctor import TestConstructor
 import libvvtest.consolewriter as consolewriter
 
 
@@ -231,8 +230,7 @@ def make_fake_Batcher( tlist ):
                                 tlist, None, None,
                                 None,
                                 None, None,
-                                None, jobhandler,
-                                TestConstructor() )
+                                None, jobhandler )
 
     bjob = jobhandler.createJob()
     bjob.setAttr( 'testlist', tlist )

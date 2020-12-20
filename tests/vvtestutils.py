@@ -36,7 +36,6 @@ cfgdir = os.path.join( topdir, 'config' )
 vvtest_file = pjoin( topdir, 'vvtest' )
 resultspy = pjoin( topdir, 'libvvtest', 'results.py' )
 
-from libvvtest.testctor import TestConstructor
 import libvvtest.testspec as testspec
 import libvvtest.testcase as testcase
 import libvvtest.teststatus as teststatus
@@ -681,8 +680,7 @@ def parse_time( colon_time_string ):
 
 def create_tests_from_file( filename, platname=core_platform_name() ):
     ""
-    tctor = TestConstructor()
-    creator = testcreator.TestCreator( tctor, platname )
+    creator = testcreator.TestCreator( {}, platname )
 
     assert not os.path.isabs( filename )
     assert not os.path.normpath(filename).startswith('..')
@@ -703,7 +701,7 @@ def make_simple_script_parse_instance( srcfile ):
     evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
     vspecs = ScriptReader( srcfile )
     testname = os.path.splitext(srcfile)[0]
-    ts = TestConstructor().makeTestSpec( testname, os.getcwd(), srcfile )
+    ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
 
     inst = testcreator.ParsingInstance( testname=testname,
                                         tfile=ts,
@@ -720,7 +718,7 @@ def make_simple_xml_parse_instance( srcfile ):
     evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
     xdoc = read_xml_file( srcfile )
     testname = os.path.splitext(srcfile)[0]
-    ts = TestConstructor().makeTestSpec( testname, os.getcwd(), srcfile )
+    ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
 
     inst = testcreator.ParsingInstance( testname=testname,
                                         tfile=ts,
@@ -730,13 +728,16 @@ def make_simple_xml_parse_instance( srcfile ):
     return inst
 
 
-def make_fake_TestSpec( name='atest', keywords=['key1','key2'], tctor=None ):
+def make_fake_TestSpec( name='atest', keywords=['key1','key2'], idtraits=None ):
     ""
-    if tctor == None:
-        tctor = TestConstructor()
-    ts = tctor.makeTestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
+    if idtraits is not None:
+        ts = testspec.TestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt', idtraits )
+    else:
+        ts = testspec.TestSpec( name, os.getcwd(), 'sdir/'+name+'.vvt' )
+
     ts.setKeywordList( keywords )
     ts.setParameters( { 'np':'4' } )
+
     return ts
 
 
@@ -898,8 +899,7 @@ def scan_to_make_TestExecList( path, timeout_attr=None ):
     ""
     tlist = TestList()
 
-    tctor = TestConstructor()
-    tc = testcreator.TestCreator( tctor, 'XBox', [] )
+    tc = testcreator.TestCreator( {}, 'XBox', [] )
     scan = TestFileScanner( tc )
     scan.scanPath( tlist, path )
 

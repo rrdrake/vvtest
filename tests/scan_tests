@@ -22,7 +22,6 @@ import testutils as util
 from testutils import print3
 
 import libvvtest.TestList as TestList
-from libvvtest.testctor import TestConstructor
 from libvvtest.testcreator import TestCreator
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.scanner import TestFileScanner
@@ -193,8 +192,7 @@ def scan_path_with_warnings_output( path ):
 
 def construct_TestList_and_TestFileScanner( spectype=None, ostream=None ):
     ""
-    tctor = TestConstructor()
-    creator = TestCreator( tctor )
+    creator = TestCreator()
     tlist = TestList.TestList()
 
     if ostream:

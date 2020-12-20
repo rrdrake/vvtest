@@ -13,7 +13,6 @@ from os.path import join as pjoin
 from . import testlistio
 from .groups import ParameterizeAnalyzeGroups
 from .teststatus import copy_test_results
-from .testctor import TestConstructor
 
 
 default_filename = 'testlist'
@@ -25,14 +24,12 @@ class TestList:
     to a file.
     """
 
-    def __init__(self, filename=None, testctor=None):
+    def __init__(self, filename=None):
         ""
         if filename:
             self.filename = normpath( abspath( filename ) )
         else:
             self.filename = abspath( default_filename )
-
-        self.tctor = testctor
 
         self.rundate = None
         self.startdate = None
@@ -124,7 +121,7 @@ class TestList:
         if os.path.exists( self.filename ):
 
             tlr = testlistio.TestListReader( self.filename )
-            tlr.read( self.tctor )
+            tlr.read()
 
             rd = tlr.getAttr( 'rundate', None )
             if rd != None:
@@ -150,7 +147,7 @@ class TestList:
         for fn in files:
 
             tlr = testlistio.TestListReader( fn )
-            tlr.read( self.tctor )
+            tlr.read()
 
             self.startdate = tlr.getStartDate()
             self.finishdate = tlr.getFinishDate()
@@ -158,11 +155,7 @@ class TestList:
             file_attrs.clear()
             file_attrs.update( tlr.getAttrs() )
 
-            short = file_attrs.get( 'shortxdirs', None )
-            idgen = self.tctor.makeIDGenerator( short )
-
             for xdir,tcase in tlr.getTests().items():
-                tcase.getSpec().resetIDGenerator( idgen )
                 self.tcasemap[ xdir ] = tcase
 
         return file_attrs
@@ -181,7 +174,7 @@ class TestList:
             t = self.tcasemap.get( tspec.getID(), None )
             if t != None:
                 copy_test_results( t.getStat(), tcase.getStat() )
-                t.getSpec().resetIDGenerator( tspec.getIDGenerator() )
+                t.getSpec().setIDTraits( tspec.getIDTraits() )
 
     def resultsFileIsMarkedFinished(self):
         ""

@@ -12,6 +12,7 @@ from . import FilterExpressions
 
 from .ScriptReader import ScriptReader
 from .errors import TestSpecError
+from .testspec import TestSpec
 
 from . import parsexml
 from . import parsevvt
@@ -21,9 +22,9 @@ from .paramset import ParameterSet
 
 class TestCreator:
 
-    def __init__(self, testctor, platname=os.uname()[0], optionlist=[]):
+    def __init__(self, idtraits={}, platname=os.uname()[0], optionlist=[]):
         ""
-        self.tctor = testctor
+        self.idtraits = idtraits
         self.evaluator = ExpressionEvaluator( platname, optionlist )
 
     def fromFile(self, rootpath, relpath, force_params=None):
@@ -41,7 +42,7 @@ class TestCreator:
         form = map_extension_to_spec_form( relpath )
 
         ctor = create_test_constructor( form, rootpath, relpath,
-                                        self.evaluator, self.tctor,
+                                        self.evaluator, self.idtraits,
                                         force_params )
 
         ctor.readFile()
@@ -63,7 +64,7 @@ class TestCreator:
         ctor = create_test_constructor( form, tspec.getRootpath(),
                                               tspec.getFilepath(),
                                               self.evaluator,
-                                              self.tctor,
+                                              self.idtraits,
                                               None )
 
         ctor.readFile( strict=True )
@@ -108,15 +109,14 @@ class ExpressionEvaluator:
 
 class TestMaker:
 
-    def __init__(self, rootpath, relpath, evaluator, testctor,
+    def __init__(self, rootpath, relpath, evaluator, idtraits,
                        force_params={} ):
         ""
         self.root = rootpath
         self.fpath = relpath
         self.force = force_params
         self.evaluator = evaluator
-
-        self.tctor = testctor
+        self.idtraits = idtraits
 
         self.source = None
 
@@ -144,7 +144,7 @@ class TestMaker:
         tspec.setParameterSet( new_pset )
 
         if new_pset.getStagedGroup():
-            staging.mark_staged_tests( new_pset, [ tspec ], self.tctor )
+            staging.mark_staged_tests( new_pset, [ tspec ] )
 
         if tspec.isAnalyze():
             analyze_spec = self.parseAnalyzeSpec( tname )
@@ -159,7 +159,7 @@ class TestMaker:
 
         testL = self.generate_test_objects( tname, pset )
 
-        staging.mark_staged_tests( pset, testL, self.tctor )
+        staging.mark_staged_tests( pset, testL )
 
         analyze_spec = self.parseAnalyzeSpec( tname )
         self.check_add_analyze_test( analyze_spec, tname, pset, testL )
@@ -182,7 +182,7 @@ class TestMaker:
             raise TestSpecError( 'an analyze requires at least one ' + \
                                  'parameter to be defined' )
 
-        parent = self.tctor.makeTestSpec( testname, self.root, self.fpath )
+        parent = TestSpec( testname, self.root, self.fpath, self.idtraits )
 
         parent.setIsAnalyze()
         parent.setParameterSet( paramset )
@@ -205,14 +205,14 @@ class TestMaker:
         testL = []
 
         if len( pset.getParameters() ) == 0:
-            t = self.tctor.makeTestSpec( tname, self.root, self.fpath )
+            t = TestSpec( tname, self.root, self.fpath, self.idtraits )
             testL.append(t)
 
         else:
             # take a cartesian product of all the parameter values
             for pdict in pset.getInstances():
                 # create the test and add to test list
-                t = self.tctor.makeTestSpec( tname, self.root, self.fpath )
+                t = TestSpec( tname, self.root, self.fpath, self.idtraits )
                 t.setParameters( pdict )
                 t.setParameterSet( pset )
                 testL.append(t)
@@ -298,14 +298,14 @@ def map_extension_to_spec_form( filepath ):
 
 
 def create_test_constructor( spec_form, rootpath, relpath,
-                             evaluator, testctor, force_params ):
+                             evaluator, idtraits, force_params ):
     ""
     if spec_form == 'xml':
-        ctor = XMLTestMaker( rootpath, relpath, evaluator, testctor,
+        ctor = XMLTestMaker( rootpath, relpath, evaluator, idtraits,
                              force_params )
 
     elif spec_form == 'script':
-        ctor = ScriptTestMaker( rootpath, relpath, evaluator, testctor,
+        ctor = ScriptTestMaker( rootpath, relpath, evaluator, idtraits,
                                 force_params )
 
     else:

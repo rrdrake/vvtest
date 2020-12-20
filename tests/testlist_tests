@@ -23,7 +23,6 @@ from testutils import print3
 import libvvtest.testlistio as tio
 import libvvtest.TestList as TestList
 import libvvtest.testspec as testspec
-from libvvtest.testctor import TestConstructor
 from libvvtest.testcase import TestCase
 import libvvtest.paramset as ParameterSet
 
@@ -39,7 +38,7 @@ class TestSpec_to_and_from_string( vtu.vvtestTestCase ):
 
         sid = tio.test_to_string( tcase )
         assert '\n' not in sid
-        tcase2 = tio.string_to_test( sid, TestConstructor() )
+        tcase2 = tio.string_to_test( sid )
 
         assert_TestCase_same_as_fake( tcase2 )
 
@@ -48,7 +47,7 @@ class TestSpec_to_and_from_string( vtu.vvtestTestCase ):
         tcase = create_fake_analyze_TestCase()
 
         sid = tio.test_to_string( tcase )
-        tcase2 = tio.string_to_test( sid, TestConstructor() )
+        tcase2 = tio.string_to_test( sid )
 
         assert tcase2.getSpec().isAnalyze()
 
@@ -64,7 +63,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
         d1 = tlr.getStartDate()
         d2 = tlr.getFinishDate()
         assert d2-d1 > 1 and d2-d1 < 5
@@ -78,7 +77,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         assert tlr.getAttr( 'foobar', 'default value' ) == 'default value'
         self.assertRaises( Exception, tlr.getAttr, 'foobar' )
@@ -98,7 +97,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         tspec = tcase.getSpec()
@@ -119,7 +118,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tm = time.time()
         assert tm - tlr.getStartDate() < 5
@@ -160,7 +159,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         tstart,tdone = self.write_with_include_file( tcase )
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert tcase.getSpec().getDisplayString() == 'sdir/atest.np=4'
@@ -181,7 +180,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert tcase.getSpec().getDisplayString() == 'sdir/atest.np=4'
@@ -194,7 +193,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         self.write_with_include_file( tcase, skip_completed_mark=True )
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert tcase.getSpec().getDisplayString() == 'sdir/atest.np=4'
@@ -205,7 +204,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert tcase.getSpec().getDisplayString() == 'sdir/atest.np=4'
@@ -222,7 +221,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         os.chdir( 'rundir' )
         tlr = tio.TestListReader( tfile )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert_TestCase_same_as_fake( tcase, rootdir )
@@ -237,7 +236,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         assert tm and (time.time() - tm) < 10
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
         assert abs( tlr.getFinishDate() - tm ) < 2
 
     def test_scan_an_unfinished_test_results_file(self):
@@ -259,7 +258,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'tests.out' )
-        tlr.read( TestConstructor() )
+        tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
         assert_TestCase_same_as_fake( tcase )
@@ -285,7 +284,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         tl.stringFileWrite( anything=['A',1] )
 
         tr = tio.TestListReader( tl.getFilename() )
-        tr.read( TestConstructor() )
+        tr.read()
         assert tr.getAttr( 'anything' ) == ['A',1]
 
         tl.setResultsDate()
@@ -293,7 +292,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         tl.writeFinished()
 
         tr = tio.TestListReader( tl.getResultsFilename() )
-        tr.read( TestConstructor() )
+        tr.read()
         D = tr.getAttr( 'checkme' )
         assert len(D) == 1 and D['A'] == 1
 
@@ -319,7 +318,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         sfx = tl.getResultsDate()
         time.sleep(2)
 
-        tl = TestList.TestList( testctor=TestConstructor() )
+        tl = TestList.TestList()
         tl.readTestList()
         assert tl.getResultsDate() == sfx
         rfile = write_TestList_fake_results( tl )
@@ -354,7 +353,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         # create the sublist test results
-        tlsub = TestList.TestList( filename=fn, testctor=TestConstructor() )
+        tlsub = TestList.TestList( filename=fn )
         tlsub.readTestList()
         write_TestList_fake_results( tlsub )
         time.sleep(1)
@@ -378,7 +377,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tl = TestList.TestList( testctor=TestConstructor() )
+        tl = TestList.TestList()
         tl.readTestResults()
 
         tm = tl.getDateStamp()
@@ -446,8 +445,8 @@ class format_versions( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'testlist' )
-        tlr.read( TestConstructor() )
-        assert tlr.getFileVersion() == 34
+        tlr.read()
+        assert tlr.getFileVersion() == 35
 
     def test_reading_testlist_format_version_31_is_an_exception(self):
         ""
@@ -467,7 +466,7 @@ class format_versions( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'testlist' )
-        tlr.read( TestConstructor() )
+        tlr.read()
         assert tlr.getFileVersion() == 32
         assert len( tlr.getTests() ) == 3
 
@@ -480,14 +479,14 @@ class format_versions( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tlr = tio.TestListReader( 'testlist.1' )
-        tlr.read( TestConstructor() )
+        tlr.read()
         assert tlr.getFileVersion() == 33
         assert len( tlr.getTests() ) == 1
         tcase = list( tlr.getTests().values() )[0]
         assert tcase.getStat().getResultStatus() == 'pass'
 
         tlr = tio.TestListReader( 'testlist' )
-        tlr.read( TestConstructor() )
+        tlr.read()
         assert tlr.getFileVersion() == 33
         assert len( tlr.getTests() ) == 3
         for tcase in tlr.getTests().values():
@@ -568,7 +567,7 @@ example_include_2_version_33 = """\
 
 def create_TestCase():
     ""
-    tspec = TestConstructor().makeTestSpec( 'atest', os.getcwd(), 'atest.xml' )
+    tspec = testspec.TestSpec( 'atest', os.getcwd(), 'atest.xml' )
 
     tspec.setKeywordList( ['key1','key2'] )
 
@@ -633,7 +632,7 @@ def create_TestCase_with_results():
 
 def create_fake_analyze_TestCase():
     ""
-    tspec = TestConstructor().makeTestSpec( 'atest', os.getcwd(), 'atest.vvt' )
+    tspec = testspec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
 
     tspec.setIsAnalyze()
     pset = ParameterSet.ParameterSet()
@@ -729,7 +728,7 @@ def write_TestList_fake_results( testlistobj ):
 
 def read_TestList_and_check_fake_test():
     ""
-    tl = TestList.TestList( testctor=TestConstructor() )
+    tl = TestList.TestList()
     tl.readTestList()
     tl.readTestResults()
     tL = list( tl.getTests() )

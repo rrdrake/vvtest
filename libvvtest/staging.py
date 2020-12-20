@@ -4,13 +4,11 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os, sys
-
-from . import testspec
-from . import parseutil
+from .parseutil import create_dependency_result_expression
+from .testid import TestID
 
 
-def mark_staged_tests( pset, testL, testctor ):
+def mark_staged_tests( pset, testL ):
     """
     1. each test must be told which parameter names form the staged set
     2. the first and last tests in a staged set must be marked as such
@@ -18,13 +16,13 @@ def mark_staged_tests( pset, testL, testctor ):
     """
     if pset.getStagedGroup():
 
-        oracle = StagingOracle( pset.getStagedGroup(), testctor )
+        oracle = StagingOracle( pset.getStagedGroup() )
 
         for tspec in testL:
 
             set_stage_params( tspec, oracle )
 
-            prev = oracle.findPreviousStageDisplayID( tspec )
+            prev = oracle.getPreviousStageDisplayID( tspec )
             if prev:
                 add_staged_dependency( tspec, prev )
 
@@ -42,20 +40,18 @@ def set_stage_params( tspec, oracle ):
 
 def add_staged_dependency( from_tspec, to_display_string ):
     ""
-    wx = parseutil.create_dependency_result_expression( None )
+    wx = create_dependency_result_expression( None )
     from_tspec.addDependency( to_display_string, wx )
 
 
 class StagingOracle:
 
-    def __init__(self, stage_group, testctor):
+    def __init__(self, stage_group):
         ""
         self.param_nameL = stage_group[0]
         self.param_valueL = stage_group[1]
 
         self.stage_values = [ vals[0] for vals in self.param_valueL ]
-
-        self.tctor = testctor
 
     def getStagedParameterNames(self):
         ""
@@ -72,21 +68,19 @@ class StagingOracle:
         idx = self.stage_values.index( stage_val )
         return idx
 
-    def findPreviousStageDisplayID(self, tspec):
+    def getPreviousStageDisplayID(self, tspec):
         ""
         idx = self.getStageIndex( tspec )
         if idx > 0:
 
             paramD = self._create_params_for_stage( tspec, idx-1 )
 
-            idgen = self.tctor.getIDGenerator()
-            tid = idgen.makeID( tspec.getName(),
-                                tspec.getFilepath(),
-                                paramD,
-                                self.param_nameL )
-            displ = tid.computeDisplayString()
-
-            return displ
+            tid = TestID( tspec.getName(),
+                          tspec.getFilepath(),
+                          paramD,
+                          self.param_nameL,
+                          tspec.getIDTraits() )
+            return tid.computeDisplayString()
 
         return None
 
@@ -104,16 +98,16 @@ def tests_are_related_by_staging( tspec1, tspec2 ):
     ""
     if tspec1.getFilename() == tspec2.getFilename():
 
-        idgen1 = tspec1.getTestID()
-        idgen2 = tspec2.getTestID()
+        tid1 = tspec1.getTestID()
+        tid2 = tspec2.getTestID()
 
-        names1 = idgen1.getStageNames()
-        names2 = idgen2.getStageNames()
+        names1 = tspec1.getStageNames()
+        names2 = tspec2.getStageNames()
 
         if names1 and names1 == names2:
 
-            id1 = idgen1.computeID( compress_stage=True )
-            id2 = idgen2.computeID( compress_stage=True )
+            id1 = tid1.computeID( compress_stage=True )
+            id2 = tid2.computeID( compress_stage=True )
 
             return id1 == id2
 
