@@ -16,7 +16,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.testcreator import TestCreator, ExpressionEvaluator
+from libvvtest.testcreator import TestCreator
 from libvvtest.errors import TestSpecError
 
 from libvvtest.paramset import ParameterSet
@@ -546,11 +546,9 @@ class script_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = ExpressionEvaluator( 'atari', [] )
-
         vspecs = ScriptReader( 'blue.vvt' )
         pset = ParameterSet()
-        parsevvt.parse_parameterize( pset, vspecs, 'blue', evaluator, None )
+        parsevvt.parse_parameterize( pset, vspecs, 'blue', 'atari', [], None )
 
         tmap = pset.getParameterTypeMap()
         assert len( tmap ) == 3

@@ -698,7 +698,6 @@ def make_simple_script_parse_instance( srcfile ):
     ""
     from libvvtest.ScriptReader import ScriptReader
 
-    evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
     vspecs = ScriptReader( srcfile )
     testname = os.path.splitext(srcfile)[0]
     ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
@@ -706,7 +705,8 @@ def make_simple_script_parse_instance( srcfile ):
     inst = testcreator.ParsingInstance( testname=testname,
                                         tfile=ts,
                                         source=vspecs,
-                                        evaluator=evaluator )
+                                        platname='atari',
+                                        optionlist=[] )
 
     return inst
 
@@ -715,7 +715,6 @@ def make_simple_xml_parse_instance( srcfile ):
     ""
     from libvvtest.parsexml import read_xml_file
 
-    evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
     xdoc = read_xml_file( srcfile )
     testname = os.path.splitext(srcfile)[0]
     ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
@@ -723,7 +722,8 @@ def make_simple_xml_parse_instance( srcfile ):
     inst = testcreator.ParsingInstance( testname=testname,
                                         tfile=ts,
                                         source=xdoc,
-                                        evaluator=evaluator )
+                                        platname='atari',
+                                        optionlist=[] )
 
     return inst
 

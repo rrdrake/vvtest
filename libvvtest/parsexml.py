@@ -13,10 +13,13 @@ from . import FilterExpressions
 from . import timehandler
 
 from .parseutil import variable_expansion
-from .parseutil import evauate_testname_expr
+from .parseutil import evaluate_testname_expr
 from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import parse_to_word_expression
+from .parseutil import evaluate_platform_expr
+from .parseutil import evaluate_option_expr
+from .parseutil import evaluate_parameter_expr
 
 
 def read_xml_file( filename, strict=False ):
@@ -83,7 +86,7 @@ def parse_xml_test( inst ):
     inst.tfile.setSpecificationForm( 'xml' )
 
 
-def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
+def attr_filter( attrname, attrvalue, testname, paramD, platname, optionlist, lineno ):
     """
     Checks the attribute name for a filtering attributes.  Returns a pair of
     boolean values, (is filter, filter result).  The first is whether the
@@ -93,28 +96,20 @@ def attr_filter( attrname, attrvalue, testname, paramD, evaluator, lineno ):
     try:
 
         if attrname == "testname":
-            return True, evauate_testname_expr( testname, attrvalue )
+            return True, evaluate_testname_expr( testname, attrvalue )
 
         elif attrname in ["platform","platforms"]:
-            return True, evaluator.evaluate_platform_expr( attrvalue )
+            return True, evaluate_platform_expr( platname, attrvalue )
 
-        elif attrname in ["keyword","keywords"]:
-            # deprecated [became an error Sept 2017]
-            raise TestSpecError( attrname + " attribute not allowed here, " + \
-                                 "line " + str(lineno) )
-
-        elif attrname in ["not_keyword","not_keywords"]:
-            # deprecated [became an error Sept 2017]
+        elif attrname in ["keyword","keywords","not_keyword","not_keywords"]:
             raise TestSpecError( attrname + " attribute not allowed here, " + \
                                  "line " + str(lineno) )
 
         elif attrname in ["option","options"]:
-            wx = FilterExpressions.WordExpression( attrvalue )
-            return True, evaluator.evaluate_option_expr( wx )
+            return True, evaluate_option_expr( optionlist, attrvalue )
 
         elif attrname in ["parameter","parameters"]:
-            pf = FilterExpressions.ParamFilter( attrvalue )
-            return True, pf.evaluate( paramD )
+            return True, evaluate_parameter_expr( paramD, attrvalue )
 
     except ValueError:
         raise TestSpecError( "bad " + attrname + " expression, line " + \
@@ -145,7 +140,8 @@ def parse_baseline( inst ):
         skip = 0
         for n,v in nd.getAttrs().items():
             isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
-                                        inst.evaluator, str(nd.getLineNumber()) )
+                                        inst.platname, inst.optionlist,
+                                        str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -175,7 +171,7 @@ def parse_baseline( inst ):
                         fL.append( [str(fname[i]), str(fdest[i])] )
 
             variable_expansion( inst.testname,
-                                inst.evaluator.getPlatformName(),
+                                inst.platname,
                                 inst.params,
                                 fL )
 
@@ -211,7 +207,8 @@ def collect_filenames( nd, flist, inst ):
         skip = 0
         for n,v in nd.getAttrs().items():
             isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
-                                        inst.evaluator, str(nd.getLineNumber()) )
+                                        inst.platname, inst.optionlist,
+                                        str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -244,7 +241,7 @@ def collect_filenames( nd, flist, inst ):
                     fL.append( [str(f), None] )
 
             variable_expansion( inst.testname,
-                                inst.evaluator.getPlatformName(),
+                                inst.platname,
                                 inst.params,
                                 fL )
 
@@ -266,14 +263,15 @@ def parse_source_files( nd, flist, inst ):
 
         for n,v in nd.getAttrs().items():
             isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
-                                        inst.evaluator, str(nd.getLineNumber()) )
+                                        inst.platname, inst.optionlist,
+                                        str(nd.getLineNumber()) )
             if isfa:
                 raise TestSpecError( 'filter attributes not allowed here' + \
                                      ', line ' + str(nd.getLineNumber()) )
 
         # first, substitute variables into the file names
         variable_expansion( inst.testname,
-                            inst.evaluator.getPlatformName(),
+                            inst.platname,
                             inst.params,
                             globL )
 
@@ -359,7 +357,8 @@ def parse_execute_list( inst ):
         skip = 0
         for n,v in nd.getAttrs().items():
             isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
-                                        inst.evaluator, str(nd.getLineNumber()) )
+                                        inst.platname, inst.optionlist,
+                                        str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -415,7 +414,8 @@ def parse_timeouts( inst ):
         skip = 0
         for n,v in nd.getAttrs().items():
             isfa, istrue = attr_filter( n, v, inst.testname, inst.params,
-                                        inst.evaluator, str(nd.getLineNumber()) )
+                                        inst.platname, inst.optionlist,
+                                        str(nd.getLineNumber()) )
             if isfa and not istrue:
                 skip = 1
                 break
@@ -435,7 +435,7 @@ def parse_timeouts( inst ):
                 inst.tfile.setTimeout( to )
 
 
-def parse_analyze( tname, filedoc, evaluator ):
+def parse_analyze( tname, filedoc, platname, optionlist ):
     """
     Parse analyze scripts that get run after all parameterized tests complete.
 
@@ -460,7 +460,8 @@ def parse_analyze( tname, filedoc, evaluator ):
                                    ', line ' + str(nd.getLineNumber()) )
 
           isfa, istrue = attr_filter( n, v, tname, None,
-                                      evaluator, str(nd.getLineNumber()) )
+                                      platname, optionlist,
+                                      str(nd.getLineNumber()) )
           if isfa and not istrue:
               skip = 1
               break
@@ -482,7 +483,7 @@ def parse_analyze( tname, filedoc, evaluator ):
 def testname_ok( xmlnode, tname ):
     ""
     tval = xmlnode.getAttr( 'testname', None )
-    if tval != None and not evauate_testname_expr( tname, tval ):
+    if tval != None and not evaluate_testname_expr( tname, tval ):
         return False
     return True
 
@@ -559,7 +560,7 @@ def parse_keywords( inst ):
     inst.tfile.setKeywordList( keys )
 
 
-def parse_parameterize( pset, filedoc, tname, evaluator, force_params ):
+def parse_parameterize( pset, filedoc, tname, platname, optionlist, force_params ):
     """
     Parses the parameter settings for a test XML file.
 
@@ -592,7 +593,7 @@ def parse_parameterize( pset, filedoc, tname, evaluator, force_params ):
                 raise TestSpecError( n + " attribute not allowed here, " + \
                                      "line " + str(nd.getLineNumber()) )
 
-            isfa, istrue = attr_filter( n, v, tname, None, evaluator,
+            isfa, istrue = attr_filter( n, v, tname, None, platname, optionlist,
                                         str(nd.getLineNumber()) )
             if isfa:
                 if not istrue:

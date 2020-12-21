@@ -4,18 +4,51 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os, sys
 import re
 
 from .errors import TestSpecError
 from . import FilterExpressions
 
 
-def evauate_testname_expr( testname, expr ):
+class ParsingInstance:
+
+    def __init__(self, testname='',
+                       params={},
+                       tfile=None,  # a TestFile (or TestSpec)
+                       source=None,  # an XML doc or ScriptReader
+                       platname=None,
+                       optionlist=None ):
+        ""
+        self.testname = testname
+        self.params = params
+        self.tfile = tfile
+        self.source = source
+        self.platname = platname
+        self.optionlist = optionlist
+
+
+def evaluate_testname_expr( testname, expr ):
     ""
     wx = FilterExpressions.WordExpression(expr)
-    L = [ testname ]
-    return wx.evaluate( L.count )
+    return wx.evaluate( [testname].count )
+
+
+def evaluate_platform_expr( platname, expr ):
+    ""
+    wx = FilterExpressions.WordExpression(expr)
+    return wx.evaluate( [platname].count )
+
+
+def evaluate_option_expr( optlist, expr ):
+    ""
+    wx = FilterExpressions.WordExpression( expr )
+    return wx.evaluate( optlist.count )
+
+
+def evaluate_parameter_expr( paramD, expr ):
+    ""
+    pf = FilterExpressions.ParamFilter( expr )
+    return pf.evaluate( paramD )
 
 
 alphanum_chars  = 'abcdefghijklmnopqrstuvwxyz' + \

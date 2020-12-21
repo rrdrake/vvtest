@@ -14,6 +14,7 @@ from .ScriptReader import ScriptReader
 from .errors import TestSpecError
 from .testspec import TestSpec
 
+from .parseutil import ParsingInstance
 from . import parsexml
 from . import parsevvt
 from . import staging
@@ -25,7 +26,8 @@ class TestCreator:
     def __init__(self, idtraits={}, platname=os.uname()[0], optionlist=[]):
         ""
         self.idtraits = idtraits
-        self.evaluator = ExpressionEvaluator( platname, optionlist )
+        self.platname = platname
+        self.optionlist = optionlist
 
     def fromFile(self, rootpath, relpath, force_params=None):
         """
@@ -39,11 +41,21 @@ class TestCreator:
         """
         assert not os.path.isabs( relpath )
 
+        # magic: use a "file instance" class and a "test instance" class
+        #   - file instance stores
+        #       - platform name and option list
+        #       - parsed test names
+        #       - parsed parameter set
+        #   - test instance stores
+        #       - test name
+        #       - parameter values
+        #       - TestFile object (a TestSpec)
+
         form = map_extension_to_spec_form( relpath )
 
         ctor = create_test_constructor( form, rootpath, relpath,
-                                        self.evaluator, self.idtraits,
-                                        force_params )
+                                        self.platname, self.optionlist,
+                                        self.idtraits, force_params )
 
         ctor.readFile()
         tests = ctor.createTests()
@@ -63,7 +75,7 @@ class TestCreator:
 
         ctor = create_test_constructor( form, tspec.getRootpath(),
                                               tspec.getFilepath(),
-                                              self.evaluator,
+                                              self.platname, self.optionlist,
                                               self.idtraits,
                                               None )
 
@@ -71,51 +83,16 @@ class TestCreator:
         ctor.reparseTest( tspec )
 
 
-class ExpressionEvaluator:
-    """
-    Script test headers or attributes in test XML can specify a word
-    expression that must be evaluated during test parsing.  This class caches
-    the current platform name and command line option list, and provides
-    functions to evaluate platform and option expressions.
-    """
-
-    def __init__(self, platname, option_list):
-        self.platname = platname
-        self.option_list = option_list
-
-    def getPlatformName(self):
-        ""
-        return self.platname
-
-    def evaluate_platform_expr(self, expr):
-        """
-        Evaluate the given expression against the current platform name.
-        """
-        wx = FilterExpressions.WordExpression(expr)
-        return wx.evaluate( self._equals_platform )
-
-    def _equals_platform(self, platname):
-        ""
-        if self.platname != None:
-          return platname == self.platname
-        return True
-
-    def evaluate_option_expr(self, word_expr):
-        """
-        Evaluate the given expression against the list of command line options.
-        """
-        return word_expr.evaluate( self.option_list.count )
-
-
 class TestMaker:
 
-    def __init__(self, rootpath, relpath, evaluator, idtraits,
+    def __init__(self, rootpath, relpath, platname, optionlist, idtraits,
                        force_params={} ):
         ""
         self.root = rootpath
         self.fpath = relpath
         self.force = force_params
-        self.evaluator = evaluator
+        self.platname = platname
+        self.optionlist = optionlist
         self.idtraits = idtraits
 
         self.source = None
@@ -196,7 +173,8 @@ class TestMaker:
                                 params=tspec.getParameters(),
                                 tfile=tspec,
                                 source=self.source,
-                                evaluator=self.evaluator )
+                                platname=self.platname,
+                                optionlist=self.optionlist )
 
         return inst
 
@@ -220,21 +198,6 @@ class TestMaker:
         return testL
 
 
-class ParsingInstance:
-
-    def __init__(self, testname='',
-                       params={},
-                       tfile=None,
-                       source=None,
-                       evaluator=None ):
-        ""
-        self.testname = testname
-        self.params = params
-        self.tfile = tfile
-        self.source = source
-        self.evaluator = evaluator
-
-
 class XMLTestMaker( TestMaker ):
 
     def readFile(self, strict=False):
@@ -250,12 +213,14 @@ class XMLTestMaker( TestMaker ):
         ""
         pset = ParameterSet()
         parsexml.parse_parameterize( pset, self.source, tname,
-                                     self.evaluator, self.force )
+                                     self.platname, self.optionlist,
+                                     self.force )
         return pset
 
     def parseAnalyzeSpec(self, tname):
         ""
-        return parsexml.parse_analyze( tname, self.source, self.evaluator )
+        return parsexml.parse_analyze( tname, self.source,
+                                       self.platname, self.optionlist )
 
     def parseTestInstance(self, inst):
         ""
@@ -277,12 +242,14 @@ class ScriptTestMaker( TestMaker ):
         ""
         pset = ParameterSet()
         parsevvt.parse_parameterize( pset, self.source, tname,
-                                     self.evaluator, self.force )
+                                     self.platname, self.optionlist,
+                                     self.force )
         return pset
 
     def parseAnalyzeSpec(self, tname):
         ""
-        return parsevvt.parse_analyze( tname, self.source, self.evaluator )
+        return parsevvt.parse_analyze( tname, self.source,
+                                       self.platname, self.optionlist )
 
     def parseTestInstance(self, inst):
         ""
@@ -298,15 +265,15 @@ def map_extension_to_spec_form( filepath ):
 
 
 def create_test_constructor( spec_form, rootpath, relpath,
-                             evaluator, idtraits, force_params ):
+                             platname, optionlist, idtraits, force_params ):
     ""
     if spec_form == 'xml':
-        ctor = XMLTestMaker( rootpath, relpath, evaluator, idtraits,
-                             force_params )
+        ctor = XMLTestMaker( rootpath, relpath, platname, optionlist,
+                             idtraits, force_params )
 
     elif spec_form == 'script':
-        ctor = ScriptTestMaker( rootpath, relpath, evaluator, idtraits,
-                                force_params )
+        ctor = ScriptTestMaker( rootpath, relpath, platname, optionlist,
+                                idtraits, force_params )
 
     else:
         raise Exception( "invalid test specification form: "+spec_form )

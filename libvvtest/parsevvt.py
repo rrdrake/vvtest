@@ -14,12 +14,15 @@ from . import timehandler
 from .ScriptReader import check_parse_attributes_section
 
 from .parseutil import variable_expansion
-from .parseutil import evauate_testname_expr
+from .parseutil import evaluate_testname_expr
 from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
 from .parseutil import parse_to_word_expression
+from .parseutil import evaluate_platform_expr
+from .parseutil import evaluate_option_expr
+from .parseutil import evaluate_parameter_expr
 
 
 def parse_vvt_test( inst ):
@@ -141,13 +144,14 @@ def parse_keywords( inst ):
 
 class FilterParsingInstance:
 
-    def __init__(self, testname='', evaluator=None ):
+    def __init__(self, testname='', platname=None, optionlist=None ):
         ""
         self.testname = testname
-        self.evaluator = evaluator
+        self.platname = platname
+        self.optionlist = optionlist
 
 
-def parse_parameterize( pset, vspecs, tname, evaluator, force_params ):
+def parse_parameterize( pset, vspecs, tname, platname, optionlist, force_params ):
     """
     Parses the parameter settings for a script test file.
 
@@ -172,7 +176,9 @@ def parse_parameterize( pset, vspecs, tname, evaluator, force_params ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(lnum) )
 
-        inst = FilterParsingInstance( testname=tname, evaluator=evaluator )
+        inst = FilterParsingInstance( testname=tname,
+                                      platname=platname,
+                                      optionlist=optionlist )
         if not attr_filter( spec.attrs, inst, lnum ):
             continue
 
@@ -342,7 +348,7 @@ def parse_param_group_values( name_list, value_string, lineno ):
     return vL
 
 
-def parse_analyze( tname, vspecs, evaluator ):
+def parse_analyze( tname, vspecs, platname, optionlist ):
     """
     Parse any analyze specifications.
     
@@ -364,7 +370,9 @@ def parse_analyze( tname, vspecs, evaluator ):
             raise TestSpecError( "parameters attribute not allowed here, " + \
                                  "line " + str(spec.lineno) )
 
-        inst = FilterParsingInstance( testname=tname, evaluator=evaluator )
+        inst = FilterParsingInstance( testname=tname,
+                                      platname=platname,
+                                      optionlist=optionlist )
         if not attr_filter( spec.attrs, inst, spec.lineno ):
             continue
 
@@ -403,12 +411,12 @@ def parse_working_files( inst ):
     for spec in inst.source.getSpecList( 'copy' ):
         if attr_filter( spec.attrs, inst, spec.lineno ):
             collect_filenames( spec, cpfiles, inst.testname, inst.params,
-                               inst.evaluator )
+                               inst.platname, inst.optionlist )
 
     for spec in inst.source.getSpecList( 'link' ):
         if attr_filter( spec.attrs, inst, spec.lineno ):
             collect_filenames( spec, lnfiles, inst.testname, inst.params,
-                               inst.evaluator )
+                               inst.platname, inst.optionlist )
     
     for src,dst in lnfiles:
         inst.tfile.addLinkFile( src, dst )
@@ -421,14 +429,14 @@ def parse_working_files( inst ):
             if spec.value:
                 L = spec.value.split()
                 variable_expansion( inst.testname,
-                                    inst.evaluator.getPlatformName(),
+                                    inst.platname,
                                     inst.params,
                                     L )
                 fL.extend( L )
     inst.tfile.setSourceFiles( fL )
 
 
-def collect_filenames( spec, flist, tname, paramD, evaluator ):
+def collect_filenames( spec, flist, tname, paramD, platname, optionlist ):
     """
         #VVT: copy : file1 file2
         #VVT: copy (rename) : srcname1,copyname1 srcname2,copyname2
@@ -449,7 +457,7 @@ def collect_filenames( spec, flist, tname, paramD, evaluator ):
                                      'paths, line ' + str(spec.lineno) )
             fL.append( [fsrc,fdst] )
         
-        variable_expansion( tname, evaluator.getPlatformName(), paramD, fL )
+        variable_expansion( tname, platname, paramD, fL )
 
         flist.extend( fL )
 
@@ -461,7 +469,7 @@ def collect_filenames( spec, flist, tname, paramD, evaluator ):
                 raise TestSpecError( 'file names cannot be absolute ' + \
                                      'paths, line ' + str(spec.lineno) )
         
-        variable_expansion( tname, evaluator.getPlatformName(), paramD, fL )
+        variable_expansion( tname, platname, paramD, fL )
 
         flist.extend( [ [f,None] for f in fL ] )
 
@@ -538,7 +546,7 @@ def parse_baseline( inst ):
                     fL.append( [fsrc,fdst] )
                 
                 variable_expansion( inst.testname,
-                                    inst.evaluator.getPlatformName(),
+                                    inst.platname,
                                     inst.params,
                                     fL )
 
@@ -621,7 +629,7 @@ def testname_ok_scr( attrs, tname ):
     """
     if attrs != None:
         tval = attrs.get( 'testname', None )
-        if tval != None and not evauate_testname_expr( tname, tval ):
+        if tval != None and not evaluate_testname_expr( tname, tval ):
             return False
     return True
 
@@ -638,21 +646,19 @@ def attr_filter( attrs, inst, lineno ):
             try:
 
                 if name == "testname":
-                    if not evauate_testname_expr( inst.testname, value ):
+                    if not evaluate_testname_expr( inst.testname, value ):
                         return False
 
                 elif name in ["platform","platforms"]:
-                    if not inst.evaluator.evaluate_platform_expr( value ):
+                    if not evaluate_platform_expr( inst.platname, value ):
                         return False
 
                 elif name in ["option","options"]:
-                    wx = FilterExpressions.WordExpression( value )
-                    if not inst.evaluator.evaluate_option_expr( wx ):
+                    if not evaluate_option_expr( inst.optionlist, value ):
                         return False
 
                 elif name in ["parameter","parameters"]:
-                    pf = FilterExpressions.ParamFilter( value )
-                    if not pf.evaluate( inst.params ):
+                    if not evaluate_parameter_expr( inst.params, value ):
                         return False
 
             except ValueError:

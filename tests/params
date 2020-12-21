@@ -426,68 +426,66 @@ class parameter_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
-
         vspecs = ScriptReader( 'err1.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err1', evaluator, None )
+                                             vspecs, 'err1', 'atari', [], None )
 
         vspecs = ScriptReader( 'err2.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err2', evaluator, None )
+                                             vspecs, 'err2', 'atari', [], None )
 
         vspecs = ScriptReader( 'err3.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err3', evaluator, None )
+                                             vspecs, 'err3', 'atari', [], None )
 
         vspecs = ScriptReader( 'err4.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err4', evaluator, None )
+                                             vspecs, 'err4', 'atari', [], None )
 
         vspecs = ScriptReader( 'err4b.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err4b', evaluator, None )
+                                             vspecs, 'err4b', 'atari', [], None )
 
         vspecs = ScriptReader( 'err5.vvt' )
         parsevvt.parse_parameterize( ParameterSet(),
-                                     vspecs, 'err5', evaluator, {'np':'3'} )
+                                     vspecs, 'err5', 'atari', [], {'np':'3'} )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err5', evaluator, {'dt':'0.2'} )
+                                             vspecs, 'err5', 'atari', [], {'dt':'0.2'} )
 
         vspecs = ScriptReader( 'err6.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err6', evaluator, None )
+                                             vspecs, 'err6', 'atari', [], None )
 
         vspecs = ScriptReader( 'err7.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err7', evaluator, None )
+                                             vspecs, 'err7', 'atari', [], None )
 
         vspecs = ScriptReader( 'err8.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err8', evaluator, None )
+                                             vspecs, 'err8', 'atari', [], None )
 
         vspecs = ScriptReader( 'err9.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err9', evaluator, None )
+                                             vspecs, 'err9', 'atari', [], None )
 
         vspecs = ScriptReader( 'err10.vvt' )
         self.assertRaises( testcreator.TestSpecError,
                 parsevvt.parse_parameterize, ParameterSet(),
-                                             vspecs, 'err10', evaluator, None )
+                                             vspecs, 'err10', 'atari', [], None )
 
         vspecs = ScriptReader( 'ok11.vvt' )
         parsevvt.parse_parameterize( ParameterSet(),
-                                     vspecs, 'ok11', evaluator, None )
+                                     vspecs, 'ok11', 'atari', [], None )
 
     def test_for_duplicate_parameters_in_xml_form(self):
         ""
@@ -508,21 +506,19 @@ class parameter_tests( vtu.vvtestTestCase ):
             </rtest>""" )
         time.sleep(1)
 
-        evaluator = testcreator.ExpressionEvaluator( 'atari', [] )
-
         xdoc = parsexml.read_xml_file( 'err1.xml' )
         self.assertRaises( testcreator.TestSpecError,
                 parsexml.parse_parameterize, ParameterSet(),
-                                             xdoc, 'err1', evaluator, None )
+                                             xdoc, 'err1', 'atari', [], None )
 
         xdoc = parsexml.read_xml_file( 'ok1.xml' )
         parsexml.parse_parameterize( ParameterSet(),
-                                     xdoc, 'ok1', evaluator, None )
+                                     xdoc, 'ok1', 'atari', [], None )
 
         xdoc = parsexml.read_xml_file( 'err2.xml' )
         self.assertRaises( testcreator.TestSpecError,
             parsexml.parse_parameterize, ParameterSet(),
-                                         xdoc, 'err2', evaluator, None )
+                                         xdoc, 'err2', 'atari', [], None )
 
 
 #####################################################################
