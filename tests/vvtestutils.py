@@ -688,44 +688,17 @@ def create_tests_from_file( filename, platname=core_platform_name() ):
     dname,fname = os.path.split( filename )
 
     tL = []
-    for tspec in creator.fromFile( dname, fname, None ):
+    for tspec in creator.fromFile( fname, dname ):
         tL.append( testcase.TestCase( tspec ) )
 
     return tL
 
 
-def make_simple_script_parse_instance( srcfile ):
+def parse_single_test_file( filename ):
     ""
-    from libvvtest.ScriptReader import ScriptReader
-
-    vspecs = ScriptReader( srcfile )
-    testname = os.path.splitext(srcfile)[0]
-    ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
-
-    inst = testcreator.ParsingInstance( testname=testname,
-                                        tfile=ts,
-                                        source=vspecs,
-                                        platname='atari',
-                                        optionlist=[] )
-
-    return inst
-
-
-def make_simple_xml_parse_instance( srcfile ):
-    ""
-    from libvvtest.parsexml import read_xml_file
-
-    xdoc = read_xml_file( srcfile )
-    testname = os.path.splitext(srcfile)[0]
-    ts = testspec.TestSpec( testname, os.getcwd(), srcfile )
-
-    inst = testcreator.ParsingInstance( testname=testname,
-                                        tfile=ts,
-                                        source=xdoc,
-                                        platname='atari',
-                                        optionlist=[] )
-
-    return inst
+    tL = create_tests_from_file( filename )
+    assert len( tL ) == 1
+    return tL[0].getSpec()
 
 
 def make_fake_TestSpec( name='atest', keywords=['key1','key2'], idtraits=None ):

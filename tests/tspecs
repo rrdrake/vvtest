@@ -1288,7 +1288,7 @@ def reparse_test_string( stringid ):
 
 def parse_create_analyze_test( filename ):
     ""
-    tL = TestCreator().fromFile( '.', filename )
+    tL = TestCreator().fromFile( filename )
 
     analyzeL = list( filter( lambda ts: ts.isAnalyze(), tL ) )
     assert len( analyzeL ) == 1
@@ -1301,7 +1301,7 @@ def parse_create_analyze_test( filename ):
 def create_tests( relpath, platname='dummy', optlist=[] ):
     ""
     creator = TestCreator( {}, platname, optlist )
-    tL = creator.fromFile( os.getcwd(), relpath, None )
+    tL = creator.fromFile( relpath )
     sortL = [ (ts.getDisplayString(),ts) for ts in tL ]
     sortL.sort()
     tL = [ T[1] for T in sortL ]

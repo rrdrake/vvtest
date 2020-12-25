@@ -55,7 +55,7 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
         xdb = CommonSpec.CommonSpecDB()
         CommonSpec.scanCommonSpecs( xdoc, xdb )
 
-        tL = TestCreator().fromFile( '.', 't1.xml', None )
+        tL = TestCreator().fromFile( 't1.xml' )
         assert len(tL) == 1
 
         plat = FakePlatform()

@@ -13,26 +13,20 @@ from .staging import tests_are_related_by_staging
 
 class TestFileScanner:
 
-    def __init__(self, creator, path_list=[],
-                       force_params_dict=None,
-                       spectype=None,
+    def __init__(self, creator,
+                       path_list=[],
+                       specform=None,
                        warning_output_stream=sys.stdout):
         """
-        If 'force_params_dict' is not None, it must be a dictionary mapping
-        parameter names to a list of parameter values.  Any test that contains
-        a parameter in this dictionary will take on the given values for that
-        parameter.
-
-        If 'spectype' is not None, it must be 'vvt' or 'xml'.  The scanner will
-        only pick up files for those test specification types.  Default is
-        both *.xml and *.vvt.
+        If 'specform' is not None, it must be 'vvt' or 'xml'.  The scanner
+        will only pick up files for those test specification forms.  Default
+        is both 'vvt' and 'xml'.
         """
         self.creator = creator
         self.path_list = path_list
-        self.params = force_params_dict
         self.warnout = warning_output_stream
 
-        self.extensions = make_test_extension_list( spectype )
+        self.extensions = creator.getValidFileExtensions( specform )
 
         self.xdirmap = {}  # TestSpec xdir -> TestCase object
 
@@ -52,7 +46,7 @@ class TestFileScanner:
 
         if os.path.isfile( bpath ):
             basedir,fname = os.path.split( bpath )
-            self.readTestFile( testlist, basedir, fname, self.params )
+            self.readTestFile( testlist, basedir, fname )
 
         else:
             for root,dirs,files in os.walk( bpath ):
@@ -86,7 +80,7 @@ class TestFileScanner:
             bn,ext = os.path.splitext(f)
             if bn and ext in self.extensions:
                 fname = os.path.join(reldir,f)
-                self.readTestFile( testlist, basedir, fname, self.params )
+                self.readTestFile( testlist, basedir, fname )
 
         linkdirs = []
         for subd in list(dirs):
@@ -110,7 +104,7 @@ class TestFileScanner:
             for lroot,ldirs,lfiles in os.walk( ld ):
                 self._scan_recurse( testlist, basedir, lroot, ldirs, lfiles )
 
-    def readTestFile(self, testlist, basepath, relfile, force_params):
+    def readTestFile(self, testlist, basepath, relfile):
         """
         Initiates the parsing of a test file.  XML test descriptions may be
         skipped if they don't appear to be a test file.  Attributes from
@@ -127,7 +121,7 @@ class TestFileScanner:
         assert relfile
 
         try:
-            testL = self.creator.fromFile( basepath, relfile, force_params )
+            testL = self.creator.fromFile( relfile, basepath )
         except TestSpecError:
             print_warning( self.warnout,
                            "skipping file", os.path.join( basepath, relfile ),
@@ -168,16 +162,6 @@ class TestFileScanner:
             return True
 
         return False
-
-
-def make_test_extension_list( spectype ):
-    ""
-    if spectype == 'vvt':
-        return ['.vvt']
-    elif spectype == 'xml':
-        return ['.xml']
-    else:
-        return ['.xml','.vvt']
 
 
 def print_warning( stream, *args ):

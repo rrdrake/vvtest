@@ -94,7 +94,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         self.write_vvt_and_xml_test_files()
         time.sleep(1)
 
-        tlist,scan = construct_TestList_and_TestFileScanner( spectype='vvt' )
+        tlist,scan = construct_TestList_and_TestFileScanner( specform='vvt' )
         scan.scanPath( tlist, '.' )
 
         tL = list( tlist.getTests() )
@@ -102,7 +102,7 @@ class TestList_scan_behavior( vtu.vvtestTestCase ):
         assert tL[0].getSpec().getName() == 'scr'
         assert tL[0].getSpec().getFilepath() == 'scr.vvt'
 
-        tlist,scan = construct_TestList_and_TestFileScanner( spectype='xml' )
+        tlist,scan = construct_TestList_and_TestFileScanner( specform='xml' )
         scan.scanPath( tlist, '.' )
 
         tL = list( tlist.getTests() )
@@ -190,17 +190,17 @@ def scan_path_with_warnings_output( path ):
     return tlist.getTests(), val.strip()
 
 
-def construct_TestList_and_TestFileScanner( spectype=None, ostream=None ):
+def construct_TestList_and_TestFileScanner( specform=None, ostream=None ):
     ""
     creator = TestCreator()
     tlist = TestList.TestList()
 
     if ostream:
         scan = TestFileScanner( creator,
-                                spectype=spectype,
+                                specform=specform,
                                 warning_output_stream=ostream )
     else:
-        scan = TestFileScanner( creator, spectype=spectype )
+        scan = TestFileScanner( creator, specform=specform )
 
     return tlist,scan
 

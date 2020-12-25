@@ -4,102 +4,116 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os, sys
-from os.path import join as pjoin
+import os
 
-from . import testspec
-from . import FilterExpressions
-
-from .ScriptReader import ScriptReader
 from .errors import TestSpecError
-from .testspec import TestSpec
-
-from .parseutil import ParsingInstance
-from . import parsexml
-from . import parsevvt
-from . import staging
-from .paramset import ParameterSet
+from .staging import mark_staged_tests
+from .parsevvt import ScriptTestParser
+from .parsexml import XMLTestParser
 
 
 class TestCreator:
 
-    def __init__(self, idtraits={}, platname=os.uname()[0], optionlist=[]):
-        ""
+    def __init__(self, idtraits={},
+                       platname=os.uname()[0],
+                       optionlist=[],
+                       force_params=None ):
+        """
+        If 'force_params' is not None, then any parameters in a test that
+        are in the 'force_params' dictionary will have their values replaced
+        for that parameter name.
+        """
         self.idtraits = idtraits
         self.platname = platname
         self.optionlist = optionlist
+        self.force_params = force_params
 
-    def fromFile(self, rootpath, relpath, force_params=None):
+    def getValidFileExtensions(self, specform=None):
+        ""
+        if specform == 'vvt':
+            return ['.vvt']
+        elif specform == 'xml':
+            return ['.xml']
+        else:
+            return ['.xml','.vvt']
+
+    def fromFile(self, relpath, rootpath=None):
         """
         The 'rootpath' is the top directory of the file scan.  The 'relpath' is
         the name of the test file relative to 'rootpath' (it must not be an
-        absolute path).  If 'force_params' is not None, then any parameters in
-        the test that are in the 'force_params' dictionary have their values
-        replaced for that parameter name.
+        absolute path).  
 
         Returns a list of TestSpec objects, including a "parent" test if needed.
         """
         assert not os.path.isabs( relpath )
 
-        # magic: use a "file instance" class and a "test instance" class
-        #   - file instance stores
-        #       - platform name and option list
-        #       - parsed test names
-        #       - parsed parameter set
-        #   - test instance stores
-        #       - test name
-        #       - parameter values
-        #       - TestFile object (a TestSpec)
+        if not rootpath:
+            rootpath = os.getcwd()
 
-        form = map_extension_to_spec_form( relpath )
+        maker = self.create_test_maker( relpath, rootpath, False )
 
-        ctor = create_test_constructor( form, rootpath, relpath,
-                                        self.platname, self.optionlist,
-                                        self.idtraits, force_params )
-
-        ctor.readFile()
-        tests = ctor.createTests()
+        tests = maker.createTests()
 
         return tests
 
     def reparse(self, tspec):
         """
-        Parses the test source file and resets the settings for the given test.
-        The test name is not changed, and the parameters in the test source file
-        are not considered.  Instead, the parameters already defined in the test
-        object are used.
+        Parses the test source file and resets the test specifications. The
+        test name is not changed, and the parameters in the test source file
+        are not considered.  Instead, the parameters already defined in the
+        test object are used.
 
         A TestSpecError is raised if the file has an invalid specification.
         """
-        form = map_extension_to_spec_form( tspec.getFilepath() )
+        maker = self.create_test_maker( tspec.getFilepath(),
+                                        tspec.getRootpath(),
+                                        strict=True )
 
-        ctor = create_test_constructor( form, tspec.getRootpath(),
-                                              tspec.getFilepath(),
-                                              self.platname, self.optionlist,
-                                              self.idtraits,
-                                              None )
+        maker.reparseTest( tspec )
 
-        ctor.readFile( strict=True )
-        ctor.reparseTest( tspec )
+    def create_test_maker(self, relpath, rootpath, strict):
+        ""
+        form = map_extension_to_spec_form( relpath )
+
+        if form == 'xml':
+            parser = XMLTestParser( relpath, rootpath,
+                                    self.idtraits,
+                                    self.platname,
+                                    self.optionlist,
+                                    self.force_params,
+                                    strict )
+
+        else:
+            assert form == 'script'
+
+            parser = ScriptTestParser( relpath, rootpath,
+                                       self.idtraits,
+                                       self.platname,
+                                       self.optionlist,
+                                       self.force_params )
+
+        maker = TestMaker( parser )
+
+        return maker
+
+
+def map_extension_to_spec_form( filepath ):
+    ""
+    if os.path.splitext( filepath )[1] == '.xml':
+        return 'xml'
+    else:
+        return 'script'
 
 
 class TestMaker:
 
-    def __init__(self, rootpath, relpath, platname, optionlist, idtraits,
-                       force_params={} ):
+    def __init__(self, parser):
         ""
-        self.root = rootpath
-        self.fpath = relpath
-        self.force = force_params
-        self.platname = platname
-        self.optionlist = optionlist
-        self.idtraits = idtraits
-
-        self.source = None
+        self.parser = parser
 
     def createTests(self):
         ""
-        nameL = self.parseTestNames()
+        nameL = self.parser.parseTestNames()
 
         self.tests = []
         for tname in nameL:
@@ -111,39 +125,37 @@ class TestMaker:
     def reparseTest(self, tspec):
         ""
         # run through the test name logic to check validity
-        self.parseTestNames()
+        self.parser.parseTestNames()
 
         tname = tspec.getName()
 
         old_pset = tspec.getParameterSet()
-        new_pset = self.parseParameterSet( tname )
+        new_pset = self.parser.parseParameterSet( tname )
         new_pset.intersectionFilter( old_pset.getInstances() )
         tspec.setParameterSet( new_pset )
 
         if new_pset.getStagedGroup():
-            staging.mark_staged_tests( new_pset, [ tspec ] )
+            mark_staged_tests( new_pset, [ tspec ] )
 
         if tspec.isAnalyze():
-            analyze_spec = self.parseAnalyzeSpec( tname )
+            analyze_spec = self.parser.parseAnalyzeSpec( tname )
             tspec.setAnalyzeScript( analyze_spec )
 
-        inst = self.make_parsing_instance( tspec )
-        self.parseTestInstance( inst )
+        self.parser.parseTestInstance( tspec )
 
     def create_test_list(self, tname):
         ""
-        pset = self.parseParameterSet( tname )
+        pset = self.parser.parseParameterSet( tname )
 
         testL = self.generate_test_objects( tname, pset )
 
-        staging.mark_staged_tests( pset, testL )
+        mark_staged_tests( pset, testL )
 
-        analyze_spec = self.parseAnalyzeSpec( tname )
+        analyze_spec = self.parser.parseAnalyzeSpec( tname )
         self.check_add_analyze_test( analyze_spec, tname, pset, testL )
 
         for t in testL:
-            inst = self.make_parsing_instance( t )
-            self.parseTestInstance( inst )
+            self.parser.parseTestInstance( t )
 
         return testL
 
@@ -159,7 +171,7 @@ class TestMaker:
             raise TestSpecError( 'an analyze requires at least one ' + \
                                  'parameter to be defined' )
 
-        parent = TestSpec( testname, self.root, self.fpath, self.idtraits )
+        parent = self.parser.makeTestInstance( testname )
 
         parent.setIsAnalyze()
         parent.setParameterSet( paramset )
@@ -167,115 +179,21 @@ class TestMaker:
 
         return parent
 
-    def make_parsing_instance(self, tspec):
-        ""
-        inst = ParsingInstance( testname=tspec.getName(),
-                                params=tspec.getParameters(),
-                                tfile=tspec,
-                                source=self.source,
-                                platname=self.platname,
-                                optionlist=self.optionlist )
-
-        return inst
-
     def generate_test_objects(self, tname, pset):
         ""
         testL = []
 
         if len( pset.getParameters() ) == 0:
-            t = TestSpec( tname, self.root, self.fpath, self.idtraits )
+            t = self.parser.makeTestInstance( tname )
             testL.append(t)
 
         else:
             # take a cartesian product of all the parameter values
             for pdict in pset.getInstances():
                 # create the test and add to test list
-                t = TestSpec( tname, self.root, self.fpath, self.idtraits )
+                t = self.parser.makeTestInstance( tname )
                 t.setParameters( pdict )
                 t.setParameterSet( pset )
                 testL.append(t)
 
         return testL
-
-
-class XMLTestMaker( TestMaker ):
-
-    def readFile(self, strict=False):
-        ""
-        fname = pjoin( self.root, self.fpath )
-        self.source = parsexml.read_xml_file( fname, strict )
-
-    def parseTestNames(self):
-        ""
-        return parsexml.parse_test_names( self.source )
-
-    def parseParameterSet(self, tname):
-        ""
-        pset = ParameterSet()
-        parsexml.parse_parameterize( pset, self.source, tname,
-                                     self.platname, self.optionlist,
-                                     self.force )
-        return pset
-
-    def parseAnalyzeSpec(self, tname):
-        ""
-        return parsexml.parse_analyze( tname, self.source,
-                                       self.platname, self.optionlist )
-
-    def parseTestInstance(self, inst):
-        ""
-        parsexml.parse_xml_test( inst )
-
-
-class ScriptTestMaker( TestMaker ):
-
-    def readFile(self, strict=False):
-        ""
-        fname = pjoin( self.root, self.fpath )
-        self.source = ScriptReader( fname )
-
-    def parseTestNames(self):
-        ""
-        return parsevvt.parse_test_names( self.source )
-
-    def parseParameterSet(self, tname):
-        ""
-        pset = ParameterSet()
-        parsevvt.parse_parameterize( pset, self.source, tname,
-                                     self.platname, self.optionlist,
-                                     self.force )
-        return pset
-
-    def parseAnalyzeSpec(self, tname):
-        ""
-        return parsevvt.parse_analyze( tname, self.source,
-                                       self.platname, self.optionlist )
-
-    def parseTestInstance(self, inst):
-        ""
-        parsevvt.parse_vvt_test( inst )
-
-
-def map_extension_to_spec_form( filepath ):
-    ""
-    if os.path.splitext( filepath )[1] == '.xml':
-        return 'xml'
-    else:
-        return 'script'
-
-
-def create_test_constructor( spec_form, rootpath, relpath,
-                             platname, optionlist, idtraits, force_params ):
-    ""
-    if spec_form == 'xml':
-        ctor = XMLTestMaker( rootpath, relpath, platname, optionlist,
-                             idtraits, force_params )
-
-    elif spec_form == 'script':
-        ctor = ScriptTestMaker( rootpath, relpath, platname, optionlist,
-                                idtraits, force_params )
-
-    else:
-        raise Exception( "invalid test specification form: "+spec_form )
-
-    return ctor

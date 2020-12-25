@@ -28,7 +28,8 @@ import libvvtest.testlistio as tio
 import libvvtest.testrunner as testrunner
 
 from libvvtest.testcreator import TestCreator
-from libvvtest.testcreator import ScriptTestMaker
+from libvvtest.testcreator import TestMaker
+from libvvtest.parsevvt import ScriptTestParser
 import libvvtest.parsevvt as parsevvt
 import libvvtest.staging as staging
 
@@ -98,31 +99,27 @@ class staged_parameters( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        vspecs = ScriptReader( 'blue.vvt' )
-        pset = paramset.ParameterSet()
-        parsevvt.parse_parameterize( pset, vspecs, 'blue', 'atari', [], None )
+        parser = ScriptTestParser( 'blue.vvt' )
+        pset = parser.parseParameterSet( 'blue' )
 
         assert len( pset.getInstances() ) == 3
         nL,vL = pset.getStagedGroup()
         assert nL == [ 'stage', 'np' ]
         assert vL == [ ['1','1'], ['2','8'], ['3','1'] ]
 
-        vspecs = ScriptReader( 'err1.vvt' )
-        pset = paramset.ParameterSet()
+        parser = ScriptTestParser( 'err1.vvt' )
         self.assertRaises( TestSpecError,
-                parsevvt.parse_parameterize, pset, vspecs, 'err1', 'atari', [], None )
+                           parser.parseParameterSet, 'err1' )
 
     def create_test_list(self, spec_file):
-        ""
-        vctor = ScriptTestMaker( os.getcwd(), spec_file, 'atari', [], {} )
-        vctor.readFile()
-
+        ""        
         tname = os.path.splitext( basename( spec_file ) )[0]
 
-        pset = paramset.ParameterSet()
-        parsevvt.parse_parameterize( pset, vctor.source, tname, 'atari', [], None )
+        parser = ScriptTestParser( spec_file )
+        pset = parser.parseParameterSet( tname )
 
-        testL = vctor.generate_test_objects( tname, pset )
+        maker = TestMaker( parser )
+        testL = maker.generate_test_objects( tname, pset )
 
         return pset, testL
 
@@ -575,16 +572,16 @@ class staged_parameters( vtu.vvtestTestCase ):
         time.sleep(1)
 
         tc = TestCreator()
-        tL1 = tc.fromFile( os.getcwd(), 'd1/red.vvt' )
-        tL2 = tc.fromFile( os.getcwd(), 'd2/red.vvt' )
+        tL1 = tc.fromFile( 'd1/red.vvt' )
+        tL2 = tc.fromFile( 'd2/red.vvt' )
 
         assert staging.tests_are_related_by_staging( tL1[0], tL1[1] )
         assert staging.tests_are_related_by_staging( tL2[0], tL2[1] )
         assert not staging.tests_are_related_by_staging( tL1[0], tL2[0] )
         assert not staging.tests_are_related_by_staging( tL1[1], tL2[1] )
 
-        tL1 = tc.fromFile( abspath('d1'), 'red.vvt' )
-        tL2 = tc.fromFile( abspath('d2'), 'red.vvt' )
+        tL1 = tc.fromFile( 'red.vvt', abspath('d1') )
+        tL2 = tc.fromFile( 'red.vvt', abspath('d2') )
 
         for t1 in tL1:
             for t2 in tL2:

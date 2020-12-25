@@ -396,56 +396,45 @@ class exclude_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        inst = vtu.make_simple_script_parse_instance( 'blue.vvt' )
-        parsevvt.parse_enable( inst )
-        assert inst.tfile.isEnabled()
-        expr = inst.tfile.getPlatformEnableExpression()
+        tspec = vtu.parse_single_test_file( 'blue.vvt' )
+        assert tspec.isEnabled()
+        expr = tspec.getPlatformEnableExpression()
         assert not expr.evaluate( lambda word: True )
 
-        inst = vtu.make_simple_script_parse_instance( 'red.vvt' )
-        parsevvt.parse_enable( inst )
-        expr = inst.tfile.getPlatformEnableExpression()
+        tspec = vtu.parse_single_test_file( 'red.vvt' )
+        expr = tspec.getPlatformEnableExpression()
         assert     expr.evaluate( lambda word: word == 'XBox' )
         assert not expr.evaluate( lambda word: word == 'PS2' )
 
-        inst = vtu.make_simple_script_parse_instance( 'red2.vvt' )
-        parsevvt.parse_enable( inst )
-        expr = inst.tfile.getPlatformEnableExpression()
+        tspec = vtu.parse_single_test_file( 'red2.vvt' )
+        expr = tspec.getPlatformEnableExpression()
         assert     expr.evaluate( lambda word: word == 'XBox' )
         assert not expr.evaluate( lambda word: word == 'PS2' )
 
-        inst = vtu.make_simple_script_parse_instance( 'green1.vvt' )
-        parsevvt.parse_enable( inst )
-        assert inst.tfile.isEnabled()
+        tspec = vtu.parse_single_test_file( 'green1.vvt' )
+        assert tspec.isEnabled()
 
-        inst = vtu.make_simple_script_parse_instance( 'green2.vvt' )
-        parsevvt.parse_enable( inst )
-        assert inst.tfile.isEnabled()
+        tspec = vtu.parse_single_test_file( 'green2.vvt' )
+        assert tspec.isEnabled()
 
-        inst = vtu.make_simple_script_parse_instance( 'green3.vvt' )
-        parsevvt.parse_enable( inst )
-        assert not inst.tfile.isEnabled()
+        tspec = vtu.parse_single_test_file( 'green3.vvt' )
+        assert not tspec.isEnabled()
 
-        inst = vtu.make_simple_script_parse_instance( 'green4.vvt' )
-        parsevvt.parse_enable( inst )
-        assert not inst.tfile.isEnabled()
+        tspec = vtu.parse_single_test_file( 'green4.vvt' )
+        assert not tspec.isEnabled()
 
-        inst = vtu.make_simple_script_parse_instance( 'pink1.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                           parsevvt.parse_enable, inst )
+                           vtu.parse_single_test_file, 'pink1.vvt' )
 
-        inst = vtu.make_simple_script_parse_instance( 'pink2.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                           parsevvt.parse_enable, inst )
+                           vtu.parse_single_test_file, 'pink2.vvt' )
 
-        inst = vtu.make_simple_script_parse_instance( 'pink3.vvt' )
-        parsevvt.parse_enable( inst )
-        assert inst.tfile.isEnabled()
-        assert len( inst.tfile.getOptionEnableExpressions() ) == 1
+        tspec = vtu.parse_single_test_file( 'pink3.vvt' )
+        assert tspec.isEnabled()
+        assert len( tspec.getOptionEnableExpressions() ) == 1
 
-        inst = vtu.make_simple_script_parse_instance( 'pink4.vvt' )
         self.assertRaises( testcreator.TestSpecError,
-                           parsevvt.parse_enable, inst )
+                           vtu.parse_single_test_file, 'pink4.vvt' )
 
     def test_filtering_out_tests_by_enable(self):
         ""

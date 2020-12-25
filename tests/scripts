@@ -546,9 +546,8 @@ class script_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        vspecs = ScriptReader( 'blue.vvt' )
-        pset = ParameterSet()
-        parsevvt.parse_parameterize( pset, vspecs, 'blue', 'atari', [], None )
+        parser = parsevvt.ScriptTestParser( 'blue.vvt' )
+        pset = parser.parseParameterSet( 'blue' )
 
         tmap = pset.getParameterTypeMap()
         assert len( tmap ) == 3
@@ -556,7 +555,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert tmap['dx'] == float
         assert tmap['dy'] == float
 
-        tL = TestCreator().fromFile( os.getcwd(), 'blue.vvt', None )
+        tL = TestCreator().fromFile( 'blue.vvt' )
         assert len( tL ) == 2*2*2*2
 
         tspec = tL[3]

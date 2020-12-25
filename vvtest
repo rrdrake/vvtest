@@ -78,8 +78,8 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     compute_testing_directory( rtdata, opts, optD )
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
-    construct_testcase_creator( rtdata, opts )
-    construct_test_scanner( rtdata, scandirs, opts, optD )
+    construct_testcase_creator( rtdata, opts, optD )
+    construct_test_scanner( rtdata, scandirs, opts )
     import_plugin_module( rtdata )
     construct_test_selector( rtdata )
     construct_test_time_handler( rtdata, opts )
@@ -270,13 +270,14 @@ def construct_permission_setter( rtdata, opts ):
     rtdata.perms = perms
 
 
-def construct_testcase_creator( rtdata, opts ):
+def construct_testcase_creator( rtdata, opts, optD ):
     ""
     from libvvtest.testcreator import TestCreator
 
     creator = TestCreator( make_idtraits( opts ),
                            rtdata.rtconfig.getPlatformName(),
-                           rtdata.rtconfig.getOptionList() )
+                           rtdata.rtconfig.getOptionList(),
+                           optD['param_dict'] )
 
     rtdata.creator = creator
 
@@ -295,7 +296,7 @@ def make_idtraits( opts ):
     return idtraits
 
 
-def construct_test_scanner( rtdata, scandirs, opts, optD ):
+def construct_test_scanner( rtdata, scandirs, opts ):
     ""
     from libvvtest.scanner import TestFileScanner
 
@@ -304,8 +305,7 @@ def construct_test_scanner( rtdata, scandirs, opts, optD ):
         scandirs.append( rtdata.curdir )
 
     scanner = TestFileScanner( rtdata.creator, scandirs,
-                               force_params_dict=optD['param_dict'],
-                               spectype=opts.scan_type )
+                               specform=opts.scan_type )
 
     rtdata.scanner = scanner
 

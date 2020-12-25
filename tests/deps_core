@@ -519,12 +519,6 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         assert tB.isBlocked()
         assert tB.getBlockedReason() == failed_match_reason
 
-    def parse_vvt_file_dependencies(self, filename):
-        ""
-        inst = vtu.make_simple_script_parse_instance( filename )
-        parsevvt.parse_dependencies( inst )
-        return inst.tfile
-
     def test_parsing_the_expect_attribute_of_a_depends_on_directive(self):
         ""
         util.writefile( 'blue.vvt', """
@@ -554,33 +548,33 @@ class dependency_related_functions( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
-        tspec = self.parse_vvt_file_dependencies( 'blue.vvt' )
+        tspec = vtu.parse_single_test_file( 'blue.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 1 and deps[0][0] == 'green' and deps[0][2] == '+'
 
-        tspec = self.parse_vvt_file_dependencies( 'green.vvt' )
+        tspec = vtu.parse_single_test_file( 'green.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 1 and deps[0][0] == 'red' and deps[0][2] == '+'
 
-        tspec = self.parse_vvt_file_dependencies( 'red.vvt' )
+        tspec = vtu.parse_single_test_file( 'red.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 1 and deps[0][0] == 'pink' and deps[0][2] == '*'
 
-        tspec = self.parse_vvt_file_dependencies( 'pink.vvt' )
+        tspec = vtu.parse_single_test_file( 'pink.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 1 and deps[0][0] == 'silver' and deps[0][2] == '?'
 
-        tspec = self.parse_vvt_file_dependencies( 'silver.vvt' )
+        tspec = vtu.parse_single_test_file( 'silver.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 1 and deps[0][0] == 'oran*' and deps[0][2] == '2'
 
         self.assertRaises( TestSpecError,
-                           self.parse_vvt_file_dependencies, 'bad1.vvt' )
+                           vtu.parse_single_test_file, 'bad1.vvt' )
 
         self.assertRaises( TestSpecError,
-                           self.parse_vvt_file_dependencies, 'bad2.vvt' )
+                           vtu.parse_single_test_file, 'bad2.vvt' )
 
-        tspec = self.parse_vvt_file_dependencies( 'multi.vvt' )
+        tspec = vtu.parse_single_test_file( 'multi.vvt' )
         deps = tspec.getDependencies()
         assert len(deps) == 2
         assert deps[0][0] == 'red' and deps[0][2] == '2'
@@ -688,7 +682,7 @@ def make_TestExec_test_case( name ):
 def create_tests( relpath, platname=None ):
     ""
     creator = testcreator.TestCreator( {}, platname )
-    tL = creator.fromFile( '.', relpath, None )
+    tL = creator.fromFile( relpath )
 
     return tL
 

@@ -4,27 +4,11 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
+import os
 import re
 
 from .errors import TestSpecError
 from . import FilterExpressions
-
-
-class ParsingInstance:
-
-    def __init__(self, testname='',
-                       params={},
-                       tfile=None,  # a TestFile (or TestSpec)
-                       source=None,  # an XML doc or ScriptReader
-                       platname=None,
-                       optionlist=None ):
-        ""
-        self.testname = testname
-        self.params = params
-        self.tfile = tfile
-        self.source = source
-        self.platname = platname
-        self.optionlist = optionlist
 
 
 def evaluate_testname_expr( testname, expr ):
