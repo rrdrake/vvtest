@@ -44,13 +44,14 @@ class PythonProxy( object ):
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshcmd='ssh',
+                       sshcmd='ssh -t -t',
                        bashlogin=False,
                        logfile=None ):
         """
         If 'machine' is given, use ssh to run python on that machine.
         The 'pythonexe' is the remote python interpreter.
-        The 'sshcmd' can contain options.
+        The 'sshcmd' is the path to ssh with any options. The options -t -t
+        are used to ensure remote subprocesses receive a SIGHUP/SIGTERM.
         If 'bashlogin' is True, run python under "/bin/bash -l" (a login shell).
         The 'logfile' can be a filename or a file-like object.
         """
@@ -88,8 +89,9 @@ class PythonProxy( object ):
         """
         This applies a timeout to the total time the remote session is alive.
         A positive value starts a session timer, while None will cancel it.
-        If time expires during a call to this class, or has expired and a
-        call is made, a SessionTimeoutError is raised.
+        If time expires while executing a function in this class, or has
+        expired and a function of this class is called, a SessionTimeoutError
+        is raised.
         """
         if num_seconds == None:
             tm = None

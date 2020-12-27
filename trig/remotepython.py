@@ -18,10 +18,13 @@ class RemotePython:
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshcmd='ssh',
+                       sshcmd='ssh -t -t',
                        bashlogin=False,
                        logfile=None ):
-        ""
+        """
+        The 'sshcmd' is the path to ssh with any options. The options -t -t
+        are used to ensure remote subprocesses receive a SIGHUP/SIGTERM.
+        """
         self.started = False
 
         logfp = _check_open_logfile( logfile )
