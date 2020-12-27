@@ -50,11 +50,7 @@ class WordExpression:
 
             self.expr = expr
 
-            self.evalexpr = self.create_eval_expression( self.expr, self.words )
-
-    def create_eval_expression(self, string_expr, wordset):
-        ""
-        return parse_word_expression( string_expr, wordset )
+            self.evalexpr = self._create_eval_expression( self.expr, self.words )
 
     def getWordList(self):
         """
@@ -62,7 +58,24 @@ class WordExpression:
         """
         return list( self.words )
 
-    def evaluate(self, evaluator_func):
+    def evaluate(self, string_or_list):
+        """
+        If 'string_or_list' is a string, then each word in the expression
+        is True if it equals the string.
+        If 'string_or_list' is a list or generator, then each word in the
+        expression is True if is a member of the list.
+        """
+        if isinstance( string_or_list, str ):
+            members = [string_or_list]
+        else:
+            members = list( string_or_list )
+        return self._evaluate( members.count )
+
+    def _create_eval_expression(self, string_expr, wordset):
+        ""
+        return parse_word_expression( string_expr, wordset )
+
+    def _evaluate(self, evaluator_func):
         """
         Evaluates the expression from left to right using the given
         'evaluator_func' to evaluate True/False of each word.  If the original
@@ -80,23 +93,17 @@ class WordExpression:
 
         return r
 
-    def __repr__(self):
-        if self.expr == None:return 'WordExpression=None'
-        return 'WordExpression="' + self.expr + '"'
-
-    def __str__(self): return self.__repr__()
-
 
 class KeywordExpression( WordExpression ):
 
     def evaluate(self, keyword_list):
         ""
-        return WordExpression.evaluate( self, keyword_list.count )
+        return WordExpression.evaluate( self, keyword_list )
 
 
 class NonResultsKeywordExpression( KeywordExpression ):
 
-    def create_eval_expression(self, string_expr, wordset):
+    def _create_eval_expression(self, string_expr, wordset):
         ""
         return parse_non_results_expression( string_expr, wordset )
 
@@ -110,7 +117,7 @@ class PlatformExpression( WordExpression ):
     def evaluate(self, expr):
         ""
         pev = PlatformEvaluator( expr )
-        return WordExpression.evaluate( self, pev.satisfies_platform )
+        return WordExpression._evaluate( self, pev.satisfies_platform )
 
 
 class PlatformEvaluator:
@@ -126,7 +133,7 @@ class PlatformEvaluator:
     def satisfies_platform(self, plat_name):
         ""
         if self.expr is not None:
-            if not self.expr.evaluate( lambda tok: tok == plat_name ):
+            if not self.expr.evaluate( plat_name ):
                 return False
         return True
 
@@ -398,9 +405,9 @@ def replace_forward_slashes( expr, negate=False ):
             if tok:
 
                 sL = tok.split()
-                if 'and' in sL or 'or' in sL or 'not' in sL:
+                if 'and' in sL or 'or' in sL:
                     raise ValueError( 'a "/" and a boolean operator '
-                                      '("and" "or" "not") cannot be in the '
+                                      '("and", "or") cannot be in the '
                                       'same expression: '+repr(expr) )
 
                 if negate:
@@ -568,7 +575,7 @@ class ParamFilter:
         if self.wexpr == None:
             return 1
         evalobj = ParamFilter.Evaluator(self.wordD, paramD)
-        return self.wexpr.evaluate( evalobj.evaluate )
+        return self.wexpr._evaluate( evalobj.evaluate )
 
     class Evaluator:
         def __init__(self, wordD, paramD):

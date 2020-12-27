@@ -170,7 +170,7 @@ class RuntimeConfig:
         """
         Evaluate the given expression against the list of command line options.
         """
-        return expr.evaluate( self.optlist.count )
+        return expr.evaluate( self.optlist )
 
     def setRuntimeRange(self, min_runtime, max_runtime):
         ""

@@ -73,9 +73,9 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
 
         for wx in [ get_depencency_expr( tL[0], 'testY' ),
                     get_depencency_expr( tL[0], 'testZ' ) ]:
-            assert not wx.evaluate( lambda word: word == "pass" )
-            assert not wx.evaluate( lambda word: word == "diff" )
-            assert wx.evaluate( lambda word: word == "fail" )
+            assert not wx.evaluate( "pass" )
+            assert not wx.evaluate( "diff" )
+            assert wx.evaluate( "fail" )
 
         tL = create_tests( 'testA.py.vvt' )
         assert len(tL) == 1
@@ -83,9 +83,9 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
         assert_dependencies( tL[0], 'testB' )
 
         wx = get_depencency_expr( tL[0], 'testB' )
-        assert not wx.evaluate( lambda word: word == "pass" )
-        assert wx.evaluate( lambda word: word == "diff" )
-        assert wx.evaluate( lambda word: word == "fail" )
+        assert not wx.evaluate( "pass" )
+        assert wx.evaluate( "diff" )
+        assert wx.evaluate( "fail" )
 
     def test_an_astrisk_result_attribute_means_match_anything(self):
         ""
@@ -100,9 +100,9 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
         assert_dependencies( tL[0], 'testY', 'testZ' )
         for wx in [ get_depencency_expr( tL[0], 'testY' ),
                     get_depencency_expr( tL[0], 'testZ' ) ]:
-            assert wx.evaluate( lambda word: word == "pass" )
-            assert wx.evaluate( lambda word: word == "diff" )
-            assert wx.evaluate( lambda word: word == "fail" )
+            assert wx.evaluate( "pass" )
+            assert wx.evaluate( "diff" )
+            assert wx.evaluate( "fail" )
 
     def test_multiple_dependency_specifications(self):
         ""
@@ -119,15 +119,15 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
         assert_dependencies( tL[0], 'testB', 'testW', 'testY', 'testZ' )
 
         wx = get_depencency_expr( tL[0], 'testB' )
-        assert not wx.evaluate( lambda word: word == "pass" )
-        assert wx.evaluate( lambda word: word == "diff" )
-        assert wx.evaluate( lambda word: word == "fail" )
+        assert not wx.evaluate( "pass" )
+        assert wx.evaluate( "diff" )
+        assert wx.evaluate( "fail" )
 
         for wx in [ get_depencency_expr( tL[0], 'testY' ),
                     get_depencency_expr( tL[0], 'testZ' ) ]:
-            assert not wx.evaluate( lambda word: word == "pass" )
-            assert not wx.evaluate( lambda word: word == "diff" )
-            assert wx.evaluate( lambda word: word == "fail" )
+            assert not wx.evaluate( "pass" )
+            assert not wx.evaluate( "diff" )
+            assert wx.evaluate( "fail" )
 
         assert get_depencency_expr( tL[0], 'testW' ) == None
 
@@ -145,9 +145,9 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
         assert_dependencies( tL[0], 'testY' )
 
         wx = get_depencency_expr( tL[0], 'testY' )
-        assert not wx.evaluate( lambda word: word == "pass" )
-        assert not wx.evaluate( lambda word: word == "diff" )
-        assert wx.evaluate( lambda word: word == "fail" )
+        assert not wx.evaluate( "pass" )
+        assert not wx.evaluate( "diff" )
+        assert wx.evaluate( "fail" )
 
         tL = create_tests( 'testX.py.vvt', 'PlayStation' )
         assert len(tL) == 1

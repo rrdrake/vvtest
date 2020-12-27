@@ -399,17 +399,18 @@ class exclude_tests( vtu.vvtestTestCase ):
         tspec = vtu.parse_single_test_file( 'blue.vvt' )
         assert tspec.isEnabled()
         expr = tspec.getPlatformEnableExpression()
-        assert not expr.evaluate( lambda word: True )
+        assert not expr.evaluate( 'XBox' )
+        assert not expr.evaluate( 'Linux' )
 
         tspec = vtu.parse_single_test_file( 'red.vvt' )
         expr = tspec.getPlatformEnableExpression()
-        assert     expr.evaluate( lambda word: word == 'XBox' )
-        assert not expr.evaluate( lambda word: word == 'PS2' )
+        assert     expr.evaluate( 'XBox' )
+        assert not expr.evaluate( 'PS2' )
 
         tspec = vtu.parse_single_test_file( 'red2.vvt' )
         expr = tspec.getPlatformEnableExpression()
-        assert     expr.evaluate( lambda word: word == 'XBox' )
-        assert not expr.evaluate( lambda word: word == 'PS2' )
+        assert     expr.evaluate( 'XBox' )
+        assert not expr.evaluate( 'PS2' )
 
         tspec = vtu.parse_single_test_file( 'green1.vvt' )
         assert tspec.isEnabled()

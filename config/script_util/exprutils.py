@@ -17,7 +17,7 @@ def platform_expr( expr ):
     import vvtest_util as vvt
     import libvvtest.FilterExpressions as filt
     wx = filt.WordExpression( expr )
-    return wx.evaluate( lambda wrd: wrd == vvt.PLATFORM )
+    return wx.evaluate( vvt.PLATFORM )
 
 def parameter_expr( expr ):
     '''
@@ -41,4 +41,4 @@ def option_expr( expr ):
     import vvtest_util as vvt
     import libvvtest.FilterExpressions as filt
     wx = filt.WordExpression( expr )
-    return wx.evaluate( vvt.OPTIONS.count )
+    return wx.evaluate( vvt.OPTIONS )

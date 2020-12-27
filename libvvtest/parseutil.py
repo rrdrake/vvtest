@@ -14,19 +14,19 @@ from . import FilterExpressions
 def evaluate_testname_expr( testname, expr ):
     ""
     wx = FilterExpressions.WordExpression(expr)
-    return wx.evaluate( [testname].count )
+    return wx.evaluate( testname )
 
 
 def evaluate_platform_expr( platname, expr ):
     ""
     wx = FilterExpressions.WordExpression(expr)
-    return wx.evaluate( [platname].count )
+    return wx.evaluate( platname )
 
 
 def evaluate_option_expr( optlist, expr ):
     ""
     wx = FilterExpressions.WordExpression( expr )
-    return wx.evaluate( optlist.count )
+    return wx.evaluate( optlist )
 
 
 def evaluate_parameter_expr( paramD, expr ):

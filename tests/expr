@@ -17,7 +17,10 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.FilterExpressions import WordExpression, NonResultsKeywordExpression
+from libvvtest.FilterExpressions import WordExpression
+from libvvtest.FilterExpressions import NonResultsKeywordExpression
+from libvvtest.FilterExpressions import KeywordExpression
+from libvvtest.FilterExpressions import create_word_expression
 from libvvtest.FilterExpressions import ParamFilter
 from libvvtest.FilterExpressions import split_but_retain_separator
 from libvvtest.FilterExpressions import separate_expression_into_tokens
@@ -38,98 +41,80 @@ class word_expression_tests( vtu.vvtestTestCase ):
     def test_WordExpression_use_cases(self):
         ""
         ex = WordExpression()
-        print3( ex )
-        assert str(ex) == 'WordExpression=None'
-        assert ex.evaluate( list().count )
+        assert ex.evaluate( [] )
 
         ex.append(None)
-        print3( ex )
-        assert str(ex) == 'WordExpression=None'
-        assert ex.evaluate( list().count )
+        assert ex.evaluate( [] )
 
         ex = WordExpression('')
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
+        assert not ex.evaluate( [] )
 
         ex.append('')
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
+        assert not ex.evaluate( [] )
 
         ex.append("")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
+        assert not ex.evaluate( [] )
 
         ex.append(" ")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
+        assert not ex.evaluate( [] )
 
         ex = WordExpression(" ")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
+        assert not ex.evaluate( [] )
 
         ex = WordExpression(" hello  ")
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello"'
-        assert not ex.evaluate( list().count )
-        assert ex.evaluate( list(['hello']).count )
-        assert not ex.evaluate( list(['world']).count )
+        assert not ex.evaluate( [] )
+        assert ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
 
         ex.append(None)
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello"'
-        assert not ex.evaluate( list().count )
-        assert ex.evaluate( list(['hello']).count )
-        assert not ex.evaluate( list(['world']).count )
+        assert not ex.evaluate( [] )
+        assert ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
 
         ex.append("")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
-        assert not ex.evaluate( list(['hello']).count )
-        assert not ex.evaluate( list(['world']).count )
+        assert not ex.evaluate( [] )
+        assert not ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
 
         ex.append("  ")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
-        assert not ex.evaluate( list(['hello']).count )
-        assert not ex.evaluate( list(['world']).count )
+        assert not ex.evaluate( [] )
+        assert not ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
 
         ex.append("world")
-        print3( ex )
-        assert str(ex) == 'WordExpression=""'
-        assert not ex.evaluate( list().count )
-        assert not ex.evaluate( list(['hello']).count )
-        assert not ex.evaluate( list(['world']).count )
-        assert not ex.evaluate( list(['hello','world']).count )
-        assert not ex.evaluate( list(['the','next']).count )
+        assert not ex.evaluate( [] )
+        assert not ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
+        assert not ex.evaluate( ['hello','world'] )
+        assert not ex.evaluate( ['the','next'] )
 
     def test_expression_and_or_precedence(self):
         ""
         ex = WordExpression("hello and world or period")
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello and world or period"'
-        assert ex.evaluate( list(['period']).count )
+        assert not ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
+        assert     ex.evaluate( 'period' )
+        assert     ex.evaluate( ['hello','world'] )
 
         ex = WordExpression("(hello and world) or period")
-        print3( ex )
-        assert str(ex) == 'WordExpression="(hello and world) or period"'
-        assert ex.evaluate( list(['period']).count )
+        assert not ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
+        assert     ex.evaluate( 'period' )
+        assert     ex.evaluate( ['hello','world'] )
 
         ex = WordExpression("hello or world and period")
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello or world and period"'
-        assert ex.evaluate( list(['hello']).count )
+        assert     ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
+        assert not ex.evaluate( 'period' )
+        assert     ex.evaluate( ['hello','period'] )
+        assert     ex.evaluate( ['world','period'] )
 
         ex = WordExpression("hello or (world and period)")
-        print3( ex )
-        assert str(ex) == 'WordExpression="hello or (world and period)"'
-        assert ex.evaluate( list(['hello']).count )
+        assert     ex.evaluate( 'hello' )
+        assert not ex.evaluate( 'world' )
+        assert not ex.evaluate( 'period' )
+        assert     ex.evaluate( ['hello','period'] )
+        assert     ex.evaluate( ['world','period'] )
 
     def test_expression_errors(self):
         ""
@@ -158,32 +143,28 @@ class word_expression_tests( vtu.vvtestTestCase ):
     def test_using_parens_in_expressions(self):
         ""
         ex = WordExpression("( word1 and word2 ) or (word3 and word4)")
-        print3( ex )
-        assert     ex.evaluate( list(['word1','word2']).count )
-        assert     ex.evaluate( list(['word3','word4']).count )
-        assert not ex.evaluate( list(['word1','word3']).count )
-        assert not ex.evaluate( list(['word2','word4']).count )
+        assert     ex.evaluate( ['word1','word2'] )
+        assert     ex.evaluate( ['word3','word4'] )
+        assert not ex.evaluate( ['word1','word3'] )
+        assert not ex.evaluate( ['word2','word4'] )
 
         ex = WordExpression("( word1 and not (word2 or word3) ) or word4")
-        print3( ex )
-        assert     ex.evaluate( list(['word4']).count )
-        assert     ex.evaluate( list(['word1']).count )
-        assert not ex.evaluate( list(['word1','word2']).count )
-        assert not ex.evaluate( list(['word1','word3']).count )
+        assert     ex.evaluate( ['word4'] )
+        assert     ex.evaluate( ['word1'] )
+        assert not ex.evaluate( ['word1','word2'] )
+        assert not ex.evaluate( ['word1','word3'] )
 
         ex = WordExpression("word1 and not (word2 or word3) or word4")
-        print3( ex )
-        assert     ex.evaluate( list(['word4']).count )
-        assert     ex.evaluate( list(['word1']).count )
-        assert not ex.evaluate( list(['word1','word2']).count )
-        assert not ex.evaluate( list(['word1','word3']).count )
+        assert     ex.evaluate( ['word4'] )
+        assert     ex.evaluate( ['word1'] )
+        assert not ex.evaluate( ['word1','word2'] )
+        assert not ex.evaluate( ['word1','word3'] )
 
         ex = WordExpression("word4 or word1 and not (word2 or word3)")
-        print3( ex )
-        assert     ex.evaluate( list(['word4']).count )
-        assert     ex.evaluate( list(['word1']).count )
-        assert not ex.evaluate( list(['word1','word2']).count )
-        assert not ex.evaluate( list(['word1','word3']).count )
+        assert     ex.evaluate( ['word4'] )
+        assert     ex.evaluate( ['word1'] )
+        assert not ex.evaluate( ['word1','word2'] )
+        assert not ex.evaluate( ['word1','word3'] )
 
     def test_get_word_list_after_construction(self):
         ""
@@ -265,7 +246,6 @@ class word_expression_tests( vtu.vvtestTestCase ):
             return tok == 'word'
 
         ex = parse_non_results_expression( '' )
-        print3( ex )
         assert not eval( ex )
 
         ex = parse_non_results_expression( 'notrun' )
@@ -281,33 +261,26 @@ class word_expression_tests( vtu.vvtestTestCase ):
         assert eval( ex ) == True
 
         ex = parse_non_results_expression( 'fail and word' )
-        print3( ex )
         assert eval( ex ) == True
 
         ex = parse_non_results_expression( 'not word and fail' )
-        print3( ex )
         assert eval( ex ) == False
 
         ex = parse_non_results_expression( 'fail and not word' )
         print3( ex )
-        assert eval( ex ) == False
 
         ex = parse_non_results_expression( '( foo or word ) and ( pass or fail )' )
-        print3( ex )
         assert eval( ex ) == True
 
         ex = parse_non_results_expression(
                             '( foo or word ) and not ( pass or fail )' )
-        print3( ex )
         assert eval( ex ) == True
 
         ex = parse_non_results_expression(
                             '( pass or fail ) and ( foo or word ) ' )
-        print3( ex )
         assert eval( ex ) == True
 
         ex = parse_non_results_expression( 'word1 and not word2' )
-        print3( ex )
         assert eval( ex ) == False
 
         def evalfunc(tok):
@@ -315,76 +288,75 @@ class word_expression_tests( vtu.vvtestTestCase ):
 
         ex = parse_non_results_expression(
                     '( word1 and not (word2 or word3) ) or word' )
-        print3( ex )
         assert eval( ex ) == False
 
     def test_removing_results_keywords_from_expressions(self):
         ""
-        ex = WordExpression( "foo and bar" )
+        ex = KeywordExpression( "foo and bar" )
         nrex = NonResultsKeywordExpression( "foo and bar" )
         assert not nrex.containsResultsKeywords()
-        assert not ex.evaluate( ['foo'].count )
+        assert not   ex.evaluate( ['foo'] )
         assert not nrex.evaluate( ['foo'] )
-        assert     ex.evaluate( ['foo','bar'].count )
+        assert       ex.evaluate( ['foo','bar'] )
         assert     nrex.evaluate( ['foo','bar'] )
 
-        ex = WordExpression( "notrun or notdone" )
+        ex = KeywordExpression( "notrun or notdone" )
         nrex = NonResultsKeywordExpression( "notrun or notdone" )
         assert     nrex.containsResultsKeywords()
-        assert     ex.evaluate( ['aword','notdone'].count )
-        assert not ex.evaluate( ['aword','pass'].count )
+        assert       ex.evaluate( ['aword','notdone'] )
+        assert not   ex.evaluate( ['aword','pass'] )
         assert     nrex.evaluate( ['aword','pass'] )
 
-        ex = WordExpression( "notrun and word" )
+        ex = KeywordExpression( "notrun and word" )
         nrex = NonResultsKeywordExpression( "notrun and word" )
         assert     nrex.containsResultsKeywords()
-        assert     ex.evaluate( ['word','notrun'].count )
+        assert       ex.evaluate( ['word','notrun'] )
         assert     nrex.evaluate( ['word','notrun'] )
-        assert not ex.evaluate( ['word','pass'].count )
+        assert not   ex.evaluate( ['word','pass'] )
         assert     nrex.evaluate( ['word','pass'] )
 
-        ex = WordExpression( "not pass and not ( foo or bar )" )
+        ex = KeywordExpression( "not pass and not ( foo or bar )" )
         nrex = NonResultsKeywordExpression( "not pass and not ( foo or bar )" )
         assert     nrex.containsResultsKeywords()
-        assert     ex.evaluate( ['foobar','notrun'].count )
+        assert       ex.evaluate( ['foobar','notrun'] )
         assert     nrex.evaluate( ['foobar','notrun'] )
-        assert not ex.evaluate( ['foobar','pass'].count )
-        assert not ex.evaluate( ['foobar','pass'].count )
+        assert not   ex.evaluate( ['foobar','pass'] )
+        assert not   ex.evaluate( ['foobar','pass'] )
         assert     nrex.evaluate( ['foobar','pass'] )
 
-        ex = WordExpression( "not pass or not ( foo or bar )" )
+        ex = KeywordExpression( "not pass or not ( foo or bar )" )
         nrex = NonResultsKeywordExpression( "not pass or not ( foo or bar )" )
         assert     nrex.containsResultsKeywords()
-        assert     ex.evaluate( ['foo','notrun'].count )
+        assert       ex.evaluate( ['foo','notrun'] )
         assert not nrex.evaluate( ['foo','notrun'] )
 
     def test_an_exclamation_point_means_NOT(self):
         ""
         for expr in ['!foo','! foo','not foo']:
             ex = WordExpression( expr )
-            assert not ex.evaluate( ['foo'].count )
-            assert     ex.evaluate( ['bar'].count )
+            assert not ex.evaluate( 'foo' )
+            assert     ex.evaluate( 'bar' )
 
         for expr in ['foo or !bar','foo or ! bar']:
             ex = WordExpression( expr )
-            assert     ex.evaluate( ['foo'].count )
-            assert not ex.evaluate( ['bar'].count )
-            assert     ex.evaluate( ['foo','bar'].count )
-            assert     ex.evaluate( ['baz'].count )
+            assert     ex.evaluate( 'foo' )
+            assert not ex.evaluate( 'bar' )
+            assert     ex.evaluate( ['foo','bar'] )
+            assert     ex.evaluate( 'baz' )
 
         for expr in ['!(foo or bar)','! (foo or bar)']:
             ex = WordExpression( expr )
-            assert not ex.evaluate( ['foo'].count )
-            assert not ex.evaluate( ['bar'].count )
-            assert not ex.evaluate( ['foo','bar'].count )
-            assert     ex.evaluate( ['baz'].count )
+            assert not ex.evaluate( 'foo' )
+            assert not ex.evaluate( 'bar' )
+            assert not ex.evaluate( ['foo','bar'] )
+            assert     ex.evaluate( 'baz' )
 
         for expr in ['!(foo and bar)','! (foo and bar)']:
             ex = WordExpression( expr )
-            assert     ex.evaluate( ['foo'].count )
-            assert     ex.evaluate( ['bar'].count )
-            assert not ex.evaluate( ['foo','bar'].count )
-            assert     ex.evaluate( ['baz'].count )
+            assert     ex.evaluate( ['foo'] )
+            assert     ex.evaluate( ['bar'] )
+            assert not ex.evaluate( ['foo','bar'] )
+            assert     ex.evaluate( ['baz'] )
 
     def test_replace_forward_slashes(self):
         ""
@@ -408,9 +380,9 @@ class word_expression_tests( vtu.vvtestTestCase ):
 
         assert replace_forward_slashes( '/foo/bar' ) == 'foo or bar'
         assert replace_forward_slashes( 'foo/bar/' ) == 'foo or bar'
+        assert replace_forward_slashes( 'foo/not bar' ) == 'foo or not bar'
 
         self.assertRaises( ValueError, replace_forward_slashes, 'foo/(not bar)' )
-        self.assertRaises( ValueError, replace_forward_slashes, 'foo/not bar' )
         self.assertRaises( ValueError, replace_forward_slashes, 'foo or bar / baz' )
         self.assertRaises( ValueError, replace_forward_slashes, 'foo / bar and baz' )
         self.assertRaises( ValueError, replace_forward_slashes, 'foo/(bar)' )
@@ -482,49 +454,40 @@ class word_expression_tests( vtu.vvtestTestCase ):
         assert join_expressions_with_AND( ['( foo or bar ) and baz','yep'] ) == \
                                     '( ( foo or bar ) and baz ) and yep'
 
-    def magic_test_processing_forward_slash_and_negation(self):
+    def test_processing_forward_slash_and_negation(self):
         ""
         for expr in ['foo/bar','foo / bar','foo/ bar','foo /bar']:
-            ex = WordExpression( expr )
-            assert     ex.evaluate( ['foo'].count )
-            assert     ex.evaluate( ['bar'].count )
-            assert     ex.evaluate( ['bar','foo'].count )
-            assert not ex.evaluate( ['baz'].count )
+            ex = create_word_expression( [expr] )
+            assert     ex.evaluate( 'foo' )
+            assert     ex.evaluate( 'bar' )
+            assert     ex.evaluate( ['bar','foo'] )
+            assert not ex.evaluate( 'baz' )
 
         for expr in ['!foo/bar','!foo / bar','!foo/ bar','!foo /bar',
                      'not foo/bar','not foo / bar','not foo/ bar','not foo /bar' ]:
-            ex = WordExpression( expr )
-            assert not ex.evaluate( ['foo'].count )
-            assert not ex.evaluate( ['bar'].count )
-            assert not ex.evaluate( ['bar','foo'].count )
-            assert     ex.evaluate( ['baz'].count )
-
-        for expr in ['(!foo)/bar','(!foo) / bar','(!foo)/ bar','(!foo) /bar',
-                     '(not foo)/bar','(not foo) / bar','(not foo)/ bar','(not foo) /bar' ]:
-            ex = WordExpression( expr )
-            assert not ex.evaluate( ['foo'].count )
-            assert     ex.evaluate( ['bar'].count )
-            assert     ex.evaluate( ['bar','foo'].count )
-            assert     ex.evaluate( ['baz'].count )
+            ex = create_word_expression( [expr] )
+            assert not ex.evaluate( 'foo' )
+            assert     ex.evaluate( 'bar' )
+            assert     ex.evaluate( ['bar','foo'] )
+            assert     ex.evaluate( 'baz' )
 
         for expr in ['foo/!bar','foo / !bar','foo/ !bar','foo /!bar',
                      'foo/not bar','foo / not bar','foo/ not bar','foo /not bar' ]:
-            ex = WordExpression( expr )
-            assert     ex.evaluate( ['foo'].count )
-            assert not ex.evaluate( ['bar'].count )
-            assert     ex.evaluate( ['bar','foo'].count )
-            assert     ex.evaluate( ['baz'].count )
+            ex = create_word_expression( [expr] )
+            assert     ex.evaluate( 'foo' )
+            assert not ex.evaluate( 'bar' )
+            assert     ex.evaluate( ['bar','foo'] )
+            assert     ex.evaluate( 'baz' )
 
-        # magic: these should error out
-        #   - cannot have '/' in an expr with parens
+        # cannot have '/' in an expr with parens
         for expr in ['not ( foo/bar and baz )','! (foo/bar and baz)',
                      'not( foo/bar and baz )','!(foo/bar and baz)']:
-            ex = WordExpression( expr )
-        # magic: these should error out
-        #   - cannot have '/' in an expr with AND or OR
+            self.assertRaises( ValueError, create_word_expression, [expr] )
+
+        # cannot have '/' in an expr with AND or OR
         for expr in ['foo/bar and baz','foo/bar or baz',
                      'baz and foo/bar','baz or foo/bar']:
-            ex = WordExpression( expr )
+            self.assertRaises( ValueError, create_word_expression, [expr] )
 
 
 class param_expression_tests( vtu.vvtestTestCase ):

@@ -41,7 +41,7 @@ class TestDependency:
             if result not in ['pass','diff']:
                 return False
 
-        elif not self.wordexpr.evaluate( lambda word: word == result ):
+        elif not self.wordexpr.evaluate( result ):
             return False
 
         return True
