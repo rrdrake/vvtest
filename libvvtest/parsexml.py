@@ -9,7 +9,6 @@ import re
 
 from .errors import TestSpecError
 from . import xmlwrapper
-from . import FilterExpressions
 from . import timehandler
 from .testspec import TestSpec
 

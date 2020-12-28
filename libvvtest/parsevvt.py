@@ -8,7 +8,6 @@ import os, sys
 import re
 
 from .errors import TestSpecError
-from . import FilterExpressions
 from . import timehandler
 from .testspec import TestSpec
 

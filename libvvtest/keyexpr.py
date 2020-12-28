@@ -6,13 +6,13 @@
 
 
 from .teststatus import RESULTS_KEYWORDS
-from .FilterExpressions import WordExpression
-from .FilterExpressions import convert_token_list_into_eval_string
-from .FilterExpressions import separate_expression_into_tokens
-from .FilterExpressions import add_words_to_set
-from .FilterExpressions import _OPERATOR_LIST
-from .FilterExpressions import clean_up_word_expression
-from .FilterExpressions import join_expressions_with_AND
+from .wordexpr import WordExpression
+from .wordexpr import convert_token_list_into_eval_string
+from .wordexpr import separate_expression_into_tokens
+from .wordexpr import add_words_to_set
+from .wordexpr import _OPERATOR_LIST
+from .wordexpr import clean_up_word_expression
+from .wordexpr import join_expressions_with_AND
 
 
 class KeywordExpression( WordExpression ):

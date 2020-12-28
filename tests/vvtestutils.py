@@ -46,7 +46,7 @@ from libvvtest.TestList import TestList
 from libvvtest.execlist import TestExecList
 import libvvtest.testcreator as testcreator
 from libvvtest.scanner import TestFileScanner
-from libvvtest.FilterExpressions import WordExpression
+from libvvtest.wordexpr import WordExpression
 from libvvtest.depend import connect_dependency
 
 

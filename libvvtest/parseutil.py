@@ -8,25 +8,25 @@ import os
 import re
 
 from .errors import TestSpecError
-from . import FilterExpressions
+from .wordexpr import WordExpression, create_word_expression
 from .paramexpr import ParamFilter
 
 
 def evaluate_testname_expr( testname, expr ):
     ""
-    wx = FilterExpressions.WordExpression(expr)
+    wx = WordExpression(expr)
     return wx.evaluate( testname )
 
 
 def evaluate_platform_expr( platname, expr ):
     ""
-    wx = FilterExpressions.WordExpression(expr)
+    wx = WordExpression(expr)
     return wx.evaluate( platname )
 
 
 def evaluate_option_expr( optlist, expr ):
     ""
-    wx = FilterExpressions.WordExpression( expr )
+    wx = WordExpression( expr )
     return wx.evaluate( optlist )
 
 
@@ -166,9 +166,9 @@ def create_dependency_result_expression( attrs ):
         result = attrs['result'].strip()
 
         if result == '*':
-            wx = FilterExpressions.WordExpression()
+            wx = WordExpression()
         else:
-            wx = FilterExpressions.create_word_expression( [result] )
+            wx = create_word_expression( [result] )
 
     return wx
 
@@ -183,7 +183,7 @@ def parse_to_word_expression( string_or_list, lineno=None ):
         exprlist = string_or_list
 
     try:
-        wx = FilterExpressions.create_word_expression( exprlist )
+        wx = create_word_expression( exprlist )
 
     except Exception as e:
         msg = 'invalid expression'

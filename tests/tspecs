@@ -19,7 +19,6 @@ from testutils import print3
 
 from libvvtest.testcreator import TestCreator
 from libvvtest.errors import TestSpecError
-import libvvtest.FilterExpressions as FilterExpressions
 from libvvtest.platexpr import PlatformExpression
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.testcase import TestCase

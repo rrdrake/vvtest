@@ -4,9 +4,9 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-from .FilterExpressions import WordExpression
-from .FilterExpressions import clean_up_word_expression
-from .FilterExpressions import join_expressions_with_AND
+from .wordexpr import WordExpression
+from .wordexpr import clean_up_word_expression
+from .wordexpr import join_expressions_with_AND
 
 
 class PlatformExpression( WordExpression ):

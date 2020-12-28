@@ -17,19 +17,19 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.FilterExpressions import WordExpression
+from libvvtest.wordexpr import WordExpression
 from libvvtest.keyexpr import KeywordExpression, NonResultsKeywordExpression
 from libvvtest.keyexpr import parse_non_results_expression
-from libvvtest.FilterExpressions import create_word_expression
+from libvvtest.wordexpr import create_word_expression
 from libvvtest.paramexpr import ParamFilter
 from libvvtest.paramexpr import create_parameter_expression
-from libvvtest.FilterExpressions import split_but_retain_separator
-from libvvtest.FilterExpressions import separate_expression_into_tokens
-from libvvtest.FilterExpressions import convert_token_list_into_eval_string
-from libvvtest.FilterExpressions import replace_forward_slashes
-from libvvtest.FilterExpressions import join_expressions_with_AND
-from libvvtest.FilterExpressions import conditional_paren_wrap
-from libvvtest.FilterExpressions import parenthetical_tokenize
+from libvvtest.wordexpr import split_but_retain_separator
+from libvvtest.wordexpr import separate_expression_into_tokens
+from libvvtest.wordexpr import convert_token_list_into_eval_string
+from libvvtest.wordexpr import replace_forward_slashes
+from libvvtest.wordexpr import join_expressions_with_AND
+from libvvtest.wordexpr import conditional_paren_wrap
+from libvvtest.wordexpr import parenthetical_tokenize
 
 
 class word_expression_tests( vtu.vvtestTestCase ):

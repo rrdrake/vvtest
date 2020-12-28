@@ -24,7 +24,7 @@ from libvvtest.errors import TestSpecError
 from libvvtest.testcase import TestCase
 from libvvtest.testspec import TestSpec
 from libvvtest.testexec import TestExec
-from libvvtest.FilterExpressions import WordExpression
+from libvvtest.wordexpr import WordExpression
 
 from libvvtest import depend
 find_tests_by_pattern = depend.find_tests_by_pattern
