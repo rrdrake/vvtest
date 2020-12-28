@@ -214,11 +214,12 @@ class ScriptTestParser:
         testname = tspec.getName()
 
         platexprL = []
+        optexprL = []
 
         for spec in self.reader.getSpecList( 'enable' ):
 
             platexpr = None
-            opexpr = None
+            optexpr = None
 
             if spec.attrs:
 
@@ -232,34 +233,33 @@ class ScriptTestParser:
 
                 platexpr = spec.attrs.get( 'platforms',
                                            spec.attrs.get( 'platform', None ) )
-                if platexpr != None:
-                    platexpr = platexpr.strip()
-                    parse_to_word_expression( [platexpr], spec.lineno )
-                    platexprL.append( platexpr )
+                if platexpr is not None:
+                    parse_to_word_expression( platexpr.strip(), spec.lineno )
+                    platexprL.append( platexpr.strip() )
 
-                opexpr = spec.attrs.get( 'options',
-                                         spec.attrs.get( 'option', None ) )
-                if opexpr != None:
-                    opexpr = opexpr.strip()
-
+                optexpr = spec.attrs.get( 'options',
+                                          spec.attrs.get( 'option', None ) )
+                if optexpr and optexpr.strip():
                     # an empty option expression is ignored
-                    if opexpr:
-                        wx = FilterExpressions.WordExpression( opexpr )
-                        tspec.addEnableOptionExpression( wx )
+                    parse_to_word_expression( optexpr.strip(), spec.lineno )
+                    optexprL.append( optexpr.strip() )
 
             if spec.value:
                 val = spec.value.lower().strip()
                 if val != 'true' and val != 'false':
                     raise TestSpecError( 'invalid "enable" value, line ' + \
                                          str(spec.lineno) )
-                if val == 'false' and ( platexpr != None or opexpr != None ):
+                if val == 'false' and ( platexpr != None or optexpr != None ):
                     raise TestSpecError( 'an "enable" with platforms or ' + \
                         'options attributes cannot specify "false", line ' + \
                         str(spec.lineno) )
                 tspec.setEnabled( val == 'true' )
 
-        wx = parse_to_word_expression( platexprL, 1 )
+        wx = parse_to_word_expression( platexprL )
         tspec.setEnablePlatformExpression( wx )
+
+        wx = parse_to_word_expression( optexprL )
+        tspec.setEnableOptionExpression( wx )
 
     def parse_keywords(self, tspec):
         """

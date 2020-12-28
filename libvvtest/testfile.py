@@ -23,8 +23,8 @@ class TestFile:
                                    # or 'xml' or 'script'
 
         self.enabled = True
-        self.enable_expr = None    # a WordExpression
-        self.option_enable = []    # list of WordExpression
+        self.plat_enable = None    # a WordExpression
+        self.option_enable = None  # a WordExpression
         self.keywords = set()      # set of strings
         self.paramset = ParameterSet()
         self.param_types = {}      # param name to param type
@@ -80,17 +80,17 @@ class TestFile:
 
     def setEnablePlatformExpression(self, word_expression):
         ""
-        self.enable_expr = word_expression
+        self.plat_enable = word_expression
 
     def getPlatformEnableExpression(self):
         ""
-        return self.enable_expr
+        return self.plat_enable
 
-    def addEnableOptionExpression(self, word_expression):
+    def setEnableOptionExpression(self, word_expression):
         ""
-        self.option_enable.append( word_expression )
+        self.option_enable = word_expression
 
-    def getOptionEnableExpressions(self):
+    def getOptionEnableExpression(self):
         ""
         return self.option_enable
 
@@ -286,7 +286,7 @@ class TestFile:
 
             3. If this is a script test, and the returned string does not start
                with a hyphen, then the string is a filename of a separate
-               script to run.  The file path is a relative to getDirectory().
+               script to run.  The file path is relative to getDirectory().
         """
         return self.baseline_spec
 
@@ -313,10 +313,10 @@ class TestFile:
         will be matched against the execution directory of the dependency
         test.  For example "subdir/name*.np=8".
 
-        The result expression is a FilterExpressions.WordExpression object
-        and should be evaluated against the dependency test result.  For
-        example "pass or diff" or just "pass".  If the dependency result
-        expression is not true, then this test should not be run.
+        The result expression is a WordExpression object and should be
+        evaluated against the dependency test result.  For example it could
+        be "pass or diff" or just "pass".  If the dependency result expression
+        is not true, then this test should not be run.
         """
         return list( self.deps )
 

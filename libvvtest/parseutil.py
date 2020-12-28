@@ -172,23 +172,23 @@ def create_dependency_result_expression( attrs ):
     return wx
 
 
-def parse_to_word_expression( exprL, lineno ):
+def parse_to_word_expression( string_or_list, lineno=None ):
     ""
     wx = None
-    err = False
 
-    for expr in exprL:
-        if '/' in expr:
-            err = True
+    if isinstance( string_or_list, str ):
+        exprlist = [string_or_list]
+    else:
+        exprlist = string_or_list
 
-    if not err:
-        try:
-            wx = FilterExpressions.create_word_expression( exprL )
-        except Exception:
-            err = True
+    try:
+        wx = FilterExpressions.create_word_expression( exprlist )
 
-    if err:
-        raise TestSpecError( 'invalid "platforms" attribute value '
-                             ', line ' + str(lineno) )
+    except Exception as e:
+        msg = 'invalid expression'
+        if lineno:
+            msg += ' at line '+str(lineno)
+        msg += ': '+str(string_or_list)+', '+str(e)
+        raise TestSpecError( msg )
 
     return wx

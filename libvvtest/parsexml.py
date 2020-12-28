@@ -247,6 +247,7 @@ class XMLTestParser:
         testname = tspec.getName()
 
         platexprL = []
+        optexprL = []
 
         for nd in self.xmldoc.matchNodes(['include$']):
 
@@ -259,21 +260,20 @@ class XMLTestParser:
                 continue
 
             platexpr = nd.getAttr( 'platforms', nd.getAttr( 'platform', None ) )
-            if platexpr != None:
-                platexpr = platexpr.strip()
-                parse_to_word_expression( [platexpr], nd.getLineNumber() )
-                platexprL.append( platexpr )
+            if platexpr is not None:
+                parse_to_word_expression( platexpr.strip(), nd.getLineNumber() )
+                platexprL.append( platexpr.strip() )
 
+            optexpr = nd.getAttr( 'options', nd.getAttr( 'option', None ) )
+            if optexpr and optexpr.strip():
+                parse_to_word_expression( optexpr.strip(), nd.getLineNumber() )
+                optexprL.append( optexpr.strip() )
 
-            opexpr = nd.getAttr( 'options', nd.getAttr( 'option', None ) )
-            if opexpr != None:
-                opexpr = opexpr.strip()
-                if opexpr:
-                    wx = FilterExpressions.WordExpression( opexpr )
-                    tspec.addEnableOptionExpression( wx )
-
-        wx = parse_to_word_expression( platexprL, 1 )
+        wx = parse_to_word_expression( platexprL )
         tspec.setEnablePlatformExpression( wx )
+
+        wx = parse_to_word_expression( optexprL )
+        tspec.setEnableOptionExpression( wx )
 
     def parse_keywords(self, tspec):
         """

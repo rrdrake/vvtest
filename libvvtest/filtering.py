@@ -55,13 +55,11 @@ class TestFilter:
 
     def checkOptions(self, tcase):
         ""
-        ok = True
-
         tspec = tcase.getSpec()
-        for opexpr in tspec.getOptionEnableExpressions():
-            if not self.rtconfig.evaluate_option_expr( opexpr ):
-                ok = False
-                break
+
+        optexpr = tspec.getOptionEnableExpression()
+        ok = self.rtconfig.evaluate_option_expr( optexpr )
+
         if not ok:
             tcase.getStat().markSkipByOption()
 
@@ -258,13 +256,13 @@ class TestFilter:
     def filterByCummulativeRuntime(self, tcase_map):
         ""
         rtsum = self.rtconfig.getRuntimeSum()
-        if rtsum != None:
+        if rtsum is not None:
 
             # first, generate list with times
             tL = []
             for tcase in tcase_map.values():
                 tm = tcase.getStat().getRuntime( None )
-                if tm == None: tm = 0
+                if tm is None: tm = 0
                 xdir = tcase.getSpec().getDisplayString()
                 tL.append( (tm,xdir,tcase) )
             tL.sort()
@@ -301,7 +299,7 @@ def normalize_filter_directory( filter_dir ):
     ""
     subdir = None
 
-    if filter_dir != None:
+    if filter_dir is not None:
         subdir = os.path.normpath( filter_dir )
         if subdir == '' or subdir == '.':
             subdir = None
