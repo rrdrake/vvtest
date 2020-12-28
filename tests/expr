@@ -18,19 +18,18 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.FilterExpressions import WordExpression
-from libvvtest.FilterExpressions import NonResultsKeywordExpression
-from libvvtest.FilterExpressions import KeywordExpression
+from libvvtest.keyexpr import KeywordExpression, NonResultsKeywordExpression
+from libvvtest.keyexpr import parse_non_results_expression
 from libvvtest.FilterExpressions import create_word_expression
-from libvvtest.FilterExpressions import ParamFilter
+from libvvtest.paramexpr import ParamFilter
+from libvvtest.paramexpr import create_parameter_expression
 from libvvtest.FilterExpressions import split_but_retain_separator
 from libvvtest.FilterExpressions import separate_expression_into_tokens
 from libvvtest.FilterExpressions import convert_token_list_into_eval_string
-from libvvtest.FilterExpressions import parse_non_results_expression
 from libvvtest.FilterExpressions import replace_forward_slashes
 from libvvtest.FilterExpressions import join_expressions_with_AND
 from libvvtest.FilterExpressions import conditional_paren_wrap
 from libvvtest.FilterExpressions import parenthetical_tokenize
-from libvvtest.FilterExpressions import create_parameter_filter
 
 
 class word_expression_tests( vtu.vvtestTestCase ):
@@ -791,16 +790,16 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
     def test_creating_unified_parameter_expression(self):
         ""
-        pf = create_parameter_filter( None, None )
+        pf = create_parameter_expression( None, None )
         assert pf == None
 
-        pf = create_parameter_filter( ['np=1'], None )
+        pf = create_parameter_expression( ['np=1'], None )
         assert pf.evaluate( {'np':'1'} )
 
-        pf = create_parameter_filter( None, ['np=1'] )
+        pf = create_parameter_expression( None, ['np=1'] )
         assert not pf.evaluate( {'np':'1'} )
 
-        pf = create_parameter_filter( ['np<8'], ['np=1/ndevice'] )
+        pf = create_parameter_expression( ['np<8'], ['np=1/ndevice'] )
         assert     pf.evaluate( {'np':'2'} )
         assert     pf.evaluate( {'np':'1'} )
         assert not pf.evaluate( {'np':'1', 'ndevice':'1'} )

@@ -9,9 +9,9 @@ import re
 import time
 
 from . import argutil
-from .FilterExpressions import create_keyword_expression
-from .FilterExpressions import create_platform_expression
-from .FilterExpressions import create_parameter_filter
+from .keyexpr import create_keyword_expression
+from .platexpr import create_platform_expression
+from .paramexpr import create_parameter_expression
 
 
 def parse_command_line( argvlist, vvtest_version=None ):
@@ -742,7 +742,7 @@ def adjust_options_and_create_derived_options( opts ):
         derived_opts['keyword_expr'] = expr
 
         errtype = 'parameter options'
-        params = create_parameter_filter( opts.dash_p, opts.dash_P )
+        params = create_parameter_expression( opts.dash_p, opts.dash_P )
         derived_opts['param_list'] = params
 
         errtype = 'setting paramters'

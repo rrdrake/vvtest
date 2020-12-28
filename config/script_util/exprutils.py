@@ -4,8 +4,6 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-import os, sys
-
 
 def platform_expr( expr ):
     '''
@@ -15,8 +13,8 @@ def platform_expr( expr ):
     name is "Linux" or if it is "Darwin".
     '''
     import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    wx = filt.WordExpression( expr )
+    from libvvtest.FilterExpressions import WordExpression
+    wx = WordExpression( expr )
     return wx.evaluate( vvt.PLATFORM )
 
 def parameter_expr( expr ):
@@ -27,8 +25,8 @@ def parameter_expr( expr ):
     defined in the test.
     '''
     import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    pf = filt.ParamFilter( expr )
+    from libvvtest.paramexpr import ParamFilter
+    pf = ParamFilter( expr )
     return pf.evaluate( vvt.PARAM_DICT )
 
 def option_expr( expr ):
@@ -39,6 +37,6 @@ def option_expr( expr ):
     "-o dbg" or "-o intel" were given on the command line.
     '''
     import vvtest_util as vvt
-    import libvvtest.FilterExpressions as filt
-    wx = filt.WordExpression( expr )
+    from libvvtest.FilterExpressions import WordExpression
+    wx = WordExpression( expr )
     return wx.evaluate( vvt.OPTIONS )

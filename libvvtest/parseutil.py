@@ -9,6 +9,7 @@ import re
 
 from .errors import TestSpecError
 from . import FilterExpressions
+from .paramexpr import ParamFilter
 
 
 def evaluate_testname_expr( testname, expr ):
@@ -31,7 +32,7 @@ def evaluate_option_expr( optlist, expr ):
 
 def evaluate_parameter_expr( paramD, expr ):
     ""
-    pf = FilterExpressions.ParamFilter( expr )
+    pf = ParamFilter( expr )
     return pf.evaluate( paramD )
 
 

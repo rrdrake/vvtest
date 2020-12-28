@@ -11,8 +11,8 @@ import os
 import fnmatch
 import re
 
-from .FilterExpressions import PlatformExpression
-from .FilterExpressions import KeywordExpression, NonResultsKeywordExpression
+from .platexpr import PlatformExpression
+from .keyexpr import KeywordExpression, NonResultsKeywordExpression
 
 
 class RuntimeConfig:

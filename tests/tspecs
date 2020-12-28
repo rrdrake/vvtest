@@ -20,6 +20,7 @@ from testutils import print3
 from libvvtest.testcreator import TestCreator
 from libvvtest.errors import TestSpecError
 import libvvtest.FilterExpressions as FilterExpressions
+from libvvtest.platexpr import PlatformExpression
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.testcase import TestCase
 import libvvtest.testlistio as tio
@@ -388,7 +389,7 @@ class XML_test_specifications( vtu.vvtestTestCase ):
 
     def expr(self, string_expr):
         ""
-        expr = FilterExpressions.PlatformExpression( string_expr )
+        expr = PlatformExpression( string_expr )
         return expr
 
     def test_platform_specifications(self):

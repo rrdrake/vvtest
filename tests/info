@@ -18,7 +18,8 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.filtering import TestFilter
-from libvvtest.FilterExpressions import WordExpression, KeywordExpression
+from libvvtest.FilterExpressions import WordExpression
+from libvvtest.keyexpr import KeywordExpression
 
 
 class info_tests( vtu.vvtestTestCase ):
