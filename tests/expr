@@ -20,6 +20,7 @@ from testutils import print3
 from libvvtest.wordexpr import WordExpression
 from libvvtest.keyexpr import KeywordExpression, NonResultsKeywordExpression
 from libvvtest.keyexpr import parse_non_results_expression
+from libvvtest.keyexpr import remove_results_keywords
 from libvvtest.wordexpr import create_word_expression
 from libvvtest.paramexpr import ParamFilter
 from libvvtest.paramexpr import create_parameter_expression
@@ -239,96 +240,6 @@ class word_expression_tests( vtu.vvtestTestCase ):
         val = eval( es )
         assert val == True and type(val) == type(True)
 
-    def test_parsing_expr_for_non_results_evaluation(self):
-        ""
-        def evalfunc(tok):
-            return tok == 'word'
-
-        ex = parse_non_results_expression( '' )
-        assert not eval( ex )
-
-        ex = parse_non_results_expression( 'notrun' )
-        assert ex == None
-
-        ex = parse_non_results_expression( 'not pass' )
-        assert ex == None
-
-        ex = parse_non_results_expression( 'not ( pass or diff )' )
-        assert ex == None
-
-        ex = parse_non_results_expression( 'word and fail' )
-        assert eval( ex ) == True
-
-        ex = parse_non_results_expression( 'fail and word' )
-        assert eval( ex ) == True
-
-        ex = parse_non_results_expression( 'not word and fail' )
-        assert eval( ex ) == False
-
-        ex = parse_non_results_expression( 'fail and not word' )
-        print3( ex )
-
-        ex = parse_non_results_expression( '( foo or word ) and ( pass or fail )' )
-        assert eval( ex ) == True
-
-        ex = parse_non_results_expression(
-                            '( foo or word ) and not ( pass or fail )' )
-        assert eval( ex ) == True
-
-        ex = parse_non_results_expression(
-                            '( pass or fail ) and ( foo or word ) ' )
-        assert eval( ex ) == True
-
-        ex = parse_non_results_expression( 'word1 and not word2' )
-        assert eval( ex ) == False
-
-        def evalfunc(tok):
-            return tok in ['word1','word3']
-
-        ex = parse_non_results_expression(
-                    '( word1 and not (word2 or word3) ) or word' )
-        assert eval( ex ) == False
-
-    def test_removing_results_keywords_from_expressions(self):
-        ""
-        ex = KeywordExpression( "foo and bar" )
-        nrex = NonResultsKeywordExpression( "foo and bar" )
-        assert not nrex.containsResultsKeywords()
-        assert not   ex.evaluate( ['foo'] )
-        assert not nrex.evaluate( ['foo'] )
-        assert       ex.evaluate( ['foo','bar'] )
-        assert     nrex.evaluate( ['foo','bar'] )
-
-        ex = KeywordExpression( "notrun or notdone" )
-        nrex = NonResultsKeywordExpression( "notrun or notdone" )
-        assert     nrex.containsResultsKeywords()
-        assert       ex.evaluate( ['aword','notdone'] )
-        assert not   ex.evaluate( ['aword','pass'] )
-        assert     nrex.evaluate( ['aword','pass'] )
-
-        ex = KeywordExpression( "notrun and word" )
-        nrex = NonResultsKeywordExpression( "notrun and word" )
-        assert     nrex.containsResultsKeywords()
-        assert       ex.evaluate( ['word','notrun'] )
-        assert     nrex.evaluate( ['word','notrun'] )
-        assert not   ex.evaluate( ['word','pass'] )
-        assert     nrex.evaluate( ['word','pass'] )
-
-        ex = KeywordExpression( "not pass and not ( foo or bar )" )
-        nrex = NonResultsKeywordExpression( "not pass and not ( foo or bar )" )
-        assert     nrex.containsResultsKeywords()
-        assert       ex.evaluate( ['foobar','notrun'] )
-        assert     nrex.evaluate( ['foobar','notrun'] )
-        assert not   ex.evaluate( ['foobar','pass'] )
-        assert not   ex.evaluate( ['foobar','pass'] )
-        assert     nrex.evaluate( ['foobar','pass'] )
-
-        ex = KeywordExpression( "not pass or not ( foo or bar )" )
-        nrex = NonResultsKeywordExpression( "not pass or not ( foo or bar )" )
-        assert     nrex.containsResultsKeywords()
-        assert       ex.evaluate( ['foo','notrun'] )
-        assert not nrex.evaluate( ['foo','notrun'] )
-
     def test_an_exclamation_point_means_NOT(self):
         ""
         for expr in ['!foo','! foo','not foo']:
@@ -429,6 +340,9 @@ class word_expression_tests( vtu.vvtestTestCase ):
         ""
         assert conditional_paren_wrap( 'foo' ) == 'foo'
         assert conditional_paren_wrap( 'foo or bar' ) == '( foo or bar )'
+        assert conditional_paren_wrap( 'not foo' ) == 'not foo'
+        assert conditional_paren_wrap( '! foo' ) == '! foo'
+        assert conditional_paren_wrap( '!foo' ) == '!foo'
         assert conditional_paren_wrap( '(foo)' ) == '(foo)'
         assert conditional_paren_wrap( '( foo )' ) == '( foo )'
         assert conditional_paren_wrap( '(foo or bar)' ) == '(foo or bar)'
@@ -487,6 +401,138 @@ class word_expression_tests( vtu.vvtestTestCase ):
         for expr in ['foo/bar and baz','foo/bar or baz',
                      'baz and foo/bar','baz or foo/bar']:
             self.assertRaises( ValueError, create_word_expression, [expr] )
+
+
+class keyword_expression_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_removing_results_keywords_from_an_expression(self):
+        ""
+        # these two just for testing convenience
+        toks = separate_expression_into_tokens
+        rmkeys = remove_results_keywords
+
+        assert rmkeys( toks('') ) == ['']
+        assert rmkeys( toks('foo') ) == ['foo']
+        assert rmkeys( toks('foo or bar') ) == ['foo','or','bar']
+        assert rmkeys( toks('foo and (not bar)') ) == ['foo','and','(','not','bar',')']
+        assert rmkeys( toks('foo and not bar') ) == ['foo','and','not','bar']
+
+        assert rmkeys( toks('notrun') ) == []
+        assert rmkeys( toks('not pass') ) == []
+        assert rmkeys( toks('not ( pass or diff )') ) == []
+        assert rmkeys( toks('(pass or diff) or (notrun or fail)') ) == []
+        assert rmkeys( toks('(notrun or notdone) and fail') ) == []
+        assert rmkeys( toks('not (fail or (notrun or notdone) )') ) == []
+
+        assert rmkeys( toks('word and fail') ) == ['word']
+        assert rmkeys( toks('not word and fail') ) == ['not','word']
+        assert rmkeys( toks('word and not fail') ) == ['word']
+        assert rmkeys( toks('fail and not word') ) == ['not','word']
+        assert rmkeys( toks('fail and (not word)') ) == ['not','word']
+        assert rmkeys( toks('(not word) and fail') ) == ['not','word']
+        assert rmkeys( toks('notrun or (fail and word)') ) == ['word']
+        assert rmkeys( toks('(fail and word) or notrun') ) == ['word']
+        assert rmkeys( toks('not ( (fail and word) or notrun )') ) == ['not','word']
+
+        assert rmkeys( toks('(foo or word) and (pass or fail)') ) == ['foo','or','word']
+        assert rmkeys( toks('(foo and pass) or (bar and fail)') ) == ['foo','or','bar']
+
+        assert rmkeys( toks('foo or not (bar and fail)') ) == ['foo','or','not','bar']
+        assert rmkeys( toks('not ( (foo or pass) )') ) == ['not','foo']
+        assert rmkeys( toks('not ( (foo or bar) )') ) == ['not','(','foo','or','bar',')']
+
+    def test_parsing_expr_for_non_results_evaluation(self):
+        ""
+        def evalfunc(tok):
+            return tok == 'word'
+
+        ex = parse_non_results_expression( '' )
+        assert not eval( ex )
+
+        ex = parse_non_results_expression( 'notrun' )
+        assert ex == None
+
+        ex = parse_non_results_expression( 'not pass' )
+        assert ex == None
+
+        ex = parse_non_results_expression( 'not ( pass or diff )' )
+        assert ex == None
+
+        ex = parse_non_results_expression( 'word and fail' )
+        assert eval( ex ) == True
+
+        ex = parse_non_results_expression( 'fail and word' )
+        assert eval( ex ) == True
+
+        ex = parse_non_results_expression( 'not word and fail' )
+        assert eval( ex ) == False
+
+        ex = parse_non_results_expression( 'fail and not word' )
+        assert eval( ex ) == False
+
+        ex = parse_non_results_expression( '( foo or word ) and ( pass or fail )' )
+        assert eval( ex ) == True
+
+        ex = parse_non_results_expression(
+                            '( foo or word ) and not ( pass or fail )' )
+        assert eval( ex ) == True
+
+        ex = parse_non_results_expression(
+                            '( pass or fail ) and ( foo or word ) ' )
+        assert eval( ex ) == True
+
+        ex = parse_non_results_expression( 'word1 and not word2' )
+        assert eval( ex ) == False
+
+        def evalfunc(tok):
+            return tok in ['word1','word3']
+
+        ex = parse_non_results_expression(
+                    '( word1 and not (word2 or word3) ) or word' )
+        assert eval( ex ) == False
+
+    def test_removing_results_keywords_from_expressions(self):
+        ""
+        ex = KeywordExpression( "foo and bar" )
+        nrex = NonResultsKeywordExpression( "foo and bar" )
+        assert not nrex.containsResultsKeywords()
+        assert not   ex.evaluate( ['foo'] )
+        assert not nrex.evaluate( ['foo'] )
+        assert       ex.evaluate( ['foo','bar'] )
+        assert     nrex.evaluate( ['foo','bar'] )
+
+        ex = KeywordExpression( "notrun or notdone" )
+        nrex = NonResultsKeywordExpression( "notrun or notdone" )
+        assert     nrex.containsResultsKeywords()
+        assert       ex.evaluate( ['aword','notdone'] )
+        assert not   ex.evaluate( ['aword','pass'] )
+        assert     nrex.evaluate( ['aword','pass'] )
+
+        ex = KeywordExpression( "notrun and word" )
+        nrex = NonResultsKeywordExpression( "notrun and word" )
+        assert     nrex.containsResultsKeywords()
+        assert       ex.evaluate( ['word','notrun'] )
+        assert     nrex.evaluate( ['word','notrun'] )
+        assert not   ex.evaluate( ['word','pass'] )
+        assert     nrex.evaluate( ['word','pass'] )
+
+        ex = KeywordExpression( "not pass and not ( foo or bar )" )
+        nrex = NonResultsKeywordExpression( "not pass and not ( foo or bar )" )
+        assert     nrex.containsResultsKeywords()
+        assert       ex.evaluate( ['foobar','notrun'] )
+        assert     nrex.evaluate( ['foobar','notrun'] )
+        assert not   ex.evaluate( ['foobar','pass'] )
+        assert not   ex.evaluate( ['foobar','pass'] )
+        assert     nrex.evaluate( ['foobar','pass'] )
+
+        ex = KeywordExpression( "not pass or not ( foo or bar )" )
+        nrex = NonResultsKeywordExpression( "not pass or not ( foo or bar )" )
+        assert     nrex.containsResultsKeywords()
+        assert       ex.evaluate( ['foo','notrun'] )
+        assert not nrex.evaluate( ['foo','notrun'] )
 
 
 class param_expression_tests( vtu.vvtestTestCase ):

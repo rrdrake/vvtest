@@ -5,6 +5,20 @@
 # Government retains certain rights in this software.
 
 
+def create_word_expression( word_expr_list ):
+    ""
+    exprL = []
+
+    if word_expr_list:
+        for expr in word_expr_list:
+            exprL.append( clean_up_word_expression(expr) )
+
+    if len( exprL ) > 0:
+        return WordExpression( join_expressions_with_AND( exprL ) )
+
+    return None
+
+
 class WordExpression:
     """
     Takes a string consisting of words, parentheses, and the operators "and",
@@ -91,70 +105,6 @@ class WordExpression:
         return r
 
 
-def combine_two_expressions( expr1, expr2 ):
-    ""
-    if expr1 and expr2:
-        expr = expr1 + ' and ' + conditional_paren_wrap( expr2 )
-    else:
-        # one expression is empty, which is always false,
-        # so replace the whole thing with an empty expr
-        expr = ''
-
-    return expr
-
-
-def conditional_paren_wrap( expr ):
-    ""
-    if expr:
-        expr = expr.strip()
-        px = parenthetical_tokenize( expr )
-        if px.numTokens() > 1:
-            return '( '+expr+' )'
-
-    return expr
-
-
-class ParenExpr:
-
-    def __init__(self):
-        ""
-        self.toks = []
-
-    def parse(self, toklist, tok_idx):
-        ""
-        while tok_idx < len(toklist):
-            tok = toklist[tok_idx]
-            tok_idx += 1
-
-            if tok == '(':
-                sub = ParenExpr()
-                self.toks.append( sub )
-                tok_idx = sub.parse( toklist, tok_idx )
-            elif tok == ')':
-                break
-            else:
-                self.toks.append( tok )
-
-        return tok_idx
-
-    def numTokens(self): return len( self.toks )
-
-
-def parenthetical_tokenize( expr ):
-    """
-    Parse the given expression into a single ParenExpr object. Each ParenExpr
-    contains a list of string tokens and ParenExpr objects (which are created
-    when a paren is encountered.
-    """
-    assert expr and expr.strip()
-
-    toklist = separate_expression_into_tokens( expr )
-    px = ParenExpr()
-    px.parse( toklist, 0 )
-
-    return px
-
-
 def parse_word_expression( expr, wordset ):
     """
     Throws a ValueError if the string is an invalid expression.
@@ -179,6 +129,138 @@ def parse_word_expression( expr, wordset ):
         raise ValueError( 'invalid option expression: "' + expr + '"' )
 
     return evalexpr
+
+
+def combine_two_expressions( expr1, expr2 ):
+    ""
+    if expr1 and expr2:
+        expr = expr1 + ' and ' + conditional_paren_wrap( expr2 )
+    else:
+        # one expression is empty, which is always false,
+        # so replace the whole thing with an empty expr
+        expr = ''
+
+    return expr
+
+
+def conditional_paren_wrap( expr ):
+    ""
+    if expr:
+        expr = expr.strip()
+        tree = parenthetical_tokenize( expr )
+        if tree.numTokens() > 1:
+            if not ( tree.numTokens() == 2 and tree.getToken(0) == 'not' ):
+                return '( '+expr+' )'
+
+    return expr
+
+
+class TokenTree:
+
+    def __init__(self):
+        ""
+        self.toks = []
+
+    def parse(self, toklist, tok_idx):
+        ""
+        while tok_idx < len(toklist):
+            tok = toklist[tok_idx]
+            tok_idx += 1
+
+            if tok == '(':
+                sub = TokenTree()
+                self.toks.append( sub )
+                tok_idx = sub.parse( toklist, tok_idx )
+            elif tok == ')':
+                break
+            else:
+                self.toks.append( tok )
+
+        return tok_idx
+
+    def setTokens(self, toks):
+        ""
+        del self.toks[:]
+        self.toks.extend( toks )
+
+    def numTokens(self): return len( self.toks )
+    def getToken(self, idx): return self.toks[idx]
+    def getTokens(self): return self.toks
+
+
+def collect_token_list_from_tree( tree, toks ):
+    ""
+    for tok in tree.getTokens():
+        if isinstance( tok, TokenTree ):
+            if tok.numTokens() > 1:
+                toks.append( '(' )
+                collect_token_list_from_tree( tok, toks )
+                toks.append( ')' )
+            else:
+                collect_token_list_from_tree( tok, toks )
+        else:
+            toks.append( tok )
+
+
+def parenthetical_tokenize( expr ):
+    """
+    Parse the given expression into a single TokenTree object. Each TokenTree
+    contains a list of string tokens and/or TokenTree objects. TokenTree
+    objects are created when a left paren is encountered.
+    """
+    assert expr and expr.strip()
+
+    toklist = separate_expression_into_tokens( expr )
+    tree = TokenTree()
+    tree.parse( toklist, 0 )
+
+    return tree
+
+
+def prune_token_tree( tree, prune_token ):
+    """
+    The 'prune_token' must be a function which takes a token as its only
+    argument, and returns True if the given token should be pruned. Returns
+    the number of modifications made to the tree.
+    """
+    cnt = 0
+
+    # collapse repeated sub-expressions, such as "( ( foo ) )"
+    if tree.numTokens() == 1 and isinstance( tree.getToken(0), TokenTree ):
+        cnt += 1
+        toks = list( tree.getToken(0).getTokens() )
+        tree.setTokens( toks )
+
+    toks = []
+    ops = []
+
+    for tok in tree.getTokens():
+        if tok in _OPERATOR_LIST:
+            ops.append( tok )
+        else:
+            if prune_token( tok ):
+                cnt += 1
+            else:
+                toks.extend( ops )
+                toks.append( tok )
+
+                if isinstance( tok, TokenTree ):
+                    cnt += prune_token_tree( tok, prune_token )
+
+            del ops[:]
+
+    trim_leading_binary_operator( toks )
+
+    tree.setTokens( toks )
+
+    return cnt
+
+
+def trim_leading_binary_operator( toklist ):
+    ""
+    if toklist:
+        if toklist[0] == 'and' or toklist[0] == 'or':
+            toklist.pop( 0 )
 
 
 _OPERATOR_LIST = ['(',')','not','and','or']
@@ -310,20 +392,6 @@ def join_expressions_with_AND( expr_list ):
             return ''
 
     return final
-
-
-def create_word_expression( word_expr_list ):
-    ""
-    exprL = []
-
-    if word_expr_list:
-        for expr in word_expr_list:
-            exprL.append( clean_up_word_expression(expr) )
-
-    if len( exprL ) > 0:
-        return WordExpression( join_expressions_with_AND( exprL ) )
-
-    return None
 
 
 def clean_up_word_expression( expr, negate=False ):

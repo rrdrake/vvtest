@@ -5,32 +5,16 @@
 # Government retains certain rights in this software.
 
 
-from .teststatus import RESULTS_KEYWORDS
 from .wordexpr import WordExpression
 from .wordexpr import convert_token_list_into_eval_string
 from .wordexpr import separate_expression_into_tokens
 from .wordexpr import add_words_to_set
-from .wordexpr import _OPERATOR_LIST
 from .wordexpr import clean_up_word_expression
 from .wordexpr import join_expressions_with_AND
+from .wordexpr import TokenTree, prune_token_tree, collect_token_list_from_tree
 
-
-class KeywordExpression( WordExpression ):
-
-    def evaluate(self, keyword_list):
-        ""
-        return WordExpression.evaluate( self, keyword_list )
-
-
-class NonResultsKeywordExpression( KeywordExpression ):
-
-    def _create_eval_expression(self, string_expr, wordset):
-        ""
-        return parse_non_results_expression( string_expr, wordset )
-
-    def containsResultsKeywords(self):
-        ""
-        return len( set( RESULTS_KEYWORDS ).intersection( self.words ) ) > 0
+from .teststatus import RESULTS_KEYWORDS
+RESULTS_KEYWORD_SET = set( RESULTS_KEYWORDS )
 
 
 def create_keyword_expression( word_expr_list, not_word_expr_list ):
@@ -51,90 +35,64 @@ def create_keyword_expression( word_expr_list, not_word_expr_list ):
     return None
 
 
+class KeywordExpression( WordExpression ):
+
+    def evaluate(self, keyword_list):
+        ""
+        return WordExpression.evaluate( self, keyword_list )
+
+
+class NonResultsKeywordExpression( KeywordExpression ):
+
+    def _create_eval_expression(self, string_expr, wordset):
+        ""
+        return parse_non_results_expression( string_expr, wordset )
+
+    def containsResultsKeywords(self):
+        ""
+        return len( RESULTS_KEYWORD_SET.intersection( self.words ) ) > 0
+
+
 def parse_non_results_expression( expr, wordset=None ):
     ""
-    nrmod = NonResultsExpressionModifier( expr, wordset )
-    toklist = nrmod.getNonResultsTokenList()
+    toklist = separate_expression_into_tokens( expr )
+    add_words_to_set( toklist, wordset )
 
-    if len( toklist ) == 0:
+    new_toklist = remove_results_keywords( toklist )
+
+    if len( new_toklist ) == 0:
         return None
     else:
-        evalexpr = convert_token_list_into_eval_string( toklist )
+        evalexpr = convert_token_list_into_eval_string( new_toklist )
         return evalexpr
 
 
-class NonResultsExpressionModifier:
-
-    def __init__(self, expr, wordset):
-        ""
-        self.toklist = separate_expression_into_tokens( expr )
-        add_words_to_set( self.toklist, wordset )
-
-        self.toki = 0
-
-        self.nonresults_toklist = self.parse_subexpr()
-
-        trim_leading_binary_operator( self.nonresults_toklist )
-
-    def getNonResultsTokenList(self):
-        ""
-        return self.nonresults_toklist
-
-    def parse_subexpr(self):
-        ""
-        toklist = []
-        oplist = []
-
-        while self.toki < len( self.toklist ):
-
-            tok = self.toklist[ self.toki ]
-            self.toki += 1
-
-            if tok in _OPERATOR_LIST:
-                if tok == ')':
-                    break
-                elif tok == '(':
-                    sublist = self.parse_subexpr()
-                    if sublist:
-                        append_sublist( toklist, oplist, sublist )
-                    oplist = []
-                else:
-                    oplist.append( tok )
-
-            elif tok in RESULTS_KEYWORDS:
-                oplist = []
-
-            else:
-                append_token( toklist, oplist, tok )
-                oplist = []
-
-        return toklist
-
-
-def trim_leading_binary_operator( toklist ):
+def remove_results_keywords( toklist ):
     ""
-    if toklist:
-        if toklist[0] == 'and' or toklist[0] == 'or':
-            toklist.pop( 0 )
+    tree = TokenTree()
+    tree.parse( toklist, 0 )
+
+    while apply_pruning_operations( tree ) > 0:
+        pass
+
+    toks = []
+    collect_token_list_from_tree( tree, toks )
+
+    return toks
 
 
-def append_sublist( toklist, oplist, sublist ):
+def is_results_token( tok ):
     ""
-    append_operator( toklist, oplist )
-
-    if oplist and len( sublist ) > 1:
-        sublist = ['(']+sublist+[')']
-
-    toklist.extend( sublist )
+    return tok in RESULTS_KEYWORD_SET
 
 
-def append_token( toklist, oplist, tok ):
+def is_empty_subtree( tok ):
     ""
-    append_operator( toklist, oplist )
-    toklist.append( tok )
+    return isinstance( tok, TokenTree ) and tok.numTokens() == 0
 
 
-def append_operator( toklist, oplist ):
+def apply_pruning_operations( tree ):
     ""
-    if oplist:
-        toklist.extend( oplist )
+    cnt =  prune_token_tree( tree, is_results_token )
+    cnt += prune_token_tree( tree, is_empty_subtree )
+    return cnt
