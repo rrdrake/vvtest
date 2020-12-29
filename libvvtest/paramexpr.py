@@ -9,7 +9,31 @@ from .wordexpr import replace_forward_slashes
 from .wordexpr import join_expressions_with_AND
 
 
-class ParamFilter:
+def create_parameter_expression( param_expr_list, not_param_expr_list ):
+    ""
+    # construction will check validity
+
+    exprL = []
+
+    if param_expr_list:
+        for expr in param_expr_list:
+            ex = replace_forward_slashes( expr )
+            ParameterExpression( ex )
+            exprL.append( ex )
+
+    if not_param_expr_list:
+        for expr in not_param_expr_list:
+            ex = replace_forward_slashes( expr, negate=True )
+            ParameterExpression( ex )
+            exprL.append( ex )
+
+    if len( exprL ) > 0:
+        return ParameterExpression( join_expressions_with_AND( exprL ) )
+
+    return None
+
+
+class ParameterExpression:
 
     def __init__(self, *expr):
         """
@@ -60,7 +84,7 @@ class ParamFilter:
         """
         if self.wexpr == None:
             return 1
-        evalobj = ParamFilter.Evaluator(self.wordD, paramD)
+        evalobj = ParameterExpression.Evaluator(self.wordD, paramD)
         return self.wexpr._evaluate( evalobj.evaluate )
 
     class Evaluator:
@@ -216,27 +240,3 @@ class EvalGT( EvalOperator ):
             return 1
         except Exception: pass
         return v > self.v
-
-
-def create_parameter_expression( param_expr_list, not_param_expr_list ):
-    ""
-    # construction will check validity
-
-    exprL = []
-
-    if param_expr_list:
-        for expr in param_expr_list:
-            ex = replace_forward_slashes( expr )
-            ParamFilter( ex )
-            exprL.append( ex )
-
-    if not_param_expr_list:
-        for expr in not_param_expr_list:
-            ex = replace_forward_slashes( expr, negate=True )
-            ParamFilter( ex )
-            exprL.append( ex )
-
-    if len( exprL ) > 0:
-        return ParamFilter( join_expressions_with_AND( exprL ) )
-
-    return None

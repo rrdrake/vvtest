@@ -22,7 +22,7 @@ from libvvtest.keyexpr import KeywordExpression, NonResultsKeywordExpression
 from libvvtest.keyexpr import parse_non_results_expression
 from libvvtest.keyexpr import remove_results_keywords
 from libvvtest.wordexpr import create_word_expression
-from libvvtest.paramexpr import ParamFilter
+from libvvtest.paramexpr import ParameterExpression
 from libvvtest.paramexpr import create_parameter_expression
 from libvvtest.wordexpr import split_but_retain_separator
 from libvvtest.wordexpr import separate_expression_into_tokens
@@ -540,9 +540,9 @@ class param_expression_tests( vtu.vvtestTestCase ):
     def setUp(self):
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-    def test_ParamFilters_with_integer_param_types(self):
+    def test_parameter_expressions_with_integer_param_types(self):
         ""
-        pf = ParamFilter( 'np=4' )
+        pf = ParameterExpression( 'np=4' )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'np':2} )
@@ -550,7 +550,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert     pf.evaluate( {'size':"10", 'np':4} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/np=4') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/np=4') )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
@@ -559,60 +559,60 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10", 'np':3} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/!np') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/!np') )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/np!=') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/np!=') )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':1} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( '!np' )
+        pf = ParameterExpression( '!np' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10", 'np':1} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( 'np=1', 'size' )
+        pf = ParameterExpression( 'np=1', 'size' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':4} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np=1', 'size=' )
+        pf = ParameterExpression( 'np=1', 'size=' )
         assert not pf.evaluate( {'np':4} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':4} )
         assert     pf.evaluate( {'size':"10", 'np':1} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np!=1', 'np!=4' )
+        pf = ParameterExpression( 'np!=1', 'np!=4' )
         assert not pf.evaluate( {'np':1} )
         assert not pf.evaluate( {'np':4} )
         assert     pf.evaluate( {'np':2} )
 
-        pf = ParamFilter( 'np<=13' )
+        pf = ParameterExpression( 'np<=13' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':14} )
         assert     pf.evaluate( {'np':13} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np>=13' )
+        pf = ParameterExpression( 'np>=13' )
         assert not pf.evaluate( {'np':2} )
         assert     pf.evaluate( {'np':13} )
         assert     pf.evaluate( {'np':14} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np<13' )
+        pf = ParameterExpression( 'np<13' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':14} )
         assert not pf.evaluate( {'np':15} )
@@ -620,16 +620,16 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np>13' )
+        pf = ParameterExpression( 'np>13' )
         assert not pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':13} )
         assert     pf.evaluate( {'np':14} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-    def test_ParamFilters_with_string_param_types(self):
+    def test_parameter_expressions_with_string_param_types(self):
         ""
-        pf = ParamFilter( 'np=4' )
+        pf = ParameterExpression( 'np=4' )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'np':'2'} )
@@ -637,7 +637,7 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert     pf.evaluate( {'size':"10", 'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/np=4') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/np=4') )
         assert not pf.evaluate( {} )
         assert     pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
@@ -646,60 +646,60 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10", 'np':'3'} )
         assert not pf.evaluate( {'size':"10"} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/!np') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/!np') )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( replace_forward_slashes('np=1/np!=') )
+        pf = ParameterExpression( replace_forward_slashes('np=1/np!=') )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'1'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( '!np' )
+        pf = ParameterExpression( '!np' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10", 'np':'1'} )
         assert     pf.evaluate( {'size':"10"} )
         assert     pf.evaluate( {} )
 
-        pf = ParamFilter( 'np=1', 'size' )
+        pf = ParameterExpression( 'np=1', 'size' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':'4'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np=1', 'size=' )
+        pf = ParameterExpression( 'np=1', 'size=' )
         assert not pf.evaluate( {'np':'4'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {'size':"10", 'np':'4'} )
         assert     pf.evaluate( {'size':"10", 'np':'1'} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np!=1', 'np!=4' )
+        pf = ParameterExpression( 'np!=1', 'np!=4' )
         assert not pf.evaluate( {'np':'1'} )
         assert not pf.evaluate( {'np':'4'} )
         assert     pf.evaluate( {'np':'2'} )
 
-        pf = ParamFilter( 'np<=13' )
+        pf = ParameterExpression( 'np<=13' )
         assert     pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'20'} )
         assert     pf.evaluate( {'np':'13'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np>=13' )
+        pf = ParameterExpression( 'np>=13' )
         assert not pf.evaluate( {'np':'2'} )
         assert     pf.evaluate( {'np':'13'} )
         assert     pf.evaluate( {'np':'20'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np<13' )
+        pf = ParameterExpression( 'np<13' )
         assert     pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'20'} )
         assert not pf.evaluate( {'np':'15'} )
@@ -707,100 +707,100 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-        pf = ParamFilter( 'np>13' )
+        pf = ParameterExpression( 'np>13' )
         assert not pf.evaluate( {'np':'2'} )
         assert not pf.evaluate( {'np':'13'} )
         assert     pf.evaluate( {'np':'14'} )
         assert not pf.evaluate( {'size':"10"} )
         assert not pf.evaluate( {} )
 
-    def test_ParamFilters_with_mixed_types(self):
+    def test_parameter_expressions_with_mixed_types(self):
         ""
-        pf = ParamFilter( 'np=13' )
+        pf = ParameterExpression( 'np=13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np=ab' )
+        pf = ParameterExpression( 'np=ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np=ab' )
+        pf = ParameterExpression( 'np=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( 'np!=13' )
+        pf = ParameterExpression( 'np!=13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np!=ab' )
+        pf = ParameterExpression( 'np!=ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np!=ab' )
+        pf = ParameterExpression( 'np!=ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( 'np<=13' )
+        pf = ParameterExpression( 'np<=13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np<=13' )
+        pf = ParameterExpression( 'np<=13' )
         assert     pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( 'np<=ab' )
+        pf = ParameterExpression( 'np<=ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np<=ab' )
+        pf = ParameterExpression( 'np<=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( 'np>=13' )
+        pf = ParameterExpression( 'np>=13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np>=13' )
+        pf = ParameterExpression( 'np>=13' )
         assert not pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( 'np>=ab' )
+        pf = ParameterExpression( 'np>=ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np>=ab' )
+        pf = ParameterExpression( 'np>=ab' )
         assert     pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( 'np<13' )
+        pf = ParameterExpression( 'np<13' )
         assert not pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np<13' )
+        pf = ParameterExpression( 'np<13' )
         assert     pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( 'np<ab' )
+        pf = ParameterExpression( 'np<ab' )
         assert     pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np<ab' )
+        pf = ParameterExpression( 'np<ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
 
-        pf = ParamFilter( 'np>13' )
+        pf = ParameterExpression( 'np>13' )
         assert     pf.evaluate( {'np':'a'} )
 
-        pf = ParamFilter( 'np>13' )
+        pf = ParameterExpression( 'np>13' )
         assert not pf.evaluate( {'np':'0a'} )
 
-        pf = ParamFilter( 'np>ab' )
+        pf = ParameterExpression( 'np>ab' )
         assert not pf.evaluate( {'np':'13'} )
 
-        pf = ParamFilter( 'np>ab' )
+        pf = ParameterExpression( 'np>ab' )
         assert not pf.evaluate( {'np':'ab'} )
 
     def test_behavior_of_the_NOT_operator_on_param_expressions(self):
         ""
-        pf = ParamFilter( 'np' )
+        pf = ParameterExpression( 'np' )
         assert not pf.evaluate( {} )
         assert not pf.evaluate( { 'foo':5 } )
         assert     pf.evaluate( { 'np':2 } )
 
         for expr in [ '!np', ' not np' ]:
-            pf = ParamFilter( expr )
+            pf = ParameterExpression( expr )
             assert     pf.evaluate( {} )
             assert     pf.evaluate( { 'foo':5 } )
             assert not pf.evaluate( { 'np':2 } )
 
-        pf = ParamFilter( 'np>2' )
+        pf = ParameterExpression( 'np>2' )
         assert not pf.evaluate( {} )
         assert not pf.evaluate( {'foo':5} )
         assert not pf.evaluate( {'np':2} )
@@ -814,21 +814,21 @@ class param_expression_tests( vtu.vvtestTestCase ):
         #       which equals
         #           (np is not defined) OR (np>2)
 
-        pf = ParamFilter( 'np<=2' )
+        pf = ParameterExpression( 'np<=2' )
         assert     pf.evaluate( {'np':2} )
         assert not pf.evaluate( {'np':3} )
         assert not pf.evaluate( {} )
         assert not pf.evaluate( { 'foo':5 } )
 
         for expr in [ '!np>2', 'not np>2' ]:
-            pf = ParamFilter( expr )
+            pf = ParameterExpression( expr )
             assert     pf.evaluate( {'np':2} )
             assert not pf.evaluate( {'np':3} )
             assert     pf.evaluate( {} )
             assert     pf.evaluate( { 'foo':5 } )
 
         for expr in [ '!np>3 and np!=1', 'not np>3 and np!=1' ]:
-            pf = ParamFilter( expr )
+            pf = ParameterExpression( expr )
             assert not pf.evaluate( {'np':1} )
             assert     pf.evaluate( {'np':2} )
             assert     pf.evaluate( {'np':3} )

@@ -9,18 +9,18 @@ import re
 
 from .errors import TestSpecError
 from .wordexpr import WordExpression, create_word_expression
-from .paramexpr import ParamFilter
+from .paramexpr import ParameterExpression
 
 
 def evaluate_testname_expr( testname, expr ):
     ""
-    wx = WordExpression(expr)
+    wx = WordExpression( expr )
     return wx.evaluate( testname )
 
 
 def evaluate_platform_expr( platname, expr ):
     ""
-    wx = WordExpression(expr)
+    wx = WordExpression( expr )
     return wx.evaluate( platname )
 
 
@@ -32,7 +32,7 @@ def evaluate_option_expr( optlist, expr ):
 
 def evaluate_parameter_expr( paramD, expr ):
     ""
-    pf = ParamFilter( expr )
+    pf = ParameterExpression( expr )
     return pf.evaluate( paramD )
 
 

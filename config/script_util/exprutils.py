@@ -25,8 +25,8 @@ def parameter_expr( expr ):
     defined in the test.
     '''
     import vvtest_util as vvt
-    from libvvtest.paramexpr import ParamFilter
-    pf = ParamFilter( expr )
+    from libvvtest.paramexpr import ParameterExpression
+    pf = ParameterExpression( expr )
     return pf.evaluate( vvt.PARAM_DICT )
 
 def option_expr( expr ):
