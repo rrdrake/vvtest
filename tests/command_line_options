@@ -143,26 +143,6 @@ class version_info( vtu.vvtestTestCase ):
 
 class create_derived_options( vtu.vvtestTestCase ):
 
-    def test_creating_keyword_expression(self):
-        ""
-        expr = cmdline.create_keyword_expression( None, None )
-        assert expr == None
-
-        expr = cmdline.create_keyword_expression( ['pass'], None )
-        assert expr.getWordList() == [ 'pass' ]
-
-        expr = cmdline.create_keyword_expression( None, ['fail'] )
-        assert expr.getWordList() == [ 'fail' ]
-
-        self.assertRaises( Exception,
-                cmdline.create_keyword_expression, ['foo )'], None )
-        self.assertRaises( Exception,
-                cmdline.create_keyword_expression, None, ['foo )'] )
-        self.assertRaises( Exception,
-                cmdline.create_keyword_expression, ['foo!bar'], None )
-        self.assertRaises( Exception,
-                cmdline.create_keyword_expression, None, ['foo!bar'] )
-
     def test_error_in_keyword_specification(self):
         ""
         rtn,out,err = util.call_capture_output(

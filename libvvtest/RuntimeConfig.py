@@ -12,7 +12,7 @@ import fnmatch
 import re
 
 from .platexpr import PlatformExpression
-from .keyexpr import KeywordExpression, NonResultsKeywordExpression
+from .keyexpr import KeywordExpression
 
 
 class RuntimeConfig:
@@ -35,12 +35,10 @@ class RuntimeConfig:
         self.attrs = {}
 
         self.platname = None
-        self.default_platexpr = None
         self.platexpr = None
         self.apply_platexpr = True
 
         self.keyexpr = None
-        self.keyexpr_nr = None
 
         self.paramexpr = None
 
@@ -121,39 +119,27 @@ class RuntimeConfig:
         ""
         return self.optlist
 
-    def setKeywordExpression(self, word_expr):
+    def setKeywordExpression(self, keyword_expr):
         ""
-        self.keyexpr = word_expr
-        self._make_non_results_keyword_expression()
+        self.keyexpr = keyword_expr
 
     def addResultsKeywordExpression(self, add_expr):
         """
-        If a keyword expression already exists in this object and contains
-        results keywords (such as "diff" or "notdone"), then do nothing.
-        Otherwise AND the new expression to the existing.
+        If a current expression exists containing results keywords (such as
+        "diff" or "notdone"), then do nothing. Otherwise, AND the new
+        expression to the existing.
         """
-        if self.keyexpr is None:
-            self.keyexpr = KeywordExpression( add_expr )
-        elif not self.keyexpr_nr.containsResultsKeywords():
-            self.keyexpr.append( add_expr )
-        self._make_non_results_keyword_expression()
-
-    def _make_non_results_keyword_expression(self):
-        ""
-        if self.keyexpr is None:
-            self.keyexpr_nr = None
+        if self.keyexpr:
+            self.keyexpr.appendKeywordExpression( add_expr )
         else:
-            expr = self.keyexpr.getExpression()
-            self.keyexpr_nr = NonResultsKeywordExpression( expr )
+            self.keyexpr = KeywordExpression( add_expr )
 
     def satisfies_keywords(self, keyword_list, include_results=True):
         ""
-        if include_results:
-            if self.keyexpr:
-                return self.keyexpr.evaluate( keyword_list )
-        elif self.keyexpr_nr:
-            return self.keyexpr_nr.evaluate( keyword_list )
-        return True
+        if self.keyexpr:
+            return self.keyexpr.evaluate( keyword_list, include_results )
+        else:
+            return True
 
     def setParameterExpression(self, param_expr):
         ""

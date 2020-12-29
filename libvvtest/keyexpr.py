@@ -6,9 +6,7 @@
 
 
 from .wordexpr import WordExpression
-from .wordexpr import convert_token_list_into_eval_string
 from .wordexpr import separate_expression_into_tokens
-from .wordexpr import add_words_to_set
 from .wordexpr import clean_up_word_expression
 from .wordexpr import join_expressions_with_AND
 from .wordexpr import TokenTree, prune_token_tree, collect_token_list_from_tree
@@ -35,40 +33,45 @@ def create_keyword_expression( word_expr_list, not_word_expr_list ):
     return None
 
 
-class KeywordExpression( WordExpression ):
+class KeywordExpression:
 
-    def evaluate(self, keyword_list):
+    def __init__(self, expr=None):
         ""
-        return WordExpression.evaluate( self, keyword_list )
+        self.full = WordExpression( expr )
+        nrexpr = make_non_results_expression( expr )
+        self.non_results = WordExpression( nrexpr )
 
+    def appendKeywordExpression(self, expr):
+        """
+        If a current expression exists containing results keywords (such as
+        "diff" or "notdone"), then do nothing. Otherwise, AND the new
+        expression to the existing.
+        """
+        if not self.containsResultsKeywords():
+            self.full.append( expr )
+            nrexpr = make_non_results_expression( self.full.getExpression() )
+            self.non_results = WordExpression( nrexpr )
 
-class NonResultsKeywordExpression( KeywordExpression ):
-
-    def _create_eval_expression(self, string_expr, wordset):
+    def evaluate(self, keyword_list, include_results=True):
         ""
-        return parse_non_results_expression( string_expr, wordset )
+        if include_results:
+            return self.full.evaluate( keyword_list )
+        else:
+            return self.non_results.evaluate( keyword_list )
 
     def containsResultsKeywords(self):
         ""
-        return len( RESULTS_KEYWORD_SET.intersection( self.words ) ) > 0
+        fullwords = set( self.full.getWordList() )
+        return len( RESULTS_KEYWORD_SET.intersection( fullwords ) ) > 0
 
 
-def parse_non_results_expression( expr, wordset=None ):
+def make_non_results_expression( expr ):
     ""
-    toklist = separate_expression_into_tokens( expr )
-    add_words_to_set( toklist, wordset )
-
-    new_toklist = remove_results_keywords( toklist )
-
-    if len( new_toklist ) == 0:
+    if expr is None:
         return None
-    else:
-        evalexpr = convert_token_list_into_eval_string( new_toklist )
-        return evalexpr
 
+    toklist = separate_expression_into_tokens( expr )
 
-def remove_results_keywords( toklist ):
-    ""
     tree = TokenTree()
     tree.parse( toklist, 0 )
 
@@ -78,7 +81,10 @@ def remove_results_keywords( toklist ):
     toks = []
     collect_token_list_from_tree( tree, toks )
 
-    return toks
+    if len( toks ) == 0:
+        return None
+    else:
+        return ' '.join( toks )
 
 
 def is_results_token( tok ):

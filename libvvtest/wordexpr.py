@@ -61,7 +61,7 @@ class WordExpression:
 
             self.expr = expr
 
-            self.evalexpr = self._create_eval_expression( self.expr, self.words )
+            self.evalexpr = parse_word_expression( self.expr, self.words )
 
     def getWordList(self):
         """
@@ -81,10 +81,6 @@ class WordExpression:
         else:
             members = list( string_or_list )
         return self._evaluate( members.count )
-
-    def _create_eval_expression(self, string_expr, wordset):
-        ""
-        return parse_word_expression( string_expr, wordset )
 
     def _evaluate(self, evaluator_func):
         """
