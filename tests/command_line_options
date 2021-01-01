@@ -190,6 +190,22 @@ class create_derived_options( vtu.vvtestTestCase ):
         assert onL == ['a1','dbg']
         assert offL == ['bar','baz','foo']
 
+    def test_options_with_special_characters(self):
+        ""
+        vtu.runvvtest( '-o oval' )
+        assert util.globfile( 'TestResults*oval' )
+        vtu.remove_results()
+
+        vrun = vtu.runvvtest( '-o ov^al' )
+        assert util.globfile( 'TestResults*ov^al' )
+        vtu.remove_results()
+
+        vrun = vtu.runvvtest( '-o ov/al', raise_on_error=False )
+        assert vrun.x != 0 and 'invalid word' in vrun.out
+
+        vrun = vtu.runvvtest( '-o ov*al', raise_on_error=False )
+        assert vrun.x != 0 and 'invalid word' in vrun.out
+
     def test_converting_test_runtime_options(self):
         ""
         mn,mx,sm = cmdline.convert_test_time_options( None, None, None )

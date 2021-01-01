@@ -4,10 +4,9 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
-
-from .wordexpr import WordExpression
+from .wordexpr import WildcardWordExpression
 from .wordexpr import separate_expression_into_tokens
-from .wordexpr import clean_up_word_expression
+from .wordexpr import clean_up_wildcard_expression
 from .wordexpr import join_expressions_with_AND
 from .wordexpr import TokenTree, prune_token_tree, collect_token_list_from_tree
 
@@ -21,11 +20,11 @@ def create_keyword_expression( word_expr_list, not_word_expr_list ):
 
     if word_expr_list:
         for expr in word_expr_list:
-            exprL.append( clean_up_word_expression(expr) )
+            exprL.append( clean_up_wildcard_expression(expr) )
 
     if not_word_expr_list:
         for expr in not_word_expr_list:
-            exprL.append( clean_up_word_expression( expr, negate=True ) )
+            exprL.append( clean_up_wildcard_expression( expr, negate=True ) )
 
     if len( exprL ) > 0:
         return KeywordExpression( join_expressions_with_AND( exprL ) )
@@ -37,9 +36,9 @@ class KeywordExpression:
 
     def __init__(self, expr=None):
         ""
-        self.full = WordExpression( expr )
+        self.full = WildcardWordExpression( expr )
         nrexpr = make_non_results_expression( expr )
-        self.non_results = WordExpression( nrexpr )
+        self.non_results = WildcardWordExpression( nrexpr )
 
     def appendKeywordExpression(self, expr):
         """
@@ -50,7 +49,7 @@ class KeywordExpression:
         if not self.containsResultsKeywords():
             self.full.append( expr )
             nrexpr = make_non_results_expression( self.full.getExpression() )
-            self.non_results = WordExpression( nrexpr )
+            self.non_results = WildcardWordExpression( nrexpr )
 
     def evaluate(self, keyword_list, include_results=True):
         ""

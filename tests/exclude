@@ -158,6 +158,56 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vtu.runvvtest( '-w -o 2D+tdev' ).assertCounts( total=1, npass=1 )
 
+    def test_include_option_expression_corner_cases(self):
+        ""
+        util.writefile( "atest.xml", """
+            <rtest name="atest">
+                <include options="foo or b^r"/>
+                <execute> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( "btest.xml", """
+            <rtest name="btest">
+                <include options="foo or b/r"/>
+                <execute> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( "xtest.xml", """
+            <rtest name="xtest">
+                <include options="foo or bar-*"/>
+                <execute> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( 'ctest.vvt', """
+            #VVT: enable (options="foo or b^r")
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: enable (options="foo or b$r")
+            """ )
+        util.writefile( 'ytest.vvt', """
+            #VVT: enable (options="foo or bar-*")
+            """ )
+        time.sleep(1)
+
+        tspec = vtu.parse_single_test_file( 'atest.xml' )
+        assert tspec.getOptionEnableExpression().evaluate( 'b^r' )
+
+        self.assertRaises( testcreator.TestSpecError,
+                           vtu.parse_single_test_file, 'btest.xml' )
+
+        tspec = vtu.parse_single_test_file( 'ctest.vvt' )
+        assert tspec.getOptionEnableExpression().evaluate( 'b^r' )
+
+        self.assertRaises( testcreator.TestSpecError,
+                           vtu.parse_single_test_file, 'dtest.vvt' )
+
+        tspec = vtu.parse_single_test_file( 'xtest.xml' )
+        wx = tspec.getOptionEnableExpression()
+        assert not wx.evaluate( 'bar' )
+        assert     wx.evaluate( 'bar-baz' )
+
+        tspec = vtu.parse_single_test_file( 'ytest.vvt' )
+        wx = tspec.getOptionEnableExpression()
+        assert not wx.evaluate( 'bar' )
+        assert     wx.evaluate( 'bar-baz' )
+
     def test_using_a_platform_name_that_is_not_the_current_one(self):
         ""
         platname = vtu.core_platform_name()
@@ -211,6 +261,38 @@ class exclude_tests( vtu.vvtestTestCase ):
 
         vrun = vtu.runvvtest( '-x '+platname+' -X '+fakeplatname )
         vrun.assertCounts( total=0 )
+
+    def test_command_line_platform_expressions(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: enable (platforms=Linux or Darwin)
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: enable (platforms=XBox^1)
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: enable (platforms=foo or PS*)
+            """ )
+        util.writefile( 'dtest.xml', """
+            <rtest name="dtest">
+                <include platforms="foo or PS*"/>
+            </rtest>""" )
+        time.sleep(1)
+
+        vtu.runvvtest( '--plat pooky' ).assertCounts( total=0 )
+
+        vrun = vtu.runvvtest( '-w --plat pooky -x "XBox or Darwin"' )
+        vrun.assertCounts( total=1,  npass=1 )
+        assert vrun.getTestIds() == ['atest']
+
+        vrun = vtu.runvvtest( '-w --plat pooky -x "XBox^1 or PS2"' )
+        vrun.assertCounts( total=3,  npass=3 )
+        assert vrun.getTestIds() == ['btest','ctest','dtest']
+
+        vrun = vtu.runvvtest( '-w --plat pooky -x "XBox^1 or Da*rwin"',
+                              raise_on_error=False )
+        assert vrun.x != 0
+        assert len( vrun.grepLines( 'invalid expression word' ) ) == 1
 
     def test_using_include_on_test_file_with_more_than_one_test_name(self):
         ""

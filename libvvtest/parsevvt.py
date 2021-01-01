@@ -15,9 +15,10 @@ from .ScriptReader import ScriptReader, check_parse_attributes_section
 
 from .paramset import ParameterSet
 
+from .wordcheck import allowable_variable, allowable_word
+
 from .parseutil import variable_expansion
 from .parseutil import evaluate_testname_expr
-from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import create_dependency_result_expression
 from .parseutil import check_forced_group_parameter
@@ -56,9 +57,7 @@ class ScriptTestParser:
 
     def parseParameterSet(self, testname):
         ""
-        pset = ParameterSet()
-        self.parse_parameterize( pset, testname )
-        return pset
+        return self.parse_parameterize( testname )
 
     def parseAnalyzeSpec(self, testname):
         ""
@@ -82,7 +81,7 @@ class ScriptTestParser:
 
     ############## end public interface #################
 
-    def parse_parameterize(self, pset, testname):
+    def parse_parameterize(self, testname):
         """
         Parses the parameter settings for a script test file.
 
@@ -96,6 +95,7 @@ class ScriptTestParser:
             #VVT::                          4, 0.01 , 0.02
             #VVT::                          8, 0.001, 0.002
         """
+        pset = ParameterSet()
         tmap = {}
 
         for spec in self.reader.getSpecList( 'parameterize' ):
@@ -149,6 +149,8 @@ class ScriptTestParser:
                 pset.addParameterGroup( nameL, valL, staged )
 
         pset.setParameterTypeMap( tmap )
+
+        return pset
 
     def parse_analyze(self, testname):
         """
@@ -222,7 +224,7 @@ class ScriptTestParser:
 
             if spec.attrs:
 
-                if not testname_ok( spec.attrs, testname ):
+                if not testname_ok( spec.attrs, testname, spec.lineno ):
                     # the "enable" does not apply to this test name
                     continue
 
@@ -286,15 +288,15 @@ class ScriptTestParser:
                                     " attribute is not allowed here, " + \
                                     "line " + str(spec.lineno) )
 
-            if not testname_ok( spec.attrs, testname ):
+            if not testname_ok( spec.attrs, testname, spec.lineno ):
                 continue
 
             for key in spec.value.strip().split():
-                if allowable_string(key):
+                if allowable_word(key):
                     keys.append( key )
                 else:
-                    raise TestSpecError( 'invalid keyword: "'+key+'", line ' + \
-                                         str(spec.lineno) )
+                    raise TestSpecError( 'invalid keyword: '+repr(key) + \
+                                         ', line ' + str(spec.lineno) )
 
         tspec.setKeywordList( keys )
 
@@ -316,12 +318,12 @@ class ScriptTestParser:
         for spec in self.reader.getSpecList( 'copy' ):
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 collect_filenames( spec, cpfiles, testname, params,
-                                   self.platname, self.optionlist )
+                                   self.platname )
 
         for spec in self.reader.getSpecList( 'link' ):
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 collect_filenames( spec, lnfiles, testname, params,
-                                   self.platname, self.optionlist )
+                                   self.platname )
         
         for src,dst in lnfiles:
             tspec.addLinkFile( src, dst )
@@ -448,7 +450,7 @@ class ScriptTestParser:
         for spec in self.reader.getSpecList( 'depends on' ):
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
 
-                wx = create_dependency_result_expression( spec.attrs )
+                wx = create_dependency_result_expression( spec.attrs, spec.lineno )
                 exp = parse_expect_criterion( spec.attrs, spec.lineno )
 
                 for val in spec.value.strip().split():
@@ -461,7 +463,7 @@ class ScriptTestParser:
             name,attrD = parse_test_name_value( spec.value, spec.lineno )
             if name == testname:
 
-                wx = create_dependency_result_expression( attrD )
+                wx = create_dependency_result_expression( attrD, spec.lineno )
                 exp = parse_expect_criterion( attrD, spec.lineno )
 
                 for depname in attrD.get( 'depends on', '' ).split():
@@ -530,14 +532,18 @@ def parse_test_names( vspecs ):
 
         name,attrD = parse_test_name_value( spec.value, spec.lineno )
 
-        if not name or not allowable_string(name):
+        if not name or not allowable_word(name):
             raise TestSpecError( 'missing or invalid test name, ' + \
-                                 'line ' + str(spec.lineno) )
+                                 repr(name) + ', line ' + str(spec.lineno) )
         L.append( name )
 
     if len(L) == 0:
         # the name defaults to the basename of the script file
-        L.append( vspecs.basename() )
+        name = vspecs.basename()
+        if not name or not allowable_word(name):
+            raise TestSpecError( 'the basename of the test filename is not ' + \
+                                 'a valid test name: '+repr(name) )
+        L.append( name )
 
     return L
 
@@ -559,7 +565,7 @@ def parse_test_name_value( value, lineno ):
             check_test_name_attributes( aD, lineno )
 
         else:
-            raise TestSpecError( 'invalid test name: ' + \
+            raise TestSpecError( 'invalid test name: ' + repr(value) + \
                     ', line ' + str(lineno) )
 
     return name, aD
@@ -653,7 +659,7 @@ def check_parameter_names( name_list, lineno ):
 def check_parameter_values( value_list, lineno ):
     ""
     for v in value_list:
-        if not allowable_string(v):
+        if not allowable_word(v):
             raise TestSpecError( 'invalid parameter value: "' + \
                                  v+'", line ' + str(lineno) )
 
@@ -706,7 +712,7 @@ def parse_param_group_values( name_list, value_string, lineno ):
     return vL
 
 
-def collect_filenames( spec, flist, tname, paramD, platname, optionlist ):
+def collect_filenames( spec, flist, tname, paramD, platname ):
     """
         #VVT: copy : file1 file2
         #VVT: copy (rename) : srcname1,copyname1 srcname2,copyname2
@@ -765,10 +771,19 @@ def parse_expect_criterion( attrs, lineno ):
     return exp
 
 
-def testname_ok( attrs, tname ):
+def testname_ok( attrs, tname, lineno ):
     ""
+    ok = True
+
     if attrs != None:
         tval = attrs.get( 'testname', None )
-        if tval != None and not evaluate_testname_expr( tname, tval ):
-            return False
-    return True
+        if tval is not None:
+            try:
+                if not evaluate_testname_expr( tname, tval ):
+                    ok = False
+            except Exception as e:
+                raise TestSpecError( 'bad testname expression, ' + \
+                            repr(tval) + ': '+str(e) + \
+                            ', line ' + str(lineno) )
+
+    return ok

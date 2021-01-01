@@ -9,6 +9,24 @@ from .wordexpr import clean_up_word_expression
 from .wordexpr import join_expressions_with_AND
 
 
+def create_platform_expression( word_expr_list, not_word_expr_list ):
+    ""
+    exprL = []
+
+    if word_expr_list:
+        for expr in word_expr_list:
+            exprL.append( clean_up_word_expression(expr) )
+
+    if not_word_expr_list:
+        for expr in not_word_expr_list:
+            exprL.append( clean_up_word_expression( expr, negate=True ) )
+
+    if len( exprL ) > 0:
+        return PlatformExpression( join_expressions_with_AND( exprL ) )
+
+    return None
+
+
 class PlatformExpression( WordExpression ):
 
     def evaluate(self, expr):
@@ -33,21 +51,3 @@ class PlatformEvaluator:
             if not self.expr.evaluate( plat_name ):
                 return False
         return True
-
-
-def create_platform_expression( word_expr_list, not_word_expr_list ):
-    ""
-    exprL = []
-
-    if word_expr_list:
-        for expr in word_expr_list:
-            exprL.append( clean_up_word_expression(expr) )
-
-    if not_word_expr_list:
-        for expr in not_word_expr_list:
-            exprL.append( clean_up_word_expression( expr, negate=True ) )
-
-    if len( exprL ) > 0:
-        return PlatformExpression( join_expressions_with_AND( exprL ) )
-
-    return None

@@ -17,7 +17,9 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.wordexpr import WordExpression
+from libvvtest.errors import TestSpecError
+
+from libvvtest.wordexpr import WordExpression, WildcardWordExpression
 from libvvtest.wordexpr import create_word_expression
 from libvvtest.wordexpr import split_but_retain_separator
 from libvvtest.wordexpr import separate_expression_into_tokens
@@ -33,6 +35,8 @@ from libvvtest.keyexpr import make_non_results_expression
 
 from libvvtest.paramexpr import ParameterExpression
 from libvvtest.paramexpr import create_parameter_expression
+
+from libvvtest.parseutil import parse_to_word_expression
 
 
 class word_expression_tests( vtu.vvtestTestCase ):
@@ -405,6 +409,28 @@ class word_expression_tests( vtu.vvtestTestCase ):
             self.assertRaises( ValueError, create_word_expression, [expr] )
 
 
+class wildcard_word_expression_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_shell_style_wildcards_in_expressions(self):
+        ""
+        ex = WordExpression( 'foo*' )
+        assert not ex.evaluate( 'foobar' )
+
+        ex = WildcardWordExpression( 'foo*' )
+        assert     ex.evaluate( 'foobar' )
+        assert not ex.evaluate( 'fobar' )
+        assert not ex.evaluate( 'bazfoobar' )
+        assert     ex.evaluate( ['fo','fo o','fool'] )
+
+        ex = WildcardWordExpression( 'foo?' )
+        assert not ex.evaluate( 'foo' )
+        assert     ex.evaluate( 'fool' )
+        assert not ex.evaluate( 'fools' )
+
+
 class keyword_expression_tests( vtu.vvtestTestCase ):
 
     def setUp(self):
@@ -509,9 +535,23 @@ class keyword_expression_tests( vtu.vvtestTestCase ):
         self.assertRaises( Exception,
                            create_keyword_expression, None, ['foo )'] )
         self.assertRaises( Exception,
-                           create_keyword_expression, ['foo!bar'], None )
+                           create_keyword_expression, ['foo and or bar'], None )
         self.assertRaises( Exception,
-                           create_keyword_expression, None, ['foo!bar'] )
+                           create_keyword_expression, ['foo$bar'], None )
+        self.assertRaises( Exception,
+                           create_keyword_expression, None, ['foo$bar'] )
+
+    def test_wildcard_globbing_in_keyword_expression(self):
+        ""
+        kx = create_keyword_expression( ['foo*'], None )
+        assert     kx.evaluate( ['foo'] )
+        assert     kx.evaluate( ['foobar'] )
+        assert not kx.evaluate( ['bazfoobar'] )
+
+        kx = create_keyword_expression( None, ['foo*'] )
+        assert not kx.evaluate( ['foo'] )
+        assert not kx.evaluate( ['foobar'] )
+        assert     kx.evaluate( ['bazfoobar'] )
 
 
 class param_expression_tests( vtu.vvtestTestCase ):
@@ -813,6 +853,16 @@ class param_expression_tests( vtu.vvtestTestCase ):
             assert     pf.evaluate( {'np':3} )
             assert not pf.evaluate( {'np':4} )
 
+    def test_errors_and_corner_cases(self):
+        ""
+        pf = ParameterExpression( 'foo<=bar@3' )
+        assert pf.evaluate( {'foo':'bar@2'} )
+
+        self.assertRaises( ValueError, ParameterExpression, 'foo@=bar' )
+        self.assertRaises( ValueError, ParameterExpression, '=bar' )
+        self.assertRaises( ValueError, ParameterExpression, 'foo=b$ar' )
+        self.assertRaises( ValueError, ParameterExpression, 'foo=b*ar' )
+
     def test_creating_unified_parameter_expression(self):
         ""
         pf = create_parameter_expression( None, None )
@@ -830,6 +880,20 @@ class param_expression_tests( vtu.vvtestTestCase ):
         assert not pf.evaluate( {'np':'1', 'ndevice':'1'} )
         assert     pf.evaluate( {'np':'2', 'ndevice':'1'} )
         assert not pf.evaluate( {'np':'9', 'ndevice':'1'} )
+
+    def test_parse_to_word_expression_utility(self):
+        ""
+        wx = parse_to_word_expression( '' )
+        assert not wx.evaluate( 'foo' )
+
+        wx = parse_to_word_expression( 'foo or bar', 10 )
+        assert     wx.evaluate( 'foo' )
+        assert     wx.evaluate( 'bar' )
+        assert     wx.evaluate( ['bar','foo'] )
+        assert not wx.evaluate( 'baz' )
+
+        self.assertRaises( TestSpecError,
+                           parse_to_word_expression, 'foo or b$ar' )
 
 
 ############################################################################

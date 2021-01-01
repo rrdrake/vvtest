@@ -16,6 +16,8 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.errors import TestSpecError
+
 
 class filter_and_keywords( vtu.vvtestTestCase ):
 
@@ -152,32 +154,78 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '-w -k venus/mars', batch=batch )
             vrun.assertCounts( total=1, npass=1 )
 
+    def test_specifying_keywords_in_xml_files(self):
+        ""
+        util.writefile( 'bad3.xml', """
+            <rtest name="atest">
+              <keywords> junk1 ju/nk2 </keywords>
+            </rtest>""" )
+
+        self.assertRaises( TestSpecError, vtu.parse_single_test_file, 'bad3.xml' )
+
+        util.writefile( 'ok1.xml', """
+            <rtest name="atest">
+              <keywords> junk1 junk2 </keywords>
+            </rtest>""" )
+
+        tspec = vtu.parse_single_test_file( 'ok1.xml' )
+        kL = tspec.getKeywords()
+        kL.sort()
+        assert kL == [ 'atest', 'junk1', 'junk2', 'ok1' ]
+
+        util.writefile( 'ok2.xml', """
+            <rtest name="atest">
+              <keywords> junk1 </keywords>
+              <execute name="exename"> # none </execute>
+              <keywords> junk2 </keywords>
+            </rtest>""" )
+
+        tspec = vtu.parse_single_test_file( 'ok2.xml' )
+        kL = tspec.getKeywords()
+        kL.sort()
+        assert kL == [ 'atest', 'exename', 'junk1', 'junk2', 'ok2' ]
+        assert tspec.hasKeyword('atest')
+        assert not tspec.hasKeyword('junk')
+
+    def test_specifying_keywords_in_vvt_files(self):
+        ""
+        util.writefile( 'bad.vvt', """
+            #VVT: keywords : blah foo/bar
+            """ )
+        self.assertRaises( TestSpecError, vtu.parse_single_test_file, 'bad.vvt' )
+
+        util.writefile( 'ok.vvt', """
+            #VVT: keywords : blah^8 _foo_ bar=3 101
+            """ )
+        tspec = vtu.parse_single_test_file( 'ok.vvt' )
+        kL = tspec.getKeywords()
+        kL.sort()
+        assert kL == ['101', '_foo_', 'bar=3', 'blah^8', 'ok']
+        kL = tspec.getKeywords( include_implicit=False )
+        kL.sort()
+        assert kL == ['101', '_foo_', 'bar=3', 'blah^8']
+
     def test_special_characters_in_keyword_handling(self):
         ""
-        util.writefile( 'extra.xml', """
-            <rtest name="extra">
-              <keywords> blah-1 foo.2 bar+3 baz=4 mars#5 sun%6 pluto^7 venus:8
-                         jupiter~9 jupiter@0 </keywords>
-              <execute> echo "extra ran" </execute>
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+              <keywords> blah-1 foo.2 bar+3 baz=4 mars#5 sun%6
+                         pluto^7 venus:8 jupiter~9 jupiter@0 </keywords>
+              <execute> echo "hello" </execute>
             </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: keywords : blah-1 foo.2 bar+3 baz=4 mars#5 sun%6
+            #VVT::           pluto^7 venus:8 jupiter~9 jupiter@0
+            """ )
         time.sleep(1)
 
-        self.run_with_keyword_and_check( 'blah-1' )
-        self.run_with_keyword_and_check( 'foo.2' )
-        self.run_with_keyword_and_check( 'bar+3' )
-        self.run_with_keyword_and_check( 'baz=4' )
-        self.run_with_keyword_and_check( 'mars#5' )
-        self.run_with_keyword_and_check( 'sun%6' )
-        self.run_with_keyword_and_check( 'pluto^7' )
-        self.run_with_keyword_and_check( 'venus:8' )
-        self.run_with_keyword_and_check( 'jupiter~9' )
-        self.run_with_keyword_and_check( 'jupiter@0' )
+        vrun = vtu.runvvtest( '-k pluto^7' )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['atest','btest']
 
-    def run_with_keyword_and_check(self, keyword):
-        ""
-        vrun = vtu.runvvtest( '-w -k '+keyword )
-        vrun.assertCounts( total=1, npass=1 )
-        assert vrun.countGrepLogs( 'extra ran' ) == 1
+        vrun = vtu.runvvtest( '-w -k "foo or b\\$ar"', raise_on_error=False )
+        assert vrun.x != 0
+        assert len( vrun.grepLines( 'invalid wildcard expression word' ) ) == 1
 
     def test_script_test_filter_by_keyword_expression(self):
         ""
@@ -240,6 +288,21 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             assert vrun.countTestLines( 'pass *atest') == 1
             assert vrun.countTestLines( 'fail *btest') == 1
             assert vrun.countTestLines( 'pass *ctest') == 0
+
+    def test_command_line_keyword_expression_globbing(self):
+        ""
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+              <keywords> foo-bar earth+moon </keywords>
+              <execute> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: keywords : foo-bar earth+moon
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-k "*-bar or earth+*"' )
+        vrun.assertCounts( total=2, npass=2 )
 
 
 ########################################################################

@@ -14,9 +14,10 @@ from .testspec import TestSpec
 
 from .paramset import ParameterSet
 
+from .wordcheck import allowable_variable, allowable_word
+
 from .parseutil import variable_expansion
 from .parseutil import evaluate_testname_expr
-from .parseutil import allowable_variable, allowable_string
 from .parseutil import check_for_duplicate_parameter
 from .parseutil import parse_to_word_expression
 from .parseutil import evaluate_platform_expr
@@ -54,9 +55,7 @@ class XMLTestParser:
 
     def parseParameterSet(self, testname):
         ""
-        pset = ParameterSet()
-        self.parse_parameterize( pset, testname )
-        return pset
+        return self.parse_parameterize( testname )
 
     def parseAnalyzeSpec(self, testname):
         ""
@@ -103,7 +102,7 @@ class XMLTestParser:
 
     ############## end public interface #################
 
-    def parse_parameterize(self, pset, testname):
+    def parse_parameterize(self, testname):
         """
         Parses the parameter settings for a test XML file.
 
@@ -119,6 +118,8 @@ class XMLTestParser:
         and paramB=B1 then paramA=A2 and paramB=B2.  A separate test will NOT
         be created for the combination paramA=A1, paramB=B2, for example.
         """
+        pset = ParameterSet()
+
         force_params = self.force or {}
 
         for nd in self.xmldoc.matchNodes(['parameterize$']):
@@ -153,7 +154,7 @@ class XMLTestParser:
                                          "spaces, line " + str(nd.getLineNumber()) )
 
                 for val in vals:
-                    if not allowable_string(val):
+                    if not allowable_word(val):
                         raise TestSpecError( 'bad parameter value: "' + val + '", line ' + \
                                              str(nd.getLineNumber()) )
 
@@ -181,6 +182,8 @@ class XMLTestParser:
                       L = [ list(T) for T in zip( *pL ) ]
                       check_for_duplicate_parameter( L[1:], nd.getLineNumber() )
                       pset.addParameterGroup( L[0], L[1:] )
+
+        return pset
 
     def parse_analyze(self, testname):
         """
@@ -291,7 +294,7 @@ class XMLTestParser:
         for nd in self.xmldoc.matchNodes(['keywords$']):
             if testname_ok( nd, testname ):
                 for key in nd.getContent().split():
-                    if allowable_string(key):
+                    if allowable_word(key):
                         keys.append( key )
                     else:
                         raise TestSpecError( 'invalid keyword: "' + key + \
@@ -440,7 +443,7 @@ class XMLTestParser:
                     if nd.getAttr('analyze','').strip().lower() == 'yes':
                         analyze = True
                 else:
-                    if not xname or not allowable_string(xname):
+                    if not xname or not allowable_word(xname):
                         raise TestSpecError( 'invalid name value: "' + xname + \
                                              '", line ' + str(nd.getLineNumber()) )
 
@@ -642,9 +645,9 @@ class XMLTestParser:
             elif attrname in ["parameter","parameters"]:
                 return True, evaluate_parameter_expr( paramD, attrvalue )
 
-        except ValueError:
+        except ValueError as e:
             raise TestSpecError( "bad " + attrname + " expression, line " + \
-                                 lineno + ": " + str(sys.exc_info()[1]) )
+                                 lineno + ": " + str(e) )
 
         return False, False
 
@@ -679,10 +682,19 @@ def appears_to_be_a_test_file( filename ):
 
 def testname_ok( xmlnode, tname ):
     ""
+    ok = True
+
     tval = xmlnode.getAttr( 'testname', None )
-    if tval != None and not evaluate_testname_expr( tname, tval ):
-        return False
-    return True
+    if tval is not None:
+        try:
+            if not evaluate_testname_expr( tname, tval ):
+                ok = False
+        except Exception as e:
+            raise TestSpecError( 'bad testname expression: ' + repr(tval) + \
+                                 ', line ' + str(xmlnode.getLineNumber()) + \
+                                 ': '+str(e) )
+
+    return ok
 
 
 def parse_test_names( filedoc ):
@@ -696,14 +708,14 @@ def parse_test_names( filedoc ):
     # determine the test name
 
     name = filedoc.getAttr('name', '').strip()
-    if not name or not allowable_string(name):
+    if not name or not allowable_word(name):
         raise TestSpecError( 'missing or invalid test name attribute, ' + \
                              'line ' + str(filedoc.getLineNumber()) )
 
     L = [ name ]
     for xnd in filedoc.matchNodes( ['rtest'] ):
         nm = xnd.getAttr('name', '').strip()
-        if not nm or not allowable_string(nm):
+        if not nm or not allowable_word(nm):
             raise TestSpecError( 'missing or invalid test name attribute, ' + \
                                  'line ' + str(xnd.getLineNumber()) )
         L.append( nm )

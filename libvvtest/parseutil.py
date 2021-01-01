@@ -9,24 +9,32 @@ import re
 
 from .errors import TestSpecError
 from .wordexpr import WordExpression, create_word_expression
+from .wordexpr import WildcardWordExpression
 from .paramexpr import ParameterExpression
+from .wordcheck import check_expression_words
+from .wordcheck import check_wildcard_expression_words
+
+from .teststatus import RESULTS_KEYWORDS
 
 
 def evaluate_testname_expr( testname, expr ):
     ""
-    wx = WordExpression( expr )
+    wx = WildcardWordExpression( expr )
+    check_wildcard_expression_words( wx.getWordList() )
     return wx.evaluate( testname )
 
 
 def evaluate_platform_expr( platname, expr ):
     ""
-    wx = WordExpression( expr )
+    wx = WildcardWordExpression( expr )
+    check_wildcard_expression_words( wx.getWordList() )
     return wx.evaluate( platname )
 
 
 def evaluate_option_expr( optlist, expr ):
     ""
-    wx = WordExpression( expr )
+    wx = WildcardWordExpression( expr )
+    check_wildcard_expression_words( wx.getWordList() )
     return wx.evaluate( optlist )
 
 
@@ -34,38 +42,6 @@ def evaluate_parameter_expr( paramD, expr ):
     ""
     pf = ParameterExpression( expr )
     return pf.evaluate( paramD )
-
-
-alphanum_chars  = 'abcdefghijklmnopqrstuvwxyz' + \
-                  'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + \
-                  '0123456789_'
-allowable_chars = alphanum_chars + '.-=+#@^%:~'
-
-
-allowable_chars_dict = {}
-for c in allowable_chars:
-  allowable_chars_dict[c] = None
-
-def allowable_string(s):
-    ""
-    for c in s:
-      if c not in allowable_chars_dict:
-        return 0
-    return 1
-
-
-alphanum_chars_dict = {}
-for c in alphanum_chars:
-  alphanum_chars_dict[c] = None
-
-def allowable_variable(s):
-    ""
-    if s[:1] in ['0','1','2','3','4','5','6','7','8','9','_']:
-      return 0
-    for c in s:
-      if c not in alphanum_chars_dict:
-        return 0
-    return 1
 
 
 def variable_expansion( tname, platname, paramD, fL ):
@@ -157,18 +133,34 @@ def is_list_or_tuple( obj ):
     return False
 
 
-def create_dependency_result_expression( attrs ):
+def create_dependency_result_expression( attrs, lineno=None ):
     ""
     wx = None
 
-    if attrs != None and 'result' in attrs:
+    if attrs is not None and 'result' in attrs:
 
         result = attrs['result'].strip()
 
         if result == '*':
             wx = WordExpression()
         else:
-            wx = create_word_expression( [result] )
+            err = ''
+            try:
+                wx = create_word_expression( [result] )
+
+                for word in wx.getWordList():
+                    if word not in RESULTS_KEYWORDS:
+                        err = 'non-result word: '+repr(word)
+                        break
+
+            except Exception as e:
+                err = str(e)
+
+            if err:
+                msg = 'invalid results expression: '+repr(result)+' : '+err
+                if lineno:
+                    msg += ', line '+str(lineno)
+                raise TestSpecError( msg )
 
     return wx
 
@@ -183,13 +175,13 @@ def parse_to_word_expression( string_or_list, lineno=None ):
         exprlist = string_or_list
 
     try:
-        wx = create_word_expression( exprlist )
+        wx = create_word_expression( exprlist, allow_wildcards=True )
 
     except Exception as e:
         msg = 'invalid expression'
         if lineno:
             msg += ' at line '+str(lineno)
-        msg += ': '+str(string_or_list)+', '+str(e)
+        msg += ': '+repr(string_or_list)+', '+str(e)
         raise TestSpecError( msg )
 
     return wx

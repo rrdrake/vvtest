@@ -240,7 +240,11 @@ def construct_platform( rtdata, vvtestdir, opts, optD ):
     if opts.dash_A:
         rtdata.rtconfig.applyPlatformExpression( False )
 
-    rtdata.rtconfig.setOptionList( optD['onopts'] + [plat.getCompiler()] )
+    opL = optD['onopts']
+    if plat.getCompiler():
+        opL.append( plat.getCompiler() )
+    rtdata.rtconfig.setOptionList( opL )
+
     rtdata.rtconfig.setMaxSize( plat.getMaxSize() )
 
     rtdata.rtinfo.setInfo( platform=plat.getName(),

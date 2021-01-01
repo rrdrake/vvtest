@@ -678,9 +678,10 @@ def parse_time( colon_time_string ):
     return tval
 
 
-def create_tests_from_file( filename, platname=core_platform_name() ):
+def create_tests_from_file( filename, platname=core_platform_name(),
+                                      optionlist=[] ):
     ""
-    creator = testcreator.TestCreator( {}, platname )
+    creator = testcreator.TestCreator( {}, platname, optionlist )
 
     assert not os.path.isabs( filename )
     assert not os.path.normpath(filename).startswith('..')
@@ -694,9 +695,9 @@ def create_tests_from_file( filename, platname=core_platform_name() ):
     return tL
 
 
-def parse_single_test_file( filename ):
+def parse_single_test_file( filename, optionlist=[] ):
     ""
-    tL = create_tests_from_file( filename )
+    tL = create_tests_from_file( filename, optionlist=optionlist )
     assert len( tL ) == 1
     return tL[0].getSpec()
 

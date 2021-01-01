@@ -4,17 +4,30 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
+import fnmatch
 
-def create_word_expression( word_expr_list ):
+from .wordcheck import check_expression_words
+from .wordcheck import check_wildcard_expression_words
+
+
+def create_word_expression( list_of_string_expr, allow_wildcards=False ):
     ""
     exprL = []
 
-    if word_expr_list:
-        for expr in word_expr_list:
-            exprL.append( clean_up_word_expression(expr) )
+    if list_of_string_expr:
+        for expr in list_of_string_expr:
+            exprL.append( replace_forward_slashes( expr ) )
 
     if len( exprL ) > 0:
-        return WordExpression( join_expressions_with_AND( exprL ) )
+        expr = join_expressions_with_AND( exprL )
+        if allow_wildcards:
+            wx = WildcardWordExpression( expr )
+            check_wildcard_expression_words( wx.getWordList() )
+        else:
+            wx = WordExpression( expr )
+            check_expression_words( wx.getWordList() )
+
+        return wx
 
     return None
 
@@ -36,13 +49,10 @@ class WordExpression:
     def __init__(self, expr=None):
         ""
         self.expr = None
-
+        self.evalexpr = None
         self.words = set()   # the words in the expression
 
-        self.evalexpr = None
-
-        if expr != None:
-            self.append( expr )
+        self.append( expr )
 
     def getExpression(self):
         ""
@@ -52,7 +62,7 @@ class WordExpression:
         """
         Extends the given expression string using the AND operator.
         """
-        if expr != None:
+        if expr is not None:
 
             expr = expr.strip()
 
@@ -76,10 +86,7 @@ class WordExpression:
         If 'string_or_list' is a list or generator, then each word in the
         expression is True if is a member of the list.
         """
-        if isinstance( string_or_list, str ):
-            members = [string_or_list]
-        else:
-            members = list( string_or_list )
+        members = make_list( string_or_list )
         return self._evaluate( members.count )
 
     def _evaluate(self, evaluator_func):
@@ -99,6 +106,37 @@ class WordExpression:
         r = eval( self.evalexpr )
 
         return r
+
+
+class WildcardWordExpression( WordExpression ):
+    """
+    Recall shell style wildcard matching:
+
+        *       matches everything
+        ?       matches any single character
+        [seq]   matches any character in seq
+        [!seq]  matches any char not in seq
+    """
+
+    def evaluate(self, string_or_list):
+        ""
+        matcher = WildcardMatcher( make_list( string_or_list ) )
+        return self._evaluate( matcher.match )
+
+
+class WildcardMatcher:
+    def __init__(self, word_list):
+        self.words = word_list
+    def match(self, word):
+        return len( fnmatch.filter( self.words, word ) ) > 0
+
+
+def make_list( string_or_list ):
+    ""
+    if isinstance( string_or_list, str ):
+        return [string_or_list]
+    else:
+        return list( string_or_list )
 
 
 def parse_word_expression( expr, wordset ):
@@ -141,8 +179,7 @@ def combine_two_expressions( expr1, expr2 ):
 
 def conditional_paren_wrap( expr ):
     ""
-    if expr:
-        expr = expr.strip()
+    if expr and expr.strip():
         tree = parenthetical_tokenize( expr )
         if tree.numTokens() > 1:
             if not ( tree.numTokens() == 2 and tree.getToken(0) == 'not' ):
@@ -395,19 +432,16 @@ def clean_up_word_expression( expr, negate=False ):
     ex = replace_forward_slashes( expr, negate )
 
     wx = WordExpression( ex )
-
-    # magic: would like this check to be in the WordExpression class
-    for wrd in wx.getWordList():
-        if not allowable_word( wrd ):
-            raise ValueError( 'invalid word: "'+str(wrd)+'"' )
+    check_expression_words( wx.getWordList() )
 
     return ex
 
 
-allowable_chars = set( 'abcdefghijklmnopqrstuvwxyz' + \
-                       'ABCDEFGHIJKLMNOPQRSTUVWXYZ' + \
-                       '0123456789_' + '-+=#@%^:.~' )
-
-def allowable_word(s):
+def clean_up_wildcard_expression( expr, negate=False ):
     ""
-    return set(s).issubset( allowable_chars )
+    ex = replace_forward_slashes( expr, negate )
+
+    wx = WordExpression( ex )
+    check_wildcard_expression_words( wx.getWordList() )
+
+    return ex

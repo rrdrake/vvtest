@@ -235,25 +235,6 @@ class generate_tests( vtu.vvtestTestCase ):
 
         vtu.runvvtest( 'one' ).assertCounts( total=3, npass=3 )
 
-    def test_that_multiple_tests_in_one_xml_file_works(self):
-        ""
-        util.writefile( "multi.xml", """
-            <rtest name="multi">
-              <rtest name="multi_2nd"/>
-              <keywords> common </keywords>
-              <keywords testname="multi"> justmulti </keywords>
-              <keywords testname="multi_2nd"> just2nd </keywords>
-              <execute> echo "test name ${NAME}XXX" </execute>
-            </rtest>""" )
-        time.sleep(1)
-
-        vrun = vtu.runvvtest()
-        vrun.assertCounts( total=2, npass=2 )
-
-        assert len( util.findfiles( 'execute.log', 'TestResults*' ) ) == 2
-        assert vrun.countGrepLogs( 'test name multiXXX' ) == 1
-        assert vrun.countGrepLogs( 'test name multi_2ndXXX' ) == 1
-
     def test_selection_by_keyword_when_multiple_tests_are_in_one_file(self):
         ""
         util.writefile( "multi.xml", """

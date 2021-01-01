@@ -17,6 +17,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.errors import TestSpecError
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testcreator as testcreator
 import libvvtest.parsexml as parsexml
@@ -386,6 +387,9 @@ class parameter_tests( vtu.vvtestTestCase ):
 
     def test_parameterize_parse_errors(self):
         ""
+        util.writefile( 'err0.vvt', """
+            #VVT: parameterize : 
+            """ )
         util.writefile( 'err1.vvt', """
             #VVT: parameterize : np =
             """ )
@@ -426,54 +430,87 @@ class parameter_tests( vtu.vvtestTestCase ):
             """ )
         time.sleep(1)
 
+        parser = parsevvt.ScriptTestParser( 'err0.vvt' )
+        self.assertRaises( TestSpecError,
+                           parser.parseParameterSet, 'err0' )
+
         parser = parsevvt.ScriptTestParser( 'err1.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err1' )
 
         parser = parsevvt.ScriptTestParser( 'err2.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err2' )
 
         parser = parsevvt.ScriptTestParser( 'err3.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err3' )
 
         parser = parsevvt.ScriptTestParser( 'err4.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err4' )
 
         parser = parsevvt.ScriptTestParser( 'err4b.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err4b' )
 
         parser = parsevvt.ScriptTestParser( 'err5.vvt', force_params={'np':'3'} )
         parser.parseParameterSet( 'err5' )
         parser = parsevvt.ScriptTestParser( 'err5.vvt', force_params={'dt':'0.2'} )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err5' )
 
         parser = parsevvt.ScriptTestParser( 'err6.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err6' )
 
         parser = parsevvt.ScriptTestParser( 'err7.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err7' )
 
         parser = parsevvt.ScriptTestParser( 'err8.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err8' )
 
         parser = parsevvt.ScriptTestParser( 'err9.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err9' )
 
         parser = parsevvt.ScriptTestParser( 'err10.vvt' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err10' )
 
         parser = parsevvt.ScriptTestParser( 'ok11.vvt' )
         parser.parseParameterSet( 'ok11' )
+
+    def test_for_invalid_parameters_expression(self):
+        ""
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+              <parameterize foo="bar baz"/>
+              <execute parameters="foo=b$ar"> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            #VVT: depends on (parameters="foo=b$ar") : blah
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            #VVT: depends on (parameters="foo=b^ar") : blah
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: parameterize : foo = bar baz
+            #VVT: depends on (parameters="foo=b*ar") : blah
+            """ )
+        time.sleep(1)
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'atest.xml' )
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'btest.vvt' )
+        assert len( vtu.create_tests_from_file( 'ctest.vvt' ) ) == 2
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'dtest.vvt' )
 
     def test_for_duplicate_parameters_in_xml_form(self):
         ""
@@ -495,15 +532,37 @@ class parameter_tests( vtu.vvtestTestCase ):
         time.sleep(1)
 
         parser = parsexml.XMLTestParser( 'err1.xml' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err1' )
 
         parser = parsexml.XMLTestParser( 'ok1.xml' )
         parser.parseParameterSet( 'ok1' )
 
         parser = parsexml.XMLTestParser( 'err2.xml' )
-        self.assertRaises( testcreator.TestSpecError,
+        self.assertRaises( TestSpecError,
                            parser.parseParameterSet, 'err2' )
+
+    def test_command_line_non_alphanumeric_parameter_values(self):
+        ""
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+                <parameterize foo="bar^6"/>
+                <execute> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize : foo = bar^6
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( "-p foo=bar^6" )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['atest.foo=bar^6', 'btest.foo=bar^6']
+
+        vrun = vtu.runvvtest( "-w -p foo@=bar^6", raise_on_error=False )
+        assert vrun.x != 0
+
+        vrun = vtu.runvvtest( "-w -p foo=bar*6", raise_on_error=False )
+        assert vrun.x != 0
 
 
 #####################################################################

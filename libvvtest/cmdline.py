@@ -13,6 +13,7 @@ from . import argutil
 from .keyexpr import create_keyword_expression
 from .platexpr import create_platform_expression
 from .paramexpr import create_parameter_expression
+from . import wordcheck
 
 
 def parse_command_line( argvlist, vvtest_version=None ):
@@ -903,9 +904,11 @@ def clean_on_off_options( on_options, off_options ):
 
     if on_options:
         onL = gather_on_off_values( on_options )
+        wordcheck.check_words( onL )
 
     if off_options:
         offL = gather_on_off_values( off_options )
+        wordcheck.check_words( offL )
 
     return onL, offL
 

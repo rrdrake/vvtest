@@ -156,6 +156,50 @@ class Parse_Dependencies( vtu.vvtestTestCase ):
 
         assert get_depencency_expr( tL[0], 'testZ' ) == None
 
+    def test_result_expression_corner_cases(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: testname = venus (depends on=pluto.*, result="pass or fail")
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: testname = venus (depends on=pluto.*, result="pass or not*")
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: testname = venus (depends on=pluto.*, result="pass or fa^l")
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: depends on (result="pass or fail") : foobar
+            """ )
+        util.writefile( 'etest.vvt', """
+            #VVT: depends on (result="pass or not*") : foobar
+            """ )
+        util.writefile( 'ftest.vvt', """
+            #VVT: depends on (result="pass or fa^l") : foobar
+            """ )
+        util.writefile( 'gtest.vvt', """
+            #VVT: depends on (result="pass or lazy") : foobar
+            """ )
+        time.sleep(1)
+
+        vtu.parse_single_test_file( 'atest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'btest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'ctest.vvt' )
+
+        vtu.parse_single_test_file( 'dtest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'etest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'ftest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'gtest.vvt' )
+
 
 def assert_dependencies( tspec, *check_names ):
     ""

@@ -17,8 +17,10 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-from libvvtest.testcreator import TestCreator
 from libvvtest.errors import TestSpecError
+
+from libvvtest.testcreator import TestCreator
+from libvvtest.parseutil import evaluate_platform_expr
 from libvvtest.platexpr import PlatformExpression
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.testcase import TestCase
@@ -145,55 +147,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
             print3( ti )
         assert len(tL) == 6
 
-    def test_specifying_keywords(self):
-        ""
-        util.writefile( 'bad1.xml', """
-            <rtest>
-              <keywords> junk1 junk2 </keywords>
-            </rtest>""" )
-
-        self.assertRaises( TestSpecError, create_tests, 'bad1.xml' )
-
-        util.writefile( 'bad2.xml', """
-            <rtest name="ate/st">
-              <keywords> junk1 junk2 </keywords>
-            </rtest>""" )
-
-        self.assertRaises( TestSpecError, create_tests, 'bad2.xml' )
-
-        util.writefile( 'bad3.xml', """
-            <rtest name="atest">
-              <keywords> junk1 ju/nk2 </keywords>
-            </rtest>""" )
-
-        self.assertRaises( TestSpecError, create_tests, 'bad3.xml' )
-
-        util.writefile( 'ok1.xml', """
-            <rtest name="atest">
-              <keywords> junk1 junk2 </keywords>
-            </rtest>""" )
-
-        tL = create_tests( 'ok1.xml' )
-        assert len(tL) == 1
-        kL = tL[0].getKeywords()
-        kL.sort()
-        assert kL == [ 'atest', 'junk1', 'junk2', 'ok1' ]
-
-        util.writefile( 'ok2.xml', """
-            <rtest name="atest">
-              <keywords> junk1 </keywords>
-              <execute name="exename"> # none </execute>
-              <keywords> junk2 </keywords>
-            </rtest>""" )
-
-        tL = create_tests( 'ok2.xml' )
-        assert len(tL) == 1
-        kL = tL[0].getKeywords()
-        kL.sort()
-        assert kL == [ 'atest', 'exename', 'junk1', 'junk2', 'ok2' ]
-        assert tL[0].hasKeyword('atest')
-        assert not tL[0].hasKeyword('junk')
-
     def test_specifying_parameters(self):
         ""
         util.writefile( 'bad4.xml', """
@@ -217,6 +170,13 @@ class XML_test_specifications( vtu.vvtestTestCase ):
 
         self.assertRaises( TestSpecError, create_tests, 'bad6.xml' )
 
+        util.writefile( 'bad6b.xml', """
+            <rtest name="atest">
+              <parameterize foo.bar="baz"/>
+            </rtest>""" )
+
+        self.assertRaises( TestSpecError, create_tests, 'bad6b.xml' )
+
         util.writefile( 'bad7.xml', """
             <rtest name="atest">
               <parameterize p="val1 val/2"/>
@@ -233,21 +193,16 @@ class XML_test_specifications( vtu.vvtestTestCase ):
 
         util.writefile( 'ok3a.xml', """
             <rtest name="atest">
-              <parameterize pname="val1 val2"/>
+              <parameterize pname="val1 val2 val^9"/>
             </rtest>""" )
 
         tL = create_tests( 'ok3a.xml' )
-        assert len(tL) == 2
-        kys = set( [ t.getID() for t in tL ] )
-        assert len(kys) == 2, "keys must be unique"
-        pL = []
-        for t in tL:
-          parms = t.getParameters()
-          for (n,v) in parms.items():
-            pL.append( n+'='+v )
+        assert len(tL) == 3
+        assert len( set( [ t.getID() for t in tL ] ) ) == 3  # IDs are unique
+        pL = [ list(t.getParameters().items())[0] for t in tL ]
         pL.sort()
         print3( "param list", pL )
-        assert pL[0] == 'pname=val1' and pL[1] == 'pname=val2'
+        assert pL == [('pname','val1'), ('pname','val2'), ('pname','val^9')]
 
         util.writefile( 'ok4.xml', """
             <rtest name="atest">
@@ -610,6 +565,18 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         create_test_and_eval_platform_expr( 'ok14f.xml', 'PLAT', True,
                                             option_list=['opt'] )
 
+    def test_evaluate_platform_expr_utility(self):
+        ""
+        assert evaluate_platform_expr( 'foo', 'foo or bar' )
+
+        assert not evaluate_platform_expr( 'baz', 'foo or bar' )
+
+        self.assertRaises( Exception,
+                    evaluate_platform_expr, 'foo', 'foo or b$ar' )
+
+        assert evaluate_platform_expr( 'foo-bar', 'foo-*' )
+        assert not evaluate_platform_expr( 'foobar', 'foo-*' )
+
     def test_parameterize_with_platform_filtering(self):
         ""
         util.writefile( 'ok15.xml', """
@@ -719,6 +686,7 @@ class XML_test_specifications( vtu.vvtestTestCase ):
               <execute> set dummy = 10 </execute>
               <execute name="unixdiff"> filename1 filename2 </execute>
               <execute expect="anyexit"> echo "dummy = $dummy" </execute>
+              <execute ifdef="_NAME"> # frag </execute>
             </rtest>""" )
 
         tL = create_tests( 'ok25.xml' )
@@ -734,13 +702,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         assert xL[2][0] == None
         assert xL[2][1] == 'echo "dummy = $dummy"'
         assert xL[2][2] == 'anyexit'
-
-        util.writefile( 'bad22a.xml', """
-            <rtest name="atest">
-              <execute ifdef="_NAME"> # frag </execute>
-            </rtest>""" )
-
-        self.assertRaises( TestSpecError, create_tests, 'bad22a.xml' )
 
         util.writefile( 'bad22b.xml', """
             <rtest name="atest">
@@ -764,7 +725,6 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         tL = create_tests( 'ok25a.xml' )
         assert len(tL) == 1
         t = tL[0]
-        print3( t.getExecutionList() )
         assert len( t.getExecutionList() ) == 0, \
                "VNAME should have to be in the environment"
         os.environ[ 'VNAME' ] = "somevalue"
@@ -1101,14 +1061,50 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         ""
         util.writefile( 'ok35.xml', """
             <rtest name="atest">
-              <include options="2D and ( tridev or tri8 )"/>
+                <include options="2D and ( tridev or tri8 )"/>
             </rtest>""" )
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+                <execute options="foo or b/r"> echo "hello" </execute>
+            </rtest>""" )
+        util.writefile( 'xtest.xml', """
+            <rtest name="xtest">
+                <timeout options="foo or bar-*" value="1234"/>
+            </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: link (options="foo or b^r") : file.txt
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: link (options="foo or b$r") : file.txt
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: timeout (options="foo or bar-*") : 1234
+            """ )
+        time.sleep(1)
 
         create_and_eval_option_expr( 'ok35.xml', [], False )
         create_and_eval_option_expr( 'ok35.xml', ['2D','tridev'], True )
         create_and_eval_option_expr( 'ok35.xml', ['2D','tri8'], True )
         create_and_eval_option_expr( 'ok35.xml', ['3D','tri8'], False )
         create_and_eval_option_expr( 'ok35.xml', ['tri8','2D','tridev'], True )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'atest.xml' )
+
+        tspec = vtu.parse_single_test_file( 'xtest.xml', optionlist=['baz'] )
+        assert tspec.getTimeout() is None
+        tspec = vtu.parse_single_test_file( 'xtest.xml', optionlist=['bar-baz'] )
+        assert tspec.getTimeout() == 1234
+
+        vtu.parse_single_test_file( 'btest.vvt' )
+
+        self.assertRaises( TestSpecError,
+                           vtu.parse_single_test_file, 'ctest.vvt' )
+
+        tspec = vtu.parse_single_test_file( 'dtest.vvt', optionlist=['baz'] )
+        assert tspec.getTimeout() is None
+        tspec = vtu.parse_single_test_file( 'dtest.vvt', optionlist=['bar-baz'] )
+        assert tspec.getTimeout() == 1234
 
     def test_parameterize_analyze_combinations(self):
         ""

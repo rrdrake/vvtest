@@ -7,6 +7,9 @@
 from .wordexpr import WordExpression
 from .wordexpr import replace_forward_slashes
 from .wordexpr import join_expressions_with_AND
+from .wordcheck import allowable_param_value
+from .wordcheck import check_variable_name
+from .wordcheck import check_expression_words
 
 
 def create_parameter_expression( param_expr_list, not_param_expr_list ):
@@ -98,33 +101,58 @@ class ParameterExpression:
         """
         Returns an instance of an evaluation class based on the word.
         """
-        if not word: raise ValueError( 'empty word (expected a word)' )
+        if not word:
+            raise ValueError( 'empty word (expected a word)' )
+
+        if not allowable_param_value( word ):
+            raise ValueError( 'invalid word: '+repr(word) )
+
         if word[0] == '!':
             f = self._make_func( word[1:] )
             f.negate = not f.negate
             return f
+
         L = word.split( '<=', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
             if not L[1]: raise ValueError( "empty less-equal value" )
+            check_expression_words( [L[1]] )
             return EvalLE( L[0], L[1] )
+
         L = word.split( '>=', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
             if not L[1]: raise ValueError( "empty greater-equal value" )
+            check_expression_words( [L[1]] )
             return EvalGE( L[0], L[1] )
+
         L = word.split( '!=', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
+            check_expression_words( [L[1]] )
             return EvalNE( L[0], L[1] )
+
         L = word.split( '<', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
             if not L[1]: raise ValueError( "empty less-than value" )
+            check_expression_words( [L[1]] )
             return EvalLT( L[0], L[1] )
+
         L = word.split( '>', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
             if not L[1]: raise ValueError( "empty greater-than value" )
+            check_expression_words( [L[1]] )
             return EvalGT( L[0], L[1] )
+
         L = word.split( '=', 1 )
         if len(L) > 1:
+            check_variable_name( L[0] )
+            check_expression_words( [L[1]] )
             return EvalEQ( L[0], L[1] )
+
+        check_variable_name( word )
         return EvalEQ( word, '' )
 
 

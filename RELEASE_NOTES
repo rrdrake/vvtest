@@ -1,6 +1,19 @@
 
 Improvements:
 
+    - Wildcard expressions (aka glob'ing) has been added. On the command line,
+      wildcards are allowed for -k, -K, -x, and -X. For example,
+
+          $ vvtest -k "foo*"
+
+      would select all tests that have a keyword starting with "foo". In test
+      files, wildcards are allowed in expressions for testname, platform, and
+      options. For example,
+
+          #VVT: parameterize (testname=foo*) : np = 32
+          #VVT: link (platforms="CTS-* or Linux") : file.in
+          #VVT: timeout (options="intel or cuda-*") : 1234
+
     - The curl program can now be used to submit CDash results data. Add
       "method=curl" to your --cdash attributes, such as
 
@@ -38,6 +51,16 @@ Fixes:
     - 
 
 Changes:
+
+    - By default, the name of a test is the basename of the test filename.
+      For example, the test name of the test produced by file "atest.vvt"
+      will be "atest". This basename is now checked for validity (it must
+      be a valid test name, which means no spaces or certain special
+      characters like an astrisk or square bracket). Note that the test name
+      can be specified in the file content, in which case the filename does
+      not matter. For example, one could add
+
+          #VVT: testname = foobar
 
     - The option given to a test script when the command line -a or --analyze
       option was given to vvtest is '--execute-analysis-sections'. The old

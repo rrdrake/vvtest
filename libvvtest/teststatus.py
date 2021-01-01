@@ -7,6 +7,8 @@
 import sys, os
 import time
 
+from .wordcheck import check_variable_name
+
 
 RESULTS_KEYWORDS = [ 'notrun', 'notdone',
                      'fail', 'diff', 'pass',
@@ -55,7 +57,7 @@ class TestStatus:
         """
         Set a name to value pair.  The name can only contain a-zA-Z0-9 and _.
         """
-        check_valid_attr_name( name )
+        check_variable_name( name )
         self.attrs[name] = value
 
     def hasAttr(self, name):
@@ -289,15 +291,6 @@ class TestStatus:
         ""
         self.markDone( 1 )
         self.attrs['result'] = 'timeout'
-
-
-valid_varname_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
-
-def check_valid_attr_name( name ):
-    ""
-    for c in name:
-        if c not in valid_varname_chars:
-            raise ValueError( "character '" + c + "' not allowed in name" )
 
 
 def copy_test_results( to_tstat, from_tstat ):
