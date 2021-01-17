@@ -1,0 +1,305 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST: vvtest
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import abspath, basename, splitext
+import time
+import subprocess
+import signal
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+
+
+"""
+the bash man page uses the term "background process" for one that
+belongs to its own process group
+
+on UNIX, a subprocess can be placed into its own process group like this
+
+    subprocess.Popen( cmd, preexec_fn=lambda: os.setpgid(0,0) )  # python < 3.2
+    subprocess.Popen( cmd, start_new_session=True )              # python >= 3.2
+
+all processes in a process group can be sent the same signal using
+one call, such as os.kill()
+
+using info from "man 3 kill",
+
+    os.kill( 0, sig )    : send to all processes whose process group ID
+                           is the same as the current process
+
+    os.kill( -pid, sig ) : send to all processes whose process group ID
+                           is equal to pid
+
+"""
+
+
+class process_groups( vtu.vvtestTestCase ):
+
+    def write_simple_job_script(self, filename='job'):
+        ""
+        out = abspath( splitext( basename( filename ) )[0] + '.out' )
+
+        util.writefile( filename, """
+            import os, sys, time
+            ids = [ os.getpid(),os.getppid(),os.getpgrp(),os.getsid(0) ]
+            with open( '"""+out+"""', 'wt' ) as fp:
+                fp.write( ' '.join( [ str(i) for i in ids ] ) + os.linesep )
+            """ )
+
+        return abspath( filename )
+
+    def get_job_ids(self, filename='job.out'):
+        ""
+        with open( filename, 'rt' ) as fp:
+            return [ int(i) for i in fp.read().strip().split() ]
+
+    def test_subprocess_pid_and_group_and_session(self):
+        ""
+        fname = self.write_simple_job_script()
+        spid = run_python_script( fname )
+        ids = self.get_job_ids()
+
+        print3( 'IT:', *ids )
+        print3( 'ME:', os.getpid(), os.getppid(), os.getpgrp(), os.getsid(0) )
+
+        assert ids[0] == spid
+        assert ids[1] == os.getpid()
+        assert ids[2] == os.getpgrp()
+        assert ids[3] == os.getsid(0)
+
+    def test_subprocess_in_a_separate_process_group(self):
+        ""
+        fname = self.write_simple_job_script()
+        spid = run_python_script( fname, background=True )
+        ids = self.get_job_ids()
+
+        print3( 'IT:', *ids )
+        print3( 'ME:', os.getpid(), os.getppid(), os.getpgrp(), os.getsid(0) )
+
+        assert ids[0] == spid
+        assert ids[1] == os.getpid()
+        assert ids[2] != os.getpgrp() and ids[2] == ids[0]
+        assert ids[3] == os.getsid(0)
+
+    def write_job_which_launches_a_script(self, filename='job',
+                                                scriptname='script',
+                                                background=False ):
+        ""
+        out = abspath( splitext( basename( filename ) )[0] + '.out' )
+
+        util.writefile( filename, """
+            import os, sys, time, subprocess
+
+            ids = [ os.getpid(),os.getppid(),os.getpgrp(),os.getsid(0) ]
+            with open( '"""+out+"""', 'wt' ) as fp:
+                fp.write( ' '.join( [ str(i) for i in ids ] ) + os.linesep )
+
+            kwargs = {}
+            if """+repr(background)+""":
+                mj,mn = sys.version_info[:2]
+                if mj < 3 or (mj == 3 and mn < 2):
+                    kwargs['preexec_fn'] = lambda: os.setpgid(0,0)
+                else:
+                    kwargs['start_new_session'] = True
+            sp = subprocess.Popen( [sys.executable,'"""+scriptname+"""'], **kwargs )
+            try:
+                sp.wait()
+            except:
+                os._exit(1)
+            """ )
+
+    def test_subprocess_of_a_subprocess(self):
+        ""
+        self.write_job_which_launches_a_script()
+        self.write_simple_job_script( 'script' )
+
+        spid = run_python_script( 'job' )
+
+        ids1 = self.get_job_ids( 'job.out' )
+        ids2 = self.get_job_ids( 'script.out' )
+
+        print3( 'me :', os.getpid(), os.getppid(), os.getpgrp(), os.getsid(0) )
+        print3( 'job:', *ids1 )
+        print3( 'sub:', *ids2 )
+
+        assert ids1[0] == spid
+        assert ids1[1] == os.getpid() and ids2[1] == ids1[0]
+        assert ids1[2] == os.getpgrp() and ids2[2] == os.getpgrp()
+        assert ids1[3] == os.getsid(0) and ids2[3] == os.getsid(0)
+
+    def test_sub_sub_process_in_background(self):
+        ""
+        self.write_job_which_launches_a_script( background=True )
+        self.write_simple_job_script( 'script' )
+
+        spid = run_python_script( 'job' )
+
+        ids1 = self.get_job_ids( 'job.out' )
+        ids2 = self.get_job_ids( 'script.out' )
+
+        print3( 'me :', os.getpid(), os.getppid(), os.getpgrp(), os.getsid(0) )
+        print3( 'job:', *ids1 )
+        print3( 'sub:', *ids2 )
+
+        assert ids1[0] == spid
+        assert ids1[1] == os.getpid() and ids2[1] == ids1[0]
+        assert ids1[2] == os.getpgrp() and ids2[2] != os.getpgrp()
+        #assert ids1[3] == os.getsid(0) and ids2[3] == os.getsid(0)
+
+    def test_signalling_a_process_group(self):
+        ""
+        exc = abspath( 'exc.txt' )
+        util.writefile( 'script', """
+            import os, sys, time
+            try:
+                time.sleep(15)
+            except KeyboardInterrupt:
+                with open( '"""+exc+"""', 'wt' ):
+                    pass
+            """ )
+        self.write_job_which_launches_a_script( background=False )
+
+        t0 = time.time()
+        sp = run_python_script( 'job', background=True, wait=False )
+
+        time.sleep(1)
+        os.killpg( sp.pid, signal.SIGINT )
+        # can also be os.kill( -sp.pid, signal.SIGINT )
+
+        try:
+            while not os.path.exists('exc.txt'):
+                assert time.time()-t0 < 15
+                time.sleep(0.5)
+        finally:
+            sp.wait()
+
+    def test_a_child_in_its_own_process_group_does_not_recv_signals(self):
+        ""
+        done = abspath( 'done.txt' )
+        util.writefile( 'script', """
+            import os, sys, time
+            time.sleep(5)
+            with open( '"""+done+"""', 'wt' ):
+                pass
+            """ )
+        self.write_job_which_launches_a_script( background=True )
+
+        t0 = time.time()
+        sp = run_python_script( 'job', background=True, wait=False )
+
+        time.sleep(2)
+        os.killpg( sp.pid, signal.SIGINT )
+        sp.wait()
+
+        assert time.time()-t0 < 5
+
+        while not os.path.exists('done.txt'):
+            assert time.time()-t0 < 15
+            time.sleep(0.5)
+
+    def test_an_orphan_forms_by_the_death_of_its_parent(self):
+        ""
+        util.writefile( 'script', """
+            import os, sys, time
+            ppid0 = os.getppid()
+            os.chdir( '"""+os.getcwd()+"""' )
+            with open( 'monitor.txt', 'wt' ) as fp:
+                fp.write( str(ppid0)+os.linesep )
+                for i in range(20):
+                    ppid = os.getppid()
+                    if ppid == 1 or ppid != ppid0:
+                        fp.write( str(ppid)+os.linesep )
+                        break
+                    time.sleep(0.5)
+            with open( 'done.txt', 'wt' ):
+                pass
+            """ )
+        self.write_job_which_launches_a_script( background=True )
+
+        t0 = time.time()
+        sp = run_python_script( 'job', background=True, wait=False )
+        spid = sp.pid
+
+        time.sleep(2)
+        os.killpg( sp.pid, signal.SIGINT )
+        sp.wait()
+
+        while not os.path.exists('done.txt'):
+            assert time.time()-t0 < 12
+            time.sleep(0.5)
+
+        pid0,pid1 = util.readfile('monitor.txt').strip().split()
+        print3( pid0, pid1 )
+        assert pid0 != pid1 and int(pid1) == 1
+
+    def test_using_a_thread_to_self_detect_an_orphan(self):
+        ""
+        util.writefile( 'script', """
+            import os, sys, time, signal, threading
+
+            class SignalOnOrphan( threading.Thread ):
+                def __init__(self, sig=signal.SIGTERM):
+                    threading.Thread.__init__(self)
+                    self.daemon = True
+                    self.sig = sig
+                    self.start()
+                def run(self):
+                    while True:
+                        if os.getppid() == 1:
+                            os.kill( 0, self.sig )
+                            break
+                        time.sleep(0.5)
+
+            thr = SignalOnOrphan( signal.SIGINT )
+
+            try:
+                time.sleep(15)
+            except KeyboardInterrupt:
+                with open( 'exc.txt', 'wt' ):
+                    pass
+            """ )
+        self.write_job_which_launches_a_script( background=True )
+
+        t0 = time.time()
+        sp = run_python_script( 'job', background=True, wait=False )
+        spid = sp.pid
+
+        time.sleep(2)
+        os.killpg( sp.pid, signal.SIGINT )
+        sp.wait()
+
+        while not os.path.exists('exc.txt'):
+            assert time.time()-t0 < 12
+            time.sleep(0.5)
+
+
+def run_python_script( filename, background=False, wait=True ):
+    ""
+    kwargs = {}
+    if background:
+        kwargs['preexec_fn'] = lambda: os.setpgid(0,0)
+
+    sp = subprocess.Popen( sys.executable+' '+filename, shell=True, **kwargs )
+
+    if wait:
+        spid = sp.pid
+        x = sp.wait()
+        assert x == 0
+        return spid
+    else:
+        return sp
+
+
+########################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
