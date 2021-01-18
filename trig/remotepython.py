@@ -371,8 +371,8 @@ class OrphanSuicide( threading.Thread ):
 """
 
 bootstrap_waitloop = """
-line = sys.stdin.readline()
 thr = OrphanSuicide()
+line = sys.stdin.readline()
 while line:
     lines = eval( line.strip() )
     _remotepython_eval_lines( lines )
