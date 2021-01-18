@@ -44,14 +44,13 @@ class PythonProxy( object ):
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshcmd='ssh -t -t',
+                       sshcmd='ssh',
                        bashlogin=False,
                        logfile=None ):
         """
         If 'machine' is given, use ssh to run python on that machine.
         The 'pythonexe' is the remote python interpreter.
-        The 'sshcmd' is the path to ssh with any options. The options -t -t
-        are used to ensure remote subprocesses receive a SIGHUP/SIGTERM.
+        The 'sshcmd' is the path to ssh with any options.
         If 'bashlogin' is True, run python under "/bin/bash -l" (a login shell).
         The 'logfile' can be a filename or a file-like object.
         """

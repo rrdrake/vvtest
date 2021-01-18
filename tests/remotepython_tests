@@ -15,6 +15,7 @@ import time
 import unittest
 from textwrap import dedent
 import subprocess
+import signal
 
 try:
   from StringIO import StringIO
@@ -503,7 +504,7 @@ class integration_tests( unittest.TestCase ):
                                                True )
         assert 'foobar' not in ''.join( cmdL )
         assert cmdL[0] == '/bin/bash'
-        assert len( filter( lambda s: '/opt/super py' in s, cmdL ) ) == 1
+        assert len( list( filter( lambda s: '/opt/super py' in s, cmdL ) ) )== 1
 
         cmdL = remotepython.bootstrap_command( '/opt/super py',
                                                'sparky',
@@ -517,7 +518,7 @@ class integration_tests( unittest.TestCase ):
                                                '/opt/foobar -o baz',
                                                True )
         assert '/opt/super py' in ''.join( cmdL )
-        assert len( filter( lambda s: s.startswith('/bin/bash'), cmdL ) ) == 1
+        assert len( list( filter( lambda s: s.startswith('/bin/bash'), cmdL ) ) ) == 1
 
     def test_connecting_with_ssh_but_using_a_fake_ssh_script(self):
         ""
@@ -651,6 +652,68 @@ class integration_tests( unittest.TestCase ):
 
         assert len( util.grepfiles( 'SND: *hello good buddy', 'logfile' ) ) == 1
         assert len( util.grepfiles( 'OUT: hello good buddy', 'logfile' ) ) == 1
+
+    def test_simulating_ssh_behavior_of_separate_process_group(self):
+        """
+        by default, ssh puts the remote process into its own process group,
+        which means it does not receive signals and will become orphaned if
+        the local ssh process dies, such as with Ctrl-C (the orphaned process
+        will keep running until pipe I/O causes a crash)
+
+        to simulate this, the fake ssh script can be made to run the python
+        subprocess in the background
+        """
+        # first, check that by default, the process group ID is the same as me
+        fakessh = write_fake_ssh_script()
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        ppid,pgrp = [ int(x) for x in out.strip().split() ]
+        assert pgrp == os.getpgrp()
+
+        # then check that the 'background' option puts the process in its
+        # own process group
+        fakessh = write_fake_ssh_script( background=True )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        ppid,pgrp = [ int(x) for x in out.strip().split() ]
+        assert pgrp != os.getpgrp()
+
+        # finally, kill the fake ssh wrapper, and check that the "remote"
+        # python process dies too
+        fakessh = write_fake_ssh_script( background=True )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
+            ppid,pgrp = [ int(x) for x in out.strip().split() ]
+            rem.execute( 'import time; ' + \
+                         'time.sleep(4); ' + \
+                         'fp=open("'+abspath('alive.txt')+'","wt"); ' + \
+                         'fp.close()' )
+            time.sleep(1)
+            os.kill( ppid, signal.SIGTERM )
+        finally:
+            rem.close()
+        time.sleep(5)
+        # if the "remote" python process does not die, this file is created
+        assert not os.path.exists('alive.txt')
 
     def test_that_remote_traceback_includes_code_lines(self):
         ""
@@ -975,7 +1038,8 @@ def flush_lines_from_remote( rem ):
 
 
 def write_fake_ssh_script( die_fast=False, fake_pause=None,
-                           to_stdout=None, to_stderr=None ):
+                           to_stdout=None, to_stderr=None,
+                           background=False ):
     ""
     lineL = [ '#!'+sys.executable,
               'import sys, os, subprocess, shlex, time' ]
@@ -996,8 +1060,18 @@ def write_fake_ssh_script( die_fast=False, fake_pause=None,
 
     lineL.extend( [ 'cmdL = []',
                     'for arg in sys.argv[2:]:  # exclude the machine name',
-                    '    cmdL.extend( shlex.split( arg ) )',
-                    'subprocess.check_call( cmdL )' ] )
+                    '    cmdL.extend( shlex.split( arg ) )' ] )
+    if background:
+        mj,mn = sys.version_info[:2]
+        if mj < 3 or (mj == 3 and mn < 2):
+            lineL.append(
+                'sp = subprocess.Popen( cmdL, preexec_fn=lambda: os.setpgid(0,0) )' )
+        else:
+            lineL.append(
+                'sp = subprocess.Popen( cmdL, start_new_session=True )' )
+        lineL.append( 'sp.wait()' )
+    else:
+        lineL.append( 'subprocess.check_call( cmdL )' )
 
     util.writescript( 'fakessh', '\n'.join( lineL ) )
 

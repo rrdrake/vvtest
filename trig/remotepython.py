@@ -18,12 +18,13 @@ class RemotePython:
 
     def __init__(self, machine=None,
                        pythonexe='python',
-                       sshcmd='ssh -t -t',
+                       sshcmd='ssh',
                        bashlogin=False,
                        logfile=None ):
         """
-        The 'sshcmd' is the path to ssh with any options. The options -t -t
-        are used to ensure remote subprocesses receive a SIGHUP/SIGTERM.
+        The 'sshcmd' is the path to ssh followed by any options. Note that
+        using ssh -t -t (two -t options) to force a tty may break the
+        communication tunnel.
         """
         self.started = False
 
@@ -290,8 +291,9 @@ def bootstrap_command( pythonexe, machine, sshcmd, bashlogin ):
 
 
 bootstrap_preamble = """\
-import sys
+import sys, os
 sys.dont_write_bytecode = True
+import signal, threading, time
 import traceback, linecache
 
 _remotepython_eval_count = 0
@@ -347,10 +349,30 @@ def _remotepython_eval_lines( lines ):
     except Exception:
         traceback.print_exc()
         sys.exit(1)
+
+class OrphanSuicide( threading.Thread ):
+    def __init__(self):
+        threading.Thread.__init__(self)
+        self.daemon = True
+        try:
+            ppgrp = os.getpgid( os.getppid() )
+        except Exception:
+            pass
+        else:
+            # only engage if I am in a different process group than my parent
+            if ppgrp != os.getpgrp():
+                self.start()
+    def run(self):
+        while True:
+            if os.getppid() == 1:
+                os.kill( 0, signal.SIGTERM )
+                break
+            time.sleep(0.5)
 """
 
 bootstrap_waitloop = """
 line = sys.stdin.readline()
+thr = OrphanSuicide()
 while line:
     lines = eval( line.strip() )
     _remotepython_eval_lines( lines )
