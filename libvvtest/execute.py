@@ -339,7 +339,8 @@ def start_test( xlist, tcase, platform, is_baseline=False ):
 
     texec = tcase.getExec()
     texec.setResourceObject( obj )
-    texec.start( is_baseline )
+
+    texec.start( texec.handler.prepare_for_launch, is_baseline )
 
     tcase.getStat().markStarted( texec.getStartTime() )
 
