@@ -31,6 +31,9 @@ class TestExec:
         self.tstart = None
         self.tstop = None
 
+        self.timedout = None     # time.time() if the test times out
+        self.exit_status = None  # subprocess exit status or None if timed out
+
     def setRunDirectory(self, rundir):
         ""
         self.rundir = rundir
@@ -65,7 +68,6 @@ class TestExec:
         """
         assert self.pid == None
 
-        self.timedout = 0  # holds time.time() if the test times out
         self.tstart = time.time()
 
         sys.stdout.flush() ; sys.stderr.flush()
@@ -79,46 +81,55 @@ class TestExec:
         ""
         return self.tstart
 
+    def isStarted(self):
+        ""
+        return self.tstart is not None
+
     def poll(self):
         """
+        returns True only if the test just finished
         """
-        if self.tstart == None:
-            return False
+        transition = False
 
-        if self.tstop != None:
-            return True
+        if self.isStarted() and not self.isDone():
 
-        assert self.pid > 0
+            assert self.pid > 0
 
-        cpid,code = os.waitpid( self.pid, os.WNOHANG )
+            cpid,code = os.waitpid( self.pid, os.WNOHANG )
 
-        if cpid > 0:
+            if cpid > 0:
 
-            # test finished
+                # test finished
 
-            self.tstop = time.time()
+                self.tstop = time.time()
 
-            if self.timedout > 0:
-                exit_status = None
-            else:
-                exit_status = decode_subprocess_exit_code( code )
+                if self.timedout is None:
+                    self.exit_status = decode_subprocess_exit_code( code )
 
-            self.handler.finishExecution( exit_status, self.timedout )
+                transition = True
 
-        elif self.timeout > 0:
-            # not done .. check for timeout
-            tm = time.time()
-            if tm-self.tstart > self.timeout:
-                if self.timedout == 0:
-                    # interrupt all processes in the process group
-                    self.signalJob( signal.SIGINT )
-                    self.timedout = tm
-                elif (tm - self.timedout) > interrupt_to_kill_timeout:
-                    # SIGINT isn't killing fast enough, use stronger method
-                    self.signalJob( signal.SIGTERM )
+            elif self.timeout > 0:
+                # not done .. check for timeout
+                tm = time.time()
+                if tm-self.tstart > self.timeout:
+                    if self.timedout is None:
+                        # interrupt all processes in the process group
+                        self.signalJob( signal.SIGINT )
+                        self.timedout = tm
+                    elif (tm - self.timedout) > interrupt_to_kill_timeout:
+                        # SIGINT isn't killing fast enough, use stronger method
+                        self.signalJob( signal.SIGTERM )
 
-        return self.tstop != None
-    
+        return transition
+
+    def isDone(self):
+        ""
+        return self.tstop is not None
+
+    def getExitInfo(self):
+        ""
+        return self.exit_status, self.timedout
+
     def signalJob(self, sig):
         """
         Sends a signal to the job, such as signal.SIGINT.
@@ -127,7 +138,7 @@ class TestExec:
             os.kill( self.pid, sig )
         except Exception:
             pass
-    
+
     def killJob(self):
         """
         Sends the job a SIGINT signal, waits a little, and if the job
@@ -136,10 +147,15 @@ class TestExec:
         self.signalJob( signal.SIGINT )
         time.sleep(2)
 
-        if self.poll() == None:
+        t1 = self.poll()
+
+        t2 = False
+        if not self.isDone():
             self.signalJob( signal.SIGTERM )
             time.sleep(5)
-            self.poll()
+            t2 = self.poll()
+        
+        return t1 or t2
 
     def _prepare_and_execute_test(self, is_baseline):
         ""
