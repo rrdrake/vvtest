@@ -40,8 +40,7 @@ class TestRunner:
         texec = tcase.getExec()
         tstat = tcase.getStat()
 
-        handler = ExecutionHandler( tcase,
-                                    self.perms,
+        handler = ExecutionHandler( self.perms,
                                     self.rtconfig,
                                     self.platform,
                                     self.usrplugin,
@@ -77,10 +76,9 @@ class TestRunner:
 
 class ExecutionHandler:
 
-    def __init__(self, tcase, perms, rtconfig, platform,
+    def __init__(self, perms, rtconfig, platform,
                        usrplugin, test_dir, commondb):
         ""
-        self.tcase = tcase
         self.perms = perms
         self.rtconfig = rtconfig
         self.platform = platform
@@ -183,7 +181,7 @@ class ExecutionHandler:
         print3( "Cleaning execute directory after execution..." )
 
         specform = tcase.getSpec().getSpecificationForm()
-        rundir = tcase.getExec().getRunDirectory()
+        rundir = tcase.getExec().getRunDirectory()  # magic: getExec makes cycle
 
         post_clean_execute_directory( rundir, specform )
 
@@ -215,22 +213,24 @@ class ExecutionHandler:
 
             self.perms.apply( os.path.abspath( "machinefile" ) )
 
-    def finishExecution(self, exit_status, timedout):
+    def finishExecution(self, tcase):
         ""
-        tspec = self.tcase.getSpec()
-        tstat = self.tcase.getStat()
+        tspec = tcase.getSpec()
+        tstat = tcase.getStat()
+
+        exit_status, timedout = tcase.getExec().getExitInfo()
 
         if timedout > 0:
             tstat.markTimedOut()
         else:
             tstat.markDone( exit_status )
 
-        rundir = self.tcase.getExec().getRunDirectory()
+        rundir = tcase.getExec().getRunDirectory()
         self.perms.recurse( rundir )
 
-        self.check_run_postclean( self.tcase )
+        self.check_run_postclean( tcase )
 
-        self.platform.returnResources( self.tcase.getExec().getResourceObject() )
+        self.platform.returnResources( tcase.getExec().getResourceObject() )
 
     def make_execute_command(self, tcase, baseline, pyexe):
         ""
@@ -252,35 +252,35 @@ class ExecutionHandler:
 
         return cmdL
 
-    def prepare_for_launch(self, baseline):
+    def prepare_for_launch(self, tcase, baseline):
         ""
-        self.check_redirect_output_to_log_file( self.tcase, baseline )
+        self.check_redirect_output_to_log_file( tcase, baseline )
 
-        if self.tcase.getSpec().getSpecificationForm() == 'xml':
-            self.write_xml_run_script( self.tcase )
+        if tcase.getSpec().getSpecificationForm() == 'xml':
+            self.write_xml_run_script( tcase )
         else:
-            self.write_script_utils( self.tcase )
+            self.write_script_utils( tcase )
 
-        tm = self.tcase.getExec().getTimeout()
+        tm = tcase.getExec().getTimeout()
         self.set_timeout_environ_variable( tm )
 
-        self.check_run_preclean( self.tcase, baseline )
-        self.check_write_mpi_machine_file( self.tcase )
-        self.check_set_working_files( self.tcase, baseline )
+        self.check_run_preclean( tcase, baseline )
+        self.check_write_mpi_machine_file( tcase )
+        self.check_set_working_files( tcase, baseline )
 
         set_PYTHONPATH( self.rtconfig.getAttr( 'vvtestdir' ),
                         self.rtconfig.getAttr( 'configdir' ) )
 
-        pyexe = self.apply_plugin_preload( self.tcase )
+        pyexe = self.apply_plugin_preload( tcase )
 
-        cmd_list = self.make_execute_command( self.tcase, baseline, pyexe )
+        cmd_list = self.make_execute_command( tcase, baseline, pyexe )
 
-        echo_test_execution_info( self.tcase.getSpec().getName(), cmd_list, tm )
+        echo_test_execution_info( tcase.getSpec().getName(), cmd_list, tm )
 
         print3()
 
         if baseline:
-            self.copyBaselineFiles( self.tcase )
+            self.copyBaselineFiles( tcase )
 
         return cmd_list
 

@@ -233,8 +233,7 @@ class DirectRunner( TestListRunner ):
         for tcase in list( self.xlist.getRunning() ):
             tx = tcase.getExec()
             if tx.poll():
-                x,t = tx.getExitInfo()
-                tx.handler.finishExecution( x, t )
+                tx.handler.finishExecution( tcase )
             if tx.isDone():
                 xs = XstatusString( tcase, self.test_dir, self.cwd )
                 print3( "Finished:", xs )
@@ -313,8 +312,7 @@ def run_baseline( xlist, plat ):
             time.sleep(1)
 
             if texec.poll():
-                x,t = texec.getExitInfo()
-                texec.handler.finishExecution( x, t )
+                texec.handler.finishExecution( tcase )
 
             if texec.isDone():
                 if tcase.getStat().passed():
@@ -326,8 +324,7 @@ def run_baseline( xlist, plat ):
 
         if not tcase.getStat().isDone():
             if texec.killJob():
-                x,t = texec.getExitInfo()
-                texec.handler.finishExecution( x, t )
+                texec.handler.finishExecution( tcase )
             failures = True
             print3( "TIMED OUT" )
 
@@ -342,7 +339,7 @@ def start_test( handler, tcase, platform, is_baseline=False ):
     texec = tcase.getExec()
     texec.setResourceObject( obj )
 
-    texec.start( handler.prepare_for_launch, is_baseline )
+    texec.start( handler.prepare_for_launch, tcase, is_baseline )
 
     tcase.getStat().markStarted( texec.getStartTime() )
 

@@ -469,7 +469,6 @@ class staged_parameters( vtu.vvtestTestCase ):
         xhand.check_run_preclean( tcase, False )
         assert xhand.numpreclean == 0
         tcase = vtu.make_fake_staged_TestCase( 0 )
-        xhand.setTestCase( tcase )
         xhand.check_run_preclean( tcase, False )
         assert xhand.numpreclean == 1
 
@@ -478,8 +477,8 @@ class staged_parameters( vtu.vvtestTestCase ):
         xhand,tcase = make_prepost_execution_handler()
         xhand.check_run_postclean( tcase )
         assert xhand.numpostclean == 0
-        xhand.tcase.getStat().markStarted( time.time() )
-        xhand.tcase.getStat().markDone( 0 )
+        tcase.getStat().markStarted( time.time() )
+        tcase.getStat().markDone( 0 )
         xhand.check_run_postclean( tcase )
         assert xhand.numpostclean == 0
         xhand.rtconfig.setAttr( 'postclean', True )
@@ -495,7 +494,6 @@ class staged_parameters( vtu.vvtestTestCase ):
         tcase = vtu.make_fake_staged_TestCase( 2 )
         tcase.getStat().markStarted( time.time() )
         tcase.getStat().markDone( 0 )
-        xhand.setTestCase( tcase )
         xhand.check_run_postclean( tcase )
         assert xhand.numpostclean == 1
 
@@ -695,7 +693,7 @@ class MockPrePostCleanExecutionHandler( testrunner.ExecutionHandler ):
 
     def __init__(self, tcase, rtconfig):
         ""
-        testrunner.ExecutionHandler.__init__( self, tcase, None, rtconfig,
+        testrunner.ExecutionHandler.__init__( self, None, rtconfig,
                                               None, None, None, None )
         self.numpreclean = 0
         self.numpostclean = 0
@@ -707,10 +705,6 @@ class MockPrePostCleanExecutionHandler( testrunner.ExecutionHandler ):
     def postclean(self, *args, **kwargs):
         ""
         self.numpostclean += 1
-
-    def setTestCase(self, tcase):
-        ""
-        self.tcase = tcase
 
 
 def make_prepost_execution_handler( **kwargs ):

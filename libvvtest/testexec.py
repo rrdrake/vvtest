@@ -52,6 +52,7 @@ class TestExec:
 
     def setExecutionHandler(self, handler):
         ""
+        # magic: remove this function
         self.handler = handler
 
     def setResourceObject(self, obj):
@@ -62,7 +63,7 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, execute_test_func, is_baseline):
+    def start(self, execute_test_func, tcase, is_baseline):
         """
         Launches the child process.
         """
@@ -75,7 +76,7 @@ class TestExec:
         self.pid = os_fork_with_retry( 10 )
         if self.pid == 0:
             # child process is the test itself
-            self.prepare_then_execute_test( execute_test_func, is_baseline )
+            self.prepare_then_execute_test( execute_test_func, tcase, is_baseline )
 
     def getStartTime(self):
         ""
@@ -157,12 +158,12 @@ class TestExec:
         
         return t1 or t2
 
-    def prepare_then_execute_test(self, launch_prep_func, is_baseline):
+    def prepare_then_execute_test(self, launch_prep_func, tcase, is_baseline):
         ""
         try:
             os.chdir( self.rundir )
 
-            cmd_list = launch_prep_func( is_baseline )
+            cmd_list = launch_prep_func( tcase, is_baseline )
 
             sys.stdout.flush() ; sys.stderr.flush()
 
