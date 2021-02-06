@@ -120,7 +120,11 @@ class FileSubmitter:
                 self.curl_submit( self.meth, submit_url, filename )
 
     def urllib_submit(self, submit_url, filename):
-        ""
+        """
+        for python3, the CA cert file can be given to the urlopen command with a kwarg, for example,
+            cafile='/etc/pki/tls/certs/ca-bundle.crt'
+        but that means adding a mechanism to manage where/how to get/find the CA file
+        """
         import urllib
 
         if hasattr( urllib, 'urlopen' ):
