@@ -222,7 +222,8 @@ class DirectRunner( TestListRunner ):
         tspec = tnext.getSpec()
         texec = tnext.getExec()
         print3( 'Starting:', exec_path( tspec, self.test_dir ) )
-        start_test( self.xlist, tnext, self.plat )
+        handler = tnext.getExec().handler
+        start_test( handler, tnext, self.plat )
         self.tlist.appendTestResult( tnext )
 
     def print_finished(self):
@@ -303,7 +304,8 @@ def run_baseline( xlist, plat ):
 
         sys.stdout.write( "baselining "+xdir+"..." )
 
-        start_test( xlist, tcase, plat, is_baseline=True )
+        handler = tcase.getExec().handler
+        start_test( handler, tcase, plat, is_baseline=True )
 
         tm = int( os.environ.get( 'VVTEST_BASELINE_TIMEOUT', 30 ) )
         for i in range(tm):
@@ -333,14 +335,14 @@ def run_baseline( xlist, plat ):
         print3( "\n\n !!!!!!!!!!!  THERE WERE FAILURES  !!!!!!!!!! \n\n" )
 
 
-def start_test( xlist, tcase, platform, is_baseline=False ):
+def start_test( handler, tcase, platform, is_baseline=False ):
     ""
     obj = platform.getResources( tcase.getSize() )
 
     texec = tcase.getExec()
     texec.setResourceObject( obj )
 
-    texec.start( texec.handler.prepare_for_launch, is_baseline )
+    texec.start( handler.prepare_for_launch, is_baseline )
 
     tcase.getStat().markStarted( texec.getStartTime() )
 

@@ -88,42 +88,42 @@ class ExecutionHandler:
         self.test_dir = test_dir
         self.commondb = commondb
 
-    def check_redirect_output_to_log_file(self, baseline):
+    def check_redirect_output_to_log_file(self, tcase, baseline):
         ""
         if self.rtconfig.getAttr('logfile'):
-            logfname = get_execution_log_filename( self.tcase, baseline )
+            logfname = get_execution_log_filename( tcase, baseline )
             redirect_stdout_stderr_to_filename( logfname )
             self.perms.apply( os.path.abspath( logfname ) )
 
-    def check_run_preclean(self, baseline):
+    def check_run_preclean(self, tcase, baseline):
         ""
         if self.rtconfig.getAttr('preclean') and \
            not self.rtconfig.getAttr('analyze') and \
            not baseline and \
-           self.tcase.getSpec().isFirstStage():
-            self.preclean()
+           tcase.getSpec().isFirstStage():
+            self.preclean( tcase )
 
-    def preclean(self):
+    def preclean(self, tcase):
         """
         Should only be run just prior to launching the test script.  It
         removes all files in the execute directory except for a few vvtest
         files.
         """
         print3( "Cleaning execute directory for execution..." )
-        specform = self.tcase.getSpec().getSpecificationForm()
+        specform = tcase.getSpec().getSpecificationForm()
         pre_clean_execute_directory( specform )
 
-    def check_set_working_files(self, baseline):
+    def check_set_working_files(self, tcase, baseline):
         """
         establish soft links and make copies of working files
         """
         if not baseline:
-            if not self.setWorkingFiles():
+            if not self.setWorkingFiles( tcase ):
                 sys.stdout.flush()
                 sys.stderr.flush()
                 os._exit(1)
 
-    def setWorkingFiles(self):
+    def setWorkingFiles(self, tcase):
         """
         Called before the test script is executed, this sets the link and
         copy files in the test execution directory.  Returns False if certain
@@ -131,7 +131,7 @@ class ExecutionHandler:
         """
         print3( "Linking and copying working files..." )
 
-        tspec = self.tcase.getSpec()
+        tspec = tcase.getSpec()
 
         srcdir = normpath( pjoin( tspec.getRootpath(),
                                   dirname( tspec.getFilepath() ) ) )
@@ -142,9 +142,9 @@ class ExecutionHandler:
 
         return ok
 
-    def apply_plugin_preload(self):
+    def apply_plugin_preload(self, tcase):
         ""
-        pyexe = self.plugin.testPreload( self.tcase )
+        pyexe = self.plugin.testPreload( tcase )
         if pyexe:
             return pyexe
         else:
@@ -167,29 +167,29 @@ class ExecutionHandler:
 
             os.environ['VVTEST_TIMEOUT'] = str( int( t ) )
 
-    def check_run_postclean(self):
+    def check_run_postclean(self, tcase):
         ""
         if self.rtconfig.getAttr('postclean') and \
-           self.tcase.getStat().passed() and \
-           not self.tcase.hasDependent() and \
-           self.tcase.getSpec().isLastStage():
-            self.postclean()
+           tcase.getStat().passed() and \
+           not tcase.hasDependent() and \
+           tcase.getSpec().isLastStage():
+            self.postclean( tcase )
 
-    def postclean(self):
+    def postclean(self, tcase):
         """
         Should only be run right after the test script finishes.  It removes
         all files in the execute directory except for a few vvtest files.
         """
         print3( "Cleaning execute directory after execution..." )
 
-        specform = self.tcase.getSpec().getSpecificationForm()
-        rundir = self.tcase.getExec().getRunDirectory()
+        specform = tcase.getSpec().getSpecificationForm()
+        rundir = tcase.getExec().getRunDirectory()
 
         post_clean_execute_directory( rundir, specform )
 
-    def copyBaselineFiles(self):
+    def copyBaselineFiles(self, tcase):
         ""
-        tspec = self.tcase.getSpec()
+        tspec = tcase.getSpec()
 
         troot = tspec.getRootpath()
         tdir = os.path.dirname( tspec.getFilepath() )
@@ -201,9 +201,9 @@ class ExecutionHandler:
             print3( "baseline: cp -p "+fromfile+" "+dst )
             shutil.copy2( fromfile, dst )
 
-    def check_write_mpi_machine_file(self):
+    def check_write_mpi_machine_file(self, tcase):
         ""
-        obj = self.tcase.getExec().getResourceObject()
+        obj = tcase.getExec().getResourceObject()
 
         if hasattr( obj, 'machinefile' ):
 
@@ -228,18 +228,18 @@ class ExecutionHandler:
         rundir = self.tcase.getExec().getRunDirectory()
         self.perms.recurse( rundir )
 
-        self.check_run_postclean()
+        self.check_run_postclean( self.tcase )
 
         self.platform.returnResources( self.tcase.getExec().getResourceObject() )
 
-    def make_execute_command(self, baseline, pyexe):
+    def make_execute_command(self, tcase, baseline, pyexe):
         ""
-        maker = MakeScriptCommand( self.tcase.getSpec(), pyexe )
+        maker = MakeScriptCommand( tcase.getSpec(), pyexe )
         cmdL = maker.make_base_execute_command( baseline )
 
         if cmdL != None:
 
-            obj = self.tcase.getExec().getResourceObject()
+            obj = tcase.getExec().getResourceObject()
             if hasattr( obj, "mpi_opts") and obj.mpi_opts:
                 cmdL.extend( ['--mpirun_opts', obj.mpi_opts] )
 
@@ -254,42 +254,42 @@ class ExecutionHandler:
 
     def prepare_for_launch(self, baseline):
         ""
-        self.check_redirect_output_to_log_file( baseline )
+        self.check_redirect_output_to_log_file( self.tcase, baseline )
 
         if self.tcase.getSpec().getSpecificationForm() == 'xml':
-            self.write_xml_run_script()
+            self.write_xml_run_script( self.tcase )
         else:
-            self.write_script_utils()
+            self.write_script_utils( self.tcase )
 
         tm = self.tcase.getExec().getTimeout()
         self.set_timeout_environ_variable( tm )
 
-        self.check_run_preclean( baseline )
-        self.check_write_mpi_machine_file()
-        self.check_set_working_files( baseline )
+        self.check_run_preclean( self.tcase, baseline )
+        self.check_write_mpi_machine_file( self.tcase )
+        self.check_set_working_files( self.tcase, baseline )
 
         set_PYTHONPATH( self.rtconfig.getAttr( 'vvtestdir' ),
                         self.rtconfig.getAttr( 'configdir' ) )
 
-        pyexe = self.apply_plugin_preload()
+        pyexe = self.apply_plugin_preload( self.tcase )
 
-        cmd_list = self.make_execute_command( baseline, pyexe )
+        cmd_list = self.make_execute_command( self.tcase, baseline, pyexe )
 
         echo_test_execution_info( self.tcase.getSpec().getName(), cmd_list, tm )
 
         print3()
 
         if baseline:
-            self.copyBaselineFiles()
+            self.copyBaselineFiles( self.tcase )
 
         return cmd_list
 
-    def write_xml_run_script(self):
+    def write_xml_run_script(self, tcase):
         ""
         # no 'form' defaults to the XML test specification format
 
-        tspec = self.tcase.getSpec()
-        texec = self.tcase.getExec()
+        tspec = tcase.getSpec()
+        texec = tcase.getExec()
         rundir = texec.getRunDirectory()
 
         script_file = pjoin( rundir, 'runscript' )
@@ -304,7 +304,7 @@ class ExecutionHandler:
 
             # note that this writes a different sequence if the test is an
             # analyze test
-            cshScriptWriter.writeScript( self.tcase,
+            cshScriptWriter.writeScript( tcase,
                                          self.commondb,
                                          self.platform,
                                          self.rtconfig.getAttr('vvtestdir'),
@@ -316,9 +316,9 @@ class ExecutionHandler:
 
             self.perms.apply( os.path.abspath( script_file ) )
 
-    def write_script_utils(self):
+    def write_script_utils(self, tcase):
         ""
-        texec = self.tcase.getExec()
+        texec = tcase.getExec()
         rundir = texec.getRunDirectory()
 
         for lang in ['py','sh']:
@@ -328,7 +328,7 @@ class ExecutionHandler:
             if self.rtconfig.getAttr('preclean') or \
                not os.path.exists( script_file ):
 
-                ScriptWriter.writeScript( self.tcase,
+                ScriptWriter.writeScript( tcase,
                                           script_file,
                                           lang,
                                           self.rtconfig,
