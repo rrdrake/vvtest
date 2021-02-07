@@ -25,7 +25,7 @@ from libvvtest.ScriptReader import ScriptReader
 from libvvtest.RuntimeConfig import RuntimeConfig
 import libvvtest.depend as depend
 import libvvtest.testlistio as tio
-import libvvtest.testrunner as testrunner
+import libvvtest.exechandler as exechandler
 
 from libvvtest.testcreator import TestCreator
 from libvvtest.testcreator import TestMaker
@@ -689,11 +689,11 @@ def reparse_test_string( stringid ):
     return tcase
 
 
-class MockPrePostCleanExecutionHandler( testrunner.ExecutionHandler ):
+class MockPrePostCleanExecutionHandler( exechandler.ExecutionHandler ):
 
     def __init__(self, tcase, rtconfig):
         ""
-        testrunner.ExecutionHandler.__init__( self, None, rtconfig,
+        exechandler.ExecutionHandler.__init__( self, None, rtconfig,
                                               None, None, None )
         self.numpreclean = 0
         self.numpostclean = 0

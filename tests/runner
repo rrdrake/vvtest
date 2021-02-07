@@ -18,55 +18,55 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.testrunner as testrunner
+import libvvtest.exechandler as exechandler
 import libvvtest.outpututils as outpututils
 
 
-class testrunner_free_functions( vtu.vvtestTestCase ):
+class exechandler_free_functions( vtu.vvtestTestCase ):
 
     def test_execution_log_name(self):
         ""
         tcase = vtu.make_fake_TestCase()
-        fn = testrunner.get_execution_log_filename( tcase, False )
+        fn = exechandler.get_execution_log_filename( tcase, False )
         assert fn == 'execute.log'
-        fn = testrunner.get_execution_log_filename( tcase, True )
+        fn = exechandler.get_execution_log_filename( tcase, True )
         assert fn == 'baseline.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=0 )
-        fn = testrunner.get_execution_log_filename( tcase, False )
+        fn = exechandler.get_execution_log_filename( tcase, False )
         assert fn == 'execute_stage=1.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=1 )
-        fn = testrunner.get_execution_log_filename( tcase, False )
+        fn = exechandler.get_execution_log_filename( tcase, False )
         assert fn == 'execute_stage=2.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=2 )
-        fn = testrunner.get_execution_log_filename( tcase, False )
+        fn = exechandler.get_execution_log_filename( tcase, False )
         assert fn == 'execute_stage=3.log'
 
     def test_setting_PYTHONPATH(self):
         ""
         with util.set_environ( PYTHONPATH=None ):
 
-            ps = testrunner.determine_PYTHONPATH( '/some/path', [] )
+            ps = exechandler.determine_PYTHONPATH( '/some/path', [] )
             assert ps == ':/some/path/config:/some/path'
-            ps = testrunner.determine_PYTHONPATH( '/some/colon:path', [] )
+            ps = exechandler.determine_PYTHONPATH( '/some/colon:path', [] )
             assert ps == ':'
 
-            ps = testrunner.determine_PYTHONPATH( '/pypath', ['/foo/bar'] )
+            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar'] )
             assert ps == ':/foo/bar:/pypath/config:/pypath'
-            ps = testrunner.determine_PYTHONPATH( '/pypath', ['/foo/bar:baz'] )
+            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar:baz'] )
             assert ps == ':/pypath/config:/pypath'
 
-            ps = testrunner.determine_PYTHONPATH( '/pypath', ['/foo/bar','/to/day'] )
+            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar','/to/day'] )
             assert ps == ':/foo/bar:/to/day:/pypath/config:/pypath'
 
         with util.set_environ( PYTHONPATH='/usr/path:/an:other' ):
-            ps = testrunner.determine_PYTHONPATH( '/pypath', [] )
+            ps = exechandler.determine_PYTHONPATH( '/pypath', [] )
             assert ps == ':/pypath/config:/pypath:/usr/path:/an:other'
 
         with util.set_environ( PYTHONPATH=None ):
-            testrunner.set_PYTHONPATH( '/pypath', ['/foo/bar'] )
+            exechandler.set_PYTHONPATH( '/pypath', ['/foo/bar'] )
             assert os.environ['PYTHONPATH'] == ':/foo/bar:/pypath/config:/pypath'
 
     def prepare_for_link_and_copy(self):
@@ -95,17 +95,17 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         time.sleep(1)
 
         with util.change_directory( 'destdir1' ):
-            testrunner.force_copy_path_to_current_directory( src1, None )
-            testrunner.force_copy_path_to_current_directory( src2, None )
-            testrunner.force_copy_path_to_current_directory( src3, None )
+            exechandler.force_copy_path_to_current_directory( src1, None )
+            exechandler.force_copy_path_to_current_directory( src2, None )
+            exechandler.force_copy_path_to_current_directory( src3, None )
 
         with util.change_directory( 'destdir2' ):
-            testrunner.force_copy_path_to_current_directory( src1, None )
-            testrunner.force_copy_path_to_current_directory( src2, None )
-            testrunner.force_copy_path_to_current_directory( src3, None )
+            exechandler.force_copy_path_to_current_directory( src1, None )
+            exechandler.force_copy_path_to_current_directory( src2, None )
+            exechandler.force_copy_path_to_current_directory( src3, None )
 
         with util.change_directory( 'destdir3' ):
-            testrunner.force_copy_path_to_current_directory( src1, 'tryme' )
+            exechandler.force_copy_path_to_current_directory( src1, 'tryme' )
 
         time.sleep(1)
 
@@ -124,17 +124,17 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         time.sleep(1)
 
         with util.change_directory( 'destdir1' ):
-            testrunner.force_link_path_to_current_directory( src1, None )
-            testrunner.force_link_path_to_current_directory( src2, None )
-            testrunner.force_link_path_to_current_directory( src3, None )
+            exechandler.force_link_path_to_current_directory( src1, None )
+            exechandler.force_link_path_to_current_directory( src2, None )
+            exechandler.force_link_path_to_current_directory( src3, None )
 
         with util.change_directory( 'destdir2' ):
-            testrunner.force_link_path_to_current_directory( src1, None )
-            testrunner.force_link_path_to_current_directory( src2, None )
-            testrunner.force_link_path_to_current_directory( src3, None )
+            exechandler.force_link_path_to_current_directory( src1, None )
+            exechandler.force_link_path_to_current_directory( src2, None )
+            exechandler.force_link_path_to_current_directory( src3, None )
 
         with util.change_directory( 'destdir3' ):
-            testrunner.force_link_path_to_current_directory( src1, 'tryme' )
+            exechandler.force_link_path_to_current_directory( src1, 'tryme' )
 
         time.sleep(1)
 
@@ -156,28 +156,28 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         util.writefile( 'srcdir/file1.*', 'file w/ wildcard char\n' )
         time.sleep(1)
 
-        fL = testrunner.get_source_file_names( 'srcdir/file*.txt' )
+        fL = exechandler.get_source_file_names( 'srcdir/file*.txt' )
         fL.sort()
         assert fL == [ 'srcdir/file1.txt', 'srcdir/file2.txt' ]
 
-        fL = testrunner.get_source_file_names( 'srcdir/file1.*' )
+        fL = exechandler.get_source_file_names( 'srcdir/file1.*' )
         assert fL == [ 'srcdir/file1.*' ]
 
-        fL = testrunner.get_source_file_names( 'srcdir/file2.*' )
+        fL = exechandler.get_source_file_names( 'srcdir/file2.*' )
         assert fL == [ 'srcdir/file2.txt' ]
 
-        fL = testrunner.get_source_file_names( 'srcdir/file.*' )
+        fL = exechandler.get_source_file_names( 'srcdir/file.*' )
         assert len( fL ) == 0
 
         with util.change_directory( 'destdir3' ):
-            testrunner.link_and_copy_files( srcdir,
+            exechandler.link_and_copy_files( srcdir,
                                             [ ('file*.txt',None),
                                               (srcdir+'/file2.txt','lnk.txt') ],
                                             [ ('adir','bdir'),
                                               (srcdir+'/file2.txt','cpy.txt') ] )
 
             ok,out,err = util.call_capture_output(
-                testrunner.link_and_copy_files, srcdir,
+                exechandler.link_and_copy_files, srcdir,
                                             [ ('junk*',None) ],
                                             [ ('file*.txt','dest.txt') ] )
             assert not ok
@@ -226,14 +226,14 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
 
         with util.change_directory( 'xdir' ):
             # with xml specification form, the 'runscript' must not be removed
-            testrunner.pre_clean_execute_directory( 'xml' )
+            exechandler.pre_clean_execute_directory( 'xml' )
 
         time.sleep(1)
 
         self.check_example_pre_cleaned_execute_directory( 'xml' )
 
         with util.change_directory( 'xdir' ):
-            testrunner.pre_clean_execute_directory( None )
+            exechandler.pre_clean_execute_directory( None )
 
         self.check_example_pre_cleaned_execute_directory( None )
 
@@ -261,11 +261,11 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         self.make_example_execute_directory()
         time.sleep(1)
 
-        testrunner.post_clean_execute_directory( 'xdir', 'xml' )
+        exechandler.post_clean_execute_directory( 'xdir', 'xml' )
         time.sleep(1)
         self.check_example_post_cleaned_execute_directory( 'xml' )
 
-        testrunner.post_clean_execute_directory( 'xdir', None )
+        exechandler.post_clean_execute_directory( 'xdir', None )
         time.sleep(1)
         self.check_example_post_cleaned_execute_directory( None )
 
@@ -293,7 +293,7 @@ class testrunner_free_functions( vtu.vvtestTestCase ):
         cmdL = [ sys.executable, '--longopt', 'foo bar', 'myarg' ]
 
         rtn,out,err = util.call_capture_output(
-            testrunner.echo_test_execution_info, 'atest', cmdL, 60 )
+            exechandler.echo_test_execution_info, 'atest', cmdL, 60 )
 
         with open( 'execute.log', 'wt' ) as fp:
             fp.write( out+'\nblah blah blah\n' )

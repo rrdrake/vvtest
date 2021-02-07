@@ -13,10 +13,10 @@ from .teststatus import copy_test_results
 
 class TestExecList:
 
-    def __init__(self, tlist, runner):
+    def __init__(self, tlist, handler):
         ""
         self.tlist = tlist
-        self.runner = runner
+        self.handler = handler
 
         self.backlog = TestBacklog()
         self.waiting = {}  # TestSpec ID -> TestCase object
@@ -32,11 +32,11 @@ class TestExecList:
         self._connect_execute_dependencies( check_dependencies )
 
         for tcase in self.backlog.iterate():
-            self.runner.initialize_for_execution( tcase )
+            self.handler.initialize_for_execution( tcase )
 
     def getExecutionHandler(self):
         ""
-        return self.runner.getExecutionHandler()
+        return self.handler
 
     def popNext(self, maxsize):
         """

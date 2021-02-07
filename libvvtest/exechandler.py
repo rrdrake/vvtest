@@ -18,29 +18,20 @@ from . import ScriptWriter
 from .makecmd import MakeScriptCommand
 
 
-class TestRunner:
+class ExecutionHandler:
 
-    def __init__(self, test_dir, platform, rtconfig, usrplugin, perms):
+    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir):
         """
         The platform is a Platform object.  The test_dir is the top level
         testing directory, which is either an absolute path or relative to
         the current working directory.
         """
-        self.test_dir = test_dir
-        self.platform = platform
-        self.rtconfig = rtconfig
-        self.usrplugin = usrplugin
         self.perms = perms
-
-        self.handler = ExecutionHandler( self.perms,
-                                         self.rtconfig,
-                                         self.platform,
-                                         self.usrplugin,
-                                         self.test_dir )
-
-    def getExecutionHandler(self):
-        ""
-        return self.handler
+        self.rtconfig = rtconfig
+        self.platform = platform
+        self.plugin = usrplugin
+        self.test_dir = test_dir
+        self.commondb = None
 
     def initialize_for_execution(self, tcase):
         ""
@@ -49,7 +40,7 @@ class TestRunner:
         tstat = tcase.getStat()
 
         if tspec.getSpecificationForm() == 'xml':
-            self.handler.loadCommonXMLDB()
+            self.loadCommonXMLDB()
 
         texec.setTimeout( tstat.getAttr( 'timeout', 0 ) )
 
@@ -63,18 +54,6 @@ class TestRunner:
             os.makedirs( wdir )
 
         self.perms.apply( xdir )
-
-
-class ExecutionHandler:
-
-    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir):
-        ""
-        self.perms = perms
-        self.rtconfig = rtconfig
-        self.platform = platform
-        self.plugin = usrplugin
-        self.test_dir = test_dir
-        self.commondb = None
 
     def loadCommonXMLDB(self):
         ""
@@ -217,10 +196,10 @@ class ExecutionHandler:
 
         exit_status, timedout = tcase.getExec().getExitInfo()
 
-        if timedout > 0:
-            tstat.markTimedOut()
-        else:
+        if timedout is None:
             tstat.markDone( exit_status )
+        else:
+            tstat.markTimedOut()
 
         rundir = tcase.getExec().getRunDirectory()
         self.perms.recurse( rundir )

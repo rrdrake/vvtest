@@ -15,7 +15,7 @@ import shlex
 
 import libvvtest.cmdline as cmdline
 from libvvtest.execlist import TestExecList
-from libvvtest.testrunner import TestRunner
+from libvvtest.exechandler import ExecutionHandler
 import libvvtest.pathutil as pathutil
 from libvvtest.errors import FatalError
 import libvvtest.location as location
@@ -643,10 +643,11 @@ def generate_test_list( opts, optD, rtdata ):
     rtdata.results_writer.prerun( tlist, rtdata.rtinfo, verbosity=1 )
     print3()
 
-    runner = TestRunner( rtdata.testdir, rtdata.plat, rtdata.rtconfig,
-                         rtdata.plugin, rtdata.perms )
+    handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
+                                rtdata.plat, rtdata.plugin,
+                                rtdata.testdir )
 
-    xlist = TestExecList( tlist, runner )
+    xlist = TestExecList( tlist, handler )
     xlist.createTestExecs()
 
     print3( "\nTest directory:", basename( rtdata.testdir ) )
@@ -757,10 +758,11 @@ def baseline_tests( opts, optD, rtdata ):
 
     if tlist.numActive() > 0:
 
-        runner = TestRunner( rtdata.testdir, rtdata.plat, rtdata.rtconfig,
-                             rtdata.plugin, rtdata.perms )
+        handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
+                                    rtdata.plat, rtdata.plugin,
+                                    rtdata.testdir )
 
-        xlist = TestExecList( tlist, runner )
+        xlist = TestExecList( tlist, handler )
         xlist.createTestExecs()
 
         execute.run_baseline( xlist, rtdata.plat )
@@ -1001,10 +1003,11 @@ def run_test_exec_list( opts, optD, rtdata ):
         # this variable allows vvtest tests to run vvtest (ie, allows recursion)
         os.environ['VVTEST_TEST_ROOT'] = rtdata.testdir
 
-        runner = TestRunner( rtdata.testdir, rtdata.plat, rtdata.rtconfig,
-                             rtdata.plugin, rtdata.perms )
+        handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
+                                    rtdata.plat, rtdata.plugin,
+                                    rtdata.testdir )
 
-        xlist = TestExecList( tlist, runner )
+        xlist = TestExecList( tlist, handler )
         xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
 
         totaltime = get_total_timeout( opts.total_timeout )
