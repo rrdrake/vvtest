@@ -456,7 +456,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         ""
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
-    def test_add_dependency_uniquifies_multiple_TestSpec(self):
+    def test_add_dependency_uniquifies_by_test_id_TestSpec(self):
         ""
         tcase = make_TestSpec_test_case( 'testA' )
 
@@ -468,7 +468,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
         assert tcase.numDependencies() == 1
 
-    def test_add_dependency_uniquifies_multiple_TestExec(self):
+    def test_test_add_dependency_uniquifies_by_test_id_TestExec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
@@ -480,7 +480,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
         assert tcase.numDependencies() == 1
 
-    def test_add_dependency_uniquifies_TestSpec_then_TestExec(self):
+    def test_add_dependency_uniquifies_by_test_id_TestSpec_then_TestExec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
@@ -493,7 +493,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         assert len( tcase.deps ) == 1
         assert id( tcase.deps[0].tcase ) == id(dep2)
 
-    def test_add_dependency_uniquifies_TestExec_then_TestSpec(self):
+    def test_add_dependency_uniquifies_by_test_id_TestExec_then_TestSpec(self):
         ""
         tcase = make_TestExec_test_case( 'testA' )
 
@@ -505,7 +505,7 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
         assert tcase.numDependencies() == 1
         assert len( tcase.deps ) == 1
-        assert id( tcase.deps[0].tcase ) == id(dep1)
+        assert id( tcase.deps[0].tcase ) == id(dep2)
 
     def test_add_dep_with_match_pattern(self):
         ""

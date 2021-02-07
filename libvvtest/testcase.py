@@ -54,9 +54,8 @@ class TestCase:
         append = True
         for i,tdep in enumerate( self.deps ):
             if tdep.getTestID() == testdep.getTestID():
-                # if same test ID, prefer the one with a TestExec
-                if not self.deps[i].hasTestExec():
-                    self.deps[i] = testdep
+                # if same test ID, overwrite
+                self.deps[i] = testdep
                 append = False
                 break
 
