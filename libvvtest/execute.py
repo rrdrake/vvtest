@@ -164,6 +164,7 @@ class DirectRunner( TestListRunner ):
         TestListRunner.__init__( self, test_dir, tlist, xlist, perms,
                                  rtinfo, results_writer, plat, total_timeout )
         self.qsub_id = None
+        self.handler = xlist.getExecutionHandler()
 
     def setQsubID(self, qsub_id):
         ""
@@ -222,8 +223,7 @@ class DirectRunner( TestListRunner ):
         tspec = tnext.getSpec()
         texec = tnext.getExec()
         print3( 'Starting:', exec_path( tspec, self.test_dir ) )
-        handler = tnext.getExec().handler
-        start_test( handler, tnext, self.plat )
+        start_test( self.handler, tnext, self.plat )
         self.tlist.appendTestResult( tnext )
 
     def print_finished(self):
@@ -233,7 +233,7 @@ class DirectRunner( TestListRunner ):
         for tcase in list( self.xlist.getRunning() ):
             tx = tcase.getExec()
             if tx.poll():
-                tx.handler.finishExecution( tcase )
+                self.handler.finishExecution( tcase )
             if tx.isDone():
                 xs = XstatusString( tcase, self.test_dir, self.cwd )
                 print3( "Finished:", xs )
@@ -294,6 +294,8 @@ def run_baseline( xlist, plat ):
     ""
     failures = False
 
+    handler = xlist.getExecutionHandler()
+
     for tcase in xlist.consumeBacklog():
 
         tspec = tcase.getSpec()
@@ -303,7 +305,6 @@ def run_baseline( xlist, plat ):
 
         sys.stdout.write( "baselining "+xdir+"..." )
 
-        handler = tcase.getExec().handler
         start_test( handler, tcase, plat, is_baseline=True )
 
         tm = int( os.environ.get( 'VVTEST_BASELINE_TIMEOUT', 30 ) )
@@ -312,7 +313,7 @@ def run_baseline( xlist, plat ):
             time.sleep(1)
 
             if texec.poll():
-                texec.handler.finishExecution( tcase )
+                handler.finishExecution( tcase )
 
             if texec.isDone():
                 if tcase.getStat().passed():
@@ -324,7 +325,7 @@ def run_baseline( xlist, plat ):
 
         if not tcase.getStat().isDone():
             if texec.killJob():
-                texec.handler.finishExecution( tcase )
+                handler.finishExecution( tcase )
             failures = True
             print3( "TIMED OUT" )
 

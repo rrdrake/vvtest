@@ -34,6 +34,10 @@ class TestExecList:
         for tcase in self.backlog.iterate():
             self.runner.initialize_for_execution( tcase )
 
+    def getExecutionHandler(self):
+        ""
+        return self.runner.getExecutionHandler()
+
     def popNext(self, maxsize):
         """
         Finds a test to execute.  Returns a TestExec object, or None if no

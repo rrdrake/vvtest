@@ -50,11 +50,6 @@ class TestExec:
         ""
         return self.timeout
 
-    def setExecutionHandler(self, handler):
-        ""
-        # magic: remove this function
-        self.handler = handler
-
     def setResourceObject(self, obj):
         ""
         self.resource_obj = obj

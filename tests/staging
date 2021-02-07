@@ -694,7 +694,7 @@ class MockPrePostCleanExecutionHandler( testrunner.ExecutionHandler ):
     def __init__(self, tcase, rtconfig):
         ""
         testrunner.ExecutionHandler.__init__( self, None, rtconfig,
-                                              None, None, None, None )
+                                              None, None, None )
         self.numpreclean = 0
         self.numpostclean = 0
 

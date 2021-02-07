@@ -32,7 +32,15 @@ class TestRunner:
         self.usrplugin = usrplugin
         self.perms = perms
 
-        self.commondb = None
+        self.handler = ExecutionHandler( self.perms,
+                                         self.rtconfig,
+                                         self.platform,
+                                         self.usrplugin,
+                                         self.test_dir )
+
+    def getExecutionHandler(self):
+        ""
+        return self.handler
 
     def initialize_for_execution(self, tcase):
         ""
@@ -40,13 +48,8 @@ class TestRunner:
         texec = tcase.getExec()
         tstat = tcase.getStat()
 
-        handler = ExecutionHandler( self.perms,
-                                    self.rtconfig,
-                                    self.platform,
-                                    self.usrplugin,
-                                    self.test_dir,
-                                    self.getCommonXMLDB( tspec ) )
-        texec.setExecutionHandler( handler )
+        if tspec.getSpecificationForm() == 'xml':
+            self.handler.loadCommonXMLDB()
 
         texec.setTimeout( tstat.getAttr( 'timeout', 0 ) )
 
@@ -61,30 +64,24 @@ class TestRunner:
 
         self.perms.apply( xdir )
 
-    def getCommonXMLDB(self, tspec):
-        ""
-        if tspec.getSpecificationForm() == 'xml':
-            if self.commondb == None:
-                d = pjoin( self.rtconfig.getAttr('vvtestdir'), 'libvvtest' )
-                cfgdirs = self.rtconfig.getAttr('configdir')
-                self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
-
-            return self.commondb
-
-        return None
-
 
 class ExecutionHandler:
 
-    def __init__(self, perms, rtconfig, platform,
-                       usrplugin, test_dir, commondb):
+    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir):
         ""
         self.perms = perms
         self.rtconfig = rtconfig
         self.platform = platform
         self.plugin = usrplugin
         self.test_dir = test_dir
-        self.commondb = commondb
+        self.commondb = None
+
+    def loadCommonXMLDB(self):
+        ""
+        if self.commondb is None:
+            d = pjoin( self.rtconfig.getAttr('vvtestdir'), 'libvvtest' )
+            cfgdirs = self.rtconfig.getAttr('configdir')
+            self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
 
     def check_redirect_output_to_log_file(self, tcase, baseline):
         ""
