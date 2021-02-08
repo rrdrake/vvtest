@@ -33,10 +33,10 @@ class ExecutionHandler:
         self.test_dir = test_dir
         self.commondb = None
 
-    def initialize_for_execution(self, tcase):
+    def initialize_for_execution(self, texec):
         ""
+        tcase = texec.getTestCase()
         tspec = tcase.getSpec()
-        texec = tcase.getExec()
         tstat = tcase.getStat()
 
         if tspec.getSpecificationForm() == 'xml':
@@ -141,15 +141,15 @@ class ExecutionHandler:
 
             os.environ['VVTEST_TIMEOUT'] = str( int( t ) )
 
-    def check_run_postclean(self, tcase):
+    def check_run_postclean(self, tcase, rundir):
         ""
         if self.rtconfig.getAttr('postclean') and \
            tcase.getStat().passed() and \
            not tcase.hasDependent() and \
            tcase.getSpec().isLastStage():
-            self.postclean( tcase )
+            self.postclean( tcase, rundir )
 
-    def postclean(self, tcase):
+    def postclean(self, tcase, rundir):
         """
         Should only be run right after the test script finishes.  It removes
         all files in the execute directory except for a few vvtest files.
@@ -157,7 +157,6 @@ class ExecutionHandler:
         print3( "Cleaning execute directory after execution..." )
 
         specform = tcase.getSpec().getSpecificationForm()
-        rundir = tcase.getExec().getRunDirectory()  # magic: getExec makes cycle
 
         post_clean_execute_directory( rundir, specform )
 
@@ -175,47 +174,48 @@ class ExecutionHandler:
             print3( "baseline: cp -p "+fromfile+" "+dst )
             shutil.copy2( fromfile, dst )
 
-    def check_write_mpi_machine_file(self, tcase):
+    def check_write_mpi_machine_file(self, resourceobj):
         ""
-        obj = tcase.getExec().getResourceObject()
-
-        if hasattr( obj, 'machinefile' ):
+        if hasattr( resourceobj, 'machinefile' ):
 
             fp = open( "machinefile", "w" )
             try:
-                fp.write( obj.machinefile )
+                fp.write( resourceobj.machinefile )
             finally:
                 fp.close()
 
             self.perms.apply( os.path.abspath( "machinefile" ) )
 
-    def finishExecution(self, tcase):
+    def finishExecution(self, texec):
         ""
+        tcase = texec.getTestCase()
         tspec = tcase.getSpec()
         tstat = tcase.getStat()
 
-        exit_status, timedout = tcase.getExec().getExitInfo()
+        exit_status, timedout = texec.getExitInfo()
 
         if timedout is None:
             tstat.markDone( exit_status )
         else:
             tstat.markTimedOut()
 
-        rundir = tcase.getExec().getRunDirectory()
+        rundir = texec.getRunDirectory()
         self.perms.recurse( rundir )
 
-        self.check_run_postclean( tcase )
+        self.check_run_postclean( tcase, texec.getRunDirectory() )
 
-        self.platform.returnResources( tcase.getExec().getResourceObject() )
+        self.platform.returnResources( texec.getResourceObject() )
 
-    def make_execute_command(self, tcase, baseline, pyexe):
+    def make_execute_command(self, texec, baseline, pyexe):
         ""
+        tcase = texec.getTestCase()
+
         maker = MakeScriptCommand( tcase.getSpec(), pyexe )
         cmdL = maker.make_base_execute_command( baseline )
 
         if cmdL != None:
 
-            obj = tcase.getExec().getResourceObject()
+            obj = texec.getResourceObject()
             if hasattr( obj, "mpi_opts") and obj.mpi_opts:
                 cmdL.extend( ['--mpirun_opts', obj.mpi_opts] )
 
@@ -228,20 +228,24 @@ class ExecutionHandler:
 
         return cmdL
 
-    def prepare_for_launch(self, tcase, baseline):
+    def prepare_for_launch(self, texec, baseline):
         ""
+        tcase = texec.getTestCase()
+
         self.check_redirect_output_to_log_file( tcase, baseline )
 
         if tcase.getSpec().getSpecificationForm() == 'xml':
-            self.write_xml_run_script( tcase )
+            self.write_xml_run_script( tcase, texec.getRunDirectory() )
         else:
-            self.write_script_utils( tcase )
+            rundir = texec.getRunDirectory()
+            resourceobj = texec.getResourceObject()
+            self.write_script_utils( tcase, rundir, resourceobj )
 
-        tm = tcase.getExec().getTimeout()
+        tm = texec.getTimeout()
         self.set_timeout_environ_variable( tm )
 
         self.check_run_preclean( tcase, baseline )
-        self.check_write_mpi_machine_file( tcase )
+        self.check_write_mpi_machine_file( texec.getResourceObject() )
         self.check_set_working_files( tcase, baseline )
 
         set_PYTHONPATH( self.rtconfig.getAttr( 'vvtestdir' ),
@@ -249,7 +253,7 @@ class ExecutionHandler:
 
         pyexe = self.apply_plugin_preload( tcase )
 
-        cmd_list = self.make_execute_command( tcase, baseline, pyexe )
+        cmd_list = self.make_execute_command( texec, baseline, pyexe )
 
         echo_test_execution_info( tcase.getSpec().getName(), cmd_list, tm )
 
@@ -260,13 +264,11 @@ class ExecutionHandler:
 
         return cmd_list
 
-    def write_xml_run_script(self, tcase):
+    def write_xml_run_script(self, tcase, rundir):
         ""
         # no 'form' defaults to the XML test specification format
 
         tspec = tcase.getSpec()
-        texec = tcase.getExec()
-        rundir = texec.getRunDirectory()
 
         script_file = pjoin( rundir, 'runscript' )
 
@@ -292,11 +294,8 @@ class ExecutionHandler:
 
             self.perms.apply( os.path.abspath( script_file ) )
 
-    def write_script_utils(self, tcase):
+    def write_script_utils(self, tcase, rundir, resourceobj):
         ""
-        texec = tcase.getExec()
-        rundir = texec.getRunDirectory()
-
         for lang in ['py','sh']:
 
             script_file = pjoin( rundir, 'vvtest_util.'+lang )
@@ -304,7 +303,7 @@ class ExecutionHandler:
             if self.rtconfig.getAttr('preclean') or \
                not os.path.exists( script_file ):
 
-                ScriptWriter.writeScript( tcase,
+                ScriptWriter.writeScript( tcase, resourceobj,
                                           script_file,
                                           lang,
                                           self.rtconfig,
@@ -552,8 +551,3 @@ def print3( *args ):
     ""
     sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + '\n' )
     sys.stdout.flush()
-
-def printerr( *args ):
-    ""
-    sys.stderr.write( ' '.join( [ str(x) for x in args ] ) + '\n' )
-    sys.stderr.flush()

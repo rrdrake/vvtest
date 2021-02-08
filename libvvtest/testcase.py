@@ -12,7 +12,6 @@ class TestCase:
         ""
         self.tspec = testspec
         self.tstat = TestStatus()
-        self.texec = None
 
         self.deps = []
         self.depdirs = {}  # xdir -> match pattern
@@ -25,14 +24,6 @@ class TestCase:
     def getStat(self):
         ""
         return self.tstat
-
-    def getExec(self):
-        ""
-        return self.texec
-
-    def setExec(self, texec):
-        ""
-        self.texec = texec
 
     def getSize(self):
         ""

@@ -19,9 +19,9 @@ class TestExecList:
         self.handler = handler
 
         self.backlog = TestBacklog()
-        self.waiting = {}  # TestSpec ID -> TestCase object
-        self.started = {}  # TestSpec ID -> TestCase object
-        self.stopped = {}  # TestSpec ID -> TestCase object
+        self.waiting = {}  # TestSpec ID -> TestExec object
+        self.started = {}  # TestSpec ID -> TestExec object
+        self.stopped = {}  # TestSpec ID -> TestExec object
 
     def createTestExecs(self, check_dependencies=True):
         """
@@ -31,8 +31,8 @@ class TestExecList:
         self._sort_by_size_and_runtime()
         self._connect_execute_dependencies( check_dependencies )
 
-        for tcase in self.backlog.iterate():
-            self.handler.initialize_for_execution( tcase )
+        for texec in self.backlog.iterate():
+            self.handler.initialize_for_execution( texec )
 
     def getExecutionHandler(self):
         ""
@@ -50,45 +50,48 @@ class TestExecList:
         For case #2, numRunning() will be zero.
         """
         # find longest runtime test with size constraint
-        tcase = self._pop_next_test( maxsize )
-        if tcase == None and len(self.started) == 0:
+        texec = self._pop_next_test( maxsize )
+        if texec == None and len(self.started) == 0:
             # find longest runtime test without size constraint
-            tcase = self._pop_next_test( None )
+            texec = self._pop_next_test( None )
 
-        if tcase != None:
-            self._move_to_started( tcase )
+        if texec != None:
+            self._move_to_started( texec )
 
-        return tcase
+        return texec
 
     def consumeBacklog(self):
         ""
-        for tcase in self.backlog.consume():
+        for texec in self.backlog.consume():
+            tcase = texec.getTestCase()
             self.waiting[ tcase.getSpec().getID() ] = tcase
-            self._move_to_started( tcase )
-            yield tcase
+            self._move_to_started( texec )
+            yield texec
 
     def popRemaining(self):
         """
         All remaining tests are removed from the backlog and returned as a
-        list of (testcase,blocked_reason).
+        list of (testexec,blocked_reason).
         """
         tL = []
-        for tcase in self.backlog.consume():
-            tL.append( (tcase,tcase.getBlockedReason()) )
+        for texec in self.backlog.consume():
+            tcase = texec.getTestCase()
+            tL.append( (texec,tcase.getBlockedReason()) )
         return tL
 
     def getRunning(self):
         """
-        Return the list of TestCase that are still running.
+        Return the list of TestExec that are still running.
         """
         return self.started.values()
 
-    def testDone(self, tcase):
+    def testDone(self, texec):
         ""
+        tcase = texec.getTestCase()
         xid = tcase.getSpec().getID()
         self.tlist.appendTestResult( tcase )
         self.started.pop( xid, None )
-        self.stopped[ xid ] = tcase
+        self.stopped[ xid ] = texec
 
     def numDone(self):
         """
@@ -108,52 +111,56 @@ class TestExecList:
 
     def getNextTest(self):
         ""
-        tcase = self.backlog.pop()
+        texec = self.backlog.pop()
 
-        if tcase != None:
-            self.waiting[ tcase.getSpec().getID() ] = tcase
+        if texec != None:
+            tcase = texec.getTestCase()
+            self.waiting[ tcase.getSpec().getID() ] = texec
 
-        return tcase
+        return texec
 
     def checkStateChange(self, tmp_tcase):
         ""
         tid = tmp_tcase.getSpec().getID()
 
-        tcase = None
+        texec = None
 
         if tid in self.waiting:
             if tmp_tcase.getStat().isNotDone():
-                tcase = self.waiting.pop( tid )
-                self.started[ tid ] = tcase
+                texec = self.waiting.pop( tid )
+                self.started[ tid ] = texec
             elif tmp_tcase.getStat().isDone():
-                tcase = self.waiting.pop( tid )
-                self.stopped[ tid ] = tcase
+                texec = self.waiting.pop( tid )
+                self.stopped[ tid ] = texec
 
         elif tid in self.started:
             if tmp_tcase.getStat().isDone():
-                tcase = self.started.pop( tid )
-                self.stopped[ tid ] = tcase
+                texec = self.started.pop( tid )
+                self.stopped[ tid ] = texec
 
-        if tcase:
+        if texec:
+            tcase = texec.getTestCase()
             copy_test_results( tcase.getStat(), tmp_tcase.getStat() )
             self.tlist.appendTestResult( tcase )
 
-        return tcase
+        return texec
 
-    def _move_to_started(self, tcase):
+    def _move_to_started(self, texec):
         ""
+        tcase = texec.getTestCase()
+
         tid = tcase.getSpec().getID()
 
         self.waiting.pop( tid )
-        self.started[ tid ] = tcase
+        self.started[ tid ] = texec
 
     def _generate_backlog_from_testlist(self):
         ""
         for tcase in self.tlist.getTests():
             if not tcase.getStat().skipTest():
                 assert tcase.getSpec().constructionCompleted()
-                tcase.setExec( TestExec() )
-                self.backlog.insert( tcase )
+                texec = TestExec( tcase )
+                self.backlog.insert( texec )
 
     def _sort_by_size_and_runtime(self):
         """
@@ -169,8 +176,9 @@ class TestExecList:
         tmap = self.tlist.getTestMap()
         groups = self.tlist.getGroupMap()
 
-        for tcase in self.backlog.iterate():
+        for texec in self.backlog.iterate():
 
+            tcase = texec.getTestCase()
             if tcase.getSpec().isAnalyze():
                 grpL = groups.getGroup( tcase )
                 depend.connect_analyze_dependencies( tcase, grpL, tmap )
@@ -181,12 +189,13 @@ class TestExecList:
         ""
         constraint = TestConstraint( maxsize )
 
-        tcase = self.backlog.pop( constraint )
+        texec = self.backlog.pop( constraint )
 
-        if tcase != None:
+        if texec != None:
+            tcase = texec.getTestCase()
             self.waiting[ tcase.getSpec().getID() ] = tcase
 
-        return tcase
+        return texec
 
 
 class TestConstraint:
@@ -202,8 +211,10 @@ class TestConstraint:
         else:
             return self.maxsize[0]
 
-    def apply(self, tcase):
+    def apply(self, texec):
         ""
+        tcase = texec.getTestCase()
+
         if self.maxsize != None:
 
             np,nd = tcase.getSize()
@@ -220,7 +231,7 @@ class TestConstraint:
 
 class TestBacklog:
     """
-    Stores a list of TestCase objects.  They can be sorted either by
+    Stores a list of TestExec objects.  They can be sorted either by
 
         ( num procs, runtime )
     or
@@ -235,20 +246,20 @@ class TestBacklog:
         self.tests = []
         self.testcmp = None
 
-    def insert(self, tcase):
+    def insert(self, texec):
         """
         Note: to support streaming, this function would have to use
               self.testcmp to do an insert (rather than an append)
         """
-        self.tests.append( tcase )
+        self.tests.append( texec )
 
     def sort(self, secondary='runtime'):
         ""
         if secondary == 'runtime':
-            self.testcmp = TestCaseCompare( make_runtime_key )
+            self.testcmp = TestExecCompare( make_runtime_key )
         else:
             assert secondary == 'timeout'
-            self.testcmp = TestCaseCompare( make_timeout_key )
+            self.testcmp = TestExecCompare( make_timeout_key )
 
         if sys.version_info[0] < 3:
             self.tests.sort( self.testcmp.compare, reverse=True )
@@ -257,7 +268,7 @@ class TestBacklog:
 
     def pop(self, constraint=None):
         ""
-        tcase = None
+        texec = None
 
         if constraint:
             idx = self._get_starting_index( constraint.getMaxNP() )
@@ -266,22 +277,22 @@ class TestBacklog:
 
         while idx < len( self.tests ):
             if constraint == None or constraint.apply( self.tests[idx] ):
-                tcase = self.tests.pop( idx )
+                texec = self.tests.pop( idx )
                 break
             idx += 1
 
-        return tcase
+        return texec
 
     def consume(self):
         ""
         while len( self.tests ) > 0:
-            tcase = self.tests.pop( 0 )
-            yield tcase
+            texec = self.tests.pop( 0 )
+            yield texec
 
     def iterate(self):
         ""
-        for tcase in self.tests:
-            yield tcase
+        for texec in self.tests:
+            yield texec
 
     def _get_starting_index(self, max_np):
         ""
@@ -291,16 +302,18 @@ class TestBacklog:
             return bisect_left( self.tests, max_np )
 
 
-def make_runtime_key( tcase ):
+def make_runtime_key( texec ):
     ""
+    tcase = texec.getTestCase()
     return [ tcase.getSize()[0], tcase.getStat().getRuntime( 0 ) ]
 
-def make_timeout_key( tcase ):
+def make_timeout_key( texec ):
     ""
+    tcase = texec.getTestCase()
     return [ tcase.getSize()[0], tcase.getStat().getAttr( 'timeout' ) ]
 
 
-class TestCaseCompare:
+class TestExecCompare:
     """
     This class is a convenience for supporting Python 2 and 3 sorting.
     Python 2 needs the compare function.  Python 3 just needs a "get key"
@@ -330,7 +343,7 @@ def bisect_left( tests, np ):
     hi = len(tests)
     while lo < hi:
         mid = (lo+hi)//2
-        if np < tests[mid].getSize()[0]: lo = mid+1
+        if np < tests[mid].getTestCase().getSize()[0]: lo = mid+1
         else: hi = mid
     return lo
 

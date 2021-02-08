@@ -11,14 +11,13 @@ from os.path import dirname, normpath
 from .teststatus import DIFF_EXIT_STATUS, SKIP_EXIT_STATUS
 
 
-def writeScript( testcase, filename, lang, rtconfig, plat, test_dir ):
+def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir ):
     """
     Writes a helper script for the test.  The script language is based on
     the 'lang' argument.
     """
     testobj = testcase.getSpec()
     tname = testobj.getName()
-    resourceobj = testcase.getExec().getResourceObject()
 
     troot = testobj.getRootpath()
     assert os.path.isabs( troot )

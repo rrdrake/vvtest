@@ -21,8 +21,10 @@ class TestExec:
     Runs a test in the background and provides methods to poll and kill it.
     """
     
-    def __init__(self):
+    def __init__(self, tcase):
         ""
+        self.tcase = tcase
+
         self.timeout = 0
         self.rundir = None
         self.resource_obj = None
@@ -33,6 +35,10 @@ class TestExec:
 
         self.timedout = None     # time.time() if the test times out
         self.exit_status = None  # subprocess exit status or None if timed out
+
+    def getTestCase(self):
+        ""
+        return self.tcase
 
     def setRunDirectory(self, rundir):
         ""
@@ -58,7 +64,7 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, execute_test_func, tcase, is_baseline):
+    def start(self, execute_test_func, is_baseline):
         """
         Launches the child process.
         """
@@ -71,7 +77,7 @@ class TestExec:
         self.pid = os_fork_with_retry( 10 )
         if self.pid == 0:
             # child process is the test itself
-            self.prepare_then_execute_test( execute_test_func, tcase, is_baseline )
+            self.prepare_then_execute_test( execute_test_func, is_baseline )
 
     def getStartTime(self):
         ""
@@ -153,12 +159,12 @@ class TestExec:
         
         return t1 or t2
 
-    def prepare_then_execute_test(self, launch_prep_func, tcase, is_baseline):
+    def prepare_then_execute_test(self, launch_prep_func, is_baseline):
         ""
         try:
             os.chdir( self.rundir )
 
-            cmd_list = launch_prep_func( tcase, is_baseline )
+            cmd_list = launch_prep_func( self, is_baseline )
 
             sys.stdout.flush() ; sys.stderr.flush()
 

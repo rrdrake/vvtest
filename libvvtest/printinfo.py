@@ -45,7 +45,8 @@ class TestInformationPrinter:
         txL = self.xlist.getRunning()
         self.println( "  *", len(txL), "running test(s):" )
 
-        for tcase in txL:
+        for texec in txL:
+            tcase = texec.getTestCase()
             tspec = tcase.getSpec()
             sdt = tcase.getStat().getStartDate()
             duration = datetime.timedelta( seconds=int(now-sdt) )

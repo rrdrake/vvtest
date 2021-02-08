@@ -475,26 +475,26 @@ class staged_parameters( vtu.vvtestTestCase ):
     def test_post_clean_logic(self):
         ""
         xhand,tcase = make_prepost_execution_handler()
-        xhand.check_run_postclean( tcase )
+        xhand.check_run_postclean( tcase, None )
         assert xhand.numpostclean == 0
         tcase.getStat().markStarted( time.time() )
         tcase.getStat().markDone( 0 )
-        xhand.check_run_postclean( tcase )
+        xhand.check_run_postclean( tcase, None )
         assert xhand.numpostclean == 0
         xhand.rtconfig.setAttr( 'postclean', True )
-        xhand.check_run_postclean( tcase )
+        xhand.check_run_postclean( tcase, None )
         assert xhand.numpostclean == 1
 
         tcase = vtu.make_fake_staged_TestCase( 1 )
         tcase.getStat().markStarted( time.time() )
         tcase.getStat().markDone( 0 )
         xhand,_ = make_prepost_execution_handler( tcase=tcase, postclean=True )
-        xhand.check_run_postclean( tcase )
+        xhand.check_run_postclean( tcase, None )
         assert xhand.numpostclean == 0
         tcase = vtu.make_fake_staged_TestCase( 2 )
         tcase.getStat().markStarted( time.time() )
         tcase.getStat().markDone( 0 )
-        xhand.check_run_postclean( tcase )
+        xhand.check_run_postclean( tcase, None )
         assert xhand.numpostclean == 1
 
     def test_finding_staged_test_dependencies(self):

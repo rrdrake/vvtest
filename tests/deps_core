@@ -468,36 +468,11 @@ class dependency_related_functions( vtu.vvtestTestCase ):
 
         assert tcase.numDependencies() == 1
 
-    def test_test_add_dependency_uniquifies_by_test_id_TestExec(self):
+    def test_add_dependency_uniquifies_by_test_id(self):
         ""
-        tcase = make_TestExec_test_case( 'testA' )
-
-        dep1 = make_TestExec_test_case( 'atest' )
-        depend.connect_dependency( tcase, dep1 )
-
-        dep2 = make_TestExec_test_case( 'atest' )
-        depend.connect_dependency( tcase, dep2 )
-
-        assert tcase.numDependencies() == 1
-
-    def test_add_dependency_uniquifies_by_test_id_TestSpec_then_TestExec(self):
-        ""
-        tcase = make_TestExec_test_case( 'testA' )
+        tcase = make_TestSpec_test_case( 'testA' )
 
         dep1 = make_TestSpec_test_case( 'atest' )
-        depend.connect_dependency( tcase, dep1 )
-
-        dep2 = make_TestExec_test_case( 'atest' )
-        depend.connect_dependency( tcase, dep2 )
-
-        assert len( tcase.deps ) == 1
-        assert id( tcase.deps[0].tcase ) == id(dep2)
-
-    def test_add_dependency_uniquifies_by_test_id_TestExec_then_TestSpec(self):
-        ""
-        tcase = make_TestExec_test_case( 'testA' )
-
-        dep1 = make_TestExec_test_case( 'atest' )
         depend.connect_dependency( tcase, dep1 )
 
         dep2 = make_TestSpec_test_case( 'atest' )
@@ -713,14 +688,6 @@ def make_TestSpec_test_case( name, subdir=None ):
     ts = TestSpec( name, os.getcwd(), subdir+name+'.vvt' )
 
     return TestCase( ts )
-
-
-def make_TestExec_test_case( name ):
-    ""
-    ts = TestSpec( name, os.getcwd(), name+'.vvt' )
-    tcase = TestCase( ts )
-    tcase.setExec( TestExec() )
-    return tcase
 
 
 def create_tests( relpath, platname=None ):

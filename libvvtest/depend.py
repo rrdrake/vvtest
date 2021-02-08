@@ -16,10 +16,6 @@ class TestDependency:
         self.matchpat = matchpat
         self.wordexpr = wordexpr
 
-    def hasTestExec(self):
-        ""
-        return self.tcase.getExec() != None
-
     def getTestID(self):
         ""
         return self.tcase.getSpec().getID()
@@ -97,7 +93,6 @@ class FailedTestDependency:
     'depends on' globbing match criterion is not satisfied.
     """
     def __init__(self, reason): self.reason = reason
-    def hasTestExec(self): return False
     def getTestID(self): return None
     def ranOrCouldRun(self): return False
     def satisfiesResult(self): return False

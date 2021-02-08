@@ -119,7 +119,7 @@ class Batcher:
             - a list of batch ids that were not run
             - a list of batch ids that did not finish
             - a list of the tests that did not run, each of which is a
-              pair (a test, failed dependency test)
+              pair (TestCase, failed dependency test)
         """
         jobL = self.jobhandler.markNotStartedJobsAsDone()
 
@@ -323,8 +323,9 @@ class BatchTestGrouper:
 
         self.xlist.sortBySizeAndTimeout()
         while True:
-            tcase = self.xlist.getNextTest()
-            if tcase != None:
+            texec = self.xlist.getNextTest()
+            if texec != None:
+                tcase = texec.getTestCase()
                 size = tcase.getSize()
                 tm = tcase.getStat().getAttr('timeout')
                 self._add_test_case( size, tm, tcase )
@@ -458,9 +459,11 @@ class ResultsHandler:
                 pass
             else:
                 for file_tcase in jobtests.values():
-                    tcase = self.xlist.checkStateChange( file_tcase )
-                    if tcase and tcase.getStat().isDone():
-                        donetests.append( tcase )
+                    texec = self.xlist.checkStateChange( file_tcase )
+                    if texec:
+                        tcase = texec.getTestCase()
+                        if tcase.getStat().isDone():
+                            donetests.append( tcase )
 
     def getReasonForNotRun(self, bjob):
         ""

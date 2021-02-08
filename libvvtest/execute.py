@@ -218,26 +218,25 @@ class DirectRunner( TestListRunner ):
 
         return encode_integer_warning( self.tlist )
 
-    def start_next(self, tnext):
+    def start_next(self, texec):
         ""
-        tspec = tnext.getSpec()
-        texec = tnext.getExec()
-        print3( 'Starting:', exec_path( tspec, self.test_dir ) )
-        start_test( self.handler, tnext, self.plat )
-        self.tlist.appendTestResult( tnext )
+        tcase = texec.getTestCase()
+        print3( 'Starting:', exec_path( tcase, self.test_dir ) )
+        start_test( self.handler, texec, self.plat )
+        self.tlist.appendTestResult( tcase )
 
     def print_finished(self):
         ""
         showprogress = False
 
-        for tcase in list( self.xlist.getRunning() ):
-            tx = tcase.getExec()
-            if tx.poll():
-                self.handler.finishExecution( tcase )
-            if tx.isDone():
+        for texec in list( self.xlist.getRunning() ):
+            tcase = texec.getTestCase()
+            if texec.poll():
+                self.handler.finishExecution( texec )
+            if texec.isDone():
                 xs = XstatusString( tcase, self.test_dir, self.cwd )
                 print3( "Finished:", xs )
-                self.xlist.testDone( tcase )
+                self.xlist.testDone( texec )
                 showprogress = True
 
         return showprogress
@@ -255,7 +254,8 @@ class DirectRunner( TestListRunner ):
         ""
         if len(nrL) > 0:
             print3()
-        print_notrun_reasons( nrL )
+        tcase_with_reason = [ (T[0].getTestCase(),T[1]) for T in nrL ]
+        print_notrun_reasons( tcase_with_reason )
 
 
 def print_notrun_reasons( notrunlist ):
@@ -284,9 +284,9 @@ def get_test_info( tlist, xlist ):
     return tdiv+" = %%%.1f"%tpct
 
 
-def exec_path( testspec, test_dir ):
+def exec_path( tcase, test_dir ):
     ""
-    xdir = testspec.getDisplayString()
+    xdir = tcase.getSpec().getDisplayString()
     return pathutil.relative_execute_directory( xdir, test_dir, os.getcwd() )
 
 
@@ -296,16 +296,17 @@ def run_baseline( xlist, plat ):
 
     handler = xlist.getExecutionHandler()
 
-    for tcase in xlist.consumeBacklog():
+    for texec in xlist.consumeBacklog():
 
+        tcase = texec.getTestCase()
         tspec = tcase.getSpec()
-        texec = tcase.getExec()
+        tstat = tcase.getStat()
 
         xdir = tspec.getDisplayString()
 
         sys.stdout.write( "baselining "+xdir+"..." )
 
-        start_test( handler, tcase, plat, is_baseline=True )
+        start_test( handler, texec, plat, is_baseline=True )
 
         tm = int( os.environ.get( 'VVTEST_BASELINE_TIMEOUT', 30 ) )
         for i in range(tm):
@@ -313,19 +314,19 @@ def run_baseline( xlist, plat ):
             time.sleep(1)
 
             if texec.poll():
-                handler.finishExecution( tcase )
+                handler.finishExecution( texec )
 
             if texec.isDone():
-                if tcase.getStat().passed():
+                if tstat.passed():
                     print3( "done" )
                 else:
                     failures = True
                     print3("FAILED")
                 break
 
-        if not tcase.getStat().isDone():
+        if not tstat.isDone():
             if texec.killJob():
-                handler.finishExecution( tcase )
+                handler.finishExecution( texec )
             failures = True
             print3( "TIMED OUT" )
 
@@ -333,14 +334,15 @@ def run_baseline( xlist, plat ):
         print3( "\n\n !!!!!!!!!!!  THERE WERE FAILURES  !!!!!!!!!! \n\n" )
 
 
-def start_test( handler, tcase, platform, is_baseline=False ):
+def start_test( handler, texec, platform, is_baseline=False ):
     ""
+    tcase = texec.getTestCase()
+
     obj = platform.getResources( tcase.getSize() )
 
-    texec = tcase.getExec()
     texec.setResourceObject( obj )
 
-    texec.start( handler.prepare_for_launch, tcase, is_baseline )
+    texec.start( handler.prepare_for_launch, is_baseline )
 
     tcase.getStat().markStarted( texec.getStartTime() )
 
