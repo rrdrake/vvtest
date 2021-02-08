@@ -84,12 +84,7 @@ class ScriptReader:
 
             if char0 == '#':
                 m = ScriptReader.vvtpat.match( line )
-                if m == None:
-                    # comment line, which stops any continuation
-                    if self.spec != None:
-                        self.speclineL.append( self.spec )
-                        self.spec = None
-                else:
+                if m is not None:
                     self.parse_spec( line[m.end():], info )
 
         elif self.spec != None:

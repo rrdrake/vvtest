@@ -223,6 +223,116 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             self.assertRaises( TestSpecError, ScriptReader, fn )
 
 
+class continuation_lines( vtu.vvtestTestCase ):
+
+    def test_basic_continuation(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: name = value1
+            #VVT::       value2
+            pass
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: nameA = value1
+            #VVT::        value2
+            #VVT: nameB = value3
+            pass
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: nameA = value1
+            #VVT: nameB = value2
+            #VVT::        value3
+            pass
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: name = value1
+            #VVT::       value2
+            #VVT::       value3
+            pass
+            """ )
+
+        util.writefile( 'etest.vvt', """
+            #VVT: nameA = value1
+            #VVT:       : value2
+            #VVT: nameB : value3
+            #VVT ::       value4
+            #VVT :      : value5
+            pass
+            """ )
+
+        rdr = ScriptReader( 'atest.vvt' )
+        specs = list( rdr.getSpecList() )
+        assert len( specs ) == 1
+        assert specs[0].keyword == 'name'
+        assert specs[0].value.split() == ['value1','value2']
+
+        rdr = ScriptReader( 'btest.vvt' )
+        specs = list( rdr.getSpecList() )
+        assert len( specs ) == 2
+        assert specs[0].keyword == 'nameA'
+        assert specs[0].value.split() == ['value1','value2']
+        assert specs[1].keyword == 'nameB'
+        assert specs[1].value.strip() == 'value3'
+
+        rdr = ScriptReader( 'ctest.vvt' )
+        specs = list( rdr.getSpecList() )
+        assert len( specs ) == 2
+        assert specs[0].keyword == 'nameA'
+        assert specs[0].value.split() == ['value1']
+        assert specs[1].keyword == 'nameB'
+        assert specs[1].value.split() == ['value2','value3']
+
+        rdr = ScriptReader( 'dtest.vvt' )
+        specs = list( rdr.getSpecList() )
+        assert len( specs ) == 1
+        assert specs[0].keyword == 'name'
+        assert specs[0].value.split() == ['value1','value2','value3']
+
+        rdr = ScriptReader( 'etest.vvt' )
+        specs = list( rdr.getSpecList() )
+        assert len( specs ) == 2
+        assert specs[0].keyword == 'nameA'
+        assert specs[0].value.split() == ['value1','value2']
+        assert specs[1].keyword == 'nameB'
+        assert specs[1].value.split() == ['value3','value4','value5']
+
+    def test_comments_are_ignored_but_blank_lines_break_continuation(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: name = value1
+
+            #VVT::       value2
+            pass
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: name = value1
+            #
+            #VVT::       value2
+            pass
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: name = value1
+            #   any comment
+            #VVT::       value2
+            pass
+            """ )
+
+        try:
+            ScriptReader( 'atest.vvt' )
+        except TestSpecError:
+            assert 'nothing to continue' in str( sys.exc_info()[1] )
+            assert 'atest.vvt:4' in str( sys.exc_info()[1] )
+        else:
+            raise Exception( 'expected an exception' )
+
+        for fname in ['btest.vvt','ctest.vvt']:
+            rdr = ScriptReader( fname )
+            specs = list( rdr.getSpecList() )
+            assert len( specs ) == 1
+            assert specs[0].keyword == 'name'
+            assert specs[0].value.split() == ['value1','value2']
+
+
 class ScriptReader_include_directives( vtu.vvtestTestCase ):
 
     def test_insert_file_into_directives(self):

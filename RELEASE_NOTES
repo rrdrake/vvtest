@@ -1,6 +1,18 @@
 
 Improvements:
 
+    - When writing test files, header directives can now continue across
+      comment lines, such as
+
+          #VVT: parameterize : np = 1
+          #
+          #VVT:              : 2
+          #  a comment line
+          #VVT:              : 4
+
+      However, a blank line still stops possible continuation on a subsequent
+      line.
+
     - Wildcard expressions (aka glob'ing) has been added. On the command line,
       wildcards are allowed for -k, -K, -x, and -X. For example,
 

@@ -233,6 +233,7 @@ class script_tests( vtu.vvtestTestCase ):
         assert vrun.countGrepLogs( 'hello from the test4b test' ) == 1
         assert vrun.countGrepLogs( 'hello from the test5a test' ) == 1
         assert vrun.countGrepLogs( 'hello from the test5b test' ) == 1
+
     def test_incorrect_specification_syntax(self):
         ""
         util.writescript( 'tst1.vvt', """
