@@ -1,6 +1,17 @@
 
 Improvements:
 
+    - Platform expressions used to include/exclude tests to run are now case
+      insensitive. So if a test header had
+
+          #VVT: enable (platforms=CTS*)
+
+      and the vvtest platform name was "cts1", then the test would run.
+      Other platform expressions in the test file are also case insensitive,
+      such as
+
+          #VVT: timeout (platform=CTS*) : 4h
+
     - When writing test files, header directives can now continue across
       comment lines, such as
 
@@ -63,6 +74,8 @@ Fixes:
     - 
 
 Changes:
+
+    - Platform expressions in the test files are now case insensitive.
 
     - By default, the name of a test is the basename of the test filename.
       For example, the test name of the test produced by file "atest.vvt"

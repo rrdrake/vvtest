@@ -634,6 +634,28 @@ class XML_test_specifications( vtu.vvtestTestCase ):
         tL = create_tests( 'ok18.xml', 'something' )
         assert len(tL) == 4
 
+    def test_that_platform_expressions_are_case_insensitive(self):
+        ""
+        util.writefile( 'atest.xml', """
+            <rtest name="atest">
+              <parameterize platforms="poo*" np="2"/>
+              <timeout platform="*OKY" value="51"/>
+            </rtest>""" )
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize (platforms=poo*) : np = 4
+            #VVT: timeout (platform=*OKY) : 54
+            """ )
+
+        tL = vtu.create_tests_from_file( 'atest.xml', platname='Pooky' )
+        assert len(tL) == 1
+        assert tL[0].getSpec().getDisplayString() == 'atest.np=2'
+        assert tL[0].getSpec().getTimeout() == 51
+
+        tL = vtu.create_tests_from_file( 'btest.vvt', platname='Pooky' )
+        assert len(tL) == 1
+        assert tL[0].getSpec().getDisplayString() == 'btest.np=4'
+        assert tL[0].getSpec().getTimeout() == 54
+
     def test_timeout_specifications(self):
         ""
         util.writefile( 'bad16.xml', """

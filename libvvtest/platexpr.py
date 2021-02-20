@@ -29,10 +29,19 @@ def create_platform_expression( word_expr_list, not_word_expr_list ):
 
 class PlatformExpression( WordExpression ):
 
-    def evaluate(self, expr):
-        ""
-        pev = PlatformEvaluator( expr )
-        return WordExpression._evaluate( self, pev.satisfies_platform )
+    def __init__(self, expr=None):
+        """
+        The 'expr' here is a (string) expression coming from the command line.
+        """
+        WordExpression.__init__( self, expr )
+
+    def evaluate(self, word_expr):
+        """
+        The 'word_expr' here is a WordExpression coming from the test file.
+        """
+        pev = PlatformEvaluator( word_expr )
+        return WordExpression._evaluate( self, pev.satisfies_platform,
+                                         case_insensitive=True )
 
 
 class PlatformEvaluator:
@@ -40,7 +49,7 @@ class PlatformEvaluator:
     Tests can use platform expressions to enable/disable the test.  This class
     caches the expressions and provides a function that answers the question
 
-        "Would the test run on the given platform name?"
+        Would the test run on the given platform name?
     """
     def __init__(self, word_expr):
         self.expr = word_expr
@@ -48,6 +57,7 @@ class PlatformEvaluator:
     def satisfies_platform(self, plat_name):
         ""
         if self.expr is not None:
-            if not self.expr.evaluate( plat_name ):
+            if not self.expr.evaluate( plat_name.lower(),
+                                       case_insensitive=True ):
                 return False
         return True

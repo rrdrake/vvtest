@@ -36,6 +36,9 @@ from libvvtest.keyexpr import make_non_results_expression
 from libvvtest.paramexpr import ParameterExpression
 from libvvtest.paramexpr import create_parameter_expression
 
+from libvvtest.platexpr import PlatformExpression
+from libvvtest.platexpr import create_platform_expression
+
 from libvvtest.parseutil import parse_to_word_expression
 
 
@@ -121,6 +124,16 @@ class word_expression_tests( vtu.vvtestTestCase ):
         assert not ex.evaluate( 'period' )
         assert     ex.evaluate( ['hello','period'] )
         assert     ex.evaluate( ['world','period'] )
+
+    def test_case_insensitive_evaluation(self):
+        ""
+        ex = WordExpression("hello or WorlD")
+        assert not ex.evaluate( 'world' )
+        assert     ex.evaluate( 'world', case_insensitive=True )
+
+        ex = WordExpression("hello and WorlD")
+        assert not ex.evaluate( 'world', case_insensitive=True )
+        assert     ex.evaluate( ['world','HEllO'], case_insensitive=True )
 
     def test_expression_errors(self):
         ""
@@ -429,6 +442,20 @@ class wildcard_word_expression_tests( vtu.vvtestTestCase ):
         assert not ex.evaluate( 'foo' )
         assert     ex.evaluate( 'fool' )
         assert not ex.evaluate( 'fools' )
+
+    def test_case_insensitive_wildcard_evaluation(self):
+        ""
+        ex = WildcardWordExpression("hello or WorlD")
+        assert not ex.evaluate( 'world' )
+        assert     ex.evaluate( 'world', case_insensitive=True )
+
+        ex = WildcardWordExpression("hello and WorlD")
+        assert not ex.evaluate( 'world', case_insensitive=True )
+        assert     ex.evaluate( ['world','HEllO'], case_insensitive=True )
+
+        ex = WildcardWordExpression("hell* and W??lD")
+        assert     ex.evaluate( ['world','HEllO'], case_insensitive=True )
+        assert     ex.evaluate( ['Wurld','hellooo'], case_insensitive=True )
 
 
 class keyword_expression_tests( vtu.vvtestTestCase ):
@@ -894,6 +921,82 @@ class param_expression_tests( vtu.vvtestTestCase ):
 
         self.assertRaises( TestSpecError,
                            parse_to_word_expression, 'foo or b$ar' )
+
+
+class platform_expression_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_using_None_and_empty_strings(self):
+        ""
+        assert PlatformExpression().evaluate( WordExpression() )
+        assert PlatformExpression().evaluate( WordExpression('') )
+        assert PlatformExpression().evaluate( WordExpression('foo') )
+
+        assert not PlatformExpression('').evaluate( WordExpression() )
+        assert not PlatformExpression('').evaluate( WordExpression('') )
+        assert not PlatformExpression('').evaluate( WordExpression('foo') )
+
+    def test_evaluating_against_a_single_platform_name(self):
+        ""
+        px = PlatformExpression('XBox')
+
+        assert     px.evaluate( WordExpression() )
+        assert not px.evaluate( WordExpression('') )
+        assert     px.evaluate( WordExpression('XBox') )
+        assert not px.evaluate( WordExpression('PS2') )
+
+        assert     px.evaluate( WordExpression('XBox or PS2') )
+        assert     px.evaluate( WordExpression('PS2 or XBox') )
+        assert not px.evaluate( WordExpression('PS2 or not XBox') )
+
+    def test_evaluating_against_a_platform_expression(self):
+        ""
+        px = PlatformExpression('XBox or PS2')
+
+        assert     px.evaluate( WordExpression() )
+        assert not px.evaluate( WordExpression('') )
+        assert     px.evaluate( WordExpression('XBox') )
+        assert     px.evaluate( WordExpression('PS2') )
+
+        assert     px.evaluate( WordExpression('XBox or PS2') )
+        assert     px.evaluate( WordExpression('PS2 or XBox') )
+        assert     px.evaluate( WordExpression('PS2 or not XBox') )
+        assert not px.evaluate( WordExpression('PS1 or Atari') )
+
+    def test_evaluating_against_wildcard_expressions(self):
+        ""
+        px = PlatformExpression('XBox or PS2')
+
+        assert     px.evaluate( WildcardWordExpression('XB*') )
+        assert not px.evaluate( WildcardWordExpression('foo*') )
+        assert     px.evaluate( WildcardWordExpression('XBox or not PS*') )
+
+        px = PlatformExpression('PS2')
+        assert not px.evaluate( WildcardWordExpression('XBox or not PS*') )
+
+    def test_evaluation_is_case_insensitive(self):
+        ""
+        px = PlatformExpression('XBox')
+        assert     px.evaluate( WordExpression('xbox') )
+        assert not px.evaluate( WordExpression('xboy') )
+
+        px = PlatformExpression('xbox')
+        assert     px.evaluate( WordExpression('XBox') )
+        assert not px.evaluate( WordExpression('XBoxer') )
+        assert     px.evaluate( WordExpression('XBoxer or XBox') )
+
+        px = PlatformExpression('XBox or PS2')
+        assert     px.evaluate( WildcardWordExpression('xb*') )
+        assert     px.evaluate( WildcardWordExpression('not ps*') )
+
+        px = PlatformExpression('xbox or ps2')
+        assert     px.evaluate( WildcardWordExpression('XB*') )
+        assert     px.evaluate( WildcardWordExpression('not PS*') )
+
+        px = PlatformExpression('ps2')
+        assert not px.evaluate( WildcardWordExpression('not PS*') )
 
 
 ############################################################################

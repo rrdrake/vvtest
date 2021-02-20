@@ -28,7 +28,7 @@ def evaluate_platform_expr( platname, expr ):
     ""
     wx = WildcardWordExpression( expr )
     check_wildcard_expression_words( wx.getWordList() )
-    return wx.evaluate( platname )
+    return wx.evaluate( platname, case_insensitive=True )
 
 
 def evaluate_option_expr( optlist, expr ):

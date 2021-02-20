@@ -35,15 +35,14 @@ def create_word_expression( list_of_string_expr, allow_wildcards=False ):
 class WordExpression:
     """
     Takes a string consisting of words, parentheses, and the operators "and",
-    "or", and "not".  A word is any sequence of characters not containing
-    a space or a parenthesis except the special words "and", "or", and "not".
+    "or", and "not".  A word in the expression is any sequence of characters
+    not containing a space or a parenthesis (except "and", "or", and "not").
     The initial string is parsed during construction then later evaluated
-    with the evaluate() method.  Each word is evaluated to true or false
-    based on an evaluator function given to the evaluate() method.
+    with the evaluate() method.
 
-    Without an expression (a None), the evaluate method will always return
-    True, while an empty string for an expression will always evaluate to
-    False.
+    When no expression is given to the constructor (a None), the evaluate
+    method will always return True. While an empty string given as the
+    expression will always evaluate to False.
     """
 
     def __init__(self, expr=None):
@@ -79,29 +78,35 @@ class WordExpression:
         """
         return list( self.words )
 
-    def evaluate(self, string_or_list):
+    def evaluate(self, string_or_list, case_insensitive=False):
         """
         If 'string_or_list' is a string, then each word in the expression
         is True if it equals the string.
-        If 'string_or_list' is a list or generator, then each word in the
-        expression is True if is a member of the list.
-        """
-        members = make_list( string_or_list )
-        return self._evaluate( members.count )
 
-    def _evaluate(self, evaluator_func):
+        If 'string_or_list' is a list or generator, then each word in the
+        expression evaluates to True if the word is a member of the list.
+        """
+        members = make_list( string_or_list, case_insensitive )
+        return self._evaluate( members.count, case_insensitive )
+
+    def _evaluate(self, evaluator_func, case_insensitive=False):
         """
         Evaluates the expression from left to right using the given
         'evaluator_func' to evaluate True/False of each word.  If the original
-        expression string is empty, false is returned.  If no expression was
-        set in this object, true is returned.
+        expression string is empty, False is returned.  If no expression was
+        set in this object (it is None), True is returned.
         """
-        if self.evalexpr == None:
+        if self.evalexpr is None:
             return True
 
-        def evalfunc(tok):
-            if evaluator_func(tok): return True
-            return False
+        if case_insensitive:
+            def evalfunc(tok):
+                if evaluator_func(tok.lower()): return True
+                return False
+        else:
+            def evalfunc(tok):
+                if evaluator_func(tok): return True
+                return False
 
         r = eval( self.evalexpr )
 
@@ -118,25 +123,37 @@ class WildcardWordExpression( WordExpression ):
         [!seq]  matches any char not in seq
     """
 
-    def evaluate(self, string_or_list):
+    def evaluate(self, string_or_list, case_insensitive=False):
         ""
-        matcher = WildcardMatcher( make_list( string_or_list ) )
+        words = make_list( string_or_list, case_insensitive )
+        matcher = WildcardMatcher( words, case_insensitive )
         return self._evaluate( matcher.match )
 
 
 class WildcardMatcher:
-    def __init__(self, word_list):
+
+    def __init__(self, word_list, case_insensitive):
         self.words = word_list
+        self.case = ( not case_insensitive )
+
     def match(self, word):
-        return len( fnmatch.filter( self.words, word ) ) > 0
+        if self.case:
+            return len( fnmatch.filter( self.words, word ) ) > 0
+        else:
+            return len( fnmatch.filter( self.words, word.lower() ) ) > 0
 
 
-def make_list( string_or_list ):
+def make_list( string_or_list, case_insensitive ):
     ""
     if isinstance( string_or_list, str ):
-        return [string_or_list]
+        words = [string_or_list]
     else:
-        return list( string_or_list )
+        words = list( string_or_list )
+
+    if case_insensitive:
+        words = [ word.lower() for word in words ]
+
+    return words
 
 
 def parse_word_expression( expr, wordset ):

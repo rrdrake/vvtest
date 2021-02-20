@@ -277,17 +277,24 @@ class exclude_tests( vtu.vvtestTestCase ):
             <rtest name="dtest">
                 <include platforms="foo or PS*"/>
             </rtest>""" )
+        util.writefile( 'etest.vvt', """
+            #VVT: enable (platforms=xb*)
+            """ )
+        util.writefile( 'ftest.xml', """
+            <rtest name="ftest">
+                <include platforms="?ARWIN"/>
+            </rtest>""" )
         time.sleep(1)
 
         vtu.runvvtest( '--plat pooky' ).assertCounts( total=0 )
 
         vrun = vtu.runvvtest( '-w --plat pooky -x "XBox or Darwin"' )
-        vrun.assertCounts( total=1,  npass=1 )
-        assert vrun.getTestIds() == ['atest']
+        vrun.assertCounts( total=3,  npass=3 )
+        assert vrun.getTestIds() == ['atest','etest','ftest']
 
         vrun = vtu.runvvtest( '-w --plat pooky -x "XBox^1 or PS2"' )
-        vrun.assertCounts( total=3,  npass=3 )
-        assert vrun.getTestIds() == ['btest','ctest','dtest']
+        vrun.assertCounts( total=4,  npass=4 )
+        assert vrun.getTestIds() == ['btest','ctest','dtest','etest']
 
         vrun = vtu.runvvtest( '-w --plat pooky -x "XBox^1 or Da*rwin"',
                               raise_on_error=False )
