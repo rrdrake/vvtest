@@ -31,7 +31,7 @@ class ProcessBatch:
               '# workdir = '+str(workdir) + '\n' + \
               '# outfile = '+str(outfile) + '\n\n' + \
               'cd '+workdir + ' || exit 1\n'
-        
+
         return hdr
 
     def submit(self, fname, workdir, outfile,

@@ -5,6 +5,11 @@
 # Government retains certain rights in this software.
 
 import os, sys
+import shlex
+try:
+    string_types = basestring,
+except NameError:
+    string_types = str, bytes
 
 
 def compute_num_nodes( size, cores_per_node, devices_per_node ):
@@ -39,7 +44,7 @@ def runcmd( cmdL, changedir=None ):
     """
     sys.stdout.flush()
     sys.stderr.flush()
-    
+
     outRead, outWrite = os.pipe()
     pid = os.fork()
     if pid == 0:
@@ -49,7 +54,7 @@ def runcmd( cmdL, changedir=None ):
         if changedir != None:
             os.chdir(changedir)
         os.execvp( cmdL[0], cmdL )
-    
+
     os.close(outWrite)
     out = ''
     while True:
@@ -67,10 +72,21 @@ def runcmd( cmdL, changedir=None ):
 
     os.close(outRead)
     (cpid, xs) = os.waitpid(pid,0)
-    
+
     if os.WIFEXITED(xs):
         return os.WEXITSTATUS(xs), out.strip()
     return 1, out.strip()
+
+
+def format_extra_flags(extra_flags):
+    if extra_flags is not None:
+        if isinstance(extra_flags, string_types):
+            extra_flags = shlex.split(extra_flags)
+        elif not isinstance(extra_flags, (list, tuple)):
+            extra_flags_type = type(extra_flags).__name__
+            errmsg = "Expected extra_flags to be str or list, not {0}"
+            raise ValueError(errmsg.format(extra_flags_type))
+    return extra_flags
 
 
 ####################################################################

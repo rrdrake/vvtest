@@ -157,6 +157,31 @@ class slurm_tests( vtu.vvtestTestCase ):
         obj.cancel( 123456 )
         assert int( slurm_tests.save_cmds[-1][-1] ) == 123456
 
+    def test_extra_flags(self):
+        ""
+        from batch.slurm import BatchSLURM
+        obj = BatchSLURM( 16, extra_flags="-V" )
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-V" in cmd
+
+        obj = BatchSLURM( 16, extra_flags=["-v", "var=val"])
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        obj = BatchSLURM( 16, extra_flags="-v var=val")
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        try:
+            obj = BatchSLURM( 16, extra_flags=5 )
+            raise Exception("failed to detect bad extra_flags!")
+        except ValueError:
+            # test passed
+            pass
+
 
 class lsf_tests( vtu.vvtestTestCase ):
 
@@ -211,6 +236,30 @@ class lsf_tests( vtu.vvtestTestCase ):
         obj.cancel( 123456 )
         assert int( lsf_tests.save_cmds[-1][-1] ) == 123456
 
+    def test_extra_flags(self):
+        ""
+        from batch.lsf import BatchLSF
+        obj = BatchLSF( 16, extra_flags="-V" )
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-V" in cmd
+
+        obj = BatchLSF( 16, extra_flags=["-v", "var=val"])
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        obj = BatchLSF( 16, extra_flags="-v var=val")
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        try:
+            obj = BatchLSF( 16, extra_flags=5 )
+            raise Exception("failed to detect bad extra_flags!")
+        except ValueError:
+            # test passed
+            pass
 
 class craypbs_tests( vtu.vvtestTestCase ):
 
@@ -248,6 +297,30 @@ class craypbs_tests( vtu.vvtestTestCase ):
         assert stateD[ '123457.sdb' ] == 'pending'
         assert stateD[ '7345.sdb' ] == ''
 
+    def test_extra_flags(self):
+        ""
+        from batch.craypbs import BatchCrayPBS
+        obj = BatchCrayPBS( 16, extra_flags="-V" )
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-V" in cmd
+
+        obj = BatchCrayPBS( 16, extra_flags=["-v", "var=val"])
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        obj = BatchCrayPBS( 16, extra_flags="-v var=val")
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        try:
+            obj = BatchCrayPBS( 16, extra_flags=5 )
+            raise Exception("failed to detect bad extra_flags!")
+        except ValueError:
+            # test passed
+            pass
 
 class pbs_tests( vtu.vvtestTestCase ):
 
@@ -285,6 +358,31 @@ class pbs_tests( vtu.vvtestTestCase ):
         assert stateD[ '12345.ladmin1' ] == 'running'
         assert stateD[ '123456.ladmin1' ] == 'pending'
         assert stateD[ '7345.ladmin1' ] == ''
+
+    def test_extra_flags(self):
+        ""
+        from batch.pbs import BatchPBS
+        obj = BatchPBS( 16, extra_flags="-V" )
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-V" in cmd
+
+        obj = BatchPBS( 16, extra_flags=["-v", "var=val"])
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        obj = BatchPBS( 16, extra_flags="-v var=val")
+        obj.setRunCommand( self.mock_run_command )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        assert "-v var=val" in cmd
+
+        try:
+            obj = BatchPBS( 16, extra_flags=5 )
+            raise Exception("failed to detect bad extra_flags!")
+        except ValueError:
+            # test passed
+            pass
 
 
 ############################################################################
