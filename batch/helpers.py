@@ -6,6 +6,7 @@
 
 import os, sys
 import shlex
+import subprocess
 
 
 def compute_num_nodes( size, cores_per_node, devices_per_node ):
@@ -36,42 +37,28 @@ def compute_node_count( num, numper ):
 
 
 def runcmd( cmdL, changedir=None ):
-    """
-    """
+    ""
     sys.stdout.flush()
     sys.stderr.flush()
 
-    outRead, outWrite = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        os.close(outRead)
-        os.dup2(outWrite, sys.stdout.fileno())
-        os.dup2(outWrite, sys.stderr.fileno())
-        if changedir != None:
-            os.chdir(changedir)
-        os.execvp( cmdL[0], cmdL )
+    if changedir:
+        cwd = os.getcwd()
+        os.chdir( changedir )
 
-    os.close(outWrite)
-    out = ''
-    while True:
-        buf = os.read(outRead,2048)
-        if not buf:
-            break
+    try:
+        sp = subprocess.Popen( cmdL, stdout=subprocess.PIPE,
+                                     stderr=subprocess.STDOUT )
+        out,err = sp.communicate()
+    finally:
+        if changedir:
+            os.chdir( cwd )
 
-        if sys.version_info[0] < 3:
-            out += buf
-        else:
-            try:
-                out += buf.decode( 'ascii', errors='ignore' )
-            except Exception:
-                out += buf.decode( 'ascii' )
+    if sys.version_info[0] < 3:
+        out = out if out else ''
+    else:
+        out = out.decode() if out else ''
 
-    os.close(outRead)
-    (cpid, xs) = os.waitpid(pid,0)
-
-    if os.WIFEXITED(xs):
-        return os.WEXITSTATUS(xs), out.strip()
-    return 1, out.strip()
+    return sp.returncode, out
 
 
 def format_extra_flags( extra_flags ):
@@ -91,10 +78,3 @@ def format_extra_flags( extra_flags ):
             flags = list( extra_flags )
 
     return flags
-
-
-####################################################################
-
-if __name__ == "__main__":
-    if len( sys.argv ) > 1:
-        runcmd( sys.argv[1:] )
