@@ -9,7 +9,7 @@ from os.path import basename
 import time
 import re
 
-from .helpers import runcmd, compute_num_nodes
+from .helpers import runcmd, compute_num_nodes, format_extra_flags
 
 
 jobpat = re.compile( r'Job\s+<\d+>\s+is submitted to' ) #, re.MULTILINE )
@@ -21,6 +21,7 @@ class BatchLSF:
         self.ppn = max( 1, ppn )
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.runcmd = runcmd
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -49,7 +50,8 @@ class BatchLSF:
         integer.
         """
         cmdL = ['bsub']
-
+        if self.extra_flags is not None:
+            cmdL.extend(self.extra_flags)
         cmdL.extend( [ '-J', basename(fname) ] )
         cmdL.extend( [ '-e', outfile ] )
         cmdL.extend( [ '-o', outfile ] )

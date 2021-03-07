@@ -7,7 +7,7 @@
 import os, sys
 import time
 
-from .helpers import runcmd, compute_num_nodes
+from .helpers import runcmd, compute_num_nodes, format_extra_flags
 
 class BatchSLURM:
 
@@ -16,6 +16,7 @@ class BatchSLURM:
         self.ppn = ppn
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.runcmd = runcmd
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -53,6 +54,8 @@ class BatchSLURM:
         an error is returned.
         """
         cmdL = ['sbatch']
+        if self.extra_flags is not None:
+            cmdL.extend(self.extra_flags)
         if queue != None:
             cmdL.append('--partition='+queue)
         if account != None:
@@ -180,7 +183,7 @@ def print3( *args ):
 
 
 if __name__ == "__main__":
-    
+
     bat = BatchSLURM()
 
     fp = open('tmp.sub','w')

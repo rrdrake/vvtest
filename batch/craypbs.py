@@ -12,7 +12,7 @@ This batch handler was used on the Cray XE machines.  Most commands are MOAB
 but it has aspects of PBS.
 """
 
-from .helpers import runcmd
+from .helpers import runcmd, format_extra_flags
 
 class BatchCrayPBS:
     """
@@ -25,6 +25,8 @@ class BatchCrayPBS:
         self.ppn = ppn
 
         self.runcmd = runcmd
+
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -39,14 +41,14 @@ class BatchCrayPBS:
         nnodes = int( np/self.ppn )
         if (np%self.ppn) != 0:
             nnodes += 1
-        
+
         hdr = '#MSUB -l nodes='+str(nnodes)+':ppn='+str(self.ppn)+ \
                       ',walltime='+str(qtime) + '\n' + \
               '#MSUB -j oe' + '\n' + \
               '#MSUB -o '+outfile + '\n' + \
               '#MSUB -d '+workdir + '\n' + \
               'cd '+workdir
-        
+
         return hdr
 
 
@@ -65,6 +67,8 @@ class BatchCrayPBS:
         an error is returned.
         """
         cmdL = ['msub']
+        if self.extra_flags is not None:
+            cmdL.extend(self.extra_flags)
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
         cmdL.extend(['-o', outfile])
@@ -72,9 +76,9 @@ class BatchCrayPBS:
         cmdL.extend(['-N', os.path.basename(fname)])
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
-        
+
         x, out = self.runcmd( cmdL, workdir )
-        
+
         # output should contain something like the following
         #    12345.ladmin1 or 12345.sdb
         jobid = None
@@ -83,11 +87,11 @@ class BatchCrayPBS:
             L = s.split()
             if len(L) == 1:
                 jobid = s
-        
+
         if jobid == None:
             return cmd, out, None, "batch submission failed or could not parse " + \
                                    "output to obtain the job id"
-        
+
         if confirm:
             time.sleep(1)
             ok = 0
@@ -100,7 +104,7 @@ class BatchCrayPBS:
             if not ok:
                 return cmd, out, None, "could not confirm that the job entered " + \
                             "the queue after 20 seconds (job id " + str(jobid) + ")"
-        
+
         return cmd, out, jobid, ""
 
     def query(self, jobidL):
@@ -114,11 +118,11 @@ class BatchCrayPBS:
         cmdL = ['showq']
         cmd = ' '.join( cmdL )
         x, out = self.runcmd(cmdL)
-        
+
         stateD = {}
         for jid in jobidL:
             stateD[jid] = ''  # default to done
-        
+
         err = ''
         for line in out.strip().split( os.linesep ):
             try:
@@ -134,7 +138,7 @@ class BatchCrayPBS:
             except Exception:
                 e = sys.exc_info()[1]
                 err = "failed to parse squeue output: " + str(e)
-        
+
         return cmd, out, err, stateD
 
     def HMSformat(self, nseconds):
@@ -167,7 +171,7 @@ def print3( *args ):
 
 
 if __name__ == "__main__":
-    
+
     bat = BatchCrayPBS()
 
     fp = open('tmp.sub','w')

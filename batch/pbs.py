@@ -6,26 +6,28 @@
 
 import os, sys
 import time
+import shlex
 
-from .helpers import runcmd
+from .helpers import runcmd, format_extra_flags
 
 class BatchPBS:
 
-    def __init__(self, ppn, variation=None):
+    def __init__(self, ppn, variation=None, **kwargs):
         """
         If 'variation' is given in the BatchPBS constructor, it causes the
         header to be created a little differently.  The known values are:
-          
+
           "select" : The -lselect= option is used instead of -lnodes= such as
                        -l select=<num nodes>:mpiprocs=<ppn>:ncpus=<ppn>
                      where <num nodes> is the number of nodes needed and <ppn>
                      is the number of processors per node.
-        
+
         By default, the -lnodes= method is used.
         """
         if ppn <= 0: ppn = 1
         self.ppn = ppn
         self.variation = variation
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
         self.runcmd = runcmd
 
@@ -41,18 +43,18 @@ class BatchPBS:
         nnodes = int( np/self.ppn )
         if (np%self.ppn) != 0:
             nnodes += 1
-        
+
         if self.variation != None and self.variation == "select":
             hdr = '#PBS -l select=' + str(nnodes) + \
                    ':mpiprocs=' + str(self.ppn) + ':ncpus='+str(self.ppn)+'\n'
         else:
             hdr = '#PBS -l nodes=' + str(nnodes) + ':ppn=' + str(self.ppn)+'\n'
-        
+
         hdr = hdr +  '#PBS -l walltime=' + self.HMSformat(qtime) + '\n' + \
                      '#PBS -j oe\n' + \
                      '#PBS -o ' + outfile + '\n' + \
                      'cd ' + workdir + '\n'
-        
+
         return hdr
 
 
@@ -71,15 +73,17 @@ class BatchPBS:
         an error is returned.
         """
         cmdL = ['qsub']
+        if self.extra_flags is not None:
+            cmdL.extend(self.extra_flags)
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
         cmdL.extend(['-o', outfile])
         cmdL.extend(['-j', 'oe'])
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
-        
+
         x, out = self.runcmd(cmdL, workdir)
-        
+
         # output should contain something like the following
         #    12345.ladmin1
         jobid = None
@@ -88,11 +92,11 @@ class BatchPBS:
             L = s.split()
             if len(L) == 1:
                 jobid = s
-        
+
         if jobid == None:
             return cmd, out, None, "batch submission failed or could not parse " + \
                                    "output to obtain the job id"
-        
+
         if confirm:
             time.sleep(1)
             ok = 0
@@ -105,7 +109,7 @@ class BatchPBS:
             if not ok:
                 return cmd, out, None, "could not confirm that the job entered " + \
                           "the queue after 20 seconds (job id " + str(jobid) + ")"
-        
+
         return cmd, out, jobid, ""
 
     def query(self, jobidL):
@@ -119,12 +123,12 @@ class BatchPBS:
         cmdL = ['qstat']
         cmd = ' '.join( cmdL )
         x, out = self.runcmd(cmdL)
-        
+
         # create a dictionary with the results; maps job id to a status string
         stateD = {}
         for j in jobidL:
             stateD[j] = ''  # default to done
-        
+
         err = ''
         for line in out.strip().split( os.linesep ):
             try:
@@ -144,7 +148,7 @@ class BatchPBS:
             except Exception:
                 e = sys.exc_info()[1]
                 err = "failed to parse squeue output: " + str(e)
-        
+
         return cmd, out, err, stateD
 
 
@@ -181,7 +185,7 @@ def print3( *args ):
 
 
 if __name__ == "__main__":
-    
+
     bat = BatchPBS()
 
     fp = open('tmp.sub','w')
