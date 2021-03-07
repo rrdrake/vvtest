@@ -15,19 +15,17 @@ MOAB systems.
 from .helpers import runcmd, format_extra_flags
 
 class BatchMOAB:
-    """
-    """
+
     def __init__(self, ppn, **kwargs):
         """
         The 'variation' keyword can be
 
             knl : Cray KNL partition
         """
-        if ppn <= 0: ppn = 1
-        self.ppn = ppn
-
+        self.ppn = max( ppn, 1 )
+        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
         self.variation = kwargs.get( 'variation', '' )
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
 
     def header(self, size, qtime, workdir, outfile, plat_attrs):
         """
@@ -67,9 +65,7 @@ class BatchMOAB:
         until the job id shows up.  If it does not show up in about 20 seconds,
         an error is returned.
         """
-        cmdL = ['msub']
-        if self.extra_flags is not None:
-            cmdL.extend(self.extra_flags)
+        cmdL = ['msub']+self.extra_flags
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
         cmdL.extend(['-o', outfile])

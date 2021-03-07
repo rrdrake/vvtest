@@ -15,18 +15,14 @@ but it has aspects of PBS.
 from .helpers import runcmd, format_extra_flags
 
 class BatchCrayPBS:
-    """
-    """
 
     def __init__(self, ppn, **kwargs):
-        """
-        """
-        if ppn <= 0: ppn = 1
-        self.ppn = ppn
+        ""
+        self.ppn = max( ppn, 1 )
+        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
 
         self.runcmd = runcmd
-
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -66,9 +62,7 @@ class BatchCrayPBS:
         until the job id shows up.  If it does not show up in about 20 seconds,
         an error is returned.
         """
-        cmdL = ['msub']
-        if self.extra_flags is not None:
-            cmdL.extend(self.extra_flags)
+        cmdL = ['msub']+self.extra_flags
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
         cmdL.extend(['-o', outfile])

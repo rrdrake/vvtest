@@ -6,10 +6,6 @@
 
 import os, sys
 import shlex
-try:
-    string_types = basestring,
-except NameError:
-    string_types = str, bytes
 
 
 def compute_num_nodes( size, cores_per_node, devices_per_node ):
@@ -78,15 +74,23 @@ def runcmd( cmdL, changedir=None ):
     return 1, out.strip()
 
 
-def format_extra_flags(extra_flags):
-    if extra_flags is not None:
-        if isinstance(extra_flags, string_types):
-            extra_flags = shlex.split(extra_flags)
-        elif not isinstance(extra_flags, (list, tuple)):
+def format_extra_flags( extra_flags ):
+    ""
+    flags = []
+
+    if extra_flags:
+        if type(extra_flags) == type(''):
+            flags = shlex.split(extra_flags)
+
+        elif type(extra_flags) not in [type(()),type([])]:
             extra_flags_type = type(extra_flags).__name__
             errmsg = "Expected extra_flags to be str or list, not {0}"
             raise ValueError(errmsg.format(extra_flags_type))
-    return extra_flags
+
+        else:
+            flags = list( extra_flags )
+
+    return flags
 
 
 ####################################################################

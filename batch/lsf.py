@@ -20,8 +20,9 @@ class BatchLSF:
         ""
         self.ppn = max( 1, ppn )
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+
         self.runcmd = runcmd
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -49,9 +50,7 @@ class BatchLSF:
         message is a string containing the error.  If successful, job id is an
         integer.
         """
-        cmdL = ['bsub']
-        if self.extra_flags is not None:
-            cmdL.extend(self.extra_flags)
+        cmdL = ['bsub']+self.extra_flags
         cmdL.extend( [ '-J', basename(fname) ] )
         cmdL.extend( [ '-e', outfile ] )
         cmdL.extend( [ '-o', outfile ] )

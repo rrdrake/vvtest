@@ -12,11 +12,12 @@ from .helpers import runcmd, compute_num_nodes, format_extra_flags
 class BatchSLURM:
 
     def __init__(self, ppn, **kwargs):
-        if ppn <= 0: ppn = 1
-        self.ppn = ppn
+        ""
+        self.ppn = max( ppn, 1 )
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+
         self.runcmd = runcmd
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
 
     def setRunCommand(self, run_function):
         ""
@@ -53,9 +54,7 @@ class BatchSLURM:
         until the job id shows up.  If it does not show up in about 20 seconds,
         an error is returned.
         """
-        cmdL = ['sbatch']
-        if self.extra_flags is not None:
-            cmdL.extend(self.extra_flags)
+        cmdL = ['sbatch']+self.extra_flags
         if queue != None:
             cmdL.append('--partition='+queue)
         if account != None:

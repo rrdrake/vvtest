@@ -24,10 +24,9 @@ class BatchPBS:
 
         By default, the -lnodes= method is used.
         """
-        if ppn <= 0: ppn = 1
-        self.ppn = ppn
+        self.ppn = max( ppn, 1 )
         self.variation = variation
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags"))
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
 
         self.runcmd = runcmd
 
@@ -72,9 +71,7 @@ class BatchPBS:
         until the job id shows up.  If it does not show up in about 20 seconds,
         an error is returned.
         """
-        cmdL = ['qsub']
-        if self.extra_flags is not None:
-            cmdL.extend(self.extra_flags)
+        cmdL = ['qsub']+self.extra_flags
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
         cmdL.extend(['-o', outfile])

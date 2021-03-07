@@ -9,14 +9,16 @@ import time
 import signal
 import subprocess
 
-from .helpers import runcmd
+from .helpers import runcmd, format_extra_flags
 
 class ProcessBatch:
 
     def __init__(self, ppn, **kwargs):
-        if ppn <= 0: ppn = 1
-        self.ppn = ppn
+        ""
+        self.ppn = max( ppn, 1 )
         self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+
         self.childids = []
 
     def header(self, size, qtime, workdir, outfile, plat_attrs):

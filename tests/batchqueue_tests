@@ -12,6 +12,7 @@ sys.excepthook = sys.__excepthook__
 import os
 from os.path import abspath
 import time
+from textwrap import dedent
 
 import vvtestutils as vtu
 import testutils as util
@@ -58,6 +59,16 @@ class general_tests( vtu.vvtestTestCase ):
         assert compute_num_nodes( (31,None), 16, 4 ) == 2
 
 
+def check_extra_batch_submit_flags( batch_type, mock_run_cmd ):
+    ""
+    for flags in ['-V', ['-v','var=val'], '-v var=val']:
+        obj = batch_type( 16, extra_flags=flags)
+        obj.setRunCommand( mock_run_cmd )
+        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        check = flags if type(flags)==type('') else ' '.join(flags)
+        assert check in cmd, 'expected '+repr(check)+' to appear in '+repr(cmd)
+
+
 class procbatch_tests( vtu.vvtestTestCase ):
 
     def test_smoke_test(self):
@@ -101,13 +112,13 @@ class slurm_tests( vtu.vvtestTestCase ):
             return 0, 'Submitted batch job 291041'
 
         if cmdL[0] == 'squeue':
-            return 0, """
-15994641 PD
-16004759 PD
-16004368 R
-16001384 R
-16001384 CD
-"""
+            return 0, dedent( """
+                              15994641 PD
+                              16004759 PD
+                              16004368 R
+                              16001384 R
+                              16001384 CD
+                              """ )
 
         if cmdL[0] == 'scancel':
             return 0, ''
@@ -160,27 +171,8 @@ class slurm_tests( vtu.vvtestTestCase ):
     def test_extra_flags(self):
         ""
         from batch.slurm import BatchSLURM
-        obj = BatchSLURM( 16, extra_flags="-V" )
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-V" in cmd
-
-        obj = BatchSLURM( 16, extra_flags=["-v", "var=val"])
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        obj = BatchSLURM( 16, extra_flags="-v var=val")
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        try:
-            obj = BatchSLURM( 16, extra_flags=5 )
-            raise Exception("failed to detect bad extra_flags!")
-        except ValueError:
-            # test passed
-            pass
+        check_extra_batch_submit_flags( BatchSLURM, self.mock_run_command )
+        self.assertRaises( ValueError, BatchSLURM, 16, extra_flags=5 )
 
 
 class lsf_tests( vtu.vvtestTestCase ):
@@ -195,10 +187,10 @@ class lsf_tests( vtu.vvtestTestCase ):
             return 0, 'Job <68628> is submitted to default queue <normal>.'
 
         if cmdL[0] == 'bjobs':
-            return 0, """
-68628   PEND
-68728   RUN
-"""
+            return 0, dedent( """
+                              68628   PEND
+                              68728   RUN
+                              """ )
 
         if cmdL[0] == 'bkill':
             return 0, ''
@@ -239,27 +231,9 @@ class lsf_tests( vtu.vvtestTestCase ):
     def test_extra_flags(self):
         ""
         from batch.lsf import BatchLSF
-        obj = BatchLSF( 16, extra_flags="-V" )
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-V" in cmd
+        check_extra_batch_submit_flags( BatchLSF, self.mock_run_command )
+        self.assertRaises( ValueError, BatchLSF, 16, extra_flags=5 )
 
-        obj = BatchLSF( 16, extra_flags=["-v", "var=val"])
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        obj = BatchLSF( 16, extra_flags="-v var=val")
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        try:
-            obj = BatchLSF( 16, extra_flags=5 )
-            raise Exception("failed to detect bad extra_flags!")
-        except ValueError:
-            # test passed
-            pass
 
 class craypbs_tests( vtu.vvtestTestCase ):
 
@@ -269,11 +243,11 @@ class craypbs_tests( vtu.vvtestTestCase ):
             return 0, '12345.sdb'
 
         if cmdL[0] == 'showq':
-            return 0, """
-123456.sdb n/a Running field
-12345.sdb n/a Running field
-123457.sdb n/a Idle field
-"""
+            return 0, dedent( """
+                              123456.sdb n/a Running field
+                              12345.sdb n/a Running field
+                              123457.sdb n/a Idle field
+                              """ )
         raise Exception( 'mock failure' )
 
     def test_smoke_test(self):
@@ -300,27 +274,9 @@ class craypbs_tests( vtu.vvtestTestCase ):
     def test_extra_flags(self):
         ""
         from batch.craypbs import BatchCrayPBS
-        obj = BatchCrayPBS( 16, extra_flags="-V" )
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-V" in cmd
+        check_extra_batch_submit_flags( BatchCrayPBS, self.mock_run_command )
+        self.assertRaises( ValueError, BatchCrayPBS, 16, extra_flags=5 )
 
-        obj = BatchCrayPBS( 16, extra_flags=["-v", "var=val"])
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        obj = BatchCrayPBS( 16, extra_flags="-v var=val")
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        try:
-            obj = BatchCrayPBS( 16, extra_flags=5 )
-            raise Exception("failed to detect bad extra_flags!")
-        except ValueError:
-            # test passed
-            pass
 
 class pbs_tests( vtu.vvtestTestCase ):
 
@@ -330,11 +286,11 @@ class pbs_tests( vtu.vvtestTestCase ):
             return 0, '12345.ladmin1'
 
         if cmdL[0] == 'qstat':
-            return 0, """
-123456.ladmin1 field1 field2 field3 Q field6
-12345.ladmin1 field1 field2 field3 R field6
-123457.ladmin1 field1 field2 field3 C field6
-"""
+            return 0, dedent( """
+                              123456.ladmin1 field1 field2 field3 Q field6
+                              12345.ladmin1 field1 field2 field3 R field6
+                              123457.ladmin1 field1 field2 field3 C field6
+                              """ )
         raise Exception( 'mock failure' )
 
     def test_smoke_test(self):
@@ -362,27 +318,8 @@ class pbs_tests( vtu.vvtestTestCase ):
     def test_extra_flags(self):
         ""
         from batch.pbs import BatchPBS
-        obj = BatchPBS( 16, extra_flags="-V" )
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-V" in cmd
-
-        obj = BatchPBS( 16, extra_flags=["-v", "var=val"])
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        obj = BatchPBS( 16, extra_flags="-v var=val")
-        obj.setRunCommand( self.mock_run_command )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
-        assert "-v var=val" in cmd
-
-        try:
-            obj = BatchPBS( 16, extra_flags=5 )
-            raise Exception("failed to detect bad extra_flags!")
-        except ValueError:
-            # test passed
-            pass
+        check_extra_batch_submit_flags( BatchPBS, self.mock_run_command )
+        self.assertRaises( ValueError, BatchPBS, 16, extra_flags=5 )
 
 
 ############################################################################
