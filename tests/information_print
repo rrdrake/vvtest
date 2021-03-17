@@ -162,7 +162,9 @@ class timing_output_tests( vtu.vvtestTestCase ):
         tdir = vrun.resultsDir()
         tL,tsum = vrun.getTimeoutInfoSection()
 
-        def check_times( testL, timesum, subdir='TestResults.Linux' ):
+        plat = vtu.core_platform_name()
+
+        def check_times( testL, timesum, subdir='TestResults.'+plat ):
             ""
             if subdir: subdir += '/'
             assert len( testL ) == 3

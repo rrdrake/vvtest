@@ -12,6 +12,7 @@ from os.path import join as pjoin
 from os.path import dirname, abspath, normpath, basename
 import time
 import shlex
+import pipes
 
 import libvvtest.cmdline as cmdline
 from libvvtest.execlist import TestExecList
@@ -1105,7 +1106,7 @@ def determine_job_check_intervals():
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     ""
-    cmd = sys.executable + ' ' + vvtestpath
+    cmd = sys.executable + ' ' + pipes.quote(vvtestpath)
 
     if opts.dash_e: cmd += ' -e'
     if opts.dash_m: cmd += ' -m'
@@ -1115,22 +1116,22 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     cmd += ' -n 1'  # force sequential batch execution
 
     for cfgdir in rtconfig.getAttr('configdir'):
-        cmd += ' --config='+cfgdir
+        cmd += ' --config='+pipes.quote(cfgdir)
 
-    cmd += ' --plat '+rtconfig.getPlatformName()
+    cmd += ' --plat '+pipes.quote(rtconfig.getPlatformName())
 
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
             if v:
-                cmd += ' --platopt ' + k + '=' + v
+                cmd += ' --platopt ' + k + '=' + pipes.quote(v)
             else:
                 cmd += ' --platopt ' + k
 
     if opts.perms:
-        cmd += ' --perms '+','.join( opts.perms )
+        cmd += ' --perms='+pipes.quote(','.join( opts.perms ))
 
     for arg in rtconfig.getAttr('testargs'):
-        cmd += ' --test-args="'+arg+'"'
+        cmd += ' --test-args='+pipes.quote(arg)
 
     return cmd
 

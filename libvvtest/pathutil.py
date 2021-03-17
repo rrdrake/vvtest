@@ -108,7 +108,10 @@ def fault_tolerant_remove( path, num_attempts=5 ):
         rmpath = path
     else:
         rmpath = os.path.join( dn, 'vvtest_remove_'+random_string()+'_'+fn )
-        os.rename( path, rmpath )
+        try:
+            os.rename( path, rmpath )
+        except Exception as e:
+            raise type(e)( 'Failed to remove path '+repr(path)+': '+str(e) )
 
     for i in range( num_attempts ):
         try:

@@ -143,24 +143,30 @@ class fault_tolerant_remove_tests( vtu.vvtestTestCase ):
         try:
             time.sleep(1)
 
-            pathutil.fault_tolerant_remove( 'subdir' )
+            try:
+                pathutil.fault_tolerant_remove( 'subdir' )
+            except Exception as e:
+                # On Macs (BSD?), you can't rename a subdirectory without
+                # write permission on the subdirectory
+                assert 'Failed to remove' in str(e)
+                assert sys.platform.lower().startswith('darwin')
+            else:
+                assert os.path.samefile( os.getcwd(), cwd )
+                assert not os.path.exists( 'subdir' )
+                fn1 = util.globfile( '*/file.txt' )
+                assert fn1.startswith( 'vvtest_remove_' )
+                dn1 = dirname( fn1 )
 
-            assert os.path.samefile( os.getcwd(), cwd )
-            assert not os.path.exists( 'subdir' )
-            fn1 = util.globfile( '*/file.txt' )
-            assert fn1.startswith( 'vvtest_remove_' )
-            dn1 = dirname( fn1 )
+                # a second time does not change the name; this is important
+                # because otherwise multiple unsuccessful removes can make the
+                # "remove" file name grow indefinitely
 
-            # a second time does not change the name; this is important
-            # because otherwise multiple unsuccessful removes can make the
-            # "remove" file name grow indefinitely
+                pathutil.fault_tolerant_remove( dn1 )
 
-            pathutil.fault_tolerant_remove( dn1 )
-
-            fn2 = util.globfile( '*/file.txt' )
-            assert fn2.startswith( 'vvtest_remove_' )
-            dn2 = dirname( fn2 )
-            assert dn2 == dn1
+                fn2 = util.globfile( '*/file.txt' )
+                assert fn2.startswith( 'vvtest_remove_' )
+                dn2 = dirname( fn2 )
+                assert dn2 == dn1
 
         finally:
             for pn in os.listdir('.'):

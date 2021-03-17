@@ -405,9 +405,9 @@ def main(args):
 
         # Read in all the realizations.
         realizations = []
-        with open(args.parameters_jsonl, 'r') as F:
+        with open(args.parameters_jsonl, 'rt') as F:
             for line in F.readlines():
-                realizations.append(json.loads(line, encoding='utf-8'))
+                realizations.append(json.loads(line))
 
         # Create each file.
         base, suffix = os.path.splitext(args.output_file)

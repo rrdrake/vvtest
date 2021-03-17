@@ -40,12 +40,12 @@ class parameter_tests( vtu.vvtestTestCase ):
 
             vtu.remove_results()
 
-            vrun = vtu.runvvtest( "-p 'np<8' -P 'np=1'", batch=batch )
+            vrun = vtu.runvvtest( "-N 8 -p 'np<8' -P 'np=1'", batch=batch )
             vrun.assertCounts( total=1, npass=1 )
             assert vrun.countGrepLogs( 'execute basic2' ) == 1
             assert vrun.countGrepLogs( 'execute basic2 np = 4' ) == 1
 
-            vrun = vtu.runvvtest( "-p 'np<=8'", batch=batch )
+            vrun = vtu.runvvtest( "-N 8 -p 'np<=8'", batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
             vrun = vtu.runvvtest( "-i -v", batch=batch )
@@ -59,8 +59,8 @@ class parameter_tests( vtu.vvtestTestCase ):
         -p level>0  means  (level defined) AND (level > 0)
 
         -P level>0  means  NOT [ (level defined) AND (level > 0) ]
-                           NOT (level defined) OR NOT (level > 0)
-                           (level not defined) OR (level <= 0)
+                    or     NOT (level defined) OR NOT (level > 0)
+                    or     (level not defined) OR (level <= 0)
         """
         util.writefile( 'atest.vvt', """
             #VVT: parameterize : np = 2

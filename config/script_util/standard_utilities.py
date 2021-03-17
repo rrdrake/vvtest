@@ -124,7 +124,10 @@ def _tracer_( frame, event, arg ):
         # this returns (filename, lineno, function, code_context, index)
         infT = inspect.getframeinfo( frame, 1 )
         fileloc = infT[0]+':'+str(infT[1])  # the file name and line
-        codeline = infT[3][ infT[4] ].rstrip()  # the relevant line of code
+        if infT[3]:
+            codeline = infT[3][ infT[4] ].rstrip()  # the relevant line of code
+        else:
+            codeline = infT[2] if infT[2] else '<unknown>'
 
         # try to avoid tracing files inside of the python installation
         p1 = os.path.realpath( sys.prefix )
