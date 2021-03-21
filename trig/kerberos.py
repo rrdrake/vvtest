@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os, sys
+import subprocess
 
 help_string = """
 USAGE
@@ -93,21 +94,18 @@ def set_ticket():
 
 def init_ticket( echo="echo" ):
     ""
-    from command import Command
     destroy_ticket()
-    Command( 'kinit -f -r 90d -l 1d -c $ticketpath' ).run( echo=echo )
+    run( 'kinit -f -r 90d -l 1d -c '+ticketpath, echo=echo )
 
 
 def destroy_ticket( echo="echo" ):
     ""
-    from command import Command
-    Command( 'kdestroy -c $ticketpath' ).run_timeout( 60, echo=echo )
+    run( 'kdestroy -c '+ticketpath, echo=echo )
 
 
 def renew_ticket( echo="echo" ):
     ""
-    from command import Command
-    Command( 'kinit -R -c $ticketpath' ).run_timeout( 60, echo=echo )
+    run( 'kinit -R -c '+ticketpath, echo=echo )
 
 
 def get_user_name():
@@ -129,6 +127,35 @@ def get_user_name():
         pass
 
     raise Exception( "could not determine the user name of this process" )
+
+
+def run( cmd, echo='echo' ):
+    ""
+    if echo:
+        print ( cmd )
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    if echo:
+        x = subprocess.call( cmd, shell=True )
+        out = ''
+    else:
+        sp = subprocess.Popen( cmd, shell=True, stdout=subprocess.PIPE,
+                                                stderr=subprocess.STDOUT )
+        out,err = sp.communicate()
+        x = sp.returncode
+
+        if sys.version_info[0] < 3:
+            out = out if out else ''
+        else:
+            out = out.decode() if out else ''
+
+    if out and ( x != 0 or echo == 'echo' ):
+        print ( out )
+
+    if x != 0:
+        raise Exception( 'Command failed: '+repr(cmd) )
 
 
 ################################################################

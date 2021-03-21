@@ -10,6 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+from os.path import abspath
 import time
 import unittest
 
@@ -33,37 +34,49 @@ class catchall( unittest.TestCase ):
     def setUp(self):
         ""
         util.setup_test()
-        os.environ[ 'COMMAND_DRYRUN' ] = ''
+
+        os.mkdir( 'fake_bin' )
+
+        util.writescript( 'fake_bin/kinit', """
+            #!/bin/bash
+            echo 'FAKEKINIT:' "$@"
+            """ )
+        util.writescript( 'fake_bin/kdestroy', """
+            #!/bin/bash
+            echo 'FAKEKDESTROY:' "$@"
+            """ )
+
+        self.bin = abspath('fake_bin')+':'+os.environ.get('PATH','/usr/bin')
 
     def test_set_ticket(self):
         """
         the set_ticket function sets the KRB5CCNAME environ variable
         """
-        if 'KRB5CCNAME' in os.environ:
-            os.environ.pop( 'KRB5CCNAME' )
-
-        kerberos.set_ticket()
-
-        assert 'KRB5CCNAME' in os.environ
+        with util.set_environ( KRB5CCNAME=None ):
+            assert 'KRB5CCNAME' not in os.environ
+            kerberos.set_ticket()
+            assert 'KRB5CCNAME' in os.environ
 
     def test_init_ticket(self):
         ""
-        kerberos.init_ticket( echo='none' )
-        kerberos.init_ticket()
+        with util.set_environ( PATH=self.bin ):
+            kerberos.init_ticket( echo='none' )
+            kerberos.init_ticket()
 
     def test_destroy_ticket(self):
         ""
-        kerberos.destroy_ticket( echo='none' )
-        kerberos.destroy_ticket()
+        with util.set_environ( PATH=self.bin ):
+            kerberos.destroy_ticket( echo='none' )
+            kerberos.destroy_ticket()
 
     def test_renew_ticket(self):
         ""
-        kerberos.renew_ticket( echo='none' )
-        kerberos.renew_ticket()
+        with util.set_environ( PATH=self.bin ):
+            kerberos.renew_ticket( echo='none' )
+            kerberos.renew_ticket()
 
     def test_man_page(self):
         ""
-        os.environ.pop( 'COMMAND_DRYRUN' )
         util.runcmd( kerbcmd+' -h', raise_on_error=True )
         util.runcmd( kerbcmd+' --help', raise_on_error=True )
 
