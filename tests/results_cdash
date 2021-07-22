@@ -667,6 +667,39 @@ class integration_tests( vtu.vvtestTestCase ):
                                 'destination is an http URL' )
         assert len( lines ) == 1
 
+    def test_staged_test_handling(self):
+        ""
+        util.writefile( 'foo.vvt', """
+            #VVT: parameterize (staged) : bar = A B C
+
+            import sys
+            import vvtest_util as vvt
+            from script_util import exit_diff
+
+            print ( 'bar='+vvt.bar+' stage='+vvt.stage )
+
+            if vvt.bar == 'A':
+                exit_diff()
+            elif vvt.bar == 'B':
+                sys.exit(1)
+            """ )
+
+        vrun = vtu.runvvtest( '--cdash file.xml' )
+
+        xml = util.read_xml_file( 'file.xml' )
+
+        testinfo = extract_test_results( xml, 'foo.bar stage=1(bar=A)' )
+        assert 'bar=A stage=1' in testinfo['output']
+        assert 'foo.vvt' in testinfo['FullCommandLine']
+
+        testinfo = extract_test_results( xml, 'foo.bar stage=2(bar=B)' )
+        assert 'bar=B stage=2' in testinfo['output']
+        assert 'foo.vvt' in testinfo['FullCommandLine']
+
+        testinfo = extract_test_results( xml, 'foo.bar stage=3(bar=C)' )
+        assert not testinfo.get( 'output', None )
+        assert not testinfo.get( 'FullCommandLine', None )
+
 
 def make_CDashWriter( destination, subclass_submitter=None,
                       project=None, datestamp=None ):

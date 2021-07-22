@@ -27,21 +27,23 @@ class exechandler_free_functions( vtu.vvtestTestCase ):
     def test_execution_log_name(self):
         ""
         tcase = vtu.make_fake_TestCase()
-        fn = exechandler.get_execution_log_filename( tcase, False )
+        fn = tcase.getSpec().getLogFilename()
         assert fn == 'execute.log'
-        fn = exechandler.get_execution_log_filename( tcase, True )
+        fn = tcase.getSpec().getLogFilename( False )
+        assert fn == 'execute.log'
+        fn = tcase.getSpec().getLogFilename( True )
         assert fn == 'baseline.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=0 )
-        fn = exechandler.get_execution_log_filename( tcase, False )
+        fn = tcase.getSpec().getLogFilename()
         assert fn == 'execute_stage=1.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=1 )
-        fn = exechandler.get_execution_log_filename( tcase, False )
+        fn = tcase.getSpec().getLogFilename()
         assert fn == 'execute_stage=2.log'
 
         tcase = vtu.make_fake_staged_TestCase( stage_index=2 )
-        fn = exechandler.get_execution_log_filename( tcase, False )
+        fn = tcase.getSpec().getLogFilename()
         assert fn == 'execute_stage=3.log'
 
     def test_setting_PYTHONPATH(self):
@@ -299,7 +301,7 @@ class exechandler_free_functions( vtu.vvtestTestCase ):
             fp.write( out+'\nblah blah blah\n' )
         time.sleep(1)
 
-        cmd2 = outpututils.get_test_command_line( '.' )
+        cmd2 = outpututils.get_test_command_line( 'execute.log' )
         assert shlex.split(cmd2) == cmdL
 
 

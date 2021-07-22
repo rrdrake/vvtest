@@ -133,9 +133,7 @@ class JUnitWriter:
 
     def make_execute_log_section(self, tcase, max_KB):
         ""
-        xdir = tcase.getSpec().getExecuteDirectory()
-        logdir = pjoin( self.testdir, xdir )
-        logfile = pjoin( logdir, 'execute.log' )
+        logfile = outpututils.get_log_file_path( self.testdir, tcase.getSpec() )
 
         try:
             sysout = outpututils.file_read_with_limit( logfile, max_KB )

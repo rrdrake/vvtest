@@ -55,16 +55,20 @@ def location_display_string( tspec, test_dir, cwd ):
     return loc
 
 
-def get_test_command_line( test_exec_dir ):
+def get_log_file_path( testdir, tspec ):
     ""
-    log = pjoin( test_exec_dir, 'execute.log' )
+    fn = tspec.getLogFilename()
+    return pjoin( testdir, tspec.getExecuteDirectory(), fn )
 
+
+def get_test_command_line( logfilename ):
+    ""
     cmdmark = 'Command      : '
 
-    if os.path.isfile( log ):
-        cmd = '*** could not get command line from log file: '+log
+    if os.path.isfile( logfilename ):
+        cmd = '*** could not get command line from log file: '+logfilename
         try:
-            with open( log, 'rt' ) as fp:
+            with open( logfilename, 'rt' ) as fp:
                 for line in fp:
                     if line.startswith( cmdmark ):
                         cmd = line.split( cmdmark, 1 )[1].strip()
@@ -72,7 +76,7 @@ def get_test_command_line( test_exec_dir ):
         except Exception:
             pass
     else:
-        cmd = '*** log file missing: '+log
+        cmd = '*** unable to get command line (log file missing): '+logfilename
 
     return cmd
 

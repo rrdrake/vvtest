@@ -7,7 +7,7 @@
 import os, sys
 from os.path import join as pjoin
 
-from .outpututils import capture_traceback, get_test_command_line
+from . import outpututils
 from .pathutil import change_directory
 
 
@@ -35,7 +35,7 @@ class UserPluginBridge:
             try:
                 self.prolog( command_line )
             except Exception:
-                xs,tb = capture_traceback( sys.exc_info() )
+                xs,tb = outpututils.capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
 
     def callEpilogue(self, rundir, tcaselist):
@@ -48,7 +48,7 @@ class UserPluginBridge:
                 with change_directory( rundir ):
                     self.epilog( testD )
             except Exception:
-                xs,tb = capture_traceback( sys.exc_info() )
+                xs,tb = outpututils.capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
 
     def validateTest(self, tcase):
@@ -61,7 +61,7 @@ class UserPluginBridge:
             try:
                 rtn = self.validate( specs )
             except Exception:
-                xs,tb = capture_traceback( sys.exc_info() )
+                xs,tb = outpututils.capture_traceback( sys.exc_info() )
                 self._check_print_exc( xs, tb )
                 rtn = xs.strip().replace( '\n', ' ' )[:160]
 
@@ -79,7 +79,7 @@ class UserPluginBridge:
                 if rtn != None:
                     rtn = max( 0, int(rtn) )
             except Exception:
-                xs,tb = capture_traceback( sys.exc_info() )
+                xs,tb = outpututils.capture_traceback( sys.exc_info() )
                 self._check_print_exc( xs, tb )
                 rtn = None
 
@@ -100,7 +100,7 @@ class UserPluginBridge:
                     specs['preload'] = label
                 pyexe = self.preload( specs )
             except Exception:
-                xs,tb = capture_traceback( sys.exc_info() )
+                xs,tb = outpututils.capture_traceback( sys.exc_info() )
                 sys.stdout.write( '\n' + tb + '\n' )
                 pyexe = None
 
@@ -157,8 +157,8 @@ def convert_test_list_to_info_dict( rtconfig, rundir, tcaselist ):
         if tstat.skipTest():
             infoD['skip'] = tstat.getReasonForSkipTest()
         elif result not in ['notrun','skip']:
-            logdir = pjoin( rundir, xdir )
-            infoD['command'] = get_test_command_line( logdir )
+            log = outpututils.get_log_file_path( rundir, tspec )
+            infoD['command'] = outpututils.get_test_command_line( log )
 
         testD[ tspec.getDisplayString() ] = infoD
 
@@ -192,7 +192,7 @@ def import_module_by_name( modulename ):
         pass
 
     except Exception:
-        xs,tb = capture_traceback( sys.exc_info() )
+        xs,tb = outpututils.capture_traceback( sys.exc_info() )
         sys.stdout.write( '\n' + tb + '\n' )
         raise UserPluginError( 'failed to import '+modulename+': '+xs )
 

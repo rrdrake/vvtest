@@ -65,7 +65,7 @@ class ExecutionHandler:
     def check_redirect_output_to_log_file(self, tcase, baseline):
         ""
         if self.rtconfig.getAttr('logfile'):
-            logfname = get_execution_log_filename( tcase, baseline )
+            logfname = tcase.getSpec().getLogFilename( baseline )
             redirect_stdout_stderr_to_filename( logfname )
             self.perms.apply( os.path.abspath( logfname ) )
 
@@ -311,20 +311,6 @@ class ExecutionHandler:
                                           self.test_dir )
 
                 self.perms.apply( os.path.abspath( script_file ) )
-
-
-def get_execution_log_filename( tcase, baseline ):
-    ""
-    stageid = tcase.getSpec().getStageID()
-
-    if baseline:
-        logfname = 'baseline.log'
-    elif stageid != None:
-        logfname = 'execute_'+stageid+'.log'
-    else:
-        logfname = 'execute.log'
-
-    return logfname
 
 
 def set_PYTHONPATH( vvtestdir, configdirs ):

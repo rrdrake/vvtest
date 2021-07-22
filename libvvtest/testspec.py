@@ -127,6 +127,21 @@ class TestSpec( TestFile ):
         """
         return self.last_stage
 
+    def getLogFilename(self, baseline=False):
+        """
+        Usually 'execute.log' except for staged tests and when baselining.
+        """
+        stageid = self.getStageID()
+
+        if baseline:
+            fn = 'baseline.log'
+        elif stageid != None:
+            fn = 'execute_'+stageid+'.log'
+        else:
+            fn = 'execute.log'
+
+        return fn
+
     def getKeywords(self, include_implicit=True):
         """
         Returns the list of keyword strings.  If 'include_implicit' is True,

@@ -98,6 +98,34 @@ class junit_output_format_tests( vtu.vvtestTestCase ):
             doc = util.read_xml_file( 'ju.xml' )
             assert len( util.recursive_find_xml_element( doc, 'testcase' ) ) == 0
 
+    def test_execute_log_output_for_staged_tests(self):
+        ""
+        util.writefile( "subdir/foo.vvt", """
+            #VVT: parameterize (staged): bar = A B
+
+            import vvtest_util as vvt
+            from script_util import exit_diff
+            print ( 'bar='+vvt.bar+' stage='+vvt.stage )
+            exit_diff()
+            """ )
+
+        vrun = vtu.runvvtest( '--junit ju.xml subdir' )
+        vrun.assertCounts( total=2, diff=2 )
+
+        doc = util.read_xml_file( 'ju.xml' )
+        flg = 0
+        for nd in doc.findall( 'testsuite/testcase' ):
+            sysnd = nd.find( 'system-out' )
+            if 'stage=1' in nd.get('name'):
+                txt = util.get_sub_text_from_xml_node(sysnd)
+                assert 'bar=A stage=1' in txt
+                flg += 1
+            elif 'stage=2' in nd.get('name'):
+                txt = util.get_sub_text_from_xml_node(sysnd)
+                assert 'bar=B stage=2' in txt
+                flg += 100
+        assert flg == 101
+
 
 def write_three_test_files():
     ""

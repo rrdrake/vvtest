@@ -318,7 +318,7 @@ def set_test_list( fmtr, dspecs, atestlist, testdir ):
         tstat = tcase.getStat()
 
         vvstat = tstat.getResultStatus()
-        logdir = pjoin( testdir, tspec.getExecuteDirectory() )
+        log = outpututils.get_log_file_path( testdir, tspec )
 
         kwargs = {}
 
@@ -329,7 +329,7 @@ def set_test_list( fmtr, dspecs, atestlist, testdir ):
             kwargs['status']    = 'passed'
             kwargs['runtime']   = tstat.getRuntime( None )
             kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
-            kwargs['command']   = outpututils.get_test_command_line( logdir )
+            kwargs['command']   = outpututils.get_test_command_line( log )
             if fspec == 'all':
                 kwargs['output'] = get_test_output( testdir, tspec, max_KB )
 
@@ -338,7 +338,7 @@ def set_test_list( fmtr, dspecs, atestlist, testdir ):
             kwargs['runtime']   = tstat.getRuntime( None )
             kwargs['detail']    = vvstat
             kwargs['exitvalue'] = tstat.getAttr( 'xvalue', None )
-            kwargs['command']   = outpututils.get_test_command_line( logdir )
+            kwargs['command']   = outpututils.get_test_command_line( log )
             kwargs['output']    = get_test_output( testdir, tspec, max_KB )
 
         fmtr.addTest( tspec.getDisplayString(), **kwargs )
@@ -369,10 +369,12 @@ def get_test_output( testdir, tspec, file_max_KB ):
     out += '\n$ ls -l '+tdir+'\n'
     out += '\n'.join( list_directory_as_strings( tdir ) ) + '\n'
 
-    for fn in [ 'execute.log' ]:
-        pn = pjoin( tdir, fn )
-        if os.path.exists( pn ):
-            out += '\n' + get_file_contents( pn, file_max_KB ) + '\n'
+    pn = outpututils.get_log_file_path( testdir, tspec )
+
+    if os.path.exists( pn ):
+        out += '\n' + get_file_contents( pn, file_max_KB ) + '\n'
+    else:
+        out += '\n*** log file does not exist: '+pn+'\n'
 
     return out
 
