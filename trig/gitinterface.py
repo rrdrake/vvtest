@@ -102,7 +102,7 @@ class GitRepo:
 
             _push_branch( self.grun, br, repository, verbose )
 
-    def pull(self, verbose=0):
+    def pull(self, rebase=True, verbose=0):
         ""
         if self.is_bare():
             raise GitInterfaceError( 'cannot pull into a bare repository' )
@@ -116,9 +116,11 @@ class GitRepo:
         self.run( 'tag GITINTERFACE_PULL_BACKUP', verbose=verbose )
 
         try:
-            self.run( 'pull', verbose=verbose )
+            cmd = 'pull' + ( ' --rebase' if rebase else '' )
+            self.run( cmd, verbose=verbose )
 
         except Exception:
+            self.run( 'rebase --abort', verbose=verbose )
             self.run( 'reset --hard GITINTERFACE_PULL_BACKUP', verbose=verbose )
             self.run( 'checkout '+curbranch, verbose=verbose )
             self.run( 'tag -d GITINTERFACE_PULL_BACKUP', verbose=verbose )
@@ -529,9 +531,9 @@ def _find_toplevel_bare_git_repo( directory ):
 
 def _is_toplevel_bare_git_repo( directory ):
     ""
-    br  = pjoin( directory, 'branches' )
+    obj  = pjoin( directory, 'objects' )
     cfg = pjoin( directory, 'config' )
-    if os.path.isdir(br) and os.path.isfile(cfg):
+    if os.path.isdir(obj) and os.path.isfile(cfg):
         return True
     return False
 
@@ -737,33 +739,38 @@ def _fetch_then_checkout_branch( gitrun, branchname, verbose ):
 
 def _current_branch_string( gitrun, verbose ):
     ""
-    x,out = gitrun.run( 'branch --no-color', capture=True, verbose=verbose )
+    if _rebase_in_progress( gitrun, verbose ):
+        val = '(rebase in progress, e.g. merge conflict)'
 
-    val = None
+    else:
+        x,out = gitrun.run( 'branch --no-color', capture=True, verbose=verbose )
 
-    for line in out.splitlines():
-        if line.startswith( '* (' ):
-            # detatched
-            val = line[2:].strip()
-            if _rebase_in_progress( gitrun, verbose ):
-                val = '(rebase in progress, e.g. merge conflict)'
-            break
-        elif line.startswith( '* ' ):
-            val = line[2:].strip()
-            break
+        val = None
+
+        for line in out.splitlines():
+            if line.startswith( '* (' ):
+                # detatched
+                val = line[2:].strip()
+                break
+            elif line.startswith( '* ' ):
+                val = line[2:].strip()
+                break
 
     return val
 
 
 def _rebase_in_progress( gitrun, verbose ):
     ""
-    x,out = gitrun.run( 'status', capture=True, verbose=verbose )
-
-    for line in out.splitlines():
-        line = line.strip()
-        if line.startswith( '# You are currently rebasing' ) or \
-           line.startswith( 'You are currently rebasing' ):
-            return True
+    x,out = gitrun.run( 'status', capture=True,
+                                  verbose=verbose,
+                                  raise_on_error=False )
+    if x == 0:
+        for line in out.splitlines():
+            line = line.strip()
+            if line.startswith( '# You are currently rebasing' ) or \
+               line.startswith( 'You are currently rebasing' ) or \
+               line.startswith( 'You have unmerged paths' ):
+                return True
 
     return False
 

@@ -463,6 +463,8 @@ def fault_tolerant_remove( path, num_attempts=5 ):
 
     rmpath = pjoin( dn, 'remove_'+fn + '_'+ random_string() )
 
+    add_owner_permissions( path )
+
     os.rename( path, rmpath )
 
     for i in range( num_attempts ):
@@ -478,6 +480,16 @@ def fault_tolerant_remove( path, num_attempts=5 ):
             pass
 
         time.sleep(1)
+
+
+def add_owner_permissions( path ):
+    ""
+    if not os.path.islink( path ):
+        if os.path.isdir( path ):
+            fm = get_filemode(path) | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR
+        else:
+            fm = get_filemode(path) | stat.S_IRUSR | stat.S_IWUSR
+        os.chmod( path, fm )
 
 
 def readfile( filename ):

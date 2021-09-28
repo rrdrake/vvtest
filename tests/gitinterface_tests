@@ -131,14 +131,14 @@ class create_and_clone( trigutil.trigTestCase ):
             top = get_repo_toplevel( grun )
         assert os.path.samefile( top, baredir )
 
-        with util.change_directory( baredir+'/branches' ):
+        with util.change_directory( baredir+'/objects' ):
             top = get_repo_toplevel( grun )
         assert os.path.samefile( top, baredir )
 
         top = get_repo_toplevel( grun, baredir )
         assert os.path.samefile( top, baredir )
 
-        top = get_repo_toplevel( grun, baredir+'/branches' )
+        top = get_repo_toplevel( grun, baredir+'/objects' )
         assert os.path.samefile( top, baredir )
 
         # check unlikely case of bare repo not found
@@ -1656,8 +1656,13 @@ def create_local_repo_with_a_commit( directory ):
 def git_version():
     ""
     x,out = util.runcmd( 'git --version' )
-    vL = out.split()[-1].split('.')
-    return int(vL[0]), int(vL[1]), int(vL[2])
+    try:
+        vL = out.split()[-1].split('.')
+        mj,mn,mc = int(vL[0]), int(vL[1]), int(vL[2])
+    except Exception:
+        vL = out.split()[2].split('.')
+        mj,mn,mc = int(vL[0]), int(vL[1]), int(vL[2])
+    return mj,mn,mc
 
 
 #######################################################################
