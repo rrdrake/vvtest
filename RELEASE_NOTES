@@ -1,6 +1,26 @@
 
 Improvements:
 
+    - 
+
+Fixes:
+
+    - 
+
+Changes:
+
+    - 
+
+
+==============================================================================
+
+Release 1.3
+-----------
+
+Oct 22, 2021
+
+Improvements:
+
     - Add option --minimal-xdirs, which suppresses parameter name=value strings
       in test execution directory names if the parameter only has one value in
       the test. For example, a test file named 'foo.vvt' with
