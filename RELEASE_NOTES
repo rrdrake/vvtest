@@ -1,6 +1,20 @@
 
 Improvements:
 
+    - Add option --minimal-xdirs, which suppresses parameter name=value strings
+      in test execution directory names if the parameter only has one value in
+      the test. For example, a test file named 'foo.vvt' with
+
+          #VVT: parameterize : material = steel
+          #VVT: parameterize : shape = square round
+
+      would result in execution directory names
+
+          foo.shape=square
+          foo.shape=round
+
+      The parameter 'material' is still defined in the vvtest_util.py file.
+
     - Platform expressions used to include/exclude tests to run are now case
       insensitive. So if a test header had
 

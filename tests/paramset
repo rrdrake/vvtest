@@ -16,7 +16,7 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.paramset as ParameterSet
+import libvvtest.paramset as paramset
 from libvvtest.paramset import add_parameter_group_to_list_of_dicts
 from libvvtest.paramset import accumulate_parameter_group_list
 from libvvtest.paramset import contains_parameter_name_value
@@ -125,7 +125,7 @@ class ParameterSet_single_parameters( vtu.vvtestTestCase ):
 
     def test_one_value(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1'] )
 
         instL = pset.getInstances()
@@ -134,7 +134,7 @@ class ParameterSet_single_parameters( vtu.vvtestTestCase ):
 
     def test_two_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
 
         instL = pset.getInstances()
@@ -144,7 +144,7 @@ class ParameterSet_single_parameters( vtu.vvtestTestCase ):
 
     def test_two_parameters(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1'] )
         pset.addParameter( 'B', ['b1'] )
 
@@ -154,7 +154,7 @@ class ParameterSet_single_parameters( vtu.vvtestTestCase ):
 
     def test_two_parameters_with_two_values_each(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         pset.addParameter( 'B', ['b1','b2'] )
 
@@ -167,7 +167,7 @@ class ParameterSet_single_parameters( vtu.vvtestTestCase ):
 
     def test_add_duplicate_parameter_names(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         pset.addParameter( 'B', ['b1','b2'] )
         pset.addParameter( 'A', ['a3'] )
@@ -182,7 +182,7 @@ class ParameterSet_group_parameters( vtu.vvtestTestCase ):
 
     def test_a_group(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['A'], [ ['a1'] ] )
 
         instL = pset.getInstances()
@@ -191,7 +191,7 @@ class ParameterSet_group_parameters( vtu.vvtestTestCase ):
 
     def test_a_group_with_two_names(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['A','B'], [ ['a1','b1'] ] )
 
         instL = pset.getInstances()
@@ -200,7 +200,7 @@ class ParameterSet_group_parameters( vtu.vvtestTestCase ):
 
     def test_a_single_followed_by_a_group(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         pset.addParameterGroup( ['B','C'], [ ['b1','c1'], ['b2','c2'] ] )
 
@@ -213,7 +213,7 @@ class ParameterSet_group_parameters( vtu.vvtestTestCase ):
 
     def test_a_group_followed_by_a_single(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['B','C'], [ ['b1','c1'], ['b2','c2'] ] )
         pset.addParameter( 'A', ['a1','a2'] )
 
@@ -226,7 +226,7 @@ class ParameterSet_group_parameters( vtu.vvtestTestCase ):
 
     def test_add_duplicate_parameter_group_names(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['B','C'], [ ['b1','c1'], ['b2','c2'] ] )
         pset.addParameter( 'A', ['a1','a2'] )
         pset.addParameterGroup( ['B','C'], [ ['b1','c3'], ['b2','c4'] ] )
@@ -243,7 +243,7 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
 
     def test_nothing_filtered_out(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         origL = [] + pset.getInstances()
 
@@ -254,7 +254,7 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
 
     def test_everything_filtered_out(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         origL = pset.getInstances()
         assert len(origL) > 0
@@ -265,7 +265,7 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
 
     def test_filter_everything_out_followed_by_filter_nothing_out(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2'] )
         origL = [] + pset.getInstances()
 
@@ -279,7 +279,7 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
 
     def test_filter_out_x_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a','b'] )
         pset.addParameter( 'B', ['x','y'] )
         assert len( pset.getInstances() ) == 4
@@ -293,7 +293,7 @@ class ParameterSet_param_filter( vtu.vvtestTestCase ):
 
     def test_intersection_filter(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a','b'] )
         pset.addParameter( 'B', ['x','y'] )
         assert len( pset.getInstances() ) == 4
@@ -419,13 +419,13 @@ class ParameterSet_getParameters( vtu.vvtestTestCase ):
 
     def test_empty_does_not_crash(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pD = pset.getParameters()
         assert len(pD) == 0
 
     def test_single_parameter_names_and_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','a2','a3'] )
 
         pD = pset.getParameters()
@@ -434,7 +434,7 @@ class ParameterSet_getParameters( vtu.vvtestTestCase ):
 
     def test_double_parameter_names_and_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['A','B'], [ ['a1','b1'], ['a2','b2'] ] )
 
         pD = pset.getParameters()
@@ -443,7 +443,7 @@ class ParameterSet_getParameters( vtu.vvtestTestCase ):
 
     def test_single_filtered_parameter_names_and_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameter( 'A', ['a1','x','a3'] )
         pset.applyParamFilter( param_filter_evaluate_exclude_x_values )
 
@@ -453,7 +453,7 @@ class ParameterSet_getParameters( vtu.vvtestTestCase ):
 
     def test_double_filtered_parameter_names_and_values(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['A','B'], [ ['a1','b1'], ['a2','x'] ] )
         pset.applyParamFilter( param_filter_evaluate_exclude_x_values )
 
@@ -463,7 +463,7 @@ class ParameterSet_getParameters( vtu.vvtestTestCase ):
 
     def test_duplicate_params_and_filtered(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         pset.addParameterGroup( ['A','B'], [ ['a1','b1'], ['a2','x'] ] )
         pset.addParameter( 'C', [ 'x', 'c2', 'c3' ] )
         pset.addParameterGroup( ['A','B'], [ ['x','b1'], ['a2','b2'] ] )
@@ -480,7 +480,7 @@ class mark_staged( vtu.vvtestTestCase ):
 
     def test_staged_parameters_set_and_get(self):
         ""
-        pset = ParameterSet.ParameterSet()
+        pset = paramset.ParameterSet()
         assert pset.getStagedGroup() == None
         pset.addParameterGroup( ('stage','np'), [ ['1','1'], ['2','4'] ], True )
         nL,vL = pset.getStagedGroup()

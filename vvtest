@@ -290,6 +290,7 @@ def construct_testcase_creator( rtdata, opts, optD ):
 def make_idtraits( opts ):
     ""
     idtraits = {}
+
     if opts.short_xdirs:
         try:
             nchars = int( opts.short_xdirs )
@@ -297,6 +298,9 @@ def make_idtraits( opts ):
             raise FatalError( 'invalid --short-xdirs value: ' + \
                               repr(opts.short_xdirs) )
         idtraits['numchars'] = nchars
+
+    if opts.minimal_xdirs:
+        idtraits['minxdirs'] = True
 
     return idtraits
 

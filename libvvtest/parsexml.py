@@ -29,7 +29,6 @@ class XMLTestParser:
 
     def __init__(self, filepath,
                        rootpath=None,
-                       idtraits={},
                        platname=os.uname()[0],
                        optionlist=[],
                        force_params=None,
@@ -41,7 +40,6 @@ class XMLTestParser:
             rootpath = os.getcwd()
         self.root = rootpath
 
-        self.idtraits = idtraits
         self.platname = platname
         self.optionlist = optionlist
         self.force = force_params
@@ -61,9 +59,9 @@ class XMLTestParser:
         ""
         return self.parse_analyze( testname )
 
-    def makeTestInstance(self, testname):
+    def makeTestInstance(self, testname, idtraits):
         ""
-        return TestSpec( testname, self.root, self.fpath, self.idtraits )
+        return TestSpec( testname, self.root, self.fpath, idtraits )
 
     def parseTestInstance(self, tspec):
         """

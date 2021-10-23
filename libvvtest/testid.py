@@ -27,7 +27,7 @@ class TestID:
         ""
         bname = self.name
 
-        paramL = self._get_parameters_as_list( compress_stage=True)
+        paramL = self._get_parameters_as_list( compress_stage=True )
         if len( paramL ) > 0:
             bname += '.' + '.'.join(paramL)
 
@@ -77,13 +77,22 @@ class TestID:
                     L.append( n + '=' + v )
             L.sort()
 
+            if len(L) == 0:
+                # can only happen with minxdirs; it is a bit of a hack, but
+                # a single empty string will result in an execute directory
+                # that is distinguishable from an analyze test
+                L.append('')
+
         return L
 
     def _hide_parameter(self, param_name, compress_stage):
         ""
-        if compress_stage and self.staged:
+        if param_name in self.idtraits.get('minxdirs',[]):
+            return True
+        elif compress_stage and self.staged:
             return param_name == self.staged[0]
-        return False
+        else:
+            return False
 
     def _compress_parameter(self, param_name, compress_stage):
         ""

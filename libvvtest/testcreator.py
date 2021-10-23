@@ -77,7 +77,6 @@ class TestCreator:
 
         if form == 'xml':
             parser = XMLTestParser( relpath, rootpath,
-                                    self.idtraits,
                                     self.platname,
                                     self.optionlist,
                                     self.force_params,
@@ -87,12 +86,11 @@ class TestCreator:
             assert form == 'script'
 
             parser = ScriptTestParser( relpath, rootpath,
-                                       self.idtraits,
                                        self.platname,
                                        self.optionlist,
                                        self.force_params )
 
-        maker = TestMaker( parser )
+        maker = TestMaker( parser, self.idtraits )
 
         return maker
 
@@ -107,9 +105,10 @@ def map_extension_to_spec_form( filepath ):
 
 class TestMaker:
 
-    def __init__(self, parser):
+    def __init__(self, parser, idtraits={}):
         ""
         self.parser = parser
+        self.idtraits = idtraits
 
     def createTests(self):
         ""
@@ -171,7 +170,8 @@ class TestMaker:
             raise TestSpecError( 'an analyze requires at least one ' + \
                                  'parameter to be defined' )
 
-        parent = self.parser.makeTestInstance( testname )
+        idt = get_idtraits( self.idtraits, [] )
+        parent = self.parser.makeTestInstance( testname, idt )
 
         parent.setIsAnalyze()
         parent.setParameterSet( paramset )
@@ -179,21 +179,70 @@ class TestMaker:
 
         return parent
 
-    def generate_test_objects(self, tname, pset):
+    def generate_test_objects(self, tname, paramset):
         ""
         testL = []
 
-        if len( pset.getParameters() ) == 0:
-            t = self.parser.makeTestInstance( tname )
+        if len( paramset.getParameters() ) == 0:
+            idt = get_idtraits( self.idtraits, [] )
+            t = self.parser.makeTestInstance( tname, idt )
             testL.append(t)
 
         else:
+            suppress = get_suppressed_parameters( paramset, self.idtraits )
+
             # take a cartesian product of all the parameter values
-            for pdict in pset.getInstances():
-                # create the test and add to test list
-                t = self.parser.makeTestInstance( tname )
+            for pdict in paramset.getInstances():
+                idt = get_idtraits( self.idtraits, suppress )
+                t = self.parser.makeTestInstance( tname, idt )
                 t.setParameters( pdict )
-                t.setParameterSet( pset )
+                t.setParameterSet( paramset )
                 testL.append(t)
 
         return testL
+
+
+def get_suppressed_parameters( paramset, idtraits ):
+    ""
+    if 'minxdirs' in idtraits:
+
+        keyvals = {}
+        for params in paramset.getInstances():
+            for n,v in params.items():
+                if n in keyvals:
+                    keyvals[n].add( v )
+                else:
+                    keyvals[n] = set([v])
+
+        staged = paramset.getStagedGroup()
+        if staged:
+            exclude = staged[0]
+        else:
+            exclude = []
+
+        suppress = []
+        for n,vals in keyvals.items():
+            if len(vals) == 1 and n not in exclude:
+                suppress.append( n )
+
+        return suppress
+
+    else:
+        return None
+
+
+def get_idtraits( idtraits, suppressed ):
+    ""
+    if 'minxdirs' in idtraits:
+
+        idt = dict( idtraits )
+
+        if suppressed:
+            idt['minxdirs'] = suppressed
+        else:
+            del idt['minxdirs']
+
+        return idt
+
+    else:
+        return idtraits

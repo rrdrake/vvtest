@@ -570,6 +570,9 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--short-xdirs', metavar='NUMCHARS',
         help='Shorten long execution directory names with more characters '
              'than the given value (default is 100).' )
+    grp.add_argument( '--minimal-xdirs', action='store_true',
+        help='Shorten execution directory names by excluding parameterize '
+             'names with only one value.' )
 
     # resources
     grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )

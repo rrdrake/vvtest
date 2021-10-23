@@ -1,0 +1,321 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST: vvtest
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import basename, abspath
+from os.path import join as pjoin
+import unittest
+import time
+import glob
+import re
+
+import vvtestutils as vtu
+import testutils as util
+
+import libvvtest.testid as testid
+import libvvtest.testcreator as testcreator
+import libvvtest.paramset as paramset
+
+from libvvtest.testcreator import get_suppressed_parameters
+
+
+class unit_tests( unittest.TestCase ):
+
+    def setUp(self):
+        ""
+        util.setup_test( cleanout=False )
+
+    def test_compute_suppressed_parameters(self):
+        ""
+        no_minxdirs = {}
+        minxdirs = { 'minxdirs':True }
+
+        pset = paramset.ParameterSet()
+        pset.addParameter( 'A', ['a1','a2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert not get_suppressed_parameters( pset, minxdirs )
+
+        pset = paramset.ParameterSet()
+        pset.addParameter( 'A', ['a1'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert get_suppressed_parameters( pset, minxdirs ) == ['A']
+
+        pset = paramset.ParameterSet()
+        pset.addParameter( 'A', ['a1'] )
+        pset.addParameter( 'B', ['b1','b2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert get_suppressed_parameters( pset, minxdirs ) == ['A']
+
+        pset = paramset.ParameterSet()
+        pset.addParameter( 'A', ['a1'] )
+        pset.addParameter( 'B', ['b2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        pL = get_suppressed_parameters( pset, minxdirs )
+        assert sorted(pL) == ['A','B']
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ['B','C'], [ ['b1','c1'], ['b2','c2'] ] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert not get_suppressed_parameters( pset, minxdirs )
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ['B','C'], [ ['b1','c1'] ] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        pL = get_suppressed_parameters( pset, minxdirs )
+        assert sorted(pL) == ['B','C']
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ['B','C'], [ ['b1','c1'] ] )
+        pset.addParameter( 'A', ['a1','a2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        pL = get_suppressed_parameters( pset, minxdirs )
+        assert sorted(pL) == ['B','C']
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ['B','C'], [ ['b1','c1'] ] )
+        pset.addParameter( 'A', ['c1'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        pL = get_suppressed_parameters( pset, minxdirs )
+        assert sorted(pL) == ['A','B','C']
+
+        # staged parameter names are not suppressed
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ('stage','np'), [ ['1','1'], ['2','4'] ], minxdirs )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert not get_suppressed_parameters( pset, minxdirs )
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ('stage','np'), [ ['1','16'] ], minxdirs )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert not get_suppressed_parameters( pset, minxdirs )
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ('stage','np'), [ ['1','16'] ], minxdirs )
+        pset.addParameter( 'A', ['a1','a2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert not get_suppressed_parameters( pset, minxdirs )
+
+        pset = paramset.ParameterSet()
+        pset.addParameterGroup( ('stage','np'), [ ['1','16'] ], minxdirs )
+        pset.addParameter( 'A', ['a2'] )
+        assert not get_suppressed_parameters( pset, no_minxdirs )
+        assert get_suppressed_parameters( pset, minxdirs ) == ['A']
+
+    def test_adjusting_idtraits_for_suppressions(self):
+        ""
+        traits1 = {}
+        traits2 = testcreator.get_idtraits( traits1, None )
+        assert traits1 == {} and id(traits1) == id(traits2)
+
+        traits1 = {}
+        traits2 = testcreator.get_idtraits( traits1, [] )
+        assert traits1 == {} and id(traits1) == id(traits2)
+
+        traits1 = { 'name':'value' }
+        traits2 = testcreator.get_idtraits( traits1, None )
+        assert traits1 == {'name':'value'} and id(traits1) == id(traits2)
+
+        traits1 = { 'name':'value' }
+        traits2 = testcreator.get_idtraits( traits1, [] )
+        assert traits1 == {'name':'value'} and id(traits1) == id(traits2)
+
+        traits1 = { 'minxdirs':True }
+        traits2 = testcreator.get_idtraits( traits1, None )
+        assert traits1 == { 'minxdirs':True }
+        assert traits2 == {}
+
+        traits1 = { 'minxdirs':True }
+        traits2 = testcreator.get_idtraits( traits1, [] )
+        assert traits1 == { 'minxdirs':True }
+        assert traits2 == {}
+
+        traits1 = { 'minxdirs':True }
+        sup = ['A']
+        traits2 = testcreator.get_idtraits( traits1, sup )
+        assert traits1 == { 'minxdirs':True }
+        assert traits2 == { 'minxdirs':['A'] }
+        assert id(traits2['minxdirs']) == id(sup)
+
+        traits1 = { 'minxdirs':True, 'name':'value' }
+        traits2 = testcreator.get_idtraits( traits1, [] )
+        assert traits1 == { 'minxdirs':True, 'name':'value' }
+        assert traits2 == { 'name':'value' }
+
+        traits1 = { 'minxdirs':True, 'name':'value' }
+        sup = ['A']
+        traits2 = testcreator.get_idtraits( traits1, sup )
+        assert traits1 == { 'minxdirs':True, 'name':'value' }
+        assert traits2 == { 'minxdirs':['A'], 'name':'value' }
+        assert id(traits2['minxdirs']) == id(sup)
+
+    def test_suppression_of_parameters_in_test_id(self):
+        ""
+        min_off = {}
+        min_on = { 'minxdirs':['B'] }
+        params = {'A':'1','B':'2'}
+        tid1 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_off )
+        tid2 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_on )
+
+        assert tid1.computeExecuteDirectory() == 'bar/foo.A=1.B=2'
+        assert tid1.computeDisplayString()    == 'bar/foo.A=1.B=2'
+        assert tid2.computeExecuteDirectory() == 'bar/foo.A=1'
+        assert tid2.computeDisplayString()    == 'bar/foo.A=1'
+        assert tid1.computeID() != tid2.computeID()
+
+        min_off = {}
+        min_on = { 'minxdirs':['A'] }
+        params = {'A':'1','B':'2'}
+        tid1 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_off )
+        tid2 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_on )
+
+        assert tid1.computeExecuteDirectory() == 'bar/foo.A=1.B=2'
+        assert tid1.computeDisplayString()    == 'bar/foo.A=1.B=2'
+        assert tid2.computeExecuteDirectory() == 'bar/foo.B=2'
+        assert tid2.computeDisplayString()    == 'bar/foo.B=2'
+        assert tid1.computeID() != tid2.computeID()
+
+        min_off = {}
+        min_on = { 'minxdirs':['A'] }
+        params = {'A':'1'}
+        tid1 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_off )
+        tid2 = testid.TestID( 'foo', 'bar/foo.vvt', params, [], min_on )
+
+        assert tid1.computeExecuteDirectory() == 'bar/foo.A=1'
+        assert tid1.computeDisplayString()    == 'bar/foo.A=1'
+        assert tid2.computeExecuteDirectory() == 'bar/foo.'
+        assert tid2.computeDisplayString()    == 'bar/foo.'
+        assert tid1.computeID() != tid2.computeID()
+
+    def test_suppression_of_parameters_in_a_staging_test(self):
+        ""
+        # Note: the stage parameter names will never be in the suppression list
+
+        min_off = {}
+        min_on = { 'minxdirs':['B'] }
+        pD = {'stage':'1','A':'1','B':'2'}
+        tid1 = testid.TestID( 'foo', 'bar/foo.vvt', pD, ['stage','A'], min_off )
+        tid2 = testid.TestID( 'foo', 'bar/foo.vvt', pD, ['stage','A'], min_on )
+        assert tid1.computeExecuteDirectory() == 'bar/foo.A.B=2'
+        assert tid1.computeDisplayString()    == 'bar/foo.A.B=2 stage=1(A=1)'
+        assert tid2.computeExecuteDirectory() == 'bar/foo.A'
+        assert tid2.computeDisplayString()    == 'bar/foo.A stage=1(A=1)'
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_parsing_with_minimal_xdirs(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = a b
+            #VVT: parameterize : bar = x
+            """ )
+
+        idtraits = {}
+        tc = testcreator.TestCreator( idtraits )
+        tL = check_sort( tc.fromFile( 'atest.vvt' ) )
+
+        assert tL[0].getExecuteDirectory() == 'atest.bar=x.foo=a'
+        assert tL[0].getDisplayString()    == 'atest.bar=x.foo=a'
+        assert tL[1].getExecuteDirectory() == 'atest.bar=x.foo=b'
+        assert tL[1].getDisplayString()    == 'atest.bar=x.foo=b'
+
+        idtraits = { 'minxdirs':True }
+        tc = testcreator.TestCreator( idtraits )
+        tL = check_sort( tc.fromFile( 'atest.vvt' ) )
+
+        assert tL[0].getExecuteDirectory() == 'atest.foo=a'
+        assert tL[0].getDisplayString()    == 'atest.foo=a'
+        assert tL[1].getExecuteDirectory() == 'atest.foo=b'
+        assert tL[1].getDisplayString()    == 'atest.foo=b'
+
+
+class command_line_tests( vtu.vvtestTestCase ):
+
+    def test_parameters_with_one_value_are_not_in_the_execute_dir(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = x
+            import vvtest_util as vvt
+            assert vvt.foo == 'x'
+            """ )
+
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize : foo = y
+            #VVT: analyze : --analyze
+            import os, sys
+            import vvtest_util as vvt
+            if '--analyze' in sys.argv[1:]:
+                assert len( vvt.DEPDIRS ) == 1
+                assert os.path.basename( vvt.DEPDIRS[0] ) == 'btest.'
+            else:
+                assert vvt.foo == 'y'
+            """ )
+
+        util.writefile( 'ctest.vvt', """
+            #VVT: parameterize : foo = z
+            #VVT: parameterize : bar = a b
+            #VVT: analyze : --analyze
+            import os, sys
+            import vvtest_util as vvt
+            if '--analyze' in sys.argv[1:]:
+                bnL = [ os.path.basename(d) for d in vvt.DEPDIRS ]
+                assert len(bnL) == 2
+                assert sorted(bnL) == ['ctest.bar=a','ctest.bar=b']
+            else:
+                assert vvt.foo == 'z'
+                assert vvt.bar in ['a','b']
+            """ )
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--minimal-xdirs', batch=batch )
+            vrun.assertCounts( total=6, npass=6 )
+            tdir = vrun.resultsDir()
+
+            assert vrun.getTestIds() == [ 'atest.',
+                                          'btest',
+                                          'btest.',
+                                          'ctest',
+                                          'ctest.bar=a',
+                                          'ctest.bar=b' ]
+            assert len( glob.glob( tdir+'/*/execute.log' ) ) == 6
+
+            vrun = vtu.runvvtest( '-R -k btest', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=2, npass=2 )
+            assert len( glob.glob( tdir+'/*/execute.log' ) ) == 6
+
+            vrun = vtu.runvvtest( '-R --minimal-xdirs -k btest', batch=batch )
+            vrun.assertCounts( total=2, npass=2 )
+            assert len( glob.glob( tdir+'/*/execute.log' ) ) == 6
+
+
+############################################################################
+
+def check_sort( tests ):
+    ""
+    uniq = {}
+    sortL = []
+    for t in tests:
+        tid = t.getID()
+        assert tid not in uniq
+        uniq[tid] = t
+        sortL.append( ( tid, t ) )
+    sortL.sort()
+
+    return [ t for _,t in sortL ]
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
