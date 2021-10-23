@@ -13,6 +13,7 @@ import signal
 import subprocess
 import unittest
 import shutil
+import platform
 
 from os.path import dirname, abspath
 from os.path import join as pjoin
@@ -87,8 +88,11 @@ def core_platform_name():
     """
     Returns either Darwin or Linux, depending on the current platform.
     """
-    if os.uname()[0].lower().startswith( 'darwin' ):
+    plat = platform.uname()[0].lower()
+    if plat.startswith( 'darwin' ):
         return 'Darwin'
+    elif plat.startswith( 'win' ):
+        return 'Windows'
     else:
         return 'Linux'
 

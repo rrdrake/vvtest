@@ -9,8 +9,6 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 import stat
-import pwd
-import grp
 import re
 import tempfile
 
@@ -262,6 +260,7 @@ def filegroup( path ):
     """
     gid = os.stat( path ).st_gid
     try:
+        import grp
         ent = grp.getgrgid( gid )
     except Exception:
         return None
@@ -274,6 +273,7 @@ def change_group( path, group_id ):
     'group_id' can be the group name as a string.
     """
     if type(group_id) == type(''):
+        import grp
         group_id = grp.getgrnam( group_id ).gr_gid
     uid = os.stat( path ).st_uid
     os.chown( path, uid, group_id )
@@ -293,12 +293,18 @@ def my_user_name():
     Returns the name of the user running this process.
     """
     uid = os.getuid()
-    return pwd.getpwuid( uid )[0]
+    try:
+        usr = pwd.getpwuid( uid )[0]
+    except Exception:
+        import getpass
+        usr = getpass.getuser()
+    return usr
 
 
 def can_map_group_name_to_group_id( group_name ):
     ""
     try:
+        import grp
         gid = grp.getgrnam( group_name )
     except KeyError:
         return False
@@ -459,10 +465,10 @@ def get_user_name( path=None ):
     process if 'path' is not given. If the numeric user id cannot be mapped
     to a user name, the numeric id is returned as a string.
     """
-    if path:
-        uid = os.stat( path ).st_uid
-    else:
-        uid = os.getuid()
+    if path is None:
+        return my_user_name()
+
+    uid = os.stat( path ).st_uid
 
     try:
         name = pwd.getpwuid( uid )[0]

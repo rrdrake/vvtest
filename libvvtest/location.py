@@ -118,10 +118,12 @@ def find_vvtest_test_root_file( start_directory,
         if os.path.exists( mf ):
             return mf
 
-        d = dirname( d )
+        d2 = dirname( d )
 
-        if stopd and d == stopd:
+        if d2 == d or (stopd and d2 == stopd):
             break
+
+        d = d2
 
     return None
 
