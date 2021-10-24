@@ -11,8 +11,9 @@ sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
 from os.path import join as pjoin
-from os.path import abspath, dirname, basename
+from os.path import abspath, dirname, basename, normpath
 import time
+import platform
 
 import vvtestutils as vtu
 import testutils as util
@@ -31,6 +32,8 @@ import libvvtest.testlistio as testlistio
 from libvvtest.permsetter import PermissionSetter
 from libvvtest.errors import FatalError
 from libvvtest.teststatus import DIFF_EXIT_STATUS
+
+not_windows = not platform.uname()[0].lower().startswith('win')
 
 
 class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
@@ -87,13 +90,13 @@ class configdir_handling( vtu.vvtestTestCase ):
         assert dL == []
 
         dL = collect_config_dirs( ['/a/path'], None )
-        assert dL == [ '/a/path' ]
+        assert dL == [ abspath('/a/path') ]
 
         dL = collect_config_dirs( [], '/a/path' )
-        assert dL == [ '/a/path' ]
+        assert dL == [ abspath('/a/path') ]
 
         dL = collect_config_dirs( ['/a/path'], '/b/path' )
-        assert dL == [ '/a/path' ]
+        assert dL == [ abspath('/a/path') ]
 
     def test_abspath_is_applied(self):
         ""
@@ -109,62 +112,62 @@ class configdir_handling( vtu.vvtestTestCase ):
     def test_multiple_paths(self):
         ""
         os.mkdir( 'subdir' )
-        time.sleep(1)
+        soln = [ abspath('/a/path'), abspath('/b/path') ]
 
         dL = collect_config_dirs( ['/a/path','/b/path'], None )
-        assert dL == ['/a/path','/b/path']
+        assert dL == soln
 
         dL = collect_config_dirs( ['/a/path:/b/path'], None )
-        assert dL == ['/a/path','/b/path']
+        assert dL == soln
 
         dL = collect_config_dirs( [], '/a/path:/b/path' )
-        assert dL == ['/a/path','/b/path']
+        assert dL == soln
 
         dL = collect_config_dirs( [], '/a/path:subdir' )
-        assert dL == ['/a/path',abspath('subdir')]
+        assert dL == [abspath('/a/path'),abspath('subdir')]
 
     def test_directories_with_colons(self):
         ""
         os.mkdir( 'subdir' )
-        os.mkdir( 'some:dir' )
-        time.sleep(1)
 
         d1,d2 = split_by_largest_existing_path( abspath('subdir') )
         assert d1 == abspath('subdir') and d2 == None
 
-        d1,d2 = split_by_largest_existing_path( abspath('some:dir') )
-        assert d1 == abspath('some:dir') and d2 == None
+        if not_windows:
+            os.mkdir( 'some:dir' )
 
-        d1,d2 = split_by_largest_existing_path( 'some:dir' )
-        assert d1 == 'some:dir' and d2 == None
+            d1,d2 = split_by_largest_existing_path( abspath('some:dir') )
+            assert d1 == abspath('some:dir') and d2 == None
 
-        d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
-        assert d1 == 'subdir' and d2 == 'some:dir'
+            d1,d2 = split_by_largest_existing_path( 'some:dir' )
+            assert d1 == 'some:dir' and d2 == None
 
-        d1,d2 = split_by_largest_existing_path( 'foo:some:dir' )
-        assert d1 == None and d2 == 'foo:some:dir'
+            d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
+            assert d1 == 'subdir' and d2 == 'some:dir'
 
-        d1,d2 = split_by_largest_existing_path( 'some:dir:foo' )
-        assert d1 == 'some:dir' and d2 == 'foo'
+            d1,d2 = split_by_largest_existing_path( 'foo:some:dir' )
+            assert d1 == None and d2 == 'foo:some:dir'
 
-        d1,d2 = split_by_largest_existing_path( 'some:dir:foo:bar' )
-        assert d1 == 'some:dir' and d2 == 'foo:bar'
+            d1,d2 = split_by_largest_existing_path( 'some:dir:foo' )
+            assert d1 == 'some:dir' and d2 == 'foo'
 
-        d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
-        assert d1 == 'subdir' and d2 == 'some:dir'
+            d1,d2 = split_by_largest_existing_path( 'some:dir:foo:bar' )
+            assert d1 == 'some:dir' and d2 == 'foo:bar'
 
-        d1,d2 = split_by_largest_existing_path( 'foo:bar' )
-        assert d1 == None and d2 == 'foo:bar'
+            d1,d2 = split_by_largest_existing_path( 'subdir:some:dir' )
+            assert d1 == 'subdir' and d2 == 'some:dir'
 
+            d1,d2 = split_by_largest_existing_path( 'foo:bar' )
+            assert d1 == None and d2 == 'foo:bar'
 
-        dL = collect_config_dirs( [], 'some:dir:subdir' )
-        assert dL == [abspath('some:dir'),abspath('subdir')]
+            dL = collect_config_dirs( [], 'some:dir:subdir' )
+            assert dL == [abspath('some:dir'),abspath('subdir')]
 
-        dL = collect_config_dirs( [], 'subdir:some:dir' )
-        assert dL == [abspath('subdir'),abspath('some:dir')]
+            dL = collect_config_dirs( [], 'subdir:some:dir' )
+            assert dL == [abspath('subdir'),abspath('some:dir')]
 
-        dL = collect_config_dirs( [], 'foo:some:dir' )
-        assert dL == [abspath('foo'),abspath('some:dir')]
+            dL = collect_config_dirs( [], 'foo:some:dir' )
+            assert dL == [abspath('foo'),abspath('some:dir')]
 
 
 class test_results_directory( vtu.vvtestTestCase ):
@@ -172,16 +175,17 @@ class test_results_directory( vtu.vvtestTestCase ):
     def test_getting_the_test_directory_path(self):
         ""
         td = determine_test_directory( 'subdir', None, '/some/path' )
-        assert td == '/some/path/subdir'
+        print ( 'magic: '+repr(td))
+        assert td == normpath( '/some/path/subdir' )
 
         self.assertRaises( Exception,
                 determine_test_directory, 'subdir', None, 'some/path' )
 
         td = determine_test_directory( None, '/path/to/test.cache', None )
-        assert td == '/path/to'
+        assert td == normpath( '/path/to' )
 
         td = determine_test_directory( 'foo', '/path/to/test.cache', 'bar' )
-        assert td == '/path/to'
+        assert td == normpath( '/path/to' )
 
         self.assertRaises( Exception,
                 determine_test_directory, None, 'path/to/test.cache', None )
@@ -212,19 +216,22 @@ class test_results_directory( vtu.vvtestTestCase ):
         assert not location.writable_directory( 'junk1' )
         assert not location.writable_directory( abspath('junk1') )
 
-        util.writefile( 'noexec/junk2', 'foo' )
-        save_perm = util.remove_execute_perms( 'noexec' )
-        try:
-            assert not location.writable_directory( 'noexec' )
-        finally:
-            os.chmod( 'noexec', save_perm )
+        if not_windows:
+            # is directory permissions on Windows a thing??
 
-        util.writefile( 'nowrite/junk3', 'foo' )
-        save_perm = util.remove_write_perms( 'nowrite' )
-        try:
-            assert not location.writable_directory( 'nowrite' )
-        finally:
-            os.chmod( 'nowrite', save_perm )
+            util.writefile( 'noexec/junk2', 'foo' )
+            save_perm = util.remove_execute_perms( 'noexec' )
+            try:
+                assert not location.writable_directory( 'noexec' )
+            finally:
+                os.chmod( 'noexec', save_perm )
+
+            util.writefile( 'nowrite/junk3', 'foo' )
+            save_perm = util.remove_write_perms( 'nowrite' )
+            try:
+                assert not location.writable_directory( 'nowrite' )
+            finally:
+                os.chmod( 'nowrite', save_perm )
 
     def test_make_a_scratch_mirror(self):
         ""
@@ -272,8 +279,6 @@ class test_results_directory( vtu.vvtestTestCase ):
     def test_making_a_directory(self):
         ""
         os.mkdir( 'existing' )
-        os.symlink( abspath('existing'), 'goodlink' )
-        os.symlink( abspath('noexist'), 'badlink' )
         util.writefile( 'afile', 'junk' )
 
         location.check_and_make_directory( abspath('newdir') )
@@ -282,80 +287,95 @@ class test_results_directory( vtu.vvtestTestCase ):
         location.check_and_make_directory( abspath('existing') )
         assert not os.path.islink( 'existing' ) and os.path.isdir( 'existing' )
 
-        location.check_and_make_directory( abspath('goodlink') )
-        assert os.path.islink( 'goodlink' ) and os.path.isdir( 'goodlink' )
-
         location.check_and_make_directory( abspath('afile') )
         assert not os.path.islink( 'afile' ) and os.path.isdir( 'afile' )
 
-        location.check_and_make_directory( abspath('badlink') )
-        assert not os.path.islink( 'badlink' ) and os.path.isdir( 'badlink' )
+        if not_windows:
+            # making symlinks may not be allowed (Developer Privileges??)
+            os.symlink( abspath('existing'), 'goodlink' )
+            os.symlink( abspath('noexist'), 'badlink' )
+
+            location.check_and_make_directory( abspath('goodlink') )
+            assert os.path.islink( 'goodlink' ) and os.path.isdir( 'goodlink' )
+
+            location.check_and_make_directory( abspath('badlink') )
+            assert not os.path.islink( 'badlink' ) and os.path.isdir( 'badlink' )
 
     def test_force_linking_a_directory(self):
         ""
-        util.writefile( 'somedir/afile', 'foo' )
-        util.writefile( 'somefile', 'bar' )
+        if not_windows:
+            # symlinks not reliable on Windows
 
-        location.force_link_directory( abspath('frompath'), abspath('topath') )
-        assert os.path.islink( 'frompath' )
-        assert os.readlink('frompath') == abspath('topath')
+            util.writefile( 'somedir/afile', 'foo' )
+            util.writefile( 'somefile', 'bar' )
 
-        # idempotent
-        location.force_link_directory( abspath('frompath'), abspath('topath') )
-        assert os.path.islink( 'frompath' )
-        assert os.readlink('frompath') == abspath('topath')
+            location.force_link_directory( abspath('frompath'), abspath('topath') )
+            assert os.path.islink( 'frompath' )
+            assert os.readlink('frompath') == abspath('topath')
 
-        # same from path but different target
-        location.force_link_directory( abspath('frompath'), abspath('target') )
-        assert os.path.islink( 'frompath' )
-        assert os.readlink('frompath') == abspath('target')
+            # idempotent
+            location.force_link_directory( abspath('frompath'), abspath('topath') )
+            assert os.path.islink( 'frompath' )
+            assert os.readlink('frompath') == abspath('topath')
 
-        location.force_link_directory( abspath('somedir'), abspath('t2') )
-        assert os.path.islink( 'somedir' )
-        assert os.readlink('somedir') == abspath('t2')
+            # same from path but different target
+            location.force_link_directory( abspath('frompath'), abspath('target') )
+            assert os.path.islink( 'frompath' )
+            assert os.readlink('frompath') == abspath('target')
 
-        location.force_link_directory( abspath('somefile'), abspath('t3') )
-        assert os.path.islink( 'somefile' )
-        assert os.readlink('somefile') == abspath('t3')
+            location.force_link_directory( abspath('somedir'), abspath('t2') )
+            assert os.path.islink( 'somedir' )
+            assert os.readlink('somedir') == abspath('t2')
+
+            location.force_link_directory( abspath('somefile'), abspath('t3') )
+            assert os.path.islink( 'somefile' )
+            assert os.readlink('somefile') == abspath('t3')
 
     def test_making_a_mirror_directory(self):
         ""
-        os.mkdir( 'dest1' )
-        os.makedirs( 'wrkdir/dest2' )
-        os.makedirs( 'fakescratch' )
-
         perms = PermissionSetter( os.getcwd(), None )
+        os.mkdir( 'dest1' )
 
-        ok = location.make_mirror_directory( abspath('testdir'),
-                                             abspath('dest1'),
-                                             os.getcwd(), perms )
-        assert ok
-        assert os.path.islink( 'testdir' )
-        assert os.path.samefile( os.readlink( 'testdir' ), 'dest1/testdir' )
-        assert os.path.isdir( 'dest1/testdir' )
+        if not_windows:
+            os.makedirs( 'wrkdir/dest2' )
+            os.makedirs( 'fakescratch' )
 
-        ok = location.make_mirror_directory( abspath('testdir'),
-                                             'dest2',
-                                             abspath('wrkdir'), perms )
-        assert ok
-        assert os.path.islink( 'testdir' )
-        assert os.path.samefile( os.readlink( 'testdir' ), 'wrkdir/dest2/testdir' )
-        assert os.path.isdir( 'wrkdir/dest2/testdir' )
+            ok = location.make_mirror_directory( abspath('testdir'),
+                                                 abspath('dest1'),
+                                                 os.getcwd(), perms )
+            assert ok
+            assert os.path.islink( 'testdir' )
+            assert os.path.samefile( os.readlink( 'testdir' ), 'dest1/testdir' )
+            assert os.path.isdir( 'dest1/testdir' )
 
-        self.assertRaises( FatalError,
+            ok = location.make_mirror_directory( abspath('testdir'),
+                                                 'dest2',
+                                                 abspath('wrkdir'), perms )
+            assert ok
+            assert os.path.islink( 'testdir' )
+            assert os.path.samefile( os.readlink( 'testdir' ), 'wrkdir/dest2/testdir' )
+            assert os.path.isdir( 'wrkdir/dest2/testdir' )
+
+            self.assertRaises( FatalError,
+                    location.make_mirror_directory, abspath('testdir'),
+                                                    'dest1/..',
+                                                    os.getcwd(), perms )
+
+            ok = location.make_mirror_directory( abspath('testdir'),
+                                                 'any',
+                                                 os.getcwd(), perms,
+                                                 scratchdirs=[abspath('fakescratch')] )
+            assert ok
+            assert os.path.islink( 'testdir' )
+            rdir = util.globfile( 'fakescratch/*/vvtest_rundir' )
+            assert os.path.samefile( os.readlink( 'testdir' ), rdir+'/testdir' )
+            assert os.path.isdir( rdir+'/testdir' )
+        else:
+            # symlinks not reliable on Windows, so mirror feature disabled
+            self.assertRaises( FatalError,
                 location.make_mirror_directory, abspath('testdir'),
-                                                'dest1/..',
+                                                abspath('dest1'),
                                                 os.getcwd(), perms )
-
-        ok = location.make_mirror_directory( abspath('testdir'),
-                                             'any',
-                                             os.getcwd(), perms,
-                                             scratchdirs=[abspath('fakescratch')] )
-        assert ok
-        assert os.path.islink( 'testdir' )
-        rdir = util.globfile( 'fakescratch/*/vvtest_rundir' )
-        assert os.path.samefile( os.readlink( 'testdir' ), rdir+'/testdir' )
-        assert os.path.isdir( rdir+'/testdir' )
 
 
 class exit_status_controls( vtu.vvtestTestCase ):

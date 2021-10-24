@@ -8,6 +8,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
+import platform
 import time
 
 
@@ -62,7 +63,7 @@ class RuntimeInfo:
 
     def _load_defaults(self):
         ""
-        self.info['hostname']      = os.uname()[1]
+        self.info['hostname']      = platform.uname()[1]
         self.info['curdir']        = os.getcwd()
         self.info['python']        = sys.executable
         self.info['PYTHONPATH']    = os.environ.get( 'PYTHONPATH', '' )

@@ -234,9 +234,9 @@ def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):
         os.chdir( chdir )
 
     try:
-        pop = subprocess.Popen( cmd, shell=True,
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT )
+        cmdL = shlex.split(cmd)
+        pop = subprocess.Popen( cmdL, stdout=subprocess.PIPE,
+                                      stderr=subprocess.STDOUT )
 
         out,err = pop.communicate()
 

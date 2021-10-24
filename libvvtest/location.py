@@ -8,6 +8,7 @@ import os, sys
 from os.path import join as pjoin
 from os.path import normpath, abspath, basename, dirname
 import shutil
+import platform
 
 from .errors import FatalError
 from . import pathutil
@@ -118,10 +119,12 @@ def find_vvtest_test_root_file( start_directory,
         if os.path.exists( mf ):
             return mf
 
-        d = dirname( d )
+        d2 = dirname( d )
 
-        if stopd and d == stopd:
+        if d2 == d or (stopd and d2 == stopd):
             break
+
+        d = d2
 
     return None
 
@@ -248,6 +251,9 @@ def make_mirror_directory( testdirname, Mval, curdir, perms,
     Returns False only if 'Mval' is the word "any" and a suitable scratch
     directory could not be found.
     """
+    if platform.uname()[0].lower().startswith('win'):
+        raise FatalError( 'test results mirroring is not available on Windows')
+
     assert os.path.isabs( testdirname )
 
     if Mval == 'any':

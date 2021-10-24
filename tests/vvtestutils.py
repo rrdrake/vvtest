@@ -13,6 +13,11 @@ import signal
 import subprocess
 import unittest
 import shutil
+import platform
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
 
 from os.path import dirname, abspath
 from os.path import join as pjoin
@@ -87,8 +92,11 @@ def core_platform_name():
     """
     Returns either Darwin or Linux, depending on the current platform.
     """
-    if os.uname()[0].lower().startswith( 'darwin' ):
+    plat = platform.uname()[0].lower()
+    if plat.startswith( 'darwin' ):
         return 'Darwin'
+    elif plat.startswith( 'win' ):
+        return 'Windows'
     else:
         return 'Linux'
 
@@ -403,7 +411,7 @@ def vvtest_command_line( *cmd_args, **options ):
     argstr = ' '.join( cmd_args )
     argL = shlex.split( argstr )
 
-    cmdL = [ sys.executable, options.get( 'vvtestpath', vvtest_file ) ]
+    cmdL = [ quote(sys.executable), quote(options.get( 'vvtestpath', vvtest_file )) ]
 
     if need_to_add_verbose_flag( argL, options ):
         # add -v when running in order to extract the full test list

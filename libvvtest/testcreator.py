@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os
+import platform
 
 from .errors import TestSpecError
 from .staging import mark_staged_tests
@@ -15,7 +16,7 @@ from .parsexml import XMLTestParser
 class TestCreator:
 
     def __init__(self, idtraits={},
-                       platname=os.uname()[0],
+                       platname=None,
                        optionlist=[],
                        force_params=None ):
         """
@@ -24,7 +25,7 @@ class TestCreator:
         for that parameter name.
         """
         self.idtraits = idtraits
-        self.platname = platname
+        self.platname = platname if platname else platform.uname()[0]
         self.optionlist = optionlist
         self.force_params = force_params
 

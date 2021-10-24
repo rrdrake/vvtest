@@ -5,6 +5,7 @@
 # Government retains certain rights in this software.
 
 import os, sys
+import platform
 import re
 
 from .errors import TestSpecError
@@ -32,7 +33,7 @@ class ScriptTestParser:
 
     def __init__(self, filepath,
                        rootpath=None,
-                       platname=os.uname()[0],
+                       platname=None,
                        optionlist=[],
                        force_params=None ):
         ""
@@ -42,7 +43,7 @@ class ScriptTestParser:
             rootpath = os.getcwd()
         self.root = rootpath
 
-        self.platname = platname
+        self.platname = platname if platname else platform.uname()[0]
         self.optionlist = optionlist
         self.force = force_params
 
