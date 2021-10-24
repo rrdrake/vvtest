@@ -14,6 +14,10 @@ import subprocess
 import unittest
 import shutil
 import platform
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
 
 from os.path import dirname, abspath
 from os.path import join as pjoin
@@ -407,7 +411,7 @@ def vvtest_command_line( *cmd_args, **options ):
     argstr = ' '.join( cmd_args )
     argL = shlex.split( argstr )
 
-    cmdL = [ sys.executable, options.get( 'vvtestpath', vvtest_file ) ]
+    cmdL = [ quote(sys.executable), quote(options.get( 'vvtestpath', vvtest_file )) ]
 
     if need_to_add_verbose_flag( argL, options ):
         # add -v when running in order to extract the full test list

@@ -8,6 +8,7 @@ import os, sys
 from os.path import join as pjoin
 from os.path import normpath, abspath, basename, dirname
 import shutil
+import platform
 
 from .errors import FatalError
 from . import pathutil
@@ -250,6 +251,9 @@ def make_mirror_directory( testdirname, Mval, curdir, perms,
     Returns False only if 'Mval' is the word "any" and a suitable scratch
     directory could not be found.
     """
+    if platform.uname()[0].lower().startswith('win'):
+        raise FatalError( 'test results mirroring is not available on Windows')
+
     assert os.path.isabs( testdirname )
 
     if Mval == 'any':

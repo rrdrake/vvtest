@@ -6,6 +6,7 @@
 
 import os, sys
 import re
+import platform
 
 ############################################################################
 
@@ -415,7 +416,7 @@ def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
         if idplatform != None and hasattr( idplatform, "platform" ):
             platname = idplatform.platform( optdict )
         if not platname:
-            platname = os.uname()[0]
+            platname = platform.uname()[0]
 
     if not cplrname:
         if idplatform != None and hasattr( idplatform, "compiler" ):
@@ -502,7 +503,7 @@ def construct_job_info( procs, procpool,
         job_info.mpi_opts = "--hostfile machinefile"
         slots = min( len(procs), numprocs )
         job_info.machinefile = \
-                    os.uname()[1].strip() + " slots=" + str(slots) + '\n'
+                    platform.uname()[1].strip() + " slots=" + str(slots) + '\n'
 
     elif mpifile == 'machinefile':
         # use MPICH style machine file
@@ -524,7 +525,7 @@ def probe_max_processors( fail_value=4 ):
     """
     mx = None
     
-    if os.uname()[0].startswith( 'Darwin' ):
+    if platform.uname()[0].startswith( 'Darwin' ):
         # try to use sysctl on Macs
         try:
             fp = os.popen( 'sysctl -n hw.physicalcpu 2>/dev/null' )

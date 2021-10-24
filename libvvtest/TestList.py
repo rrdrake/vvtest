@@ -57,7 +57,7 @@ class TestList:
     def getResultsFilename(self):
         ""
         tup = time.localtime( self.rundate )
-        tm = time.strftime( "%Y-%m-%d_%H:%M:%S", tup )
+        tm = time.strftime( "%Y-%m-%d_%Hh%Mm%Ss", tup )
         return self.filename+'.'+tm
 
     def stringFileWrite(self, extended=False, **file_attrs):

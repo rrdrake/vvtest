@@ -7,10 +7,11 @@
 import os, sys
 import fnmatch
 import glob
+import platform
 
 debug = False
 
-uname = os.uname()
+uname = platform.uname()
 osname,nodename,osrelease,machine = uname[0], uname[1], uname[2], uname[4]
 
 def platform( opts ):
