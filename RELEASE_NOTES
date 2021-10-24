@@ -1,26 +1,6 @@
 
 Improvements:
 
-    - 
-
-Fixes:
-
-    - 
-
-Changes:
-
-    - 
-
-
-==============================================================================
-
-Release 1.3
------------
-
-Oct 22, 2021
-
-Improvements:
-
     - Add option --minimal-xdirs, which suppresses parameter name=value strings
       in test execution directory names if the parameter only has one value in
       the test. For example, a test file named 'foo.vvt' with
@@ -34,6 +14,26 @@ Improvements:
           foo.shape=round
 
       The parameter 'material' is still defined in the vvtest_util.py file.
+
+Fixes:
+
+    - 
+
+Changes:
+
+    - Deprecate some job automation tools in the trig directory: runjob.py,
+      runner, runjob_remote.py, trigger.py, triglog.py, command.py, runcmd.py.
+      The tests have been removed, but the files will be removed later.
+
+
+==============================================================================
+
+Release 1.3
+-----------
+
+Oct 22, 2021
+
+Improvements:
 
     - Platform expressions used to include/exclude tests to run are now case
       insensitive. So if a test header had
