@@ -246,6 +246,7 @@ def fileowner( path ):
     """
     uid = os.stat( path ).st_uid
     try:
+        import pwd
         ent = pwd.getpwuid( uid )
     except Exception:
         return None
@@ -471,6 +472,7 @@ def get_user_name( path=None ):
     uid = os.stat( path ).st_uid
 
     try:
+        import pwd
         name = pwd.getpwuid( uid )[0]
     except Exception:
         name = str(uid)
@@ -672,6 +674,7 @@ def parse_group_string_spec( strspec ):
         gid = int( strspec )
     except Exception:
         try:
+            import grp
             gid = grp.getgrnam( strspec ).gr_gid
         except Exception:
             raise PermissionSpecificationError(
