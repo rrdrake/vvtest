@@ -125,13 +125,13 @@ class filtering_by_file_search( vtu.vvtestTestCase ):
             vrun.assertCounts( total=0 )
 
             vtu.remove_results()
-            vrun = vtu.runvvtest( '-s foo', batch=batch )
+            vrun = vtu.runvvtest( '--search foo', batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
             vrun = vtu.runvvtest( '-R --search aliensrock', batch=batch )
             vrun.assertCounts( total=0 )
 
-            vrun = vtu.runvvtest( '-R -s foo', batch=batch )
+            vrun = vtu.runvvtest( '-R --search foo', batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
     def test_multiple_search_patterns(self):
@@ -147,7 +147,7 @@ class filtering_by_file_search( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( '-w --search covid --search 2020' )
         vrun.assertCounts( total=1, npass=1 )
 
-        vrun = vtu.runvvtest( '-w -s covid --search 2021' )
+        vrun = vtu.runvvtest( '-w --search covid --search 2021' )
         vrun.assertCounts( total=1, npass=1 )
 
 

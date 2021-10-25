@@ -127,19 +127,12 @@ class ExecutionHandler:
     def set_timeout_environ_variable(self, timeout):
         """
         add a timeout environ variable so the test can take steps to
-        shutdown a running application that is taking too long;  add
-        a bump factor so it won't shutdown before the test harness
-        recognizes it as a timeout
+        shutdown a running application that is taking too long; the app
+        should not die before the timeout, because otherwise vvtest will
+        not recognize it as a timeout
         """
         if timeout > 0:
-
-            # [Oct 2020] deprecated the bump factor in this environ variable
-
-            if timeout < 30: t = 60
-            if timeout < 120: t = timeout * 1.4
-            else: t = timeout * 1.2
-
-            os.environ['VVTEST_TIMEOUT'] = str( int( t ) )
+            os.environ['VVTEST_TIMEOUT'] = str( timeout )
 
     def check_run_postclean(self, tcase, rundir):
         ""

@@ -227,7 +227,6 @@ def construct_platform( rtdata, vvtestdir, opts, optD ):
                 vvtestdir,
                 opts.plat, opts.batch,
                 optD['platopt_dict'],  # --platopt
-                opts.dash_e,
                 opts.dash_n,
                 opts.dash_N,
                 opts.devices,
@@ -900,8 +899,6 @@ class CacheFileHandler:
             if self.opts.timeout_multiplier != None:
                 fp.write( 'TIMEOUT_MULTIPLIER=' + \
                                 str(self.opts.timeout_multiplier).strip() + '\n' )
-            if self.opts.dash_e:
-                fp.write( 'USE_ENV=1\n' )
             if self.opts.short_xdirs:
                 fp.write( 'SHORT_XDIRS='+self.opts.short_xdirs + '\n' )
 
@@ -937,8 +934,6 @@ class CacheFileHandler:
                 elif kvpair[0] == 'TIMEOUT_MULTIPLIER':
                     if not self.opts.timeout_multiplier:
                         self.opts.timeout_multiplier = kvpair[1]
-                elif kvpair[0] == 'USE_ENV':
-                    self.opts.dash_e = True
                 elif kvpair[0] == 'SHORT_XDIRS':
                     if not self.opts.short_xdirs:
                         self.opts.short_xdirs = kvpair[1]
@@ -1112,7 +1107,6 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     ""
     cmd = sys.executable + ' ' + pipes.quote(vvtestpath)
 
-    if opts.dash_e: cmd += ' -e'
     if opts.dash_m: cmd += ' -m'
     if opts.postclean: cmd += ' -C'
     if opts.analyze: cmd += ' -a'

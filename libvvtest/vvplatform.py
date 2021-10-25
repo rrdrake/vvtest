@@ -323,69 +323,43 @@ class ResourcePool:
             self.pool[idx] = self.pool.get( idx, 0 ) + 1
 
 
-def create_Platform_instance( vvtestdir, platname, isbatched, platopts, usenv,
+def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
                               numprocs, maxprocs, devices, max_devices,
                               onopts, offopts ):
-    """
-    This function is an adaptor around construct_Platform(), which passes
-    through the command line arguments as a dictionary.
-    """
-    optdict = {}
-    if platname:         optdict['--plat']    = platname
-    if platopts:         optdict['--platopt'] = platopts
-    if usenv:            optdict['-e']        = True
-    if numprocs != None: optdict['-n']        = numprocs
-    if maxprocs != None: optdict['-N']        = maxprocs
-    if onopts:           optdict['-o']        = onopts
-    if offopts:          optdict['-O']        = offopts
-
-    return construct_Platform( vvtestdir, optdict,
-                               isbatched=isbatched,
-                               devices=devices,
-                               max_devices=max_devices )
-
-
-def construct_Platform( vvtestdir, optdict, **kwargs ):
-    """
-    This function constructs a Platform object, determines the platform &
-    compiler, and loads the platform plugin.
-
-    It is retained for backward compatibility for now.  A script written by
-    a project team called this function to set environment variables in the
-    platform plugin and called certain methods on the resulting Platform object.
-
-    I want to get rid of that usage, but I'd like to abstract out the use
-    case and satisfy it in a better way (one that does not mean poking into
-    the internals of vvtest).
-    """
+    ""
     assert vvtestdir
     assert os.path.exists( vvtestdir )
     assert os.path.isdir( vvtestdir )
 
+    optdict = {}
+    if platname:         optdict['--plat']    = platname
+    if platopts:         optdict['--platopt'] = platopts
+    if onopts:           optdict['-o']        = onopts
+    if offopts:          optdict['-O']        = offopts
+
     plat = Platform( vvtestdir, optdict )
 
     platname,cplrname = get_platform_and_compiler(
-                                optdict.get( '--plat', None ),
-                                optdict.get( '--cplr', None ),
-                                optdict.get( '-o', [] ),
-                                optdict.get( '-O', [] ) )
+                                platname,
+                                None,  # compiler name not used anymore
+                                onopts,
+                                offopts )
 
     plat.platname = platname
     plat.cplrname = cplrname
 
-    set_platform_options( plat, optdict.get( '--platopt', {} ) )
+    set_platform_options( plat, platopts )
 
-    isbatched = kwargs.get( 'isbatched', False )
     if isbatched:
         # this may get overridden by platform_plugin.py
         plat.setBatchSystem( 'procbatch', 1 )
 
     initialize_platform( plat )
 
-    plat.initProcs( optdict.get( '-n', None ),
-                    optdict.get( '-N', None ),
-                    kwargs.get( 'devices', None ),
-                    kwargs.get( 'max_devices', None ) )
+    plat.initProcs( numprocs,
+                    maxprocs,
+                    devices,
+                    max_devices )
 
     return plat
 

@@ -433,25 +433,13 @@ help_deprecated = """
 
 >DEPRECATED BUT STILL AVAILABLE:
 
-The -s option is now deprecated. It is the same as --search.
-
-The -v option used to print the program version, but now means "verbose".
-Use --version instead to get the version.
+The -e option is now deprecated. It used to mean prefer environment variables
+to vvtest plugin configuration values.
 
 >DEPRECATED AND REMOVED:
 
-The option --vg could be used to pass the -vg option to each test script.
-It has been replaced by the --test-args option.
+The -s option is now deprecated. It is the same as --search.
 
-The -F option has been removed. It is the same as -R.
-
-The --pipeline option has been removed. It is the same as --batch.
-
-The --qsub-limit option has been removed. It is the same as --batch-limit.
-
-The --qsub-length option has been removed. It is the same as --batch-length.
-
-The --check=<name> option has been removed. Use --test-args instead.
 """
 
 
@@ -521,12 +509,9 @@ def create_parser( argvlist, vvtest_version ):
              'runtimes is less than the given number of seconds.' )
 
     # more filtering
-    grp.add_argument( '--search', metavar='REGEX', dest='search',
-                      action='append',
+    grp.add_argument( '--search', metavar='REGEX', dest='search', action='append',
         help='Include tests that have an input file containing the '
              'given regular expression.  Multiple are ORed together.' )
-    grp.add_argument( '-s', metavar='REGEX', dest='dash_s', action='append',
-        help='Deprecated; use --search instead.' )
     grp.add_argument( '--include-tdd', action='store_true',
         help='Include tests that contain the keyword "TDD", which are '
              'normally not included.' )
@@ -620,9 +605,8 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--config', action='append',
         help='Directory containing testing plugins and helpers. '
              'Same as VVTEST_CONFIGDIR environment variable.' )
-    grp.add_argument( '-e', dest='dash_e', action='store_true',
-        help='Prevents test harness from overwriting environment '
-             'variables prior to each test.' )
+    grp.add_argument( '-e', action='store_true',
+        help='Deprecated; will be removed next release.' )
     grp.add_argument( '--user-args', metavar='ARGS',
         help='Ignored by vvtest.  Use --user-args to pass arguments through '
              'sys.argv to user plugin functions.  User plugin functions are '
@@ -728,12 +712,6 @@ def check_deprecated_option_use( opts ):
     # if opts.qsub_limit:
     #     # --qsub-limit replaced with --batch-limit
     #     opts.batch_limit = opts.qsub_limit
-
-    if opts.dash_s:
-        if opts.search == None:
-            opts.search = opts.dash_s
-        else:
-            opts.search.extend( opts.dash_s )
 
 
 def adjust_options_and_create_derived_options( opts ):

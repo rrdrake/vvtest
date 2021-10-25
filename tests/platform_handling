@@ -149,31 +149,10 @@ class constructing_platform( vtu.vvtestTestCase ):
         assert plat.getattr( 'walltime' ) == '2:34'
         assert plat.getattr( 'QoS' ) == 'long'
 
-    def test_the_construct_Platform_function(self):
-        """
-        Very bad design, but the construct_Platform() function is used by
-        client projects.  This test helps preserve backward compatibility
-        (until deprecation) while facilitating refactoring towards a better
-        architecture.
-        """
-        plat = vvplatform.construct_Platform( os.getcwd(), {} )
-
-        optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
-        plat = vvplatform.construct_Platform( os.getcwd(),
-                    { '--plat':'XBox',
-                      '--platopt':optD,
-                      '-e':True,
-                      '-n':10,
-                      '-N':20,
-                      '-o':['dbg'],
-                      '-O':['symbols'],
-                      '--qsub-id':23 } )
-        self.check_platform_object( plat )
-
     def test_the_create_Platform_instance_function(self):
         ""
         plat = vvplatform.create_Platform_instance(
-                    os.getcwd(), None, None, None, None,
+                    os.getcwd(), None, None, {},
                     None, None, None, None,
                     None, None )
 
@@ -182,7 +161,6 @@ class constructing_platform( vtu.vvtestTestCase ):
                     os.getcwd(),
                     'XBox', True,
                     optD,
-                    True,
                     10, 20, None, None,
                     ['dbg'], ['symbols'] )
         self.check_platform_object( plat )
@@ -199,7 +177,6 @@ class constructing_platform( vtu.vvtestTestCase ):
         opts = plat.getOptions()
         assert opts['-o'] == ['dbg']
         assert opts['-O'] == ['symbols']
-        assert opts['-e'] == True
         platopts = opts['--platopt']
         assert 'knl' in platopts
         assert platopts['q'] == 'justdoit'

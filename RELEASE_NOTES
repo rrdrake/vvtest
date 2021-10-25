@@ -21,6 +21,29 @@ Fixes:
 
 Changes:
 
+    - The VVTEST_TIMEOUT environment variable made available to each test
+      execution used to add a "bump factor". This bump has been removed.
+      Tests can use the timeout to ensure all the MPI processes will die.
+      However, the test should not die before the timeout because otherwise
+      vvtest will not recognize it as having timed out.
+
+    - The -e option has been deprecated. It is still parsed but does nothing.
+
+    - The deprecated -s option is no longer recognized. Use --search instead.
+
+    - Unlikely it is still being used, but the function construct_Platform()
+      in the file libvvtest/vvplatform.py has been removed. It was a way to
+      share vvtest platform variables from the platform_plugin.py file, but
+      a better way is to define them in the environment ahead of time, or
+      share a script between platform_plugin.py and other scripts.
+
+    - Deprecate some features in the trig/perms.py module. It is no longer
+      executable and cannot be used as an entry point (use trig/chperms
+      instead). The following functions in perms.py are now deprecated (but
+      still exist for now): permission(), change_filemode(), i_own(),
+      replace_conditional_execute(), change_group(), apply_itemized_chmod(),
+      can_map_group_name_to_group_id(), apply_chmod(), chmod_recurse().
+
     - Deprecate some job automation tools in the trig directory: runjob.py,
       runner, runjob_remote.py, trigger.py, triglog.py, command.py, runcmd.py.
       The tests have been removed, but the files will be removed later.
