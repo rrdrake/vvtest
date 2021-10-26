@@ -564,6 +564,27 @@ class parameter_tests( vtu.vvtestTestCase ):
         vrun = vtu.runvvtest( "-w -p foo=bar*6", raise_on_error=False )
         assert vrun.x != 0
 
+    def test_override_parameter_values_with_option(self):
+        """
+        Protect the behavior where a `parameterize` statement below will
+        override whatever is set above.
+        """
+        util.writefile( 'atest.vvt', """
+            # VVT: parameterize : np,fruit = 4,apple 8,banana
+            # VVT: parameterize (options="gpu") : np,ndevice = 1,1
+            import vvtest_util as vvt
+            print(vvt.PARAM_DICT)
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( "-w -n 8 -N 8" )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['atest.fruit=apple.np=4', 'atest.fruit=banana.np=8']
+
+        vrun = vtu.runvvtest( "-w -n 8  -N 8 --devices 1 --max-devices 1 -o gpu" )
+        vrun.assertCounts( total=2, npass=2 )
+        assert vrun.getTestIds() == ['atest.fruit=apple.ndevice=1.np=1', 'atest.fruit=banana.ndevice=1.np=1']
+
 
 #####################################################################
 
