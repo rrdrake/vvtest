@@ -228,9 +228,9 @@ def remove_results():
 
 class VvtestCommandRunner:
 
-    def __init__(self, cmd):
+    def __init__(self, cmdL):
         ""
-        self.cmd = cmd
+        self.cmdL = cmdL
 
     def run(self, **options):
         ""
@@ -241,7 +241,7 @@ class VvtestCommandRunner:
         verb = 1
         if quiet: verb = 0
 
-        x,out = util.runcmd( self.cmd, chdir=chdir,
+        x,out = util.runcmd( self.cmdL, chdir=chdir,
                              raise_on_error=False, verbose=verb )
 
         if x == 0:
@@ -395,8 +395,8 @@ def runvvtest( *cmd_args, **options ):
               chdir=some/path (default=None)
               addplatform=True
     """
-    cmd = vvtest_command_line( *cmd_args, **options )
-    vrun = VvtestCommandRunner( cmd )
+    cmdL = vvtest_command_line( *cmd_args, **options )
+    vrun = VvtestCommandRunner( cmdL )
     vrun.run( **options )
     return vrun
 
@@ -411,7 +411,7 @@ def vvtest_command_line( *cmd_args, **options ):
     argstr = ' '.join( cmd_args )
     argL = shlex.split( argstr )
 
-    cmdL = [ quote(sys.executable), quote(options.get( 'vvtestpath', vvtest_file )) ]
+    cmdL = [ sys.executable, options.get( 'vvtestpath', vvtest_file ) ]
 
     if need_to_add_verbose_flag( argL, options ):
         # add -v when running in order to extract the full test list
@@ -434,11 +434,10 @@ def vvtest_command_line( *cmd_args, **options ):
         if '-n' not in argL:
             cmdL.extend( [ '-n', '8' ] )
 
-    cmd = ' '.join( cmdL )
     if argstr:
-        cmd += ' ' + argstr
+        cmdL.extend( shlex.split(argstr))
 
-    return cmd
+    return cmdL
 
 
 def need_to_add_verbose_flag( vvtest_args, options ):

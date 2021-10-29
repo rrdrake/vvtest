@@ -221,22 +221,31 @@ def writescript( fname, content ):
 
 
 def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):
-    ""
+    """
+    the 'cmd' argument can be a string or a list; if string then
+    shell=True is given to subprocess
+    """
+    cmdstr = cmd if type(cmd) == type('') else ' '.join(cmd)
+
     dstr = ''
     if chdir:
         dstr = 'cd '+chdir+' && '
         cwd = os.getcwd()
 
     if verbose > 0:
-        print3( 'RUN: '+dstr+cmd )
+        print3( 'RUN: '+dstr+cmdstr )
 
     if chdir:
         os.chdir( chdir )
 
     try:
-        cmdL = shlex.split(cmd)
-        pop = subprocess.Popen( cmdL, stdout=subprocess.PIPE,
-                                      stderr=subprocess.STDOUT )
+        if type(cmd) == type(''):
+            pop = subprocess.Popen( cmd, shell=True,
+                                         stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT )
+        else:
+            pop = subprocess.Popen( cmd, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT )
 
         out,err = pop.communicate()
 
@@ -252,9 +261,9 @@ def runcmd( cmd, chdir=None, raise_on_error=True, verbose=1 ):
     if x != 0:
         if raise_on_error:
             if verbose < 1:
-                print3( 'RUN: '+dstr+cmd )
+                print3( 'RUN: '+dstr+cmdstr )
             print3( out )
-            raise Exception( 'runcmd failed: '+repr(dstr+cmd) )
+            raise Exception( 'runcmd failed: '+repr(dstr+cmdstr) )
         elif verbose >= 1:
             print3( out )
     elif verbose >= 2:
@@ -290,7 +299,7 @@ def run_redirect( cmd, redirect_filename ):
     if type(cmd) == type(''):
         scmd = cmd
     else:
-        scmd = shell_escape( cmd )
+        scmd = shell_escape( cmd )  # magic: try to avoid this special function
     if outfp == None:
         sys.stdout.write( scmd + '\n' )
     else:

@@ -175,7 +175,6 @@ class test_results_directory( vtu.vvtestTestCase ):
     def test_getting_the_test_directory_path(self):
         ""
         td = determine_test_directory( 'subdir', None, '/some/path' )
-        print ( 'magic: '+repr(td))
         assert td == normpath( '/some/path/subdir' )
 
         self.assertRaises( Exception,
