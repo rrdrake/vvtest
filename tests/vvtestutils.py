@@ -109,12 +109,12 @@ def launch_vvtest_then_terminate_it( *cmd_args, **options ):
     batch = options.pop( 'batch', False )
     addverbose = options.pop( 'addverbose', True )
 
-    cmd = vvtest_command_line( *cmd_args, batch=batch, addverbose=addverbose )
+    cmdL = vvtest_command_line( *cmd_args, batch=batch, addverbose=addverbose )
 
     fp = open( logfilename, 'w' )
     try:
-        print3( cmd )
-        pop = subprocess.Popen( cmd, shell=True,
+        print3( cmdL )
+        pop = subprocess.Popen( cmdL,
                     stdout=fp.fileno(), stderr=fp.fileno(),
                     preexec_fn=lambda:os.setpgid(os.getpid(),os.getpid()) )
 
@@ -162,11 +162,11 @@ def interrupt_vvtest_batch( vvtest_args, count=None, signum=None ):
 
 def run_vvtest_with_hook( vvtest_args, envspec, batch=False ):
     ""
-    cmd = vvtest_command_line( vvtest_args, batch=batch )
+    cmdL = vvtest_command_line( vvtest_args, batch=batch )
 
     os.environ['VVTEST_UNIT_TEST_SPEC'] = envspec
     try:
-        x,out = util.runcmd( cmd, raise_on_error=False )
+        x,out = util.runcmd( cmdL, raise_on_error=False )
     finally:
         del os.environ['VVTEST_UNIT_TEST_SPEC']
 
