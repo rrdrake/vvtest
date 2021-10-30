@@ -342,7 +342,8 @@ def start_test( handler, texec, platform, is_baseline=False ):
 
     texec.setResourceObject( obj )
 
-    texec.start( handler.prepare_for_launch, is_baseline )
+    texec.start( handler.prepare_for_launch,
+                 handler.rtconfig, is_baseline, handler.perms )
 
     tcase.getStat().markStarted( texec.getStartTime() )
 

@@ -235,6 +235,10 @@ class integration_signalling_tests( vtu.vvtestTestCase ):
 
     def test_sub_sub_process_signalling_in_a_test_script(self):
         ""
+        # magic: this test fails using subprocess mode, because the
+        #        subprocess.terminate() method only signals the first
+        #        subprocess, and leaves the sub-subprocess without a parent
+
         util.writefile( 'script.vvt', """
             #VVT: link : subscript
             import subprocess

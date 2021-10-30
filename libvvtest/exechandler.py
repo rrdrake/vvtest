@@ -62,13 +62,6 @@ class ExecutionHandler:
             cfgdirs = self.rtconfig.getAttr('configdir')
             self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
 
-    def check_redirect_output_to_log_file(self, tcase, baseline):
-        ""
-        if self.rtconfig.getAttr('logfile'):
-            logfname = tcase.getSpec().getLogFilename( baseline )
-            redirect_stdout_stderr_to_filename( logfname )
-            self.perms.apply( os.path.abspath( logfname ) )
-
     def check_run_preclean(self, tcase, baseline):
         ""
         if self.rtconfig.getAttr('preclean') and \
@@ -95,7 +88,7 @@ class ExecutionHandler:
             if not self.setWorkingFiles( tcase ):
                 sys.stdout.flush()
                 sys.stderr.flush()
-                os._exit(1)
+                raise Exception( 'failed to setup working files' )
 
     def setWorkingFiles(self, tcase):
         """
@@ -224,8 +217,6 @@ class ExecutionHandler:
     def prepare_for_launch(self, texec, baseline):
         ""
         tcase = texec.getTestCase()
-
-        self.check_redirect_output_to_log_file( tcase, baseline )
 
         if tcase.getSpec().getSpecificationForm() == 'xml':
             self.write_xml_run_script( tcase, texec.getRunDirectory() )
@@ -515,15 +506,6 @@ def remove_path( path ):
             shutil.rmtree( path )
         else:
             os.remove( path )
-
-
-def redirect_stdout_stderr_to_filename( filename ):
-    ""
-    ofile = open( filename, "w+" )
-
-    # reassign stdout & stderr file descriptors to the file
-    os.dup2( ofile.fileno(), sys.stdout.fileno() )
-    os.dup2( ofile.fileno(), sys.stderr.fileno() )
 
 
 def print3( *args ):

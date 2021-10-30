@@ -64,7 +64,7 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, execute_test_func, is_baseline):
+    def start(self, execute_test_func, rtconfig, is_baseline, perms):
         """
         Launches the child process.
         """
@@ -72,12 +72,45 @@ class TestExec:
 
         self.tstart = time.time()
 
-        sys.stdout.flush() ; sys.stderr.flush()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        logfp = self._open_logfile( rtconfig, is_baseline, perms )
 
-        self.pid = os_fork_with_retry( 10 )
-        if self.pid == 0:
-            # child process is the test itself
-            self.prepare_then_execute_test( execute_test_func, is_baseline )
+        cwd = os.getcwd()
+        try:
+            os.chdir( self.rundir )
+
+            if False:
+                self.subpid = self.forkless_prepare_then_execute(
+                                    execute_test_func, is_baseline, logfp )
+            else:
+                self.pid = self.prepare_then_execute(
+                                    execute_test_func, is_baseline, logfp )
+        finally:
+            self._close_logfile( logfp )
+            os.chdir( cwd )
+
+    def _open_logfile(self, rtconfig, is_baseline, perms):
+        ""
+        logfile = None
+        if rtconfig.getAttr('logfile'):
+            logfile = self.tcase.getSpec().getLogFilename( is_baseline )
+
+        if logfile:
+            if not os.path.isabs( logfile ):
+                logfile = os.path.join( self.rundir, logfile )
+            logfp = open( logfile, 'w+' )
+
+            perms.apply( logfile )
+        else:
+            logfp = None
+
+        return logfp
+
+    def _close_logfile(self, logfp):
+        ""
+        if logfp:
+            logfp.close()
 
     def getStartTime(self):
         ""
@@ -95,32 +128,55 @@ class TestExec:
 
         if self.isStarted() and not self.isDone():
 
-            assert self.pid > 0
+            if self.pid:
 
-            cpid,code = os.waitpid( self.pid, os.WNOHANG )
+                assert self.pid > 0
 
-            if cpid > 0:
+                cpid,code = os.waitpid( self.pid, os.WNOHANG )
 
-                # test finished
+                if cpid > 0:
 
-                self.tstop = time.time()
+                    # test finished
 
-                if self.timedout is None:
-                    self.exit_status = decode_subprocess_exit_code( code )
+                    self.tstop = time.time()
 
-                transition = True
-
-            elif self.timeout > 0:
-                # not done .. check for timeout
-                tm = time.time()
-                if tm-self.tstart > self.timeout:
                     if self.timedout is None:
-                        # interrupt all processes in the process group
-                        self.signalJob( signal.SIGINT )
-                        self.timedout = tm
-                    elif (tm - self.timedout) > interrupt_to_kill_timeout:
-                        # SIGINT isn't killing fast enough, use stronger method
-                        self.signalJob( signal.SIGTERM )
+                        self.exit_status = decode_subprocess_exit_code( code )
+
+                    transition = True
+
+                elif self.timeout > 0:
+                    # not done .. check for timeout
+                    tm = time.time()
+                    if tm-self.tstart > self.timeout:
+                        if self.timedout is None:
+                            # interrupt all processes in the process group
+                            self.signalJob( signal.SIGINT )
+                            self.timedout = tm
+                        elif (tm - self.timedout) > interrupt_to_kill_timeout:
+                            # SIGINT isn't killing fast enough, use stronger method
+                            self.signalJob( signal.SIGTERM )
+
+            else:
+                if self.subpid is None:
+                    # test finished during startup
+                    assert self.exit_status is not None
+                    self.tstop = time.time()
+                    transition = True
+
+                else:
+                    code = self.subpid.poll()
+                    if code is not None:
+                        self.tstop = time.time()
+                        self.exit_status = code
+                        transition = True
+                    elif self.timeout > 0:
+                        tm = time.time()
+                        if tm-self.tstart > self.timeout:
+                            self.tstop = tm
+                            self.timedout = tm
+                            self.subpid.terminate()
+                            transition = True
 
         return transition
 
@@ -137,7 +193,10 @@ class TestExec:
         Sends a signal to the job, such as signal.SIGINT.
         """
         try:
-            os.kill( self.pid, sig )
+            if self.pid is not None:
+                os.kill( self.pid, sig )
+            elif self.subpid is not None:
+                self.subpid.terminate()
         except Exception:
             pass
 
@@ -159,27 +218,96 @@ class TestExec:
         
         return t1 or t2
 
-    def prepare_then_execute_test(self, launch_prep_func, is_baseline):
+    def prepare_then_execute(self, execute_test_func, is_baseline, logfp):
         ""
-        try:
-            os.chdir( self.rundir )
+        pid = os_fork_with_retry( 10 )
+        if pid == 0:
+            # this is the new child process
 
-            cmd_list = launch_prep_func( self, is_baseline )
+            redirect_stdout_err( logfp )
 
-            sys.stdout.flush() ; sys.stderr.flush()
+            try:
+                cmd_list = execute_test_func( self, is_baseline )
 
-            if cmd_list == None:
-                # this can only happen in baseline mode
-                os._exit(0)
-            else:
-                x = group_exec_subprocess( cmd_list )
-                os._exit(x)
+                sys.stdout.flush() ; sys.stderr.flush()
 
-        except:
-            sys.stdout.flush() ; sys.stderr.flush()
-            traceback.print_exc()
-            sys.stdout.flush() ; sys.stderr.flush()
-            os._exit(1)
+                if cmd_list == None:
+                    # can only happen in baseline mode
+                    os._exit(0)
+                else:
+                    x = group_exec_subprocess( cmd_list )
+                    os._exit(x)
+
+            except:
+                sys.stdout.flush() ; sys.stderr.flush()
+                traceback.print_exc()
+                sys.stdout.flush() ; sys.stderr.flush()
+                os._exit(1)
+
+        return pid
+
+    def forkless_prepare_then_execute(self, execute_test_func, is_baseline, logfp):
+        ""
+        subpid = None
+        with redirect_output( logfp ):
+            try:
+                cmd_list = execute_test_func( self, is_baseline )
+                if cmd_list is None:
+                    # can only happen in baseline mode
+                    self.exit_status = 0
+                elif logfp is None:
+                    subpid = subprocess.Popen( cmd_list )
+                else:
+                    subpid = subprocess.Popen( cmd_list,
+                                               stdout=logfp.fileno(),
+                                               stderr=subprocess.STDOUT )
+            except Exception:
+                sys.stdout.flush() ; sys.stderr.flush()
+                traceback.print_exc()
+
+                self.exit_status = 1
+
+        return subpid
+
+
+class redirect_output:
+    """
+    with redirect_output( fileobj ):
+        do_something()
+    """
+
+    def __init__(self, fileptr):
+        ""
+        self.fp = fileptr
+
+    def __enter__(self):
+        ""
+        if self.fp is not None:
+            self.save_stdout_fd = os.dup(1)
+            os.dup2( self.fp.fileno(), 1 )
+
+            self.save_stderr_fd = os.dup(2)
+            os.dup2( self.fp.fileno(), 2 )
+
+    def __exit__(self, type, value, traceback):
+        ""
+        sys.stdout.flush()
+        sys.stderr.flush()
+
+        if self.fp is not None:
+            os.dup2( self.save_stdout_fd, 1 )
+            os.close( self.save_stdout_fd )
+
+            os.dup2( self.save_stderr_fd, 2 )
+            os.close( self.save_stderr_fd )
+
+
+def redirect_stdout_err( logfp ):
+    ""
+    if logfp:
+        # reassign stdout & stderr file descriptors to the log file
+        os.dup2( logfp.fileno(), sys.stdout.fileno() )
+        os.dup2( logfp.fileno(), sys.stderr.fileno() )
 
 
 def decode_subprocess_exit_code( exit_code ):
