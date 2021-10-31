@@ -10,7 +10,6 @@ import glob
 import fnmatch
 from os.path import normpath, dirname
 from os.path import join as pjoin
-import platform
 
 try:
     from shlex import quote
@@ -22,12 +21,11 @@ from . import cshScriptWriter
 from . import ScriptWriter
 from .makecmd import MakeScriptCommand
 
-not_windows = not platform.uname()[0].lower().startswith('win')
-
 
 class ExecutionHandler:
 
-    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir):
+    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir,
+                       symlinks_supported=True):
         """
         The platform is a Platform object.  The test_dir is the top level
         testing directory, which is either an absolute path or relative to
@@ -38,6 +36,7 @@ class ExecutionHandler:
         self.platform = platform
         self.plugin = usrplugin
         self.test_dir = test_dir
+        self.symlinks = symlinks_supported
         self.commondb = None
 
     def initialize_for_execution(self, texec):
@@ -110,7 +109,7 @@ class ExecutionHandler:
         srcdir = normpath( pjoin( tspec.getRootpath(),
                                   dirname( tspec.getFilepath() ) ) )
 
-        if not_windows:
+        if self.symlinks:
             cpL = tspec.getCopyFiles()
             lnL = tspec.getLinkFiles()
         else:
