@@ -10,12 +10,19 @@ import glob
 import fnmatch
 from os.path import normpath, dirname
 from os.path import join as pjoin
-import pipes
+import platform
+
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
 
 from . import CommonSpec
 from . import cshScriptWriter
 from . import ScriptWriter
 from .makecmd import MakeScriptCommand
+
+not_windows = not platform.uname()[0].lower().startswith('win')
 
 
 class ExecutionHandler:
@@ -103,9 +110,14 @@ class ExecutionHandler:
         srcdir = normpath( pjoin( tspec.getRootpath(),
                                   dirname( tspec.getFilepath() ) ) )
 
-        ok = link_and_copy_files( srcdir,
-                                  tspec.getLinkFiles(),
-                                  tspec.getCopyFiles() )
+        if not_windows:
+            cpL = tspec.getCopyFiles()
+            lnL = tspec.getLinkFiles()
+        else:
+            cpL = tspec.getLinkFiles() + tspec.getCopyFiles()
+            lnL = []
+
+        ok = link_and_copy_files( srcdir, lnL, cpL )
 
         return ok
 
@@ -349,7 +361,7 @@ def echo_test_execution_info( testname, cmd_list, timeout ):
     print3( "Directory    : "+os.getcwd() )
 
     if cmd_list != None:
-        cmd = ' '.join( [ pipes.quote(arg) for arg in cmd_list ] )
+        cmd = ' '.join( [ quote(arg) for arg in cmd_list ] )
         print3( "Command      : "+cmd )
 
     print3( "Timeout      : "+str(timeout) )

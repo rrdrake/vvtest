@@ -18,6 +18,8 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from vvtestutils import windows, not_windows
+
 import libvvtest.testexec as testexec
 
 
@@ -463,4 +465,6 @@ class execute_tests( vtu.vvtestTestCase ):
 
 ############################################################################
 
-util.run_test_cases( sys.argv, sys.modules[__name__] )
+if not windows:
+    # all tests in this file use the xml format, which fail
+    util.run_test_cases( sys.argv, sys.modules[__name__] )

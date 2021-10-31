@@ -9,7 +9,9 @@ import subprocess
 import signal
 import time
 import traceback
+import platform
 
+not_windows = not platform.uname()[0].lower().startswith('win')
 
 # if a test times out, it receives a SIGINT.  if it doesn't finish up
 # after that in this number of seconds, it gets sent a SIGKILL
@@ -80,11 +82,11 @@ class TestExec:
         try:
             os.chdir( self.rundir )
 
-            if False:
-                self.subpid = self.forkless_prepare_then_execute(
+            if not_windows:
+                self.pid = self.prepare_then_execute(
                                     execute_test_func, is_baseline, logfp )
             else:
-                self.pid = self.prepare_then_execute(
+                self.subpid = self.forkless_prepare_then_execute(
                                     execute_test_func, is_baseline, logfp )
         finally:
             self._close_logfile( logfp )

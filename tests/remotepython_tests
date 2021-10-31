@@ -27,10 +27,10 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
+from vvtestutils import windows, not_windows
+
 import remotepython
 from remotepython import RemotePython
-
-not_windows = not platform.uname()[0].lower().startswith('win')
 
 rpy = sys.executable
 #rpy='/home/rrdrake/bin/Linux/py266/bin/python'
@@ -428,7 +428,7 @@ class integration_tests( unittest.TestCase ):
 
     def test_connect_and_print_hello(self):
         ""
-        bL = [False,True] if not_windows else [False]
+        bL = [False,True] if not windows else [False]
         for bashlogin in bL:
             rem = RemotePython( pythonexe=rpy,
                                 bashlogin=bashlogin,
@@ -536,7 +536,7 @@ class integration_tests( unittest.TestCase ):
             rem.close()
         assert out.strip() == 'hello' and not err
 
-        if not_windows:
+        if not windows:
             rem = RemotePython( 'sparky', pythonexe=rpy,
                                           sshcmd=fakessh,
                                           bashlogin=True,
@@ -656,6 +656,7 @@ class integration_tests( unittest.TestCase ):
         assert len( util.grepfiles( 'SND: *hello good buddy', 'logfile' ) ) == 1
         assert len( util.grepfiles( 'OUT: hello good buddy', 'logfile' ) ) == 1
 
+    @not_windows
     def test_simulating_ssh_behavior_of_separate_process_group(self):
         """
         by default, ssh puts the remote process into its own process group,
@@ -666,59 +667,57 @@ class integration_tests( unittest.TestCase ):
         to simulate this, the fake ssh script can be made to run the python
         subprocess in the background
         """
-        if not_windows:
+        # first, check that by default, the process group ID is the same as me
+        fakessh = write_fake_ssh_script()
+        time.sleep(1)
 
-            # first, check that by default, the process group ID is the same as me
-            fakessh = write_fake_ssh_script()
-            time.sleep(1)
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        ppid,pgrp = [ int(x) for x in out.strip().split() ]
+        assert pgrp == os.getpgrp()
 
-            rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
-            try:
-                rem.start( timeout=5 )
-                rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
-                out,err = get_line_from_remote( rem )
-            finally:
-                rem.close()
+        # then check that the 'background' option puts the process in its
+        # own process group
+        fakessh = write_fake_ssh_script( background=True )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
+        finally:
+            rem.close()
+        ppid,pgrp = [ int(x) for x in out.strip().split() ]
+        assert pgrp != os.getpgrp()
+
+        # finally, kill the fake ssh wrapper, and check that the "remote"
+        # python process dies too
+        fakessh = write_fake_ssh_script( background=True )
+        time.sleep(1)
+
+        rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
+        try:
+            rem.start( timeout=5 )
+            rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
+            out,err = get_line_from_remote( rem )
             ppid,pgrp = [ int(x) for x in out.strip().split() ]
-            assert pgrp == os.getpgrp()
-
-            # then check that the 'background' option puts the process in its
-            # own process group
-            fakessh = write_fake_ssh_script( background=True )
+            rem.execute( 'import time; ' + \
+                         'time.sleep(4); ' + \
+                         'fp=open("'+abspath('alive.txt')+'","wt"); ' + \
+                         'fp.close()' )
             time.sleep(1)
-
-            rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh )
-            try:
-                rem.start( timeout=5 )
-                rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
-                out,err = get_line_from_remote( rem )
-            finally:
-                rem.close()
-            ppid,pgrp = [ int(x) for x in out.strip().split() ]
-            assert pgrp != os.getpgrp()
-
-            # finally, kill the fake ssh wrapper, and check that the "remote"
-            # python process dies too
-            fakessh = write_fake_ssh_script( background=True )
-            time.sleep(1)
-
-            rem = RemotePython( 'sparky', pythonexe=rpy, sshcmd=fakessh, logfile='log.txt' )
-            try:
-                rem.start( timeout=5 )
-                rem.execute( 'print ( str(os.getppid())+" "+str(os.getpgrp()) )' )
-                out,err = get_line_from_remote( rem )
-                ppid,pgrp = [ int(x) for x in out.strip().split() ]
-                rem.execute( 'import time; ' + \
-                             'time.sleep(4); ' + \
-                             'fp=open("'+abspath('alive.txt')+'","wt"); ' + \
-                             'fp.close()' )
-                time.sleep(1)
-                os.kill( ppid, signal.SIGTERM )
-            finally:
-                rem.close()
-            time.sleep(5)
-            # if the "remote" python process does not die, this file is created
-            assert not os.path.exists('alive.txt')
+            os.kill( ppid, signal.SIGTERM )
+        finally:
+            rem.close()
+        time.sleep(5)
+        # if the "remote" python process does not die, this file is created
+        assert not os.path.exists('alive.txt')
 
     def test_that_remote_traceback_includes_code_lines(self):
         ""

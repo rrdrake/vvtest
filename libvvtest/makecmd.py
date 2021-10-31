@@ -5,6 +5,9 @@
 # Government retains certain rights in this software.
 
 import os, sys
+import platform
+
+not_windows = not platform.uname()[0].lower().startswith('win')
 
 class MakeScriptCommand:
 
@@ -101,14 +104,14 @@ class MakeScriptCommand:
 def make_file_execute_command( srcdir, path, pyexe=sys.executable ):
     ""
     if os.path.isabs( path ):
-        if os.access( path, os.X_OK ):
+        if not_windows and os.access( path, os.X_OK ):
             return [ path ]
         else:
             return [ pyexe, path ]
 
     else:
         full = os.path.join( srcdir, path )
-        if os.access( full, os.X_OK ):
+        if not_windows and os.access( full, os.X_OK ):
             return [ './'+path ]
         else:
             return [ pyexe, path ]

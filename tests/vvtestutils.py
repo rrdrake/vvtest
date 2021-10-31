@@ -57,6 +57,18 @@ from libvvtest.depend import connect_dependency
 
 ##########################################################################
 
+import functools
+
+windows = platform.uname()[0].lower().startswith('win')
+
+def not_windows(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not windows:
+            return func(*args, **kwargs)
+    return wrapper
+
+
 class vvtestTestCase( unittest.TestCase ):
 
     def setUp(self, cleanout=True):
