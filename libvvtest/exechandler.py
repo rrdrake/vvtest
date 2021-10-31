@@ -25,7 +25,9 @@ from .makecmd import MakeScriptCommand
 class ExecutionHandler:
 
     def __init__(self, perms, rtconfig, platform, usrplugin, test_dir,
-                       symlinks_supported=True):
+                       symlinks_supported=True,
+                       fork_supported=True,
+                       shbang_supported=True):
         """
         The platform is a Platform object.  The test_dir is the top level
         testing directory, which is either an absolute path or relative to
@@ -36,7 +38,11 @@ class ExecutionHandler:
         self.platform = platform
         self.plugin = usrplugin
         self.test_dir = test_dir
+
         self.symlinks = symlinks_supported
+        self.forkok = fork_supported
+        self.shbang = shbang_supported
+
         self.commondb = None
 
     def initialize_for_execution(self, texec):
@@ -207,10 +213,12 @@ class ExecutionHandler:
         ""
         tcase = texec.getTestCase()
 
-        maker = MakeScriptCommand( tcase.getSpec(), pyexe )
+        maker = MakeScriptCommand( tcase.getSpec(),
+                                   pythonexe=pyexe,
+                                   shbang_supported=self.shbang )
         cmdL = maker.make_base_execute_command( baseline )
 
-        if cmdL != None:
+        if cmdL is not None:
 
             obj = texec.getResourceObject()
             if hasattr( obj, "mpi_opts") and obj.mpi_opts:

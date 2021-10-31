@@ -10,7 +10,7 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-from os.path import abspath
+from os.path import abspath, basename
 import time
 import shutil
 
@@ -22,11 +22,12 @@ import libvvtest.makecmd as makecmd
 
 from libvvtest.paramset import ParameterSet
 from libvvtest.testspec import TestSpec
+import libvvtest.testexec as testexec
 
 
-def mkobj( tspec ):
+def mkobj( tspec, **kwargs ):
     ""
-    return makecmd.MakeScriptCommand( tspec )
+    return makecmd.MakeScriptCommand( tspec, **kwargs )
 
 
 class function_make_file_execute_command( vtu.vvtestTestCase ):
@@ -53,6 +54,22 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
 
         cmdL = makecmd.make_file_execute_command( cwd, 'subdir/ascript' )
         assert len(cmdL) == 1 and cmdL[0] == './subdir/ascript'
+
+    def test_python_execution_used_if_shbang_not_supported(self):
+        ""
+        os.mkdir( 'rundir' )
+        util.writescript( 'ascript', """
+            #!/bin/bash
+            import os, sys
+            sys.stdout.write( 'hello'+os.linesep )
+            """ )
+        cwd = os.getcwd()
+
+        cmdL = makecmd.make_file_execute_command( cwd, 'ascript', shbang=True )
+        assert cmdL[0] == './ascript'
+
+        cmdL = makecmd.make_file_execute_command( cwd, 'ascript', shbang=False )
+        assert cmdL[0] == sys.executable
 
     def test_a_non_executable_file_is_run_using_python(self):
         ""
@@ -145,7 +162,6 @@ class function_make_test_script_command( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.xml', """
             <rtest name="atest">
             </rtest>""" )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.xml' )
 
@@ -162,7 +178,6 @@ class function_make_test_script_command( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -172,6 +187,22 @@ class function_make_test_script_command( vtu.vvtestTestCase ):
         assert len(cmdL) > 1
         cmdstr = ' '.join( cmdL )
         assert 'python' in cmdstr and 'atest.vvt' in cmdstr
+
+    def test_an_executable_script_runs_under_python_if_shbang_not_supported(self):
+        ""
+        os.mkdir( 'rundir' )
+        util.writescript( 'subdir/atest.vvt', """
+            #!/bin/bash
+            print ( 'hello' )
+            """ )
+
+        tspec = make_TestSpec( 'subdir/atest.vvt' )
+
+        os.chdir( 'rundir' )
+
+        cmdL = mkobj(tspec, shbang_supported=False).make_test_script_command()
+        assert len(cmdL) > 1
+        assert cmdL[0] == sys.executable and basename(cmdL[1]) == 'atest.vvt'
 
 
 class function_command_from_filename_or_option( vtu.vvtestTestCase ):
@@ -583,6 +614,61 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
 
         assert len( util.grepfiles( 'coolname=atest', '*/atest/execute.log' ) ) == 1
         assert len( util.greplines( 'diff *atest', out ) ) > 0
+
+
+class TestExec_class_functions( vtu.vvtestTestCase ):
+
+    def test_start_and_poll_without_fork(self):
+        ""
+        os.mkdir( 'rdir' )
+
+        util.writefile( 'atest.vvt', """
+            import os, sys
+            sys.stdout.write( 'hello'+os.linesep )
+            """ )
+        tf = abspath('atest.vvt')
+
+        def mock_execute_func( texec, is_baseline ):
+            ""
+            print ( 'fake setup' )
+            return [ sys.executable, tf ]
+
+        tL = vtu.create_tests_from_file( 'atest.vvt' )
+        tcase = tL[0]
+        texec = testexec.TestExec( tcase )
+        texec.setRunDirectory( 'rdir' )
+
+        rtcfg = vtu.make_RuntimeConfig()
+        perms = vtu.make_fake_PermissionSetter()
+
+        # poor way to test; will need to change with testexec implementation
+        save_fork = testexec.os_fork_with_retry
+        try:
+            testexec.os_fork_with_retry = None
+
+            assert not texec.isStarted()
+            texec.start( mock_execute_func, rtcfg, False, perms,
+                         fork_supported=False )
+            assert texec.isStarted()
+            assert not texec.isDone()
+
+            for i in range(10):
+                changed = texec.poll()
+                if changed:
+                    break
+                time.sleep(0.5)
+
+            assert changed
+            assert texec.isStarted()
+            assert texec.isDone()
+            x,tm = texec.getExitInfo()
+            assert x == 0 and tm is None
+
+            assert len( util.grepfiles( 'fake setup', 'rdir/execute.log' ) ) == 1
+            assert len( util.grepfiles( 'hello', 'rdir/execute.log' ) ) == 1
+
+        finally:
+            testexec.os_fork_with_retry = save_fork
 
 
 ########################################################################

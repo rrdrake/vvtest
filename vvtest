@@ -658,7 +658,9 @@ def generate_test_list( opts, optD, rtdata ):
     handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                 rtdata.plat, rtdata.plugin,
                                 rtdata.testdir,
-                                symlinks_supported=not windows_platform )
+                                symlinks_supported=not windows_platform,
+                                fork_supported=not windows_platform,
+                                shbang_supported=not windows_platform )
 
     xlist = TestExecList( tlist, handler )
     xlist.createTestExecs()
@@ -773,7 +775,10 @@ def baseline_tests( opts, optD, rtdata ):
 
         handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                     rtdata.plat, rtdata.plugin,
-                                    rtdata.testdir )
+                                    rtdata.testdir,
+                                    symlinks_supported=not windows_platform,
+                                    fork_supported=not windows_platform,
+                                    shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
         xlist.createTestExecs()
@@ -1014,7 +1019,10 @@ def run_test_exec_list( opts, optD, rtdata ):
 
         handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                     rtdata.plat, rtdata.plugin,
-                                    rtdata.testdir )
+                                    rtdata.testdir,
+                                    symlinks_supported=not windows_platform,
+                                    fork_supported=not windows_platform,
+                                    shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
         xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )

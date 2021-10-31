@@ -959,6 +959,7 @@ def make_fake_PermissionSetter():
     class DummyPermissionSetter:
         def __init__(self): pass
         def set(self, path): pass
+        def apply(self, path): pass
         def recurse(self, path): pass
 
     return DummyPermissionSetter()

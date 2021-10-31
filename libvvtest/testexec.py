@@ -66,7 +66,8 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, execute_test_func, rtconfig, is_baseline, perms):
+    def start(self, execute_test_func, rtconfig, is_baseline, perms,
+                    fork_supported=True):
         """
         Launches the child process.
         """
@@ -82,7 +83,7 @@ class TestExec:
         try:
             os.chdir( self.rundir )
 
-            if not_windows:
+            if fork_supported:
                 self.pid = self.prepare_then_execute(
                                     execute_test_func, is_baseline, logfp )
             else:
