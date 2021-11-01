@@ -8,6 +8,9 @@ import os, sys
 import time
 import datetime
 import select
+import platform
+
+not_windows = not platform.uname()[0].lower().startswith('win')
 
 
 class TestInformationPrinter:
@@ -80,7 +83,7 @@ class TestInformationPrinter:
 
 def standard_in_has_data():
     ""
-    if sys.stdin and sys.stdin.isatty():
+    if not_windows and sys.stdin and sys.stdin.isatty():
         if select.select( [sys.stdin,], [], [], 0.0 )[0]:
             sys.stdin.readline()
             return True

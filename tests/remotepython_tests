@@ -10,12 +10,13 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-from os.path import abspath
+from os.path import abspath, normpath
 import time
 import unittest
 from textwrap import dedent
 import subprocess
 import signal
+import platform
 
 try:
   from StringIO import StringIO
@@ -26,9 +27,10 @@ import trigtestutils as trigutil
 import testutils as util
 from testutils import print3
 
+from vvtestutils import windows, not_windows
+
 import remotepython
 from remotepython import RemotePython
-
 
 rpy = sys.executable
 #rpy='/home/rrdrake/bin/Linux/py266/bin/python'
@@ -55,15 +57,14 @@ class remote_process_tests( trigutil.trigTestCase ):
             """ )
         time.sleep(1)
 
-        proc = subprocess.Popen( sys.executable+' repeater', 
-                                 shell=True,
+        proc = subprocess.Popen( [ sys.executable, 'repeater' ],
                                  stdin=subprocess.PIPE,
                                  stdout=subprocess.PIPE )
 
         for i in range(10):
             proc.stdin.write( remotepython.make_bytes( '%d\n' % i ) )
             proc.stdin.flush()
-            output = remotepython.make_string( proc.stdout.readline() )
+            output = remotepython.normalize_string( proc.stdout.readline() )
             print ( 'OUT='+repr(output.rstrip()) )
 
         proc.terminate()
@@ -97,8 +98,8 @@ class remote_process_tests( trigutil.trigTestCase ):
         for word in [ 'hello', 'world' ]:
             inp.write( remotepython.make_bytes( word+'\n' ) )
             inp.flush()
-            outL.append( remotepython.make_string( out.readline() ) )
-            errL.append( remotepython.make_string( err.readline() ) )
+            outL.append( remotepython.normalize_string( out.readline() ) )
+            errL.append( remotepython.normalize_string( err.readline() ) )
 
         assert outL == [ 'OUT: hello\n', 'OUT: world\n' ]
         assert errL == [ 'ERR: hello\n', 'ERR: world\n' ]
@@ -242,7 +243,7 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
 
     def test_replacement_linecache_getline_function(self):
@@ -270,7 +271,7 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
 
     def test_avoiding_line_cache_growth(self):
@@ -312,7 +313,7 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
 
     def test_add_a_module_from_a_string(self):
@@ -332,7 +333,7 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
 
     def test_executing_python_code(self):
@@ -357,7 +358,7 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
         assert 'AVALUE=24' in out and 'BVALUE=42' in out
         assert "NEWVAR='add this to globals'" in out
@@ -402,13 +403,13 @@ class bootstrap_functions( trigutil.trigTestCase ):
                 """ ) )
         time.sleep(1)
 
-        x,out = util.runcmd( sys.executable+' '+abspath('scr.py') )
+        x,out = util.runcmd( [ sys.executable, abspath('scr.py') ] )
         # print3( out )
 
         excL = extract_exception_from_output( out )
 
         assert excL[0] == 'Traceback (most recent call last):'
-        assert excL[1].startswith('  File ') and '/scr.py' in excL[1]
+        assert excL[1].startswith('  File ') and normpath('/scr.py') in excL[1]
         assert excL[2] == '    entryfunc()'
         assert excL[3] == '  File "<remotecode1>", line 3, in entryfunc'
         assert excL[4] == '    mymod.myfunc()'
@@ -427,7 +428,8 @@ class integration_tests( unittest.TestCase ):
 
     def test_connect_and_print_hello(self):
         ""
-        for bashlogin in [False,True]:
+        bL = [False,True] if not windows else [False]
+        for bashlogin in bL:
             rem = RemotePython( pythonexe=rpy,
                                 bashlogin=bashlogin,
                                 logfile='logfile' )
@@ -534,17 +536,18 @@ class integration_tests( unittest.TestCase ):
             rem.close()
         assert out.strip() == 'hello' and not err
 
-        rem = RemotePython( 'sparky', pythonexe=rpy,
-                                      sshcmd=fakessh,
-                                      bashlogin=True,
-                                      logfile='logfile' )
-        try:
-            rem.start( timeout=5 )
-            rem.execute( 'print ("hello")' )
-            out,err = get_line_from_remote( rem )
-        finally:
-            rem.close()
-        assert out.strip() == 'hello' and not err
+        if not windows:
+            rem = RemotePython( 'sparky', pythonexe=rpy,
+                                          sshcmd=fakessh,
+                                          bashlogin=True,
+                                          logfile='logfile' )
+            try:
+                rem.start( timeout=5 )
+                rem.execute( 'print ("hello")' )
+                out,err = get_line_from_remote( rem )
+            finally:
+                rem.close()
+            assert out.strip() == 'hello' and not err
 
     def test_that_output_during_connection_is_available(self):
         ""
@@ -653,6 +656,7 @@ class integration_tests( unittest.TestCase ):
         assert len( util.grepfiles( 'SND: *hello good buddy', 'logfile' ) ) == 1
         assert len( util.grepfiles( 'OUT: hello good buddy', 'logfile' ) ) == 1
 
+    @not_windows
     def test_simulating_ssh_behavior_of_separate_process_group(self):
         """
         by default, ssh puts the remote process into its own process group,
@@ -775,6 +779,7 @@ class integration_tests( unittest.TestCase ):
         time.sleep(1)
 
         cwd = os.getcwd()
+        sdir = abspath('subdir').replace( '\\', '/' )
 
         rem = RemotePython( pythonexe=rpy )
         try:
@@ -783,14 +788,14 @@ class integration_tests( unittest.TestCase ):
             rem.addModule( 'mymod',
                     'import os, sys',
                     'def myfunc( arg ):',
-                    '    os.chdir( "'+abspath('subdir')+'" )',
+                    '    os.chdir( "'+sdir+'" )',
                     '    print ( "LISTDIR="+repr(os.listdir(".")) )' )
             rem.execute( 'import mymod' )
             rem.execute( 'mymod.myfunc(42)' )
             out,err = get_line_from_remote( rem )
         finally:
             rem.close()
-        assert err == None
+        assert err == None, 'expected no err, but got '+err
         fL = eval( out.strip().split( 'LISTDIR=', 1 )[1] )
         assert fL == ['afile.txt']
 
@@ -873,7 +878,7 @@ class integration_tests( unittest.TestCase ):
         ""
         return  # magic: make execution of "real ssh" tests an option
 
-        rem = RemotePython( os.uname()[1], pythonexe=rpy )
+        rem = RemotePython( platform.uname()[1], pythonexe=rpy )
         #rem = RemotePython( 'chama' )
         try:
             ok = rem.start( timeout=5 )
@@ -1075,7 +1080,7 @@ def write_fake_ssh_script( die_fast=False, fake_pause=None,
 
     util.writescript( 'fakessh', '\n'.join( lineL ) )
 
-    return abspath( 'fakessh' )
+    return ( sys.executable+' '+abspath( 'fakessh' ) ).replace('\\','/')
 
 
 ###########################################################################

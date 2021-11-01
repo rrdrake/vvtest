@@ -13,13 +13,17 @@ import os
 from os.path import abspath
 import time
 import shlex
+import filecmp
 
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from vvtestutils import windows, not_windows
+
 import libvvtest.exechandler as exechandler
 import libvvtest.outpututils as outpututils
+import libvvtest.testexec as testexec
 
 
 class exechandler_free_functions( vtu.vvtestTestCase ):
@@ -303,6 +307,60 @@ class exechandler_free_functions( vtu.vvtestTestCase ):
 
         cmd2 = outpututils.get_test_command_line( 'execute.log' )
         assert shlex.split(cmd2) == cmdL
+
+
+class ExecutionHandler_class_methods( vtu.vvtestTestCase ):
+
+    def test_link_and_copy_when_symlinks_are_not_supported(self):
+        ""
+        util.writefile( 'sdir/atest.vvt', 'pass\n' )
+        util.writefile( 'sdir/cp.foo', 'bar\n' )
+        os.mkdir( 'xdir1' )
+        os.mkdir( 'xdir2' )
+
+        tcase = vtu.make_fake_TestCase()
+        tcase.getSpec().addCopyFile( 'cp.foo' )
+
+        if not windows:
+            with util.change_directory( 'xdir1' ):
+                xhnd = exechandler.ExecutionHandler( None, None, None, None, None,
+                                                     symlinks_supported=True )
+                xhnd.setWorkingFiles( tcase )
+            assert os.path.islink( 'xdir1/atest.vvt' )
+            assert os.path.samefile( os.readlink('xdir1/atest.vvt'), 'sdir/atest.vvt' )
+            assert not os.path.islink( 'xdir1/cp.foo' )
+            assert filecmp.cmp( 'xdir1/cp.foo', 'sdir/cp.foo', shallow=False )
+
+        with util.change_directory( 'xdir2' ):
+            xhnd = exechandler.ExecutionHandler( None, None, None, None, None,
+                                                 symlinks_supported=False )
+            xhnd.setWorkingFiles( tcase )
+        assert not os.path.islink( 'xdir2/atest.vvt' )
+        assert filecmp.cmp( 'xdir2/atest.vvt', 'sdir/atest.vvt', shallow=False )
+        assert not os.path.islink( 'xdir2/cp.foo' )
+        assert filecmp.cmp( 'xdir2/cp.foo', 'sdir/cp.foo', shallow=False )
+
+    def test_make_execute_command_when_shbang_not_supported(self):
+        ""
+        util.writescript( 'subdir/atest.vvt', """
+            #!/bin/bash
+            print ( 'hello' )
+            """ )
+
+        tL = vtu.create_tests_from_file( 'subdir/atest.vvt' )
+        tcase = tL[0]
+        texec = testexec.TestExec( tcase )
+
+        rtconfig = vtu.make_RuntimeConfig()
+        xhnd = exechandler.ExecutionHandler( None, rtconfig, None, None, None,
+                                             shbang_supported=True )
+        cmdL = xhnd.make_execute_command( texec, False, sys.executable )
+        assert cmdL == [ './atest.vvt' ]
+
+        xhnd = exechandler.ExecutionHandler( None, rtconfig, None, None, None,
+                                             shbang_supported=False )
+        cmdL = xhnd.make_execute_command( texec, False, sys.executable )
+        assert cmdL == [ sys.executable, 'atest.vvt' ]
 
 
 ############################################################################

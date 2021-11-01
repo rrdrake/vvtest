@@ -10,7 +10,11 @@ import glob
 import fnmatch
 from os.path import normpath, dirname
 from os.path import join as pjoin
-import pipes
+
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
 
 from . import CommonSpec
 from . import cshScriptWriter
@@ -20,7 +24,10 @@ from .makecmd import MakeScriptCommand
 
 class ExecutionHandler:
 
-    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir):
+    def __init__(self, perms, rtconfig, platform, usrplugin, test_dir,
+                       symlinks_supported=True,
+                       fork_supported=True,
+                       shbang_supported=True):
         """
         The platform is a Platform object.  The test_dir is the top level
         testing directory, which is either an absolute path or relative to
@@ -31,6 +38,11 @@ class ExecutionHandler:
         self.platform = platform
         self.plugin = usrplugin
         self.test_dir = test_dir
+
+        self.symlinks = symlinks_supported
+        self.forkok = fork_supported
+        self.shbang = shbang_supported
+
         self.commondb = None
 
     def initialize_for_execution(self, texec):
@@ -62,13 +74,6 @@ class ExecutionHandler:
             cfgdirs = self.rtconfig.getAttr('configdir')
             self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
 
-    def check_redirect_output_to_log_file(self, tcase, baseline):
-        ""
-        if self.rtconfig.getAttr('logfile'):
-            logfname = tcase.getSpec().getLogFilename( baseline )
-            redirect_stdout_stderr_to_filename( logfname )
-            self.perms.apply( os.path.abspath( logfname ) )
-
     def check_run_preclean(self, tcase, baseline):
         ""
         if self.rtconfig.getAttr('preclean') and \
@@ -95,7 +100,7 @@ class ExecutionHandler:
             if not self.setWorkingFiles( tcase ):
                 sys.stdout.flush()
                 sys.stderr.flush()
-                os._exit(1)
+                raise Exception( 'failed to setup working files' )
 
     def setWorkingFiles(self, tcase):
         """
@@ -110,9 +115,14 @@ class ExecutionHandler:
         srcdir = normpath( pjoin( tspec.getRootpath(),
                                   dirname( tspec.getFilepath() ) ) )
 
-        ok = link_and_copy_files( srcdir,
-                                  tspec.getLinkFiles(),
-                                  tspec.getCopyFiles() )
+        if self.symlinks:
+            cpL = tspec.getCopyFiles()
+            lnL = tspec.getLinkFiles()
+        else:
+            cpL = tspec.getLinkFiles() + tspec.getCopyFiles()
+            lnL = []
+
+        ok = link_and_copy_files( srcdir, lnL, cpL )
 
         return ok
 
@@ -203,10 +213,12 @@ class ExecutionHandler:
         ""
         tcase = texec.getTestCase()
 
-        maker = MakeScriptCommand( tcase.getSpec(), pyexe )
+        maker = MakeScriptCommand( tcase.getSpec(),
+                                   pythonexe=pyexe,
+                                   shbang_supported=self.shbang )
         cmdL = maker.make_base_execute_command( baseline )
 
-        if cmdL != None:
+        if cmdL is not None:
 
             obj = texec.getResourceObject()
             if hasattr( obj, "mpi_opts") and obj.mpi_opts:
@@ -222,8 +234,6 @@ class ExecutionHandler:
     def prepare_for_launch(self, texec, baseline):
         ""
         tcase = texec.getTestCase()
-
-        self.check_redirect_output_to_log_file( tcase, baseline )
 
         if tcase.getSpec().getSpecificationForm() == 'xml':
             self.write_xml_run_script( tcase, texec.getRunDirectory() )
@@ -356,7 +366,7 @@ def echo_test_execution_info( testname, cmd_list, timeout ):
     print3( "Directory    : "+os.getcwd() )
 
     if cmd_list != None:
-        cmd = ' '.join( [ pipes.quote(arg) for arg in cmd_list ] )
+        cmd = ' '.join( [ quote(arg) for arg in cmd_list ] )
         print3( "Command      : "+cmd )
 
     print3( "Timeout      : "+str(timeout) )
@@ -513,15 +523,6 @@ def remove_path( path ):
             shutil.rmtree( path )
         else:
             os.remove( path )
-
-
-def redirect_stdout_stderr_to_filename( filename ):
-    ""
-    ofile = open( filename, "w+" )
-
-    # reassign stdout & stderr file descriptors to the file
-    os.dup2( ofile.fileno(), sys.stdout.fileno() )
-    os.dup2( ofile.fileno(), sys.stderr.fileno() )
 
 
 def print3( *args ):

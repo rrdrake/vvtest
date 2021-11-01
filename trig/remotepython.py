@@ -6,12 +6,16 @@
 
 import os, sys
 import threading
-import pipes
 import subprocess
-import inspect
 import time
 import collections
 import shlex
+import platform
+
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
 
 
 class RemotePython:
@@ -22,9 +26,14 @@ class RemotePython:
                        bashlogin=False,
                        logfile=None ):
         """
+        If 'machine' is None, just run Python as a subprocess.
+
         The 'sshcmd' is the path to ssh followed by any options. Note that
         using ssh -t -t (two -t options) to force a tty may break the
         communication tunnel.
+
+        Setting 'bashlogin' to True means wrap the remote Python with
+        "/bin/bash -l" to force the shell to source system init scripts.
         """
         self.started = False
 
@@ -141,7 +150,7 @@ class RemotePython:
 
 def _check_open_logfile( logfile ):
     ""
-    if logfile != None and type(logfile) == type(''):
+    if logfile is not None and type(logfile) == type(''):
         return open( logfile, 'wt' )
 
     return logfile
@@ -168,7 +177,7 @@ class ReprWriter:
 
     def write(self, data):
         ""
-        if self.logfp != None:
+        if self.logfp is not None:
             self._write_to_log( data )
 
         self.outfp.write( make_bytes( repr(data)+'\n' ) )
@@ -194,12 +203,12 @@ class AsynchronousReader( threading.Thread ):
         threading.Thread.__init__(self)
         self.daemon = True
 
-        # Note on reentrancy: Signals (like Ctrl-C) can cause deadlocks in
+        # Note on threading: Signals (like Ctrl-C) can cause deadlocks in
         # threading code, such as in the implementations of Queue and even
         # Condition variables.  This can manifest as a hang when you hit
         # Ctrl-C, which is unacceptable.  My solution here is to surround the
-        # data structure accesses with a simple lock, which appears to be
-        # reentrant.
+        # data structure accesses with a simple lock, which seems to avoid
+        # the hang issue (avoid race conditions).
         self.lck = threading.Lock()
         self.lines = collections.deque()
 
@@ -238,9 +247,9 @@ class AsynchronousReader( threading.Thread ):
                 break
 
             if line:
-                line = make_string( line )
+                line = normalize_string( line )
 
-                if self.logfp != None:
+                if self.logfp is not None:
                     self._write_to_log( line )
 
                 with self.lck:
@@ -258,11 +267,17 @@ class AsynchronousReader( threading.Thread ):
 
 
 if sys.version_info[0] < 3:
-    def make_bytes( buf ): return buf
-    def make_string( buf ): return buf
+    def make_bytes( buf ):
+        return buf
+    def normalize_string( buf ):
+        sL = [ s.replace('\r','') for s in buf.split( os.linesep ) ]
+        return '\n'.join(sL)
 else:
-    def make_bytes( buf ): return buf.encode()
-    def make_string( buf ): return buf.decode()
+    def make_bytes( buf ):
+        return buf.encode()
+    def normalize_string( buf ):
+        sL = [ s.replace('\r','') for s in buf.decode().split( os.linesep ) ]
+        return '\n'.join(sL)
 
 
 def bootstrap_command( pythonexe, machine, sshcmd, bashlogin ):
@@ -273,15 +288,15 @@ def bootstrap_command( pythonexe, machine, sshcmd, bashlogin ):
         'eval( '
             'compile( '
                 'eval( sys.stdin.readline() ), '
-                       '"<remotepython_from_'+os.uname()[1]+'>", '
+                       '"<remotepython_from_'+platform.uname()[1]+'>", '
                        '"exec" ) )'
     ]
-    pycmd = ' '.join( [ pipes.quote( arg ) for arg in cmdL ] )
+    pycmd = ' '.join( [ quote( arg ) for arg in cmdL ] )
 
     if machine:
         cmdL = shlex.split( sshcmd )
         if bashlogin:
-            cmdL.extend( [ machine, '/bin/bash -l -c ' + pipes.quote(pycmd) ] )
+            cmdL.extend( [ machine, '/bin/bash -l -c ' + quote(pycmd) ] )
         else:
             cmdL.extend( [ machine, pycmd ] )
     elif bashlogin:

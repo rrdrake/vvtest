@@ -6,12 +6,15 @@
 
 import os, sys
 
+
 class MakeScriptCommand:
 
-    def __init__(self, tspec, pythonexe=sys.executable):
+    def __init__(self, tspec, pythonexe=sys.executable,
+                              shbang_supported=True):
         ""
         self.tspec = tspec
         self.pyexe = pythonexe
+        self.shbang = shbang_supported
 
     def make_base_execute_command(self, baseline):
         ""
@@ -42,7 +45,8 @@ class MakeScriptCommand:
             cmdL = ['/bin/csh', '-f', './runscript']
         else:
             srcdir,fname = os.path.split( self.tspec.getFilename() )
-            cmdL = make_file_execute_command( srcdir, fname, self.pyexe )
+            cmdL = make_file_execute_command( srcdir, fname,
+                                              self.pyexe, self.shbang )
 
         return cmdL
 
@@ -53,7 +57,8 @@ class MakeScriptCommand:
             cmdL.append( spec )
         else:
             srcdir = self.tspec.getDirectory()
-            cmdL = make_file_execute_command( srcdir, spec, self.pyexe )
+            cmdL = make_file_execute_command( srcdir, spec,
+                                              self.pyexe, self.shbang )
 
         return cmdL
 
@@ -98,17 +103,18 @@ class MakeScriptCommand:
         return cmdL
 
 
-def make_file_execute_command( srcdir, path, pyexe=sys.executable ):
+def make_file_execute_command( srcdir, path, pyexe=sys.executable,
+                                             shbang=True ):
     ""
     if os.path.isabs( path ):
-        if os.access( path, os.X_OK ):
+        if shbang and os.access( path, os.X_OK ):
             return [ path ]
         else:
             return [ pyexe, path ]
 
     else:
         full = os.path.join( srcdir, path )
-        if os.access( full, os.X_OK ):
+        if shbang and os.access( full, os.X_OK ):
             return [ './'+path ]
         else:
             return [ pyexe, path ]

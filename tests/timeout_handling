@@ -478,6 +478,10 @@ class total_timeout( vtu.vvtestTestCase ):
 
     def test_timing_out_vvtest_itself(self):
         ""
+        # magic: this test does not work for subprocess mode in python 2.7,
+        #        but does with python 3.6+ (I think subprocess.communicate
+        #        waits for all child processes to finish before returning)
+
         util.writefile( 'atest.vvt', """
             import time
             time.sleep(20)

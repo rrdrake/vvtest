@@ -13,11 +13,12 @@ import os
 from os.path import join as pjoin
 from os.path import abspath, dirname, basename, normpath
 import time
-import platform
 
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
+
+from vvtestutils import windows, not_windows
 
 import libvvtest.location as location
 from libvvtest.location import find_vvtest_test_root_file
@@ -32,8 +33,6 @@ import libvvtest.testlistio as testlistio
 from libvvtest.permsetter import PermissionSetter
 from libvvtest.errors import FatalError
 from libvvtest.teststatus import DIFF_EXIT_STATUS
-
-not_windows = not platform.uname()[0].lower().startswith('win')
 
 
 class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
@@ -133,7 +132,7 @@ class configdir_handling( vtu.vvtestTestCase ):
         d1,d2 = split_by_largest_existing_path( abspath('subdir') )
         assert d1 == abspath('subdir') and d2 == None
 
-        if not_windows:
+        if not windows:
             os.mkdir( 'some:dir' )
 
             d1,d2 = split_by_largest_existing_path( abspath('some:dir') )
@@ -175,7 +174,6 @@ class test_results_directory( vtu.vvtestTestCase ):
     def test_getting_the_test_directory_path(self):
         ""
         td = determine_test_directory( 'subdir', None, '/some/path' )
-        print ( 'magic: '+repr(td))
         assert td == normpath( '/some/path/subdir' )
 
         self.assertRaises( Exception,
@@ -216,7 +214,7 @@ class test_results_directory( vtu.vvtestTestCase ):
         assert not location.writable_directory( 'junk1' )
         assert not location.writable_directory( abspath('junk1') )
 
-        if not_windows:
+        if not windows:
             # is directory permissions on Windows a thing??
 
             util.writefile( 'noexec/junk2', 'foo' )
@@ -290,7 +288,7 @@ class test_results_directory( vtu.vvtestTestCase ):
         location.check_and_make_directory( abspath('afile') )
         assert not os.path.islink( 'afile' ) and os.path.isdir( 'afile' )
 
-        if not_windows:
+        if not windows:
             # making symlinks may not be allowed (Developer Privileges??)
             os.symlink( abspath('existing'), 'goodlink' )
             os.symlink( abspath('noexist'), 'badlink' )
@@ -301,42 +299,42 @@ class test_results_directory( vtu.vvtestTestCase ):
             location.check_and_make_directory( abspath('badlink') )
             assert not os.path.islink( 'badlink' ) and os.path.isdir( 'badlink' )
 
+    @not_windows
     def test_force_linking_a_directory(self):
         ""
-        if not_windows:
-            # symlinks not reliable on Windows
+        # symlinks not reliable on Windows
 
-            util.writefile( 'somedir/afile', 'foo' )
-            util.writefile( 'somefile', 'bar' )
+        util.writefile( 'somedir/afile', 'foo' )
+        util.writefile( 'somefile', 'bar' )
 
-            location.force_link_directory( abspath('frompath'), abspath('topath') )
-            assert os.path.islink( 'frompath' )
-            assert os.readlink('frompath') == abspath('topath')
+        location.force_link_directory( abspath('frompath'), abspath('topath') )
+        assert os.path.islink( 'frompath' )
+        assert os.readlink('frompath') == abspath('topath')
 
-            # idempotent
-            location.force_link_directory( abspath('frompath'), abspath('topath') )
-            assert os.path.islink( 'frompath' )
-            assert os.readlink('frompath') == abspath('topath')
+        # idempotent
+        location.force_link_directory( abspath('frompath'), abspath('topath') )
+        assert os.path.islink( 'frompath' )
+        assert os.readlink('frompath') == abspath('topath')
 
-            # same from path but different target
-            location.force_link_directory( abspath('frompath'), abspath('target') )
-            assert os.path.islink( 'frompath' )
-            assert os.readlink('frompath') == abspath('target')
+        # same from path but different target
+        location.force_link_directory( abspath('frompath'), abspath('target') )
+        assert os.path.islink( 'frompath' )
+        assert os.readlink('frompath') == abspath('target')
 
-            location.force_link_directory( abspath('somedir'), abspath('t2') )
-            assert os.path.islink( 'somedir' )
-            assert os.readlink('somedir') == abspath('t2')
+        location.force_link_directory( abspath('somedir'), abspath('t2') )
+        assert os.path.islink( 'somedir' )
+        assert os.readlink('somedir') == abspath('t2')
 
-            location.force_link_directory( abspath('somefile'), abspath('t3') )
-            assert os.path.islink( 'somefile' )
-            assert os.readlink('somefile') == abspath('t3')
+        location.force_link_directory( abspath('somefile'), abspath('t3') )
+        assert os.path.islink( 'somefile' )
+        assert os.readlink('somefile') == abspath('t3')
 
     def test_making_a_mirror_directory(self):
         ""
         perms = PermissionSetter( os.getcwd(), None )
         os.mkdir( 'dest1' )
 
-        if not_windows:
+        if not windows:
             os.makedirs( 'wrkdir/dest2' )
             os.makedirs( 'fakescratch' )
 

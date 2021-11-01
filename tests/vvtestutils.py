@@ -57,6 +57,18 @@ from libvvtest.depend import connect_dependency
 
 ##########################################################################
 
+import functools
+
+windows = platform.uname()[0].lower().startswith('win')
+
+def not_windows(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        if not windows:
+            return func(*args, **kwargs)
+    return wrapper
+
+
 class vvtestTestCase( unittest.TestCase ):
 
     def setUp(self, cleanout=True):
@@ -109,12 +121,12 @@ def launch_vvtest_then_terminate_it( *cmd_args, **options ):
     batch = options.pop( 'batch', False )
     addverbose = options.pop( 'addverbose', True )
 
-    cmd = vvtest_command_line( *cmd_args, batch=batch, addverbose=addverbose )
+    cmdL = vvtest_command_line( *cmd_args, batch=batch, addverbose=addverbose )
 
     fp = open( logfilename, 'w' )
     try:
-        print3( cmd )
-        pop = subprocess.Popen( cmd, shell=True,
+        print3( cmdL )
+        pop = subprocess.Popen( cmdL,
                     stdout=fp.fileno(), stderr=fp.fileno(),
                     preexec_fn=lambda:os.setpgid(os.getpid(),os.getpid()) )
 
@@ -162,11 +174,11 @@ def interrupt_vvtest_batch( vvtest_args, count=None, signum=None ):
 
 def run_vvtest_with_hook( vvtest_args, envspec, batch=False ):
     ""
-    cmd = vvtest_command_line( vvtest_args, batch=batch )
+    cmdL = vvtest_command_line( vvtest_args, batch=batch )
 
     os.environ['VVTEST_UNIT_TEST_SPEC'] = envspec
     try:
-        x,out = util.runcmd( cmd, raise_on_error=False )
+        x,out = util.runcmd( cmdL, raise_on_error=False )
     finally:
         del os.environ['VVTEST_UNIT_TEST_SPEC']
 
@@ -228,9 +240,9 @@ def remove_results():
 
 class VvtestCommandRunner:
 
-    def __init__(self, cmd):
+    def __init__(self, cmdL):
         ""
-        self.cmd = cmd
+        self.cmdL = cmdL
 
     def run(self, **options):
         ""
@@ -241,7 +253,7 @@ class VvtestCommandRunner:
         verb = 1
         if quiet: verb = 0
 
-        x,out = util.runcmd( self.cmd, chdir=chdir,
+        x,out = util.runcmd( self.cmdL, chdir=chdir,
                              raise_on_error=False, verbose=verb )
 
         if x == 0:
@@ -395,8 +407,8 @@ def runvvtest( *cmd_args, **options ):
               chdir=some/path (default=None)
               addplatform=True
     """
-    cmd = vvtest_command_line( *cmd_args, **options )
-    vrun = VvtestCommandRunner( cmd )
+    cmdL = vvtest_command_line( *cmd_args, **options )
+    vrun = VvtestCommandRunner( cmdL )
     vrun.run( **options )
     return vrun
 
@@ -411,7 +423,7 @@ def vvtest_command_line( *cmd_args, **options ):
     argstr = ' '.join( cmd_args )
     argL = shlex.split( argstr )
 
-    cmdL = [ quote(sys.executable), quote(options.get( 'vvtestpath', vvtest_file )) ]
+    cmdL = [ sys.executable, options.get( 'vvtestpath', vvtest_file ) ]
 
     if need_to_add_verbose_flag( argL, options ):
         # add -v when running in order to extract the full test list
@@ -434,11 +446,10 @@ def vvtest_command_line( *cmd_args, **options ):
         if '-n' not in argL:
             cmdL.extend( [ '-n', '8' ] )
 
-    cmd = ' '.join( cmdL )
     if argstr:
-        cmd += ' ' + argstr
+        cmdL.extend( shlex.split(argstr))
 
-    return cmd
+    return cmdL
 
 
 def need_to_add_verbose_flag( vvtest_args, options ):
@@ -948,6 +959,7 @@ def make_fake_PermissionSetter():
     class DummyPermissionSetter:
         def __init__(self): pass
         def set(self, path): pass
+        def apply(self, path): pass
         def recurse(self, path): pass
 
     return DummyPermissionSetter()

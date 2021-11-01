@@ -12,7 +12,13 @@ from os.path import join as pjoin
 from os.path import dirname, abspath, normpath, basename
 import time
 import shlex
-import pipes
+import platform
+
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
+
 
 import libvvtest.cmdline as cmdline
 from libvvtest.execlist import TestExecList
@@ -29,6 +35,8 @@ version = '1.4'
 search_fnmatch = ['*.inp','*.apr','*.i']
 
 USER_PLUGIN_MODULE_NAME = 'vvtest_user_plugin'
+
+windows_platform = platform.uname()[0].lower().startswith('win')
 
 
 class RuntimeData:
@@ -649,7 +657,10 @@ def generate_test_list( opts, optD, rtdata ):
 
     handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                 rtdata.plat, rtdata.plugin,
-                                rtdata.testdir )
+                                rtdata.testdir,
+                                symlinks_supported=not windows_platform,
+                                fork_supported=not windows_platform,
+                                shbang_supported=not windows_platform )
 
     xlist = TestExecList( tlist, handler )
     xlist.createTestExecs()
@@ -764,7 +775,10 @@ def baseline_tests( opts, optD, rtdata ):
 
         handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                     rtdata.plat, rtdata.plugin,
-                                    rtdata.testdir )
+                                    rtdata.testdir,
+                                    symlinks_supported=not windows_platform,
+                                    fork_supported=not windows_platform,
+                                    shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
         xlist.createTestExecs()
@@ -1005,7 +1019,10 @@ def run_test_exec_list( opts, optD, rtdata ):
 
         handler = ExecutionHandler( rtdata.perms, rtdata.rtconfig,
                                     rtdata.plat, rtdata.plugin,
-                                    rtdata.testdir )
+                                    rtdata.testdir,
+                                    symlinks_supported=not windows_platform,
+                                    fork_supported=not windows_platform,
+                                    shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
         xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
@@ -1105,7 +1122,7 @@ def determine_job_check_intervals():
 
 def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     ""
-    cmd = sys.executable + ' ' + pipes.quote(vvtestpath)
+    cmd = sys.executable + ' ' + quote(vvtestpath)
 
     if opts.dash_m: cmd += ' -m'
     if opts.postclean: cmd += ' -C'
@@ -1114,22 +1131,22 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     cmd += ' -n 1'  # force sequential batch execution
 
     for cfgdir in rtconfig.getAttr('configdir'):
-        cmd += ' --config='+pipes.quote(cfgdir)
+        cmd += ' --config='+quote(cfgdir)
 
-    cmd += ' --plat '+pipes.quote(rtconfig.getPlatformName())
+    cmd += ' --plat '+quote(rtconfig.getPlatformName())
 
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
             if v:
-                cmd += ' --platopt ' + k + '=' + pipes.quote(v)
+                cmd += ' --platopt ' + k + '=' + quote(v)
             else:
                 cmd += ' --platopt ' + k
 
     if opts.perms:
-        cmd += ' --perms='+pipes.quote(','.join( opts.perms ))
+        cmd += ' --perms='+quote(','.join( opts.perms ))
 
     for arg in rtconfig.getAttr('testargs'):
-        cmd += ' --test-args='+pipes.quote(arg)
+        cmd += ' --test-args='+quote(arg)
 
     return cmd
 

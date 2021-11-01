@@ -50,27 +50,27 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
 
         w.add( 'import os, sys',
                '',
-               'NAME = "'+tname+'"',
-               'TESTID = "'+testobj.getDisplayString()+'"',
-               'PLATFORM = "'+platname+'"',
-               'COMPILER = "'+cplrname+'"',
-               'VVTESTSRC = "'+tdir+'"',
-               'TESTROOT = "'+test_dir+'"',
-               'PROJECT = "'+projdir+'"',
+               'NAME = '+repr(tname),
+               'TESTID = '+repr( testobj.getDisplayString() ),
+               'PLATFORM = '+repr(platname),
+               'COMPILER = '+repr(cplrname),
+               'VVTESTSRC = '+repr(tdir),
+               'TESTROOT = '+repr(test_dir),
+               'PROJECT = '+repr(projdir),
                'OPTIONS = '+repr( onopts ),
                'OPTIONS_OFF = '+repr( offopts ),
-               'SRCDIR = "'+srcdir+'"',
+               'SRCDIR = '+repr(srcdir),
                'TIMEOUT = '+repr(timeout) )
 
         w.add( 'CONFIGDIR = '+repr(configdirs) )
 
         # order matters; configdir should be the first entry in sys.path
         w.add( '',
-               'sys.path.insert( 0, "'+trigdir+'" )',
-               'sys.path.insert( 0, "'+tdir+'" )',
-               'sys.path.insert( 0, "'+tdir+'/config" )' )
+               'sys.path.insert( 0, '+repr(trigdir)+' )',
+               'sys.path.insert( 0, '+repr(tdir)+' )',
+               'sys.path.insert( 0, '+repr( pjoin(tdir,'config') )+' )' )
         for d in configdirs[::-1]:
-            w.add( 'sys.path.insert( 0, "'+d+'" )' )
+            w.add( 'sys.path.insert( 0, '+repr(d)+' )' )
 
         w.add( '',
                'diff_exit_status = '+str(DIFF_EXIT_STATUS),
@@ -84,7 +84,7 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
                'def apply_platform_variables():',
                '    "sets the platform variables in os.environ"' )
         for k,v in platenv.items():
-            w.add( '    os.environ["'+k+'"] = "'+v+'"' )
+            w.add( '    os.environ["'+k+'"] = '+repr(v) )
 
         w.add( '', '# parameters defined by the test' )
         paramD = testobj.getParameters( typed=True )
