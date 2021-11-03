@@ -176,8 +176,7 @@ class TestSpec( TestFile ):
         Returns a dictionary mapping parameter names to values.  If 'typed'
         is True, the type map is applied to each value.
         """
-        D = {}
-        D.update( self.params )
+        D = dict( self.params )
 
         if typed:
             apply_types_to_param_values( D, self.getParameterTypes() )

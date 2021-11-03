@@ -538,6 +538,24 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         assert tB.isBlocked()
         assert tB.getBlockedReason() == failed_match_reason
 
+    def test_variable_substitution_in_dependency_matching(self):
+        ""
+        pat = 'foo/bar.np=${np}' ; pD = { 'np':'42' }
+        res = depend.apply_variable_substitution( pat, pD )
+        assert res == 'foo/bar.np=42'
+
+        pat = 'foo/bar.np=${np}.ndevice=*' ; pD = { 'np':'42', 'ndevice':'2' }
+        res = depend.apply_variable_substitution( pat, pD )
+        assert res == 'foo/bar.np=42.ndevice=*'
+
+        pat = 'foo/bar.np=${np}.ndevice=${ndevice}' ; pD = { 'np':'42', 'ndevice':'2' }
+        res = depend.apply_variable_substitution( pat, pD )
+        assert res == 'foo/bar.np=42.ndevice=2'
+
+        pat = 'foo/bar.np=${npt}.ndevice=${ndevice}' ; pD = { 'np':'42', 'ndevice':'2' }
+        res = depend.apply_variable_substitution( pat, pD )
+        assert res == 'foo/bar.np=${npt}.ndevice=2'
+
     def test_parsing_the_expect_attribute_of_a_depends_on_directive(self):
         ""
         util.writefile( 'blue.vvt', """
@@ -646,6 +664,32 @@ class dependency_related_functions( vtu.vvtestTestCase ):
         assert not depend.match_criteria_satisfied( True, depL, None, '0'  )
         assert not depend.match_criteria_satisfied( True, depL, None, '1'  )
         assert     depend.match_criteria_satisfied( True, depL, None, '2'  )
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_parameter_substitution_in_match_pattern(self):
+        ""
+        util.writefile( 'testX.vvt', """
+            #VVT: parameterize : toy = ball doll
+            """ )
+
+        util.writefile( 'testY.vvt', """
+            #VVT: parameterize : toy = ball doll
+            #VVT: depends on : testX*toy=${toy}*
+            import os
+            import vvtest_util as vvt
+            if vvt.toy == 'ball':
+                assert len( vvt.DEPDIRS ) == 1
+                assert os.path.basename( vvt.DEPDIRS[0] ) == 'testX.toy=ball'
+            else:
+                assert vvt.toy == 'doll'
+                assert len( vvt.DEPDIRS ) == 1
+                assert os.path.basename( vvt.DEPDIRS[0] ) == 'testX.toy=doll'
+            """ )
+
+        vrun = vtu.runvvtest()
+        vrun.assertCounts( total=4, npass=4 )
 
 
 #######################################

@@ -1,6 +1,16 @@
 
 Improvements:
 
+    - Add test parameter substitution in "depends on" patterns. Consider a test
+      with the following directives:
+
+          #VVT: parameterize : toy = ball doll
+          #VVT: depends on : name*toy=${toy}*
+
+      The pattern "${toy}" will be replaced with the value of the parameter as
+      defined in the test instance. In this case, there are two test instances,
+      one with toy=ball and the other toy=doll.
+
     - Add option --minimal-xdirs, which suppresses parameter name=value strings
       in test execution directory names if the parameter only has one value in
       the test. For example, a test file named 'foo.vvt' with

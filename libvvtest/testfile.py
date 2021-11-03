@@ -306,8 +306,8 @@ class TestFile:
 
     def getDependencies(self):
         """
-        Returns a list of ( xdir pattern, result expression ) specifying
-        test dependencies and their expected results.
+        Returns a list of ( xdir pattern, result expression, expect pattern )
+        specifying test dependencies and their expected results.
 
         The xdir pattern is a shell pattern (not a regular expression) and
         will be matched against the execution directory of the dependency
@@ -317,6 +317,12 @@ class TestFile:
         evaluated against the dependency test result.  For example it could
         be "pass or diff" or just "pass".  If the dependency result expression
         is not true, then this test should not be run.
+
+        The expect pattern is one of
+            '+' : one or more matches must be found
+            '*' : zero or more matches
+            '?' : exactly one match
+             N  : an integer number of matches must be found (non-negative)
         """
         return list( self.deps )
 

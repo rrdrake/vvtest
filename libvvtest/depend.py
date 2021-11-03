@@ -231,7 +231,8 @@ def check_connect_dependencies( tcase, testcasemap, strict=True ):
     for dep_pat,expr,expect in tspec.getDependencies():
 
         srcdir = os.path.dirname( tspec.getFilepath() )
-        depL = find_tests_by_pattern( srcdir, dep_pat, testcasemap )
+        matchpat = apply_variable_substitution( dep_pat, tspec.getParameters() )
+        depL = find_tests_by_pattern( srcdir, matchpat, testcasemap )
 
         if match_criteria_satisfied( strict, depL, expr, expect ):
             for dep_id in depL:
@@ -240,6 +241,13 @@ def check_connect_dependencies( tcase, testcasemap, strict=True ):
                     connect_dependency( tcase, dep_obj, dep_pat, expr )
         else:
             connect_failed_dependency( tcase )
+
+
+def apply_variable_substitution( pat, paramD ):
+    ""
+    for n,v in paramD.items():
+        pat = pat.replace( '${'+n+'}', v )
+    return pat
 
 
 def match_criteria_satisfied( strict, depL, expr, expect ):
