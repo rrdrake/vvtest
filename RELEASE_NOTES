@@ -1,6 +1,10 @@
 
 Improvements:
 
+    - Add handling of a VVTEST_PLATFORM environment variable in the
+      config/idplatform.py configuration script.  Now if that environment
+      variable is defined, then the value is used as the platform name.
+
     - Unknown attributes in *.vvt header file directives now cause a parse
       failure.
 
