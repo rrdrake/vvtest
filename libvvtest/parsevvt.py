@@ -101,10 +101,9 @@ class ScriptTestParser:
 
             lnum = spec.lineno
 
-            if spec.attrs and \
-               ( 'parameters' in spec.attrs or 'parameter' in spec.attrs ):
-                raise TestSpecError( "parameters attribute not allowed here, " + \
-                                     "line " + str(lnum) )
+            check_allowed_attrs( spec.attrs, lnum,
+                    'testname platform platforms option options '
+                    'staged autotype' )
 
             if not self.attr_filter( spec.attrs, testname, None, lnum ):
                 continue
@@ -168,23 +167,11 @@ class ScriptTestParser:
         specval = None
         for spec in self.reader.getSpecList( 'analyze' ):
 
-            if spec.attrs and \
-               ( 'parameters' in spec.attrs or 'parameter' in spec.attrs ):
-                raise TestSpecError( "parameters attribute not allowed here, " + \
-                                     "line " + str(spec.lineno) )
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                    'testname platform platforms option options' )
 
             if not self.attr_filter( spec.attrs, testname, None, spec.lineno ):
                 continue
-
-            if spec.attrs and 'file' in spec.attrs:
-                raise TestSpecError( 'the "file" analyze attribute is ' + \
-                                     'no longer supported, ' + \
-                                     'line ' + str(spec.lineno) )
-
-            if spec.attrs and 'argument' in spec.attrs:
-                raise TestSpecError( 'the "argument" analyze attribute is ' + \
-                                     'no longer supported, ' + \
-                                     'line ' + str(spec.lineno) )
 
             sval = spec.value
             if not sval or not sval.strip():
@@ -223,13 +210,12 @@ class ScriptTestParser:
 
             if spec.attrs:
 
+                check_allowed_attrs( spec.attrs, spec.lineno,
+                        'testname platform platforms option options' )
+
                 if not testname_ok( spec.attrs, testname, spec.lineno ):
                     # the "enable" does not apply to this test name
                     continue
-
-                if 'parameters' in spec.attrs or 'parameter' in spec.attrs:
-                    raise TestSpecError( "parameters attribute not " + \
-                                         "allowed here, line " + str(spec.lineno) )
 
                 platexpr = spec.attrs.get( 'platforms',
                                            spec.attrs.get( 'platform', None ) )
@@ -268,8 +254,8 @@ class ScriptTestParser:
           keywords : key1 key2
           keywords (testname=mytest) : key3
         
-        Also includes the test name and the parameterize names.
-        TODO: what other implicit keywords ??
+        Note that a test will automatically pick up the test name and the
+        parameterize names as keywords.
         """
         testname = tspec.getName()
 
@@ -277,15 +263,7 @@ class ScriptTestParser:
 
         for spec in self.reader.getSpecList( 'keywords' ):
 
-            if spec.attrs:
-                # explicitly deny certain attributes for keyword definition
-                for attrname in ['parameters','parameter',
-                                 'platform','platforms',
-                                 'option','options']:
-                    if attrname in spec.attrs:
-                        raise TestSpecError( "the "+attrname + \
-                                    " attribute is not allowed here, " + \
-                                    "line " + str(spec.lineno) )
+            check_allowed_attrs( spec.attrs, spec.lineno, 'testname' )
 
             if not testname_ok( spec.attrs, testname, spec.lineno ):
                 continue
@@ -315,17 +293,22 @@ class ScriptTestParser:
         lnfiles = []
 
         for spec in self.reader.getSpecList( 'copy' ):
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms '
+                'option options rename' )
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
-                collect_filenames( spec, cpfiles, testname, params,
-                                   self.platname )
+                collect_filenames( spec, cpfiles, testname, params, self.platname )
 
         for spec in self.reader.getSpecList( 'link' ):
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms '
+                'option options rename' )
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
-                collect_filenames( spec, lnfiles, testname, params,
-                                   self.platname )
+                collect_filenames( spec, lnfiles, testname, params, self.platname )
         
         for src,dst in lnfiles:
             tspec.addLinkFile( src, dst )
+
         for src,dst in cpfiles:
             tspec.addCopyFile( src, dst )
 
@@ -334,10 +317,7 @@ class ScriptTestParser:
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 if spec.value:
                     L = spec.value.split()
-                    variable_expansion( testname,
-                                        self.platname,
-                                        params,
-                                        L )
+                    variable_expansion( testname, self.platname, params, L )
                     fL.extend( L )
 
         tspec.setSourceFiles( fL )
@@ -353,6 +333,10 @@ class ScriptTestParser:
         params = tspec.getParameters()
 
         for spec in self.reader.getSpecList( 'timeout' ):
+
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms option options' )
+
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 sval = spec.value
 
@@ -379,6 +363,10 @@ class ScriptTestParser:
         cpat = re.compile( '[\t ]*,[\t ]*' )
 
         for spec in self.reader.getSpecList( 'baseline' ):
+
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms '
+                'option options file argument' )
 
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
 
@@ -447,6 +435,11 @@ class ScriptTestParser:
         params = tspec.getParameters()
 
         for spec in self.reader.getSpecList( 'depends on' ):
+
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms '
+                'option options result expect' )
+
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
 
                 wx = create_dependency_result_expression( spec.attrs, spec.lineno )
@@ -462,6 +455,9 @@ class ScriptTestParser:
             name,attrD = parse_test_name_value( spec.value, spec.lineno )
             if name == testname:
 
+                check_allowed_attrs( attrD, spec.lineno,
+                                     ['depends on','result','expect'] )
+
                 wx = create_dependency_result_expression( attrD, spec.lineno )
                 exp = parse_expect_criterion( attrD, spec.lineno )
 
@@ -476,6 +472,11 @@ class ScriptTestParser:
         params = tspec.getParameters()
 
         for spec in self.reader.getSpecList( 'preload' ):
+
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                'testname parameter parameters platform platforms '
+                'option options' )
+
             if self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 val = ' '.join( spec.value.strip().split() )
                 tspec.setPreloadLabel( val )
@@ -490,7 +491,6 @@ class ScriptTestParser:
             for name,value in attrs.items():
 
                 try:
-
                     if name == "testname":
                         if not evaluate_testname_expr( testname, value ):
                             return False
@@ -561,7 +561,6 @@ def parse_test_name_value( value, lineno ):
 
         elif tail[0] == '(':
             aD,tail = check_parse_attributes_section( tail, str(lineno) )
-            check_test_name_attributes( aD, lineno )
 
         else:
             raise TestSpecError( 'invalid test name: ' + repr(value) + \
@@ -570,20 +569,17 @@ def parse_test_name_value( value, lineno ):
     return name, aD
 
 
-def check_test_name_attributes( attrD, lineno ):
+def check_allowed_attrs( attrD, lnum, allowed ):
     ""
     if attrD:
 
-        checkD = {}
-        checkD.update( attrD )
+        if type(allowed) == type(''):
+            allowed = allowed.split()
 
-        checkD.pop( 'depends on', None )
-        checkD.pop( 'result', None )
-        checkD.pop( 'expect', None )
-
-        if len( checkD ) > 0:
-            raise TestSpecError( 'unexpected attributes: ' + \
-                ' '.join( checkD.keys() ) + ', line ' + str(lineno) )
+        for name in attrD.keys():
+            if name not in allowed:
+                raise TestSpecError( "attribute "+repr(name) + \
+                        " not allowed here, line " + str(lnum) )
 
 
 def auto_determine_param_types( nameL, valL, tmap ):

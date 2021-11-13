@@ -437,9 +437,6 @@ class script_tests( vtu.vvtestTestCase ):
         assert nm == 'testA' and len(aD) == 0
 
         self.assertRaises( TestSpecError,
-            parsevvt.parse_test_name_value, 'testA (foo=bar)', 'info' )
-
-        self.assertRaises( TestSpecError,
             parsevvt.parse_test_name_value,
                 'testA (depends on=testB ', 'info' )
 
@@ -583,6 +580,147 @@ class script_tests( vtu.vvtestTestCase ):
 
             vrun = vtu.runvvtest( '-R', batch=batch, chdir=tdir )
             vrun.assertCounts( total=5, npass=5 )
+
+
+class bad_attrs( vtu.vvtestTestCase ):
+
+    def test_when_parameters_not_allowed(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = a b
+            #VVT: parameterize (parameters="foo=b") : np = 1 8
+            """ )
+
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize : foo = a b
+            #VVT: analyze (parameters="foo=b") : --analyze
+            """ )
+
+        util.writefile( 'ctest.vvt', """
+            #VVT: parameterize : foo = a b
+            #VVT: enable (parameters="foo=b")
+            """ )
+
+        psr = parsevvt.ScriptTestParser( 'atest.vvt' )
+        self.assertRaises( TestSpecError, psr.parse_parameterize, 'atest' )
+
+        psr = parsevvt.ScriptTestParser( 'btest.vvt' )
+        self.assertRaises( TestSpecError, psr.parse_analyze, 'btest' )
+
+        psr = parsevvt.ScriptTestParser( 'ctest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='ctest' )
+        self.assertRaises( TestSpecError, psr.parse_enable, tspec )
+
+    def test_only_the_testname_is_allowed_for_keywords(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: keywords (parameters="foo=b") : akey bkey
+            """ )
+
+        util.writefile( 'btest.vvt', """
+            #VVT: keywords (platform=Linux) : akey bkey
+            """ )
+
+        util.writefile( 'ctest.vvt', """
+            #VVT: keywords (options=foo) : akey bkey
+            """ )
+
+        psr = parsevvt.ScriptTestParser( 'atest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='atest' )
+        self.assertRaises( TestSpecError, psr.parse_keywords, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'btest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='btest' )
+        self.assertRaises( TestSpecError, psr.parse_keywords, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'ctest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='ctest' )
+        self.assertRaises( TestSpecError, psr.parse_keywords, tspec )
+
+    def test_for_unknown_attributes(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize (tname=foo) : np = 1 2
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: parameterize : np = 1 2
+            #VVT: analyze (pumpkin=spice) : --analyze
+            """ )
+        util.writefile( 'ctest.vvt', """
+            #VVT: enable (software=quality)
+            """ )
+        util.writefile( 'dtest.vvt', """
+            #VVT: keywords (mixed=nuts) : akey bkey
+            """ )
+        util.writefile( 'etest.vvt', """
+            #VVT: copy (tap=out) : afile
+            """ )
+        util.writefile( 'ftest.vvt', """
+            #VVT: link (burn=out) : afile
+            """ )
+        util.writefile( 'gtest.vvt', """
+            #VVT: timeout (shot=put) : 42
+            """ )
+        util.writefile( 'htest.vvt', """
+            #VVT: baseline (pulp=fiction) : 42
+            """ )
+        util.writefile( 'itest.vvt', """
+            #VVT: depends on (love=hate) : atest*
+            """ )
+        util.writefile( 'jtest.vvt', """
+            #VVT: testname = jtest (depends on=parents, likes=money)
+            """ )
+        util.writefile( 'ktest.vvt', """
+            #VVT: preload (unit=testing) = python1.5
+            """ )
+        util.writefile( 'ltest.vvt', """
+            #VVT: testname (foo=bar) = superduper
+            """ )
+
+        psr = parsevvt.ScriptTestParser( 'atest.vvt' )
+        self.assertRaises( TestSpecError, psr.parse_parameterize, 'atest' )
+
+        psr = parsevvt.ScriptTestParser( 'btest.vvt' )
+        self.assertRaises( TestSpecError, psr.parse_analyze, 'btest' )
+
+        psr = parsevvt.ScriptTestParser( 'ctest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='ctest' )
+        self.assertRaises( TestSpecError, psr.parse_enable, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'dtest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='dtest' )
+        self.assertRaises( TestSpecError, psr.parse_keywords, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'etest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='etest' )
+        self.assertRaises( TestSpecError, psr.parse_working_files, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'ftest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='ftest' )
+        self.assertRaises( TestSpecError, psr.parse_working_files, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'gtest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='gtest' )
+        self.assertRaises( TestSpecError, psr.parse_timeouts, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'htest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='htest' )
+        self.assertRaises( TestSpecError, psr.parse_baseline, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'itest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='itest' )
+        self.assertRaises( TestSpecError, psr.parse_dependencies, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'jtest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='jtest' )
+        self.assertRaises( TestSpecError, psr.parse_dependencies, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'ktest.vvt' )
+        tspec = vtu.make_fake_TestSpec( name='ktest' )
+        self.assertRaises( TestSpecError, psr.parse_preload_label, tspec )
+
+        psr = parsevvt.ScriptTestParser( 'ltest.vvt' )
+        self.assertRaises( TestSpecError, psr.parseTestNames )
 
 
 def reparse_test_string( stringid ):

@@ -30,7 +30,6 @@ import libvvtest.exechandler as exechandler
 from libvvtest.testcreator import TestCreator
 from libvvtest.testcreator import TestMaker
 from libvvtest.parsevvt import ScriptTestParser
-import libvvtest.parsevvt as parsevvt
 import libvvtest.staging as staging
 
 

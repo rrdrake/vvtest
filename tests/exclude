@@ -20,7 +20,6 @@ from testutils import print3
 from libvvtest.testspec import TestSpec
 import libvvtest.testcreator as testcreator
 from libvvtest.filtering import TestFilter
-import libvvtest.parsevvt as parsevvt
 
 
 class exclude_tests( vtu.vvtestTestCase ):

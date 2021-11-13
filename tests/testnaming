@@ -68,6 +68,15 @@ class parsing_testnames( vtu.vvtestTestCase ):
         names.sort()
         assert names == ['hname','iname']
 
+    def test_attributes_are_not_allowed_on_testname_specs(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: parameterize : foo = a b
+            #VVT: testname (parameters="foo=a") = fname
+            """ )
+        parser = parsevvt.ScriptTestParser( 'atest.vvt' )
+        self.assertRaises( TestSpecError, parser.parseTestNames )
+
     def test_that_multiple_tests_in_one_xml_file_works(self):
         ""
         util.writefile( "multi.xml", """

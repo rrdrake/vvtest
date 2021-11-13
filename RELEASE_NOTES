@@ -1,6 +1,9 @@
 
 Improvements:
 
+    - Unknown attributes in *.vvt header file directives now cause a parse
+      failure.
+
     - Add test parameter substitution in "depends on" patterns. Consider a test
       with the following directives:
 
