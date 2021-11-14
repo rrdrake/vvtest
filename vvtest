@@ -56,6 +56,7 @@ class RuntimeData:
         self.results_writer = None   # ResultsWriters object
         self.creator        = None   # TestCreator object
         self.scanner        = None   # TestFileScanner object
+        self.tcasefactory   = None   # TestCaseFactory object
         self.selector       = None   # TestSelector object
         self.tlm            = None   # TestListManager object
 
@@ -88,6 +89,7 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
     construct_testcase_creator( rtdata, opts, optD )
+    construct_testcase_factory( rtdata )
     construct_test_scanner( rtdata, scandirs, opts )
     import_plugin_module( rtdata )
     construct_test_selector( rtdata )
@@ -312,6 +314,16 @@ def make_idtraits( opts ):
     return idtraits
 
 
+class MagicTestCaseFactory: # magic: move/remove this
+    def new(self, tspec):
+        from libvvtest.testcase import TestCase
+        return TestCase( tspec )
+
+def construct_testcase_factory( rtdata ):
+    ""
+    rtdata.tcasefactory = MagicTestCaseFactory()
+
+
 def construct_test_scanner( rtdata, scandirs, opts ):
     ""
     from libvvtest.scanner import TestFileScanner
@@ -320,8 +332,8 @@ def construct_test_scanner( rtdata, scandirs, opts ):
         # scan current working directory by default
         scandirs.append( rtdata.curdir )
 
-    scanner = TestFileScanner( rtdata.creator, scandirs,
-                               specform=opts.scan_type )
+    scanner = TestFileScanner( rtdata.creator, rtdata.tcasefactory,
+                               scandirs, specform=opts.scan_type )
 
     rtdata.scanner = scanner
 
@@ -418,6 +430,7 @@ def construct_test_list_manager( rtdata ):
     namer = BatchFileNamer( rtdata.testdir )
 
     rtdata.tlm = TestListManager( namer=namer,
+                                  tcasefactory=rtdata.tcasefactory,
                                   rtinfo=rtdata.rtinfo,
                                   perms=rtdata.perms )
 
@@ -579,11 +592,12 @@ def get_testing_directory( opts, platobj ):
 
 class TestListManager:
 
-    def __init__(self, namer, rtinfo, perms):
+    def __init__(self, namer, tcasefactory, rtinfo, perms):
         ""
         self.tlist = None
 
         self.namer = namer
+        self.tcasefactory = tcasefactory
         self.rtinfo = rtinfo
         self.perms = perms
 
@@ -599,7 +613,7 @@ class TestListManager:
         ""
         fn = self.namer.getFilePath( batchid )
 
-        self.tlist = TestList.TestList( fn )
+        self.tlist = TestList.TestList( self.tcasefactory, fn )
 
         return self.tlist
 
@@ -610,7 +624,7 @@ class TestListManager:
     def readAndMergePreviouslyRunTests(self):
         ""
         fn = self.namer.getFilePath()
-        prev_tlist = TestList.TestList( fn )
+        prev_tlist = TestList.TestList( self.tcasefactory, fn )
 
         attrs = prev_tlist.readTestResults()
 
@@ -1066,14 +1080,14 @@ def construct_batch_runner( rtdata, tlist, xlist, totaltime, opts, optD ):
     namer = rtdata.tlm.getFileNamer()
     batch = create_Batcher( opts, optD, rtdata, namer,
                             tlist, xlist, rtdata.testdir,
-                            rtdata.plat, rtdata.perms )
+                            rtdata.plat, rtdata.perms, rtdata.tcasefactory )
     brun.setBatcher( batch )
 
     return brun
 
 
 def create_Batcher( opts, optD, rtdata, namer,
-                    tlist, xlist, test_dir, plat, perms ):
+                    tlist, xlist, test_dir, plat, perms, tcasefactory ):
     ""
     import libvvtest.batchutils as batchutils
     import batch.batching as batching
@@ -1103,7 +1117,7 @@ def create_Batcher( opts, optD, rtdata, namer,
                                 qsublimit,
                                 opts.batch_length,
                                 maxtmo,
-                                namer, jobhandler )
+                                namer, jobhandler, tcasefactory )
 
     return batch
 

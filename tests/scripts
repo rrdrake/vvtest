@@ -725,7 +725,7 @@ class bad_attrs( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid )
+    tcase = tio.string_to_test( stringid, vtu.MockTestCaseFactory() )
 
     TestCreator().reparse( tcase.getSpec() )
 

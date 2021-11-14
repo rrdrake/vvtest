@@ -202,7 +202,7 @@ class timing_output_tests( vtu.vvtestTestCase ):
 
 def make_fake_TestExecList():
     ""
-    tlist = TestList()
+    tlist = TestList( vtu.MockTestCaseFactory() )
 
     txL = []
 
@@ -232,7 +232,7 @@ def make_fake_Batcher( tlist ):
                                 tlist, None, None,
                                 None,
                                 None, None,
-                                None, jobhandler )
+                                None, jobhandler, None )
 
     bjob = jobhandler.createJob()
     bjob.setAttr( 'testlist', tlist )

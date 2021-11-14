@@ -68,7 +68,7 @@ class Platform:
             if self.devicepool != None:
                 s += ', num devices = '+str(nd)
                 s += ', max devices = '+str(maxnd)
-        print3( s )
+        print ( s )
 
     def getEnvironment(self):
         """
@@ -527,28 +527,3 @@ def probe_max_processors( fail_value=4 ):
         mx = fail_value
 
     return mx
-
-
-##########################################################################
-
-# determine the directory containing the current file
-mydir = None
-if __name__ == "__main__":
-  mydir = os.path.abspath( sys.path[0] )
-else:
-  mydir = os.path.dirname( os.path.abspath( __file__ ) )
-
-
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
-
-###############################################################################
-
-if __name__ == "__main__":
-    """
-    """
-    vvtestdir = os.path.dirname(mydir)
-    sys.path.insert( 1, os.path.join( vvtestdir, 'config' ) )
-    plat = construct_Platform( vvtestdir, {} )
-    plat.display()

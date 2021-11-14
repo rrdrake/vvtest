@@ -697,6 +697,11 @@ def parse_time( colon_time_string ):
     return tval
 
 
+class MockTestCaseFactory:
+    def new(self, tspec):
+        return testcase.TestCase( tspec )
+
+
 def create_tests_from_file( filename, platname=core_platform_name(),
                                       optionlist=[] ):
     ""
@@ -877,7 +882,7 @@ def make_fake_TestExecList( timespec='runtime' ):
     ""
     tests = make_TestCase_list( timespec=timespec )
 
-    tlist = TestList()
+    tlist = TestList( MockTestCaseFactory() )
     for tcase in tests:
         tlist.addTest( tcase )
 
@@ -890,10 +895,10 @@ def make_fake_TestExecList( timespec='runtime' ):
 
 def scan_to_make_TestExecList( path, timeout_attr=None ):
     ""
-    tlist = TestList()
+    tlist = TestList( MockTestCaseFactory() )
 
     tc = testcreator.TestCreator( {}, 'XBox', [] )
-    scan = TestFileScanner( tc )
+    scan = TestFileScanner( tc, MockTestCaseFactory() )
     scan.scanPath( tlist, path )
 
     if timeout_attr != None:

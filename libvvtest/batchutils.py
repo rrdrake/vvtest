@@ -22,15 +22,16 @@ class Batcher:
                        tlist, xlist, perms,
                        qsublimit,
                        batch_length, max_timeout,
-                       namer, jobhandler ):
+                       namer, jobhandler, tcasefactory ):
         ""
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
         self.jobhandler = jobhandler
+        self.fact = tcasefactory
 
-        self.results = ResultsHandler( tlist, xlist )
+        self.results = ResultsHandler( tlist, xlist, self.fact )
 
         self.rundate = tlist.getResultsDate()
         self.vvtestcmd = vvtestcmd
@@ -151,7 +152,7 @@ class Batcher:
         ""
         fn = self.namer.getBatchPath( batchid )
 
-        tl = TestList.TestList( fn )
+        tl = TestList.TestList( self.fact, fn )
 
         tl.setResultsDate( self.rundate )
 
@@ -429,10 +430,11 @@ def apply_queue_timeout_bump_factor( qtime ):
 
 class ResultsHandler:
 
-    def __init__(self, tlist, xlist):
+    def __init__(self, tlist, xlist, tcasefactory):
         ""
         self.tlist = tlist
         self.xlist = xlist
+        self.fact = tcasefactory
 
     def addResultsInclude(self, bjob):
         ""
@@ -451,7 +453,7 @@ class ResultsHandler:
         if os.path.isfile( rfile ):
 
             try:
-                tlr = testlistio.TestListReader( rfile )
+                tlr = testlistio.TestListReader( self.fact, rfile )
                 tlr.read()
                 jobtests = tlr.getTests()
             except Exception:

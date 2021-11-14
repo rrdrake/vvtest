@@ -26,6 +26,8 @@ from libvvtest.TestList import TestList
 from libvvtest.permsetter import PermissionSetter
 from libvvtest.runinfo import RuntimeInfo
 
+mockfactory = vtu.MockTestCaseFactory()
+
 
 class unit_tests( vtu.vvtestTestCase ):
 
@@ -60,7 +62,7 @@ class unit_tests( vtu.vvtestTestCase ):
                               rundir='/path/to/testresultsdir',
                               finishepoch=tm+73 )
 
-        testlist = TestList()
+        testlist = TestList( mockfactory )
 
         wr.postrun( testlist, rtinfo )
 
@@ -77,7 +79,7 @@ class unit_tests( vtu.vvtestTestCase ):
         ""
         wr = make_CDashWriter( 'file.xml' )
 
-        testlist = TestList()
+        testlist = TestList( mockfactory )
         tcase = vtu.make_fake_TestCase( name='atest', result='pass', runtime=42 )
         testlist.addTest( tcase )
         tcase = vtu.make_fake_TestCase( name='btest', result='diff', runtime=23 )
@@ -111,7 +113,7 @@ class unit_tests( vtu.vvtestTestCase ):
             def curl_submit(self, curlcmd, submit_url, filename):
                 records.append( (curlcmd,submit_url,filename) )
 
-        testlist = TestList()
+        testlist = TestList( mockfactory )
 
         wr = make_CDashWriter( 'file.xml',
                                subclass_submitter=OverrideFileSubmitter() )
@@ -342,7 +344,7 @@ class unit_tests( vtu.vvtestTestCase ):
                                ',name=smoke_tests' )
 
         rtinfo = RuntimeInfo()
-        testlist = TestList()
+        testlist = TestList( mockfactory )
         wr.postrun( testlist, rtinfo )
 
         xml = util.read_xml_file( 'file.xml' )
@@ -359,7 +361,7 @@ class unit_tests( vtu.vvtestTestCase ):
         wr = make_CDashWriter( 'file.xml', datestamp=rdate )
 
         rtinfo = RuntimeInfo( startepoch=tstart )
-        testlist = TestList()
+        testlist = TestList( mockfactory )
         wr.postrun( testlist, rtinfo )
 
         xml = util.read_xml_file( 'file.xml' )
@@ -453,7 +455,7 @@ class unit_tests( vtu.vvtestTestCase ):
     def make_fake_test_list_with_exec_directory(self, result='diff',
                                                       extraout=False ):
         ""
-        testlist = TestList()
+        testlist = TestList( mockfactory )
         tcase = vtu.make_fake_TestCase( name='atest', result=result, runtime=23 )
         testlist.addTest( tcase )
 

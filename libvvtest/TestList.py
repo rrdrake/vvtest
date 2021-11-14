@@ -24,8 +24,9 @@ class TestList:
     to a file.
     """
 
-    def __init__(self, filename=None):
+    def __init__(self, tcasefactory, filename=None):
         ""
+        self.fact = tcasefactory
         if filename:
             self.filename = normpath( abspath( filename ) )
         else:
@@ -120,7 +121,7 @@ class TestList:
 
         if os.path.exists( self.filename ):
 
-            tlr = testlistio.TestListReader( self.filename )
+            tlr = testlistio.TestListReader( self.fact, self.filename )
             tlr.read()
 
             rd = tlr.getAttr( 'rundate', None )
@@ -146,7 +147,7 @@ class TestList:
 
         for fn in files:
 
-            tlr = testlistio.TestListReader( fn )
+            tlr = testlistio.TestListReader( self.fact, fn )
             tlr.read()
 
             self.startdate = tlr.getStartDate()

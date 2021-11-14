@@ -25,7 +25,7 @@ class TestCreator:
         for that parameter name.
         """
         self.idtraits = idtraits
-        self.platname = platname if platname else platform.uname()[0]
+        self.platname = platname or platform.uname()[0]
         self.optionlist = optionlist
         self.force_params = force_params
 

@@ -43,7 +43,7 @@ class ScriptTestParser:
             rootpath = os.getcwd()
         self.root = rootpath
 
-        self.platname = platname if platname else platform.uname()[0]
+        self.platname = platname or platform.uname()[0]
         self.optionlist = optionlist
         self.force = force_params
 

@@ -193,14 +193,15 @@ def scan_path_with_warnings_output( path ):
 def construct_TestList_and_TestFileScanner( specform=None, ostream=None ):
     ""
     creator = TestCreator()
-    tlist = TestList.TestList()
+    tlist = TestList.TestList( vtu.MockTestCaseFactory() )
 
     if ostream:
-        scan = TestFileScanner( creator,
+        scan = TestFileScanner( creator, vtu.MockTestCaseFactory(),
                                 specform=specform,
                                 warning_output_stream=ostream )
     else:
-        scan = TestFileScanner( creator, specform=specform )
+        scan = TestFileScanner( creator, vtu.MockTestCaseFactory(),
+                                specform=specform )
 
     return tlist,scan
 
