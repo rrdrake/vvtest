@@ -34,6 +34,10 @@ Fixes:
 
 Changes:
 
+    - The CPU probe now returns the physical number of cores (rather than
+      the hyperthreaded count). This may affect the number of concurrent
+      tests run on a workstation. It can be overridden with -N <integer>.
+
     - The VVTEST_TIMEOUT environment variable made available to each test
       execution used to add a "bump factor". This bump has been removed.
       Tests can use the timeout to ensure all the MPI processes will die.

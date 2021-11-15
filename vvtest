@@ -54,9 +54,9 @@ class RuntimeData:
         self.isrestart      = False  # True if inside a test results tree
         self.perms          = None   # Permissions object
         self.results_writer = None   # ResultsWriters object
+        self.tcasefactory   = None   # TestCaseFactory object
         self.creator        = None   # TestCreator object
         self.scanner        = None   # TestFileScanner object
-        self.tcasefactory   = None   # TestCaseFactory object
         self.selector       = None   # TestSelector object
         self.tlm            = None   # TestListManager object
 
@@ -88,8 +88,8 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     compute_testing_directory( rtdata, opts, optD )
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
-    construct_testcase_creator( rtdata, opts, optD )
     construct_testcase_factory( rtdata )
+    construct_testcase_creator( rtdata, opts, optD )
     construct_test_scanner( rtdata, scandirs, opts )
     import_plugin_module( rtdata )
     construct_test_selector( rtdata )
@@ -321,6 +321,9 @@ class MagicTestCaseFactory: # magic: move/remove this
 
 def construct_testcase_factory( rtdata ):
     ""
+    ppn = rtdata.plat.getComputeNodeSize()
+    naxnp,maxnd = rtdata.plat.getMaxSize()
+
     rtdata.tcasefactory = MagicTestCaseFactory()
 
 

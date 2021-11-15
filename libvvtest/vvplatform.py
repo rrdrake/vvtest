@@ -5,10 +5,11 @@
 # Government retains certain rights in this software.
 
 import os, sys
-import re
 import platform
 
-############################################################################
+from . import rpool
+from . import rprobe
+
 
 class Platform:
 
@@ -18,7 +19,7 @@ class Platform:
         self.optdict = optdict
 
         self.plugin_maxprocs = None
-        self.procpool = ResourcePool( 1, 1 )
+        self.procpool = rpool.ResourcePool( 1, 1 )
         self.devicepool = None
 
         self.platname = None
@@ -43,6 +44,10 @@ class Platform:
         else:
             maxnd = 0
         return (maxnp,maxnd)
+
+    def getComputeNodeSize(self):
+        ""
+        pass  # magic
 
     def getSize(self):
         ""
@@ -148,11 +153,11 @@ class Platform:
                                     max_devices,
                                     self.attrs.get( 'maxdevices', None ) )
 
-        self.procpool = ResourcePool( np, maxnp )
+        self.procpool = rpool.ResourcePool( np, maxnp )
 
         if nd != None:
             assert maxdev != None
-            self.devicepool = ResourcePool( nd, maxdev )
+            self.devicepool = rpool.ResourcePool( nd, maxdev )
 
     def sizeAvailable(self):
         ""
@@ -222,7 +227,7 @@ def determine_processor_cores( num_procs, max_procs, plugin_max ):
     ""
     if max_procs == None:
         if plugin_max == None:
-            mx = probe_max_processors( 4 )
+            mx = rprobe.probe_num_processors( 4 )
         else:
             mx = plugin_max
     else:
@@ -252,75 +257,6 @@ def determine_device_count( num_devices, max_devices, plugin_max ):
             mx = num_devices
 
     return nd,mx
-
-
-class ResourcePool:
-
-    def __init__(self, total, maxavail):
-        ""
-        self.total = total
-        self.maxavail = maxavail
-
-        self.pool = None  # maps hardware id to num available
-
-    def maxAvailable(self):
-        ""
-        return self.maxavail
-
-    def numTotal(self):
-        ""
-        return self.total
-
-    def numAvailable(self):
-        ""
-        if self.pool == None:
-            num = self.total
-        else:
-            num = 0
-            for cnt in self.pool.values():
-                num += max( 0, cnt )
-
-        return num
-
-    def get(self, num):
-        ""
-        items = []
-
-        if num > 0:
-
-            if self.pool == None:
-                self._initialize_pool()
-
-            while len(items) < num:
-                self._get_most_available( items, num )
-
-        return items
-
-    def put(self, items):
-        ""
-        for idx in items:
-            self.pool[idx] = ( self.pool[idx] + 1 )
-
-    def _get_most_available(self, items, num):
-        ""
-        # reverse the index in the sort list (want indexes to be ascending)
-        L = [ (cnt,self.maxavail-idx) for idx,cnt in self.pool.items() ]
-        L.sort( reverse=True )
-
-        for cnt,ridx in L:
-            idx = self.maxavail - ridx
-            items.append( idx )
-            self.pool[idx] = ( self.pool[idx] - 1 )
-            if len(items) == num:
-                break
-
-    def _initialize_pool(self):
-        ""
-        self.pool = {}
-
-        for i in range(self.total):
-            idx = i%(self.maxavail)
-            self.pool[idx] = self.pool.get( idx, 0 ) + 1
 
 
 def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
@@ -490,40 +426,3 @@ def construct_job_info( procs, procpool,
         job_info.mpi_opts += ' ' + mpiopts
 
     return job_info
-
-
-def probe_max_processors( fail_value=4 ):
-    """
-    Tries to determine the number of processors on the current machine.  On
-    Linux systems, it uses /proc/cpuinfo.  On OSX systems, it uses sysctl.
-    """
-    mx = None
-    
-    if platform.uname()[0].startswith( 'Darwin' ):
-        # try to use sysctl on Macs
-        try:
-            fp = os.popen( 'sysctl -n hw.physicalcpu 2>/dev/null' )
-            s = fp.read().strip()
-            fp.close()
-            mx = int(s)
-        except Exception:
-            mx = None
-    
-    if mx == None and os.path.exists( '/proc/cpuinfo' ):
-        # try to probe the number of available processors by
-        # looking at the proc file system
-        repat = re.compile( 'processor\s*:' )
-        mx = 0
-        try:
-            fp = open( '/proc/cpuinfo', 'r' )
-            for line in fp.readlines():
-                if repat.match(line) != None:
-                    mx += 1
-            fp.close()
-        except Exception:
-            mx = None
-
-    if not mx or mx < 1:
-        mx = fail_value
-
-    return mx

@@ -1,0 +1,263 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST: vvtest
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+from os.path import abspath
+from os.path import join as pjoin
+import time
+
+import vvtestutils as vtu
+import testutils as util
+from testutils import print3
+from vvtestutils import adjust_sys_path_for_unit_testing
+
+import libvvtest.rpool as rpool
+import libvvtest.vvplatform as vvplatform
+
+
+class unit_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        vtu.vvtestTestCase.setUp( self, cleanout=False )
+
+    def test_resources_are_given_out_as_a_list_of_indexes(self):
+        ""
+        pool = rpool.ResourcePool( 10, 10 )
+
+        assert pool.numAvailable() == 10
+        idxL = pool.get( 3 )
+        idxL.sort()
+        assert idxL == [0,1,2]
+
+    def test_resource_availability(self):
+        ""
+        pool = rpool.ResourcePool( 10, 10 )
+
+        assert pool.numAvailable() == 10
+        pool.get( 5 )
+        assert pool.numAvailable() == 5
+        pool.get( 4 )
+        assert pool.numAvailable() == 1
+        pool.get( 1 )
+        assert pool.numAvailable() == 0
+
+    def test_get_then_put_resources(self):
+        ""
+        pool = rpool.ResourcePool( 10, 10 )
+
+        L1 = pool.get( 5 )
+        L2 = pool.get( 5 )
+        assert not overlapping_lists( L1, L2 )
+        assert pool.numAvailable() == 0
+        pool.put( L1 )
+        assert pool.numAvailable() == 5
+        L3 = pool.get(5)
+        assert not overlapping_lists( L2, L3 )
+        assert pool.numAvailable() == 0
+
+    def test_get_then_put_all_resources_back(self):
+        ""
+        pool = rpool.ResourcePool( 2, 2 )
+
+        L1 = pool.get( 1 )
+        L2 = pool.get( 1 )
+        assert pool.numAvailable() == 0
+        pool.put( L2 )
+        pool.put( L1 )
+        assert pool.numAvailable() == 2
+        L3 = pool.get( 2 )
+        assert pool.numAvailable() == 0
+        pool.put( L3 )
+        assert pool.numAvailable() == 2
+
+    def test_oversubscribing_the_pool(self):
+        ""
+        pool = rpool.ResourcePool( 8, 4 )
+
+        assert pool.numAvailable() == 8
+
+        L1 = pool.get( 4 )
+        assert sort_unique(L1) == [0,1,2,3]
+        assert pool.numAvailable() == 4
+
+        L2 = pool.get( 2 )
+        assert len(L2) == 2 and len( sort_unique(L2) ) == 2
+        for i in L2:
+            assert i in [0,1,2,3]
+        assert pool.numAvailable() == 2
+
+        L3 = pool.get( 2 )
+        assert len(L3) == 2 and len( sort_unique(L3) ) == 2
+        L4 = L1+L2
+        for i in L3:
+            assert L4.count(i) == 1
+        assert pool.numAvailable() == 0
+
+        pool.put( L2 )
+        L5 = pool.get(1)
+        assert len(L5) == 1 and L5[0] in L2
+        assert not overlapping_lists( L3, L5 )
+        assert pool.numAvailable() == 1
+
+        pool.put( L1 )
+        assert pool.numAvailable() == 5
+        L6 = pool.get(2)
+        assert len(L6) == 2 and len( sort_unique(L6) ) == 2
+        assert len( set(L3+L5).intersection( set(L6) ) ) == 1
+        assert pool.numAvailable() == 3
+
+    def test_asking_for_more_than_max_available(self):
+        """
+        This can happen if the default max procs is 4, and vvtest -N 8 is done,
+        then cd into test results directory, then vvtest -R is done.
+        """
+        pool = rpool.ResourcePool( 4, 4 )
+
+        L1 = pool.get( 6 )
+        assert len(L1) == 6
+        assert sort_unique( L1 ) == [0,1,2,3]
+        assert not ( pool.numAvailable() > 0 )
+
+        L3 = pool.get( 2 )
+        assert len(L3) == 2 and len( sort_unique(L3) ) == 2
+        for i in L3:
+            L1.count(i) == 1
+        assert not ( pool.numAvailable() > 0 )
+
+        L4 = L1+L3
+        assert sort_unique(L4) == [0,1,2,3]
+        for i in range(4):
+            assert L4.count(i) == 2
+
+        pool.put( L1 )
+        L5 = pool.get( 2 )
+        assert len(L5) == 2 and len( sort_unique(L5) ) == 2
+        assert not overlapping_lists( L3, L5 )
+        assert not ( pool.numAvailable() > 0 )
+
+
+
+class integration_tests( vtu.vvtestTestCase ):
+
+    def test_the_platform_np_and_ndevice_resource_pools(self):
+        ""
+        plat = vvplatform.Platform( '/fake', {} )
+        plat.initProcs( None, 16, None, 4 )
+
+        assert plat.sizeAvailable() == (16,4)
+
+        obj1 = plat.getResources( (4,0) )
+        assert plat.sizeAvailable() == (12,4)
+
+        obj2 = plat.getResources( (1,2) )
+        assert plat.sizeAvailable() == (11,2)
+
+        obj3 = plat.getResources( (11,2) )
+        assert plat.sizeAvailable() == (0,0)
+
+        plat.returnResources( obj2 )
+        assert plat.sizeAvailable() == (1,2)
+
+        plat.returnResources( obj1 )
+        assert plat.sizeAvailable() == (5,2)
+
+    def test_the_vvtest_util_file_defines_the_processor_ids(self):
+        ""
+        util.writefile( "atest.vvt", """
+            import time
+            import vvtest_util as vvt
+            print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
+            time.sleep(2)
+            """ )
+        util.writefile( "btest.vvt", """
+            #VVT: parameterize: np = 3
+            import time
+            import vvtest_util as vvt
+            print ( 'procids='+repr( vvt.RESOURCE_IDS_np ) )
+            print ( 'proctotal='+repr( vvt.RESOURCE_TOTAL_np ) )
+            time.sleep(2)
+            """ )
+        util.writescript( "ctest.vvt", """
+            #!/bin/sh
+            #VVT: parameterize: np,ndevice = 2,0
+            source vvtest_util.sh
+            echo "procids=$RESOURCE_IDS_np"
+            echo "proctotal=$RESOURCE_TOTAL_np"
+            sleep 2
+            """ )
+        time.sleep(1)
+
+        vrun = vtu.runvvtest( '-n 10 -N 10' )
+        vrun.assertCounts( total=3, npass=3 )
+        self.assert_processor_ids( vrun, 10 )
+
+        vrun = vtu.runvvtest( '-w -n 10 -N 6' )
+        vrun.assertCounts( total=3, npass=3 )
+        self.assert_processor_ids( vrun, 6 )
+        self.assert_processor_totals( vrun, 6 )
+
+    def assert_processor_ids(self, vrun, maxprocs):
+        ""
+        ids1 = eval( vrun.greplogs( 'procids=', 'atest' )[0].split('=',1)[1] )
+        assert len(ids1) == 1
+        ids2 = eval( vrun.greplogs( 'procids=', 'btest' )[0].split('=',1)[1] )
+        assert len(ids2) == 3 and len( sort_unique(ids2) ) == 3
+        s3 = vrun.greplogs( 'procids=', 'ctest' )[0].split('=',1)[1]
+        ids3 = [ int(si) for si in s3.split() ]
+        assert len(ids3) == 2 and len( sort_unique(ids3) ) == 2
+
+        tot = ids1+ids2+ids3
+        for i in tot:
+            assert i >= 0 and i < maxprocs
+
+        if maxprocs >= 10:
+            assert len( sort_unique(tot) ) == len(tot)
+            assert not overlapping_lists( ids1, ids2 )
+            assert not overlapping_lists( ids1, ids3 )
+            assert not overlapping_lists( ids2, ids3 )
+        else:
+            for i in tot:
+                assert tot.count(i) <= 2
+
+    def assert_processor_totals(self, vrun, maxprocs):
+        ""
+        tot1 = int( vrun.greplogs( 'proctotal=', 'atest' )[0].split('=',1)[1] )
+        tot2 = int( vrun.greplogs( 'proctotal=', 'btest' )[0].split('=',1)[1] )
+        tot3 = int( vrun.greplogs( 'proctotal=', 'ctest' )[0].split('=',1)[1] )
+        assert tot1 == maxprocs
+        assert tot2 == maxprocs
+        assert tot3 == maxprocs
+
+
+def overlapping_lists( L1, L2 ):
+    ""
+    for i in L1:
+        if i in L2:
+            return True
+    for i in L2:
+        if i in L1:
+            return True
+
+    return False
+
+
+def sort_unique( L1 ):
+    ""
+    S = set( L1 )
+    L2 = [ i for i in S ]
+    L2.sort()
+    return L2
+
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )
