@@ -15,7 +15,6 @@ import time, shutil
 
 import vvtestutils as vtu
 import testutils as util
-from testutils import print3
 
 
 class config_tests( vtu.vvtestTestCase ):

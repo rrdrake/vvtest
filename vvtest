@@ -231,9 +231,9 @@ def create_configuration( rtconfig, opts, optD, vvtestdir, configdirs ):
 
 def construct_platform( rtdata, vvtestdir, opts, optD ):
     ""
-    import libvvtest.vvplatform as vvplatform
+    from libvvtest.makeplatform import create_Platform_instance
 
-    plat = vvplatform.create_Platform_instance(
+    plat = create_Platform_instance(
                 vvtestdir,
                 opts.plat, opts.batch,
                 optD['platopt_dict'],  # --platopt

@@ -18,7 +18,8 @@ import vvtestutils as vtu
 import testutils as util
 from vvtestutils import adjust_sys_path_for_unit_testing
 
-import libvvtest.vvplatform as vvplatform
+from libvvtest.vvplatform import Platform
+import libvvtest.makeplatform as makeplatform
 
 
 class loading_idplatform( vtu.vvtestTestCase ):
@@ -46,7 +47,7 @@ class loading_idplatform( vtu.vvtestTestCase ):
         # None is returned if idplatform.py not in sys.path
         savepath = adjust_sys_path_for_unit_testing()
         try:
-            idp = vvplatform.import_idplatform()
+            idp = makeplatform.import_idplatform()
         finally:
             sys.path[:] = savepath
         assert idp == None
@@ -54,20 +55,20 @@ class loading_idplatform( vtu.vvtestTestCase ):
         # module returned if idplatform.py is in sys.path
         sys.path.insert( 0, adir )
         try:
-            idp = vvplatform.import_idplatform()
+            idp = makeplatform.import_idplatform()
         finally:
             sys.path.pop(0)
         assert idp.hello() == 'world'
 
     def test_option_convert_function(self):
         ""
-        opts = vvplatform.convert_to_option_dictionary( None, None, [], [] )
+        opts = makeplatform.convert_to_option_dictionary( None, None, [], [] )
         assert '--plat' not in opts
         assert '--cplr' not in opts
         assert opts['-o'] == []
         assert opts['-O'] == []
 
-        opts = vvplatform.convert_to_option_dictionary( 'foo', 'bar', ['a'], ['b'] )
+        opts = makeplatform.convert_to_option_dictionary( 'foo', 'bar', ['a'], ['b'] )
         assert opts['--plat'] == 'foo'
         assert opts['--cplr'] == 'bar'
         assert opts['-o'] == ['a']
@@ -86,8 +87,8 @@ class loading_idplatform( vtu.vvtestTestCase ):
 
         savepath = adjust_sys_path_for_unit_testing()
         try:
-            plat1,cplr1 = vvplatform.get_platform_and_compiler( None, None, [], [] )
-            plat2,cplr2 = vvplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
+            plat1,cplr1 = makeplatform.get_platform_and_compiler( None, None, [], [] )
+            plat2,cplr2 = makeplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
         finally:
             sys.path[:] = savepath
         assert plat1 == os.uname()[0] and not cplr1
@@ -96,8 +97,8 @@ class loading_idplatform( vtu.vvtestTestCase ):
         savepath = adjust_sys_path_for_unit_testing()
         try:
             sys.path.insert( 0, adir )
-            plat1,cplr1 = vvplatform.get_platform_and_compiler( None, None, [], [] )
-            plat2,cplr2 = vvplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
+            plat1,cplr1 = makeplatform.get_platform_and_compiler( None, None, [], [] )
+            plat2,cplr2 = makeplatform.get_platform_and_compiler( 'foo', 'bar', [], [] )
         finally:
             sys.path[:] = savepath
         assert plat1 == 'XBox' and cplr1 == 'llvm'
@@ -117,31 +118,31 @@ class constructing_platform( vtu.vvtestTestCase ):
 
         savepath = adjust_sys_path_for_unit_testing()
         try:
-            plat = vvplatform.Platform( '/fake', {} )
-            vvplatform.initialize_platform( plat )
+            plat = Platform( '/fake', {} )
+            makeplatform.initialize_platform( plat )
         finally:
             sys.path[:] = savepath
         assert plat.getattr( 'foo', None ) == None
 
         savepath = adjust_sys_path_for_unit_testing()
         try:
-            plat = vvplatform.Platform( '/fake', {} )
+            plat = Platform( '/fake', {} )
             sys.path.insert( 0, adir )
-            vvplatform.initialize_platform( plat )
+            makeplatform.initialize_platform( plat )
         finally:
             sys.path[:] = savepath
         assert plat.getattr( 'foo', None ) == 'bar'
 
     def test_setting_platform_options(self):
         ""
-        plat = vvplatform.Platform( '/fake', {} )
-        vvplatform.set_platform_options( plat, {} )
+        plat = Platform( '/fake', {} )
+        makeplatform.set_platform_options( plat, {} )
 
         popts = { 'q':'admin',
                   'PT':'fy666',
                   'walltime':'2:34',
                   'QoS':'long' }
-        vvplatform.set_platform_options( plat, popts )
+        makeplatform.set_platform_options( plat, popts )
 
         assert plat.getattr( 'queue' ) == 'admin'
         assert plat.getattr( 'account' ) == 'fy666'
@@ -150,13 +151,13 @@ class constructing_platform( vtu.vvtestTestCase ):
 
     def test_the_create_Platform_instance_function(self):
         ""
-        plat = vvplatform.create_Platform_instance(
+        plat = makeplatform.create_Platform_instance(
                     os.getcwd(), None, None, {},
                     None, None, None, None,
                     None, None )
 
         optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
-        plat = vvplatform.create_Platform_instance(
+        plat = makeplatform.create_Platform_instance(
                     os.getcwd(),
                     'XBox', True,
                     optD,

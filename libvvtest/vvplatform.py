@@ -39,24 +39,24 @@ class Platform:
     def getMaxSize(self):
         ""
         maxnp = self.procpool.maxAvailable()
-        if self.devicepool != None:
+        if self.devicepool is not None:
             maxnd = self.devicepool.maxAvailable()
         else:
             maxnd = 0
         return (maxnp,maxnd)
 
-    def getComputeNodeSize(self):
-        ""
-        pass  # magic
-
     def getSize(self):
         ""
         np = self.procpool.numTotal()
-        if self.devicepool != None:
+        if self.devicepool is not None:
             nd = self.devicepool.numTotal()
         else:
             nd = 0
         return (np,nd)
+
+    def getComputeNodeSize(self):
+        ""
+        pass  # magic
 
     def getPluginMaxProcs(self):
         ""
@@ -70,7 +70,7 @@ class Platform:
             maxnp,maxnd = self.getMaxSize()
             s += ", num procs = " + str(np)
             s += ", max procs = " + str(maxnp)
-            if self.devicepool != None:
+            if self.devicepool is not None:
                 s += ', num devices = '+str(nd)
                 s += ', max devices = '+str(maxnd)
         print ( s )
@@ -204,24 +204,6 @@ class Platform:
 
         return None
 
-    def which(self, prog):
-        """
-        """
-        if not prog:
-          return None
-        if os.path.isabs(prog):
-          return prog
-        for d in os.environ['PATH'].split(':'):
-          if not d: d = '.'
-          if os.path.isdir(d):
-            f = os.path.join( d, prog )
-            if os.path.exists(f) and \
-               os.access(f,os.R_OK) and os.access(f,os.X_OK):
-              if not os.path.isabs(f):
-                f = os.path.abspath(f)
-              return os.path.normpath(f)
-        return None
-
 
 def determine_processor_cores( num_procs, max_procs, plugin_max ):
     ""
@@ -257,125 +239,6 @@ def determine_device_count( num_devices, max_devices, plugin_max ):
             mx = num_devices
 
     return nd,mx
-
-
-def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
-                              numprocs, maxprocs, devices, max_devices,
-                              onopts, offopts ):
-    ""
-    assert vvtestdir
-    assert os.path.exists( vvtestdir )
-    assert os.path.isdir( vvtestdir )
-
-    optdict = {}
-    if platname:         optdict['--plat']    = platname
-    if platopts:         optdict['--platopt'] = platopts
-    if onopts:           optdict['-o']        = onopts
-    if offopts:          optdict['-O']        = offopts
-
-    plat = Platform( vvtestdir, optdict )
-
-    platname,cplrname = get_platform_and_compiler(
-                                platname,
-                                None,  # compiler name not used anymore
-                                onopts,
-                                offopts )
-
-    plat.platname = platname
-    plat.cplrname = cplrname
-
-    set_platform_options( plat, platopts )
-
-    if isbatched:
-        # this may get overridden by platform_plugin.py
-        plat.setBatchSystem( 'procbatch', 1 )
-
-    initialize_platform( plat )
-
-    plat.initProcs( numprocs,
-                    maxprocs,
-                    devices,
-                    max_devices )
-
-    return plat
-
-
-def set_platform_options( plat, platopts ):
-    ""
-    q = platopts.get( 'queue', platopts.get( 'q', None ) )
-    plat.setattr( 'queue', q )
-
-    act = platopts.get( 'account', platopts.get( 'PT', None ) )
-    plat.setattr( 'account', act )
-
-    wall = platopts.get( 'walltime', None )
-    plat.setattr( 'walltime', wall )
-
-    # QoS = "Quality of Service" e.g. "normal", "long", etc.
-    QoS = platopts.get( 'QoS', None )
-    plat.setattr( 'QoS', QoS )
-
-
-def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
-    ""
-    idplatform = import_idplatform()
-
-    optdict = convert_to_option_dictionary( platname, cplrname, onopts, offopts )
-
-    if not platname:
-        if idplatform != None and hasattr( idplatform, "platform" ):
-            platname = idplatform.platform( optdict )
-        if not platname:
-            platname = platform.uname()[0]
-
-    if not cplrname:
-        if idplatform != None and hasattr( idplatform, "compiler" ):
-            cplrname = idplatform.compiler( platname, optdict )
-
-    return platname, cplrname
-
-
-def initialize_platform( plat ):
-    ""
-    plug = import_platform_plugin()
-
-    if plug != None and hasattr( plug, 'initialize' ):
-        plug.initialize( plat )
-
-
-def import_idplatform():
-    ""
-    try:
-        # this comes from the config directory
-        import idplatform
-    except ImportError:
-        idplatform = None
-
-    return idplatform
-
-
-def import_platform_plugin():
-    ""
-    try:
-        # this comes from the config directory
-        import platform_plugin
-    except ImportError:
-        platform_plugin = None
-
-    return platform_plugin
-
-
-def convert_to_option_dictionary( platname, cplrname, onopts, offopts ):
-    ""
-    optdict = {}
-
-    if platname: optdict['--plat'] = platname
-    if cplrname: optdict['--cplr'] = cplrname
-
-    optdict['-o'] = onopts
-    optdict['-O'] = offopts
-
-    return optdict
 
 
 ##########################################################################
