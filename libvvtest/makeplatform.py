@@ -24,71 +24,118 @@ def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
     if onopts:           optdict['-o']        = onopts
     if offopts:          optdict['-O']        = offopts
 
-    plat = Platform( vvtestdir, optdict )
+    platname,cplrname = determine_platform_and_compiler( platname, onopts, offopts )
 
-    platname,cplrname = get_platform_and_compiler(
-                                platname,
-                                None,  # compiler name not used anymore
-                                onopts,
-                                offopts )
+    platcfg = PlatformConfig( optdict, platname, cplrname )
 
-    plat.platname = platname
-    plat.cplrname = cplrname
+    set_platform_options( platcfg, platopts )
 
-    set_platform_options( plat, platopts )
+    initialize_platform( platcfg )
 
-    if isbatched:
-        # this may get overridden by platform_plugin.py
-        plat.setBatchSystem( 'procbatch', 1 )
-
-    initialize_platform( plat )
+    plat = Platform( platname,
+                     cplrname=cplrname,
+                     environ=platcfg.envD,
+                     attrs=platcfg.attrs,
+                     batchspec=platcfg.batchspec )
 
     plat.initProcs( numprocs, maxprocs, devices, max_devices )
 
     return plat
 
 
-def set_platform_options( plat, platopts ):
+class PlatformConfig:
+    """
+    This class is used as an interface to the platform_plugin.py mechanism.
+    It is only necessary for backward compatibility, and allows the
+    configuration mechanism to be separated from the implementation (the
+    Platform class).
+    """
+
+    def __init__(self, optdict, platname, cplrname):
+        ""
+        self.platname = platname
+        self.cplrname = cplrname
+        self.optdict = optdict
+
+        self.envD = {}
+        self.attrs = {}
+        self.batchspec = ( 'procbatch', 1, {} )
+
+    def getName(self):  return self.platname
+    def getCompiler(self): return self.cplrname
+    def getOptions(self): return self.optdict
+
+    def setenv(self, name, value):
+        ""
+        if value == None:
+            if name in self.envD:
+                del self.envD[name]
+        else:
+            self.envD[name] = value
+
+    def setattr(self, name, value):
+        ""
+        if value == None:
+            if name in self.attrs:
+                del self.attrs[name]
+        else:
+            self.attrs[name] = value
+
+    def getattr(self, name, *default):
+        ""
+        if len(default) > 0:
+            return self.attrs.get( name, default[0] )
+        else:
+            return self.attrs[name]
+
+    def setBatchSystem(self, batch, ppn, **kwargs ):
+        ""
+        assert ppn and ppn > 0
+
+        self.batchspec = ( batch, ppn, kwargs )
+
+
+def set_platform_options( platcfg, platopts ):
     ""
     q = platopts.get( 'queue', platopts.get( 'q', None ) )
-    plat.setattr( 'queue', q )
+    platcfg.setattr( 'queue', q )
 
     act = platopts.get( 'account', platopts.get( 'PT', None ) )
-    plat.setattr( 'account', act )
+    platcfg.setattr( 'account', act )
 
     wall = platopts.get( 'walltime', None )
-    plat.setattr( 'walltime', wall )
+    platcfg.setattr( 'walltime', wall )
 
     # QoS = "Quality of Service" e.g. "normal", "long", etc.
     QoS = platopts.get( 'QoS', None )
-    plat.setattr( 'QoS', QoS )
+    platcfg.setattr( 'QoS', QoS )
 
 
-def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
+def determine_platform_and_compiler( platname, onopts, offopts ):
     ""
     idplatform = import_idplatform()
 
-    optdict = convert_to_option_dictionary( platname, cplrname, onopts, offopts )
+    optdict = convert_to_option_dictionary( platname, onopts, offopts )
 
     if not platname:
-        if idplatform != None and hasattr( idplatform, "platform" ):
+        if idplatform is not None and hasattr( idplatform, "platform" ):
             platname = idplatform.platform( optdict )
         if not platname:
             platname = platform.uname()[0]
 
-    if not cplrname:
-        if idplatform != None and hasattr( idplatform, "compiler" ):
-            cplrname = idplatform.compiler( platname, optdict )
+    cplrname = None
+    if idplatform is not None and hasattr( idplatform, "compiler" ):
+        cplrname = idplatform.compiler( platname, optdict )
 
     return platname, cplrname
 
 
-def initialize_platform( plat ):
+def initialize_platform( platcfg ):
     ""
     plug = import_platform_plugin()
 
-    if plug != None and hasattr( plug, 'initialize' ):
-        plug.initialize( plat )
+    if plug is not None and hasattr( plug, 'initialize' ):
+        plug.initialize( platcfg )
 
 
 def import_idplatform():
@@ -113,12 +160,11 @@ def import_platform_plugin():
     return platform_plugin
 
 
-def convert_to_option_dictionary( platname, cplrname, onopts, offopts ):
+def convert_to_option_dictionary( platname, onopts, offopts ):
     ""
     optdict = {}
 
     if platname: optdict['--plat'] = platname
-    if cplrname: optdict['--cplr'] = cplrname
 
     optdict['-o'] = onopts
     optdict['-O'] = offopts

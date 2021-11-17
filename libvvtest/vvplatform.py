@@ -13,28 +13,25 @@ from . import rprobe
 
 class Platform:
 
-    def __init__(self, vvtesthome, optdict):
+    def __init__(self, platname, cplrname=None,
+                                 environ={},
+                                 attrs={},
+                                 batchspec=None):
         ""
-        self.vvtesthome = vvtesthome
-        self.optdict = optdict
-
-        self.plugin_maxprocs = None
         self.procpool = rpool.ResourcePool( 1, 1 )
         self.devicepool = None
 
-        self.platname = None
-        self.cplrname = None
+        self.platname = platname
+        self.cplrname = cplrname
 
-        self.envD = {}
-        self.attrs = {}
-
-        self.batchspec = None
+        self.envD = environ
+        self.attrs = attrs
+        self.batchspec = batchspec
 
     # ----------------------------------------------------------------
 
     def getName(self):  return self.platname
     def getCompiler(self): return self.cplrname
-    def getOptions(self): return self.optdict
 
     def getMaxSize(self):
         ""
@@ -60,7 +57,7 @@ class Platform:
 
     def getPluginMaxProcs(self):
         ""
-        return self.plugin_maxprocs
+        return self.attrs.get( 'maxprocs', None )
 
     def display(self, isbatched=False):
         ""
@@ -83,36 +80,12 @@ class Platform:
 
     # ----------------------------------------------------------------
 
-    def setenv(self, name, value):
-        """
-        """
-        if value == None:
-            if name in self.envD:
-                del self.envD[name]
-        else:
-            self.envD[name] = value
-
-    def setattr(self, name, value):
-        """
-        """
-        if value == None:
-            if name in self.attrs:
-                del self.attrs[name]
-        else:
-            self.attrs[name] = value
-
     def getattr(self, name, *default):
         ""
         if len(default) > 0:
             return self.attrs.get( name, default[0] )
         else:
             return self.attrs[name]
-
-    def setBatchSystem(self, batch, ppn, **kwargs ):
-        ""
-        assert ppn and ppn > 0
-
-        self.batchspec = ( batch, ppn, kwargs )
 
     def initializeBatchSystem(self, batchitf):
         ""
@@ -141,12 +114,10 @@ class Platform:
             max_procs   is -N
             max_devices is --max-devices
         """
-        self.plugin_maxprocs = self.attrs.get( 'maxprocs', None )
-
         np,maxnp = \
             determine_processor_cores( num_procs,
                                        max_procs,
-                                       self.plugin_maxprocs )
+                                       self.attrs.get( 'maxprocs', None ) )
 
         nd,maxdev = \
             determine_device_count( num_devices,
