@@ -59,9 +59,9 @@ class ProcessBatch:
             sys.stdout.write( 'queue = '+str(queue) + '\n' + \
                               'account = '+str(account) + '\n\n' )
             sys.stdout.flush()
-            os.execv( '/bin/csh', ['/bin/csh', '-f', fname] )
+            os.execv( '/bin/bash', ['/bin/bash', fname] )
 
-        cmd = '/bin/csh -f ' + fname + ' >& ' + outfile
+        cmd = '/bin/bash ' + fname + ' >& ' + outfile
         out = '[forked process '+str(jobid)+']'
 
         # keep the child process ids as the queue ids
