@@ -58,16 +58,12 @@ class BatchQueueInterface:
         ""
         qt = self.attrs.get( 'walltime', queue_time )
 
-        hdr = '#!/bin/csh -f\n' + \
+        hdr = '#!/bin/bash\n' + \
               self.batch.header( size, qt, workdir, qout_file, self.attrs ) + '\n'
 
         if qout_file:
             hdr += 'touch '+qout_file + ' || exit 1\n'
 
-        # add in the shim if specified for this platform
-        s = self.attrs.get( 'batchshim', None )
-        if s:
-            hdr += '\n'+s
         hdr += '\n'
 
         with open( filename, 'wt' ) as fp:
@@ -79,7 +75,7 @@ class BatchQueueInterface:
 
             # set the environment variables from the platform into the script
             for k,v in self.envD.items():
-                fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
+                fp.write( 'export ' + k + '="' + v  + '"\n' )
 
             fp.writelines( [ command+'\n\n' ] )
 

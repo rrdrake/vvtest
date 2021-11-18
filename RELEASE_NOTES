@@ -38,6 +38,14 @@ Fixes:
 
 Changes:
 
+    - When running vvtest --batch mode, the batch scripts are written to
+      a working directory and submitted to the batch queue, then monitored.
+      There was a mechanism to insert code (called a shim) into this batch
+      script in order to setup the environment. This shim capability has
+      been removed. It is not being used and is not really necessary, because
+      batch system will forward the environment from the login nodes to the
+      batch job anyway.
+
     - The CPU probe now returns the physical number of cores (rather than
       the hyperthreaded count). This may affect the number of concurrent
       tests run on a workstation. It can be overridden with -N <integer>.
