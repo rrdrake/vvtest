@@ -20,7 +20,7 @@ class BatchJob:
 
         self.jobscript = None
         self.outfile = None
-        self.maxsize = None
+        self.size = None
         self.jobid = None
         self.wrkdir = None
 
@@ -33,7 +33,7 @@ class BatchJob:
         self.attrs = {}
 
     def getBatchID(self): return self.batchid
-    def getMaxSize(self): return self.maxsize
+    def getJobSize(self): return self.size
 
     def getJobScriptName(self): return self.jobscript
 
@@ -72,9 +72,9 @@ class BatchJob:
         ""
         self.wrkdir = dirpath
 
-    def setMaxSize(self, maxsize):
+    def setJobSize(self, jobsize):
         ""
-        self.maxsize = maxsize
+        self.size = jobsize
 
     def setJobID(self, jobid):
         ""
@@ -115,6 +115,10 @@ class BatchJobHandler:
         self.stopped  = {}  # not in queue or shown as completed by the queue
         self.done  = {}  # job results have been processed
 
+    def getNodeSize(self):
+        ""
+        return self.batchitf.getNodeSize()
+
     def createJob(self):
         ""
         bjob = BatchJob()
@@ -139,7 +143,7 @@ class BatchJobHandler:
 
         fn = batchjob.getJobScriptName()
 
-        maxsize = batchjob.getMaxSize()
+        maxsize = batchjob.getJobSize()
         self.batchitf.writeJobScript( maxsize, qtime, wrkdir, pout, fn, cmd )
 
         return fn

@@ -18,32 +18,26 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
+from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.filtering import TestFilter
 
 
 class device_tests( vtu.vvtestTestCase ):
 
-    def test_filtering_out_tests_by_max_cpu_cores(self):
+    def test_evaluating_maxdevices_in_RuntimeConfig(self):
         ""
-        tcase1 = vtu.make_fake_TestCase()
-        tcase1.getSpec().setParameters( { 'np':'1' } )
+        rtconfig = RuntimeConfig()
+        assert rtconfig.evaluate_maxdevices( (1,1000000) )
 
-        tcase2 = vtu.make_fake_TestCase()
-        tcase2.getSpec().setParameters( { 'np':'4' } )
+        rtconfig = RuntimeConfig()
+        rtconfig.setMaxSize( (5,7) )
+        assert     rtconfig.evaluate_maxdevices( (1,7) )
+        assert not rtconfig.evaluate_maxdevices( (1,8) )
 
-        rtc = vtu.make_RuntimeConfig()
-        rtc.setMaxSize( (1,0) )
-        tf = TestFilter( rtc, None )
-        assert tf.checkMaxSize( tcase1 )
-        assert not tf.checkMaxSize( tcase2 )
-
-        rtc.setMaxSize( (1,4) )
-        assert tf.checkMaxSize( tcase1 )
-        assert not tf.checkMaxSize( tcase2 )
-
-        rtc.applyMaxProcsExpression( False )
-        assert tf.checkMaxSize( tcase1 )
-        assert tf.checkMaxSize( tcase2 )
+        rtconfig = RuntimeConfig()
+        rtconfig.setMaxSize( (4,None) )
+        assert rtconfig.evaluate_maxdevices( (1,1) )
+        assert rtconfig.evaluate_maxdevices( (1,1000000) )
 
     def test_filtering_out_tests_by_max_devices(self):
         ""
@@ -105,7 +99,6 @@ class device_tests( vtu.vvtestTestCase ):
             print ( 'device_ids='+repr(vvt.RESOURCE_IDS_ndevice) )
             print ( 'device_tot='+repr(vvt.RESOURCE_TOTAL_ndevice) )
             """ )
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '-n 1 -N 5 --devices 4' )
         vrun.assertCounts( total=1, npass=1 )

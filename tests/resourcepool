@@ -17,7 +17,6 @@ import time
 import vvtestutils as vtu
 import testutils as util
 from testutils import print3
-from vvtestutils import adjust_sys_path_for_unit_testing
 
 import libvvtest.rpool as rpool
 import libvvtest.vvplatform as vvplatform
@@ -149,7 +148,7 @@ class integration_tests( vtu.vvtestTestCase ):
 
     def test_the_platform_np_and_ndevice_resource_pools(self):
         ""
-        plat = vvplatform.Platform( '/fake', {} )
+        plat = vvplatform.Platform( 'fake' )
         plat.initProcs( None, 16, None, 4 )
 
         assert plat.sizeAvailable() == (16,4)

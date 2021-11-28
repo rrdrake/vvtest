@@ -189,13 +189,12 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
     def test_specifying_platform_options(self):
         ""
         util.writefile( "testA.vvt", """
-            import time
-            time.sleep(1)
             fp = open( 'testA.txt', 'w' ) ; fp.close()
             """ )
         time.sleep(1)
 
-        opts = '--platopt q=pickme --platopt walltime=1:30:00 --platopt PT=abc'
+        opts = '--platopt q=pickme --platopt walltime=1:30:00'
+        opts += ' --platopt PT=abc --platopt ppn=2'
 
         vrun = vtu.runvvtest( opts, batch=True )
         vrun.assertCounts( total=1, npass=1 )
@@ -203,7 +202,7 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
 
         assert len( glob.glob( 'TestResult*/testA/testA.txt' ) ) == 1
 
-        lines = util.grepfiles( 'np = 1', 'TestResult*/batchset*/qbat.*' )
+        lines = util.grepfiles( 'np = 2', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
 
         lines = util.grepfiles( 'qtime =', 'TestResult*/batchset*/qbat.*' )

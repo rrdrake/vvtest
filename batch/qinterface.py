@@ -19,7 +19,13 @@ class BatchQueueInterface:
 
     def isBatched(self):
         ""
-        return self.batch != None
+        return self.batch is not None
+
+    def getNodeSize(self):
+        ""
+        np = self.attrs.get( 'ppn', self.attrs.get( 'processors_per_node', None ) )
+        nd = self.attrs.get( 'dpn', self.attrs.get( 'devices_per_node', None ) )
+        return np,nd
 
     def getCleanExitMarker(self):
         ""
@@ -35,21 +41,19 @@ class BatchQueueInterface:
 
     def setQueueType(self, qtype, ppn, **kwargs):
         """
-        Set the batch system.  If 'batch' is a string, it must be one of the
-        known batch systems, such as
+        Set the batch system to one of these values:
 
+              slurm     : standard SLURM system
+              lsf       : LSF, such as the Sierra platform
               craypbs   : for Cray machines running PBS (or PBS-like)
               moab      : for Cray machines running Moab (may work in general)
               pbs       : standard PBS system
-              slurm     : standard SLURM system
-              lsf       : LSF, such as the Sierra platform
-
-        It can also be a python object which implements the batch functions.
         """
-        if type(qtype) == type(''):
-            self.batch = batch_queue_factory( qtype, ppn, **kwargs )
-        else:
-            self.batch = qtype
+        assert type(qtype) == type('')
+
+        self.batch = batch_queue_factory( qtype, ppn, **kwargs )
+
+        self.setAttr( 'ppn', ppn )
 
         return self.batch
 

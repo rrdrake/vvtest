@@ -26,6 +26,7 @@ from libvvtest.testcase import TestCase
 from libvvtest.ScriptReader import ScriptReader
 import libvvtest.testlistio as tio
 import libvvtest.parsevvt as parsevvt
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class script_tests( vtu.vvtestTestCase ):
@@ -725,7 +726,7 @@ class bad_attrs( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid, vtu.MockTestCaseFactory() )
+    tcase = tio.string_to_test( stringid, TestCaseFactory() )
 
     TestCreator().reparse( tcase.getSpec() )
 

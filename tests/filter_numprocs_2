@@ -19,155 +19,94 @@ import testutils as util
 from testutils import print3
 
 from libvvtest.RuntimeConfig import RuntimeConfig
+from libvvtest.filtering import TestFilter
 
 
 class filter_and_num_processors( vtu.vvtestTestCase ):
 
-    def test_batch_should_not_prune_based_on_max_procs(self):
-        ""
-        maxprocs = 4
-
-        util.writescript( 'atest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np=1
-            import vvtest_util as vvt
-            print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        util.writescript( 'btest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np="""+str(maxprocs)+"""
-            import vvtest_util as vvt
-            print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        util.writescript( 'ctest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np="""+str(maxprocs+1)+"""
-            import vvtest_util as vvt
-            print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        util.writescript( 'dtest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np="""+str(maxprocs+2)+"""
-            import vvtest_util as vvt
-            print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        time.sleep(1)
-
-        vrun = vtu.runvvtest( '-N '+str(maxprocs+1), batch=True )
-        vrun.assertCounts( total=3, npass=3 )
-
-        assert len( glob.glob( 'TestResults*/atest.np=1/execute.log' ) ) == 1
-        assert len( glob.glob( 'TestResults*/btest.np='+str(maxprocs)+'/execute.log' ) ) == 1
-        assert len( glob.glob( 'TestResults*/ctest.np='+str(maxprocs+1)+'/execute.log' ) ) == 1
-        assert len( glob.glob( 'TestResults*/dtest.*/execute.log' ) ) == 0
-
-    def test_filter_out_tests_exceeding_max_procs_command_line_switch(self):
-        ""
-        util.writescript( 'btest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np = 1 2 4
-            import vvtest_util as vvt
-            print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        util.writescript( 'ctest.vvt', """
-            #!"""+sys.executable+"""
-            #VVT: parameterize : np = 1 3 4
-            #VVT: analyze : --analyze
-            import sys
-            import vvtest_util as vvt
-            if '--analyze' in sys.argv:
-                print ( 'executing analyze, np='+str(vvt.PARAM_np) )
-            else:
-                print ( 'executing test, np='+str(vvt.np) )
-            """ )
-        time.sleep(1)
-
-        for batch in [False,True]:
-
-            vtu.remove_results()
-
-            vrun = vtu.runvvtest( batch=batch )
-            vrun.assertCounts( total=7, npass=7 )
-
-            vrun = vtu.runvvtest( '-R -N 2', batch=batch )
-            vrun.assertCounts( total=3, npass=3 )
-
-            assert vrun.countTestLines( 'btest.np=1' ) == 1
-            assert vrun.countTestLines( 'btest.np=2' ) == 1
-            assert vrun.countTestLines( 'ctest' ) == 1
-
-            vrun = vtu.runvvtest( '-R', batch=batch )
-            vrun.assertCounts( total=7, npass=7 )
-
-            vrun = vtu.runvvtest( '-R', batch=batch,
-                                        chdir=vrun.resultsDir() )
-            vrun.assertCounts( total=7, npass=7 )
-
-            vtu.remove_results()
-
-            vrun = vtu.runvvtest( '-N 2', batch=batch )
-            vrun.assertCounts( total=3, npass=3 )
-
-            assert vrun.countTestLines( 'btest.np=1' ) == 1
-            assert vrun.countTestLines( 'btest.np=2' ) == 1
-            assert vrun.countTestLines( 'ctest' ) == 1
-
-            vrun = vtu.runvvtest( '-R', batch=batch,
-                                        chdir=vrun.resultsDir() )
-            vrun.assertCounts( total=3, npass=3 )
-
-            assert vrun.countTestLines( 'btest.np=1' ) == 1
-            assert vrun.countTestLines( 'btest.np=2' ) == 1
-            assert vrun.countTestLines( 'ctest' ) == 1
-
-    def test_the_maxprocs_field_in_RuntimeConfig(self):
+    def test_evaluating_maxprocs_in_RuntimeConfig(self):
         ""
         rtconfig = RuntimeConfig()
-        assert rtconfig.evaluate_maxprocs( (1,0) )
+        assert rtconfig.evaluate_maxprocs( (1000000,0) )
 
         rtconfig = RuntimeConfig()
-        rtconfig.setMaxSize( (5,0) )
+        rtconfig.setMaxSize( (5,7) )
         assert     rtconfig.evaluate_maxprocs( (5,0) )
         assert not rtconfig.evaluate_maxprocs( (6,0) )
 
-    def test_max_procs_filter_is_not_applied_in_restart_mode(self):
+        rtconfig = RuntimeConfig()
+        rtconfig.setMaxSize( (None,0) )
+        assert rtconfig.evaluate_maxprocs( (1,0) )
+        assert rtconfig.evaluate_maxprocs( (1000000,0) )
+
+    def test_filtering_tests_by_maxprocs(self):
         ""
-        util.writefile( 'config/platform_plugin.py', """
+        tcase1 = vtu.make_fake_TestCase()
+        tcase1.getSpec().setParameters( { 'np':'1' } )
+
+        tcase2 = vtu.make_fake_TestCase()
+        tcase2.getSpec().setParameters( { 'np':'4' } )
+
+        rtc = vtu.make_RuntimeConfig()
+        rtc.setMaxSize( (1,0) )
+        tf = TestFilter( rtc, None )
+        assert tf.checkMaxSize( tcase1 )
+        assert not tf.checkMaxSize( tcase2 )
+
+        rtc.setMaxSize( (1,4) )
+        assert tf.checkMaxSize( tcase1 )
+        assert not tf.checkMaxSize( tcase2 )
+
+        rtc.applyMaxProcsExpression( False )
+        assert tf.checkMaxSize( tcase1 )
+        assert tf.checkMaxSize( tcase2 )
+
+    def test_maxprocs_filtering(self):
+        ""
+        util.writefile( 'cfg/platform_plugin.py', """
             def initialize( plat ):
-                plat.setattr( 'maxprocs', 4 )
+                plat.setattr( 'maxprocs', 3 )
             """ )
-        util.writefile( 'procs.vvt', """
-            #VVT: parameterize : np = 1 8
+
+        util.writescript( 'atest.vvt', """
+            #!"""+sys.executable+"""
+            #VVT: parameterize : np = 1 2 4
+            #VVT: analyze : --analyze
             """ )
-        time.sleep(1)
 
-        vrun = vtu.runvvtest( "--config config" )
-        vrun.assertCounts( total=1, npass=1 )
-        tdir = vrun.resultsDir()
+        for batch in [False,True]:
+            vtu.remove_results()
 
-        vrun = vtu.runvvtest( "-R --config", abspath('config'), chdir=tdir )
-        vrun.assertCounts( total=1, npass=1 )
+            vrun = vtu.runvvtest( '-vv --config cfg', batch=batch )
+            vrun.assertCounts( total=4, npass=2, skip=2 )
+            tdir = vrun.resultsDir()
 
-        vtu.remove_results()
+            vtu.remove_results()
+            vrun = vtu.runvvtest( '-vv -N 4 --config cfg', batch=batch )
+            vrun.assertCounts( total=4, npass=4 )
 
-        vrun = vtu.runvvtest( "-N 8 --config config" )
-        vrun.assertCounts( total=2, npass=2 )
+            # in restart, no max procs filter unless -N is on command line
+            vrun = vtu.runvvtest( '-R --config cfg', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=4, npass=4 )
 
-        vrun = vtu.runvvtest( "-R --config", abspath('config'), chdir=tdir )
-        vrun.assertCounts( total=2, npass=2 )
+            vrun = vtu.runvvtest( '-R -N 2 --config cfg', batch=batch, chdir=tdir )
+            vrun.assertCounts( total=2, npass=2 )
 
-    def test_max_procs_filter_is_not_applied_in_batch_mode(self):
+    def test_max_procs_filter_is_not_applied_in_batch_mode_by_default(self):
         ""
+        # avoid possible builtin setting of maxprocs
+        util.writefile( 'cfg/platform_plugin.py', """
+            def initialize( plat ):
+                pass
+            """ )
+        cfg = abspath( 'cfg' )
+
         util.writefile( 'procs.vvt', """
-            #VVT: parameterize : np = 1 100000
+            #VVT: parameterize : np = 1 1000000
             """ )
         time.sleep(1)
 
-        vrun = vtu.runvvtest( batch=True )
-        vrun.assertCounts( total=2, npass=2 )
-        tdir = vrun.resultsDir()
-
-        vrun = vtu.runvvtest( '-R', batch=True, chdir=tdir )
+        vrun = vtu.runvvtest( '--config', cfg, batch=True )
         vrun.assertCounts( total=2, npass=2 )
 
 

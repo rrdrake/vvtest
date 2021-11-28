@@ -21,11 +21,10 @@ class config_tests( vtu.vvtestTestCase ):
 
     def test_using_idplatform_in_a_specified_config_directory(self):
         ""
-        util.writefile( "tst.xml", """
-            <rtest name="tst">
-              <execute> echo "the COMPILER is $COMPILER" </execute>
-            </rtest>""" )
-        time.sleep(1)
+        util.writefile( "tst.vvt", """
+            import vvtest_util as vvt
+            print ( "the COMPILER is "+vvt.COMPILER )
+            """ )
 
         for batch in [False,True]:
 
@@ -36,7 +35,6 @@ class config_tests( vtu.vvtestTestCase ):
                     return "BASIC"
                 """ )
             vtu.remove_results()
-            time.sleep(1)
 
             vrun = vtu.runvvtest( '--config config', batch=batch,
                                                      addplatform=False )
@@ -52,7 +50,6 @@ class config_tests( vtu.vvtestTestCase ):
                     return "Fortran"
                 """ )
             vtu.remove_results()
-            time.sleep(1)
 
             os.environ['VVTEST_CONFIGDIR'] = 'nonsense'
             try:

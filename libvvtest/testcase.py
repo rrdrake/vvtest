@@ -8,9 +8,10 @@ from .teststatus import TestStatus
 
 class TestCase:
 
-    def __init__(self, testspec):
+    def __init__(self, testspec, nodesize=None):
         ""
         self.tspec = testspec
+        self.nsize = nodesize
         self.tstat = TestStatus()
 
         self.deps = []
@@ -27,10 +28,7 @@ class TestCase:
 
     def getSize(self):
         ""
-        params = self.getSpec().getParameters()
-        np = max( 1, int( params.get( 'np', 1 ) ) )
-        nd = max( 0, int( params.get( 'ndevice', 0 ) ) )
-        return np,nd
+        return compute_test_size( self.getSpec().getParameters(), self.nsize )
 
     def setHasDependent(self):
         ""
@@ -94,3 +92,21 @@ class TestCase:
         for dep_dir,match_pattern in self.depdirs.items():
             dirlist.append( (match_pattern,dep_dir) )
         return dirlist
+
+
+def compute_test_size( params, nodesize ):
+
+    np = max( 1, int( params['np'] ) ) if 'np' in params else 0
+    nn = max( 1, int( params['nnode'] ) ) if 'nnode' in params else 0
+
+    if nodesize:
+        if np and nn:
+            np = max( np, nn*nodesize )
+        elif nn:
+            np = nn*nodesize
+    if not np:
+        np = 1
+
+    nd = max( 0, int( params.get( 'ndevice', 0 ) ) )
+
+    return np,nd

@@ -143,9 +143,9 @@ class Batcher:
         ""
         tlist = self._make_TestList( bjob.getBatchID(), testL )
 
-        maxsize = compute_max_size( tlist )
+        jobsize = compute_job_size( tlist, self.jobhandler.getNodeSize() )
 
-        bjob.setMaxSize( maxsize )
+        bjob.setJobSize( jobsize )
         bjob.setAttr( 'testlist', tlist )
 
     def _make_TestList(self, batchid, qlist ):
@@ -185,6 +185,12 @@ class Batcher:
             # force a timeout for batches with only one test
             if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
             else:           cmd += ' -T ' + str(qtime-120)
+
+        np,nd = bjob.getJobSize()
+        if np:
+            cmd += ' -N '+str(np)
+        if nd:
+            cmd += ' --max-devices '+str(nd)
 
         cmd += ' || exit 1'
 
@@ -399,14 +405,37 @@ class BatchGroup:
         return [ self.tsum, self.size, self.groupid, self.tests ]
 
 
-def compute_max_size( tlist ):
+def compute_job_size( tlist, nodesize ):
     ""
-    maxsize = (0,0)
+    ppn,dpn = nodesize
+
+    mxnp = 1
+    mxnd = 0
     for tcase in tlist.getTests():
         np,nd = tcase.getSize()
-        maxsize = ( max( np, maxsize[0] ), max( nd, maxsize[1] ) )
+        mxnp = max( np, mxnp )
+        mxnd = max( nd, mxnd )
 
-    return maxsize
+    nn = 1
+
+    if ppn:
+        assert type(ppn) == type(2) and ppn > 0
+        numnd = int( mxnp/ppn )
+        if mxnp%ppn != 0:
+            numnd += 1
+        nn = max( nn, numnd )
+
+    if dpn and mxnd > 0:
+        assert type(dpn) == type(2) and dpn > 0
+        numnd = int( mxnd/dpn )
+        if mxnd%dpn != 0:
+            numnd += 1
+        nn = max( nn, numnd )
+
+    np = nn*ppn if ppn else mxnp
+    nd = nn*dpn if dpn else mxnd
+
+    return np,nd
 
 
 def apply_queue_timeout_bump_factor( qtime ):

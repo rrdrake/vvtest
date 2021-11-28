@@ -10,13 +10,13 @@ import platform
 from .vvplatform import Platform
 
 
-def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
+def create_Platform_instance( vvtestdir, platname, mode, platopts,
                               numprocs, maxprocs, devices, max_devices,
                               onopts, offopts ):
     ""
     assert vvtestdir
-    assert os.path.exists( vvtestdir )
-    assert os.path.isdir( vvtestdir )
+    assert os.path.exists( vvtestdir ) and os.path.isdir( vvtestdir )
+    assert mode in ['direct','batch','batchjob']
 
     optdict = {}
     if platname:         optdict['--plat']    = platname
@@ -32,7 +32,7 @@ def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
 
     initialize_platform( platcfg )
 
-    plat = Platform( platname,
+    plat = Platform( platname, mode=mode,
                      cplrname=cplrname,
                      environ=platcfg.envD,
                      attrs=platcfg.attrs,
@@ -59,7 +59,7 @@ class PlatformConfig:
 
         self.envD = {}
         self.attrs = {}
-        self.batchspec = ( 'procbatch', 1, {} )
+        self.batchspec = None
 
     def getName(self):  return self.platname
     def getCompiler(self): return self.cplrname
@@ -94,6 +94,13 @@ class PlatformConfig:
 
         self.batchspec = ( batch, ppn, kwargs )
 
+        ppnattr = self.getattr( 'ppn', None )
+        if ppnattr is None:
+            self.setattr( 'ppn', ppn )
+        else:
+            # ppn was set using --platopts, which takes precedence
+            self.batchspec[1] = ppnattr
+
 
 def set_platform_options( platcfg, platopts ):
     ""
@@ -110,12 +117,25 @@ def set_platform_options( platcfg, platopts ):
     QoS = platopts.get( 'QoS', None )
     platcfg.setattr( 'QoS', QoS )
 
+    ppn = platopts.get( 'ppn', platopts.get( 'processors_per_node', None ) )
+    if ppn is not None:
+        ppn = int( ppn )
+        assert ppn > 0
+        platcfg.setattr( 'ppn', ppn )
+
+    dpn = platopts.get( 'dpn', platopts.get( 'devices_per_node', None ) )
+    if dpn is not None:
+        dpn = int( dpn )
+        assert dpn > 0
+        platcfg.setattr( 'dpn', dpn )
+
 
 def determine_platform_and_compiler( platname, onopts, offopts ):
     ""
     idplatform = import_idplatform()
 
-    optdict = convert_to_option_dictionary( platname, onopts, offopts )
+    optdict = { '-o':onopts, '-O':offopts }
+    if platname: optdict['--plat'] = platname
 
     if not platname:
         if idplatform is not None and hasattr( idplatform, "platform" ):
@@ -158,15 +178,3 @@ def import_platform_plugin():
         platform_plugin = None
 
     return platform_plugin
-
-
-def convert_to_option_dictionary( platname, onopts, offopts ):
-    ""
-    optdict = {}
-
-    if platname: optdict['--plat'] = platname
-
-    optdict['-o'] = onopts
-    optdict['-O'] = offopts
-
-    return optdict

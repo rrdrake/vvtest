@@ -17,13 +17,29 @@ import time
 
 import vvtestutils as vtu
 import testutils as util
-from vvtestutils import adjust_sys_path_for_unit_testing
+from vvtestutils import clean_sys_path_and_plugin_modules
 
 from libvvtest.vvplatform import Platform
 import libvvtest.makeplatform as makeplatform
+from libvvtest.makeplatform import determine_platform_and_compiler
 
 
-class loading_idplatform( vtu.vvtestTestCase ):
+class idplatform( vtu.vvtestTestCase ):
+
+    def test_cleaning_sys_path_and_plugin_modules_for_unit_testing(self):
+        ""
+        util.writefile( 'adir/idplatform.py', 'pass' )
+        adir = abspath( 'adir' )
+
+        savepath = list( sys.path )
+        try:
+            sys.path.insert( 0, adir )
+            sys.path.append( adir )
+            assert adir in sys.path
+            clean_sys_path_and_plugin_modules()
+            assert adir not in sys.path
+        finally:
+            sys.path[:] = savepath
 
     def test_import_idplatform_module(self):
         ""
@@ -34,44 +50,15 @@ class loading_idplatform( vtu.vvtestTestCase ):
         adir = abspath( 'adir' )
         time.sleep(1)
 
-        # first check adjust_sys_path_for_unit_testing()
-        savepath = list( sys.path )
-        try:
-            sys.path.insert( 0, adir )
-            sys.path.append( adir )
-            assert adir in sys.path
-            adjust_sys_path_for_unit_testing()
-            assert adir not in sys.path
-        finally:
-            sys.path[:] = savepath
-
         # None is returned if idplatform.py not in sys.path
-        savepath = adjust_sys_path_for_unit_testing()
-        try:
-            idp = makeplatform.import_idplatform()
-        finally:
-            sys.path[:] = savepath
-        assert idp == None
+        with vtu.clean_sys_path():
+            assert makeplatform.import_idplatform() is None
 
         # module returned if idplatform.py is in sys.path
-        sys.path.insert( 0, adir )
-        try:
+        with vtu.clean_sys_path():
+            sys.path.insert( 0, adir )
             idp = makeplatform.import_idplatform()
-        finally:
-            sys.path.pop(0)
-        assert idp.hello() == 'world'
-
-    def test_option_convert_function(self):
-        ""
-        opts = makeplatform.convert_to_option_dictionary( None, [], [] )
-        assert '--plat' not in opts
-        assert opts['-o'] == []
-        assert opts['-O'] == []
-
-        opts = makeplatform.convert_to_option_dictionary( 'foo', ['a'], ['b'] )
-        assert opts['--plat'] == 'foo'
-        assert opts['-o'] == ['a']
-        assert opts['-O'] == ['b']
+            assert idp.hello() == 'world'
 
     def test_using_idplatform_to_define_platform_and_compiler(self):
         ""
@@ -84,27 +71,21 @@ class loading_idplatform( vtu.vvtestTestCase ):
         adir = abspath( 'adir' )
         time.sleep(1)
 
-        savepath = adjust_sys_path_for_unit_testing()
-        try:
-            plat1,cplr1 = makeplatform.determine_platform_and_compiler( None, [], [] )
-            plat2,cplr2 = makeplatform.determine_platform_and_compiler( 'foo', [], [] )
-        finally:
-            sys.path[:] = savepath
-        assert plat1 == platform.uname()[0] and cplr1 is None
-        assert plat2 == 'foo' and cplr2 is None
+        with vtu.clean_sys_path():
+            plat1,cplr1 = determine_platform_and_compiler( None, [], [] )
+            plat2,cplr2 = determine_platform_and_compiler( 'foo', [], [] )
+            assert plat1 == platform.uname()[0] and cplr1 is None
+            assert plat2 == 'foo' and cplr2 is None
 
-        savepath = adjust_sys_path_for_unit_testing()
-        try:
+        with vtu.clean_sys_path():
             sys.path.insert( 0, adir )
-            plat1,cplr1 = makeplatform.determine_platform_and_compiler( None, [], [] )
-            plat2,cplr2 = makeplatform.determine_platform_and_compiler( 'foo', [], [] )
-        finally:
-            sys.path[:] = savepath
-        assert plat1 == 'XBox' and cplr1 == 'llvm'
-        assert plat2 == 'foo' and cplr2 == 'llvm'
+            plat1,cplr1 = determine_platform_and_compiler( None, [], [] )
+            plat2,cplr2 = determine_platform_and_compiler( 'foo', [], [] )
+            assert plat1 == 'XBox' and cplr1 == 'llvm'
+            assert plat2 == 'foo' and cplr2 == 'llvm'
 
 
-class constructing_platform( vtu.vvtestTestCase ):
+class construction( vtu.vvtestTestCase ):
 
     def test_initialize_platformconfig_from_platform_plugin(self):
         ""
@@ -115,22 +96,16 @@ class constructing_platform( vtu.vvtestTestCase ):
         adir = abspath( 'adir' )
         time.sleep(1)
 
-        savepath = adjust_sys_path_for_unit_testing()
-        try:
+        with vtu.clean_sys_path():
             plat = makeplatform.PlatformConfig( {}, None, None )
             makeplatform.initialize_platform( plat )
-        finally:
-            sys.path[:] = savepath
-        assert plat.getattr( 'foo', None ) == None
+            assert plat.getattr( 'foo', None ) == None
 
-        savepath = adjust_sys_path_for_unit_testing()
-        try:
+        with vtu.clean_sys_path():
             plat = makeplatform.PlatformConfig( {}, None, None )
             sys.path.insert( 0, adir )
             makeplatform.initialize_platform( plat )
-        finally:
-            sys.path[:] = savepath
-        assert plat.getattr( 'foo', None ) == 'bar'
+            assert plat.getattr( 'foo', None ) == 'bar'
 
     def test_setting_platformconfig_options(self):
         ""
@@ -151,14 +126,14 @@ class constructing_platform( vtu.vvtestTestCase ):
     def test_the_create_Platform_instance_function(self):
         ""
         plat = makeplatform.create_Platform_instance(
-                    os.getcwd(), None, None, {},
+                    os.getcwd(), None, 'direct', {},
                     None, None, None, None,
                     None, None )
 
         optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
         plat = makeplatform.create_Platform_instance(
                     os.getcwd(),
-                    'XBox', True,
+                    'XBox', 'batch',
                     optD,
                     10, 20, None, None,
                     ['dbg'], ['symbols'] )
@@ -169,6 +144,70 @@ class constructing_platform( vtu.vvtestTestCase ):
         assert plat.getattr( 'queue' ) == 'justdoit'
         assert plat.getattr( 'account' ) == 'fy666'
         assert plat.getattr( 'walltime' ) == '2:34'
+
+
+class modes( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        ""
+        vtu.vvtestTestCase.setUp( self )
+
+        util.writefile( 'cfg/platform_plugin.py', """
+            def initialize( platobj ):
+                platobj.setattr( 'maxprocs', 27 )
+                platobj.setattr( 'maxdevices', 11 )
+            """ )
+        self.cfgdir = abspath( 'cfg' )
+
+        util.writefile( 'nocfg/platform_plugin.py', """
+            def initialize( platobj ):
+                pass
+            """ )
+        self.nocfg = abspath( 'nocfg' )
+
+    def test_direct_mode_getMaxSize(self):
+        ""
+        # precedence:
+        #   1. command line options
+        #   2. plugin value
+        #   3. CPU probe (no device probe yet)
+
+        check_maxsize( self.nocfg,  'direct', setmax=(23,None),   expected=(23,0) )
+        check_maxsize( self.nocfg,  'direct', setmax=(23,7),      expected=(23,7) )
+        check_maxsize( self.cfgdir, 'direct', setmax=(None,None), expected=(27,11) )
+        check_maxsize( self.cfgdir, 'direct', setmax=(23,7),      expected=(23,7) )
+
+        # the system probe should always return a positive integer
+        np,nd = check_maxsize( self.nocfg, 'direct', setmax=(None,None) )
+        assert type(np) == type(2) and np > 0
+        assert nd == 0
+
+    def test_batch_mode_getMaxSize(self):
+        ""
+        check_maxsize( self.nocfg,  'batch', setmax=(23,None),   expected=(23,0) )
+        check_maxsize( self.nocfg,  'batch', setmax=(23,7),      expected=(23,7) )
+        check_maxsize( self.cfgdir, 'batch', setmax=(None,None), expected=(27,11) )
+        check_maxsize( self.cfgdir, 'batch', setmax=(23,7),      expected=(23,7) )
+        # no max procs by default in batch mode:
+        check_maxsize( self.nocfg,  'batch', setmax=(None,None), expected=(None,0) )
+
+
+def check_maxsize( cfgdir, mode, setmax=(None,None), expected=None ):
+    ""
+    nprocs,ndevice = setmax
+
+    with vtu.clean_sys_path():
+        sys.path.insert( 0, cfgdir )
+
+        plat = makeplatform.create_Platform_instance(
+                    os.getcwd(), None, mode, {},
+                    None, nprocs, None, ndevice, None, None )
+
+        mxsz = plat.getMaxSize()
+        if expected is not None:
+            assert mxsz == expected
+
+    return mxsz
 
 
 ############################################################################

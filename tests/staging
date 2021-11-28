@@ -31,6 +31,7 @@ from libvvtest.testcreator import TestCreator
 from libvvtest.testcreator import TestMaker
 from libvvtest.parsevvt import ScriptTestParser
 import libvvtest.staging as staging
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class staged_parameters( vtu.vvtestTestCase ):
@@ -681,7 +682,7 @@ def find_single_dependency( tspec, testL ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid, vtu.MockTestCaseFactory() )
+    tcase = tio.string_to_test( stringid, TestCaseFactory() )
 
     TestCreator().reparse( tcase.getSpec() )
 

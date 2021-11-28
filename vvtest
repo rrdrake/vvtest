@@ -233,9 +233,15 @@ def construct_platform( rtdata, vvtestdir, opts, optD ):
     ""
     from libvvtest.makeplatform import create_Platform_instance
 
+    mode = 'direct'
+    if opts.batch:
+        mode = 'batch'
+    elif opts.qsub_id is not None:
+        mode = 'batchjob'
+
     plat = create_Platform_instance(
                 vvtestdir,
-                opts.plat, opts.batch,
+                opts.plat, mode,
                 optD['platopt_dict'],  # --platopt
                 opts.dash_n,
                 opts.dash_N,
@@ -314,17 +320,12 @@ def make_idtraits( opts ):
     return idtraits
 
 
-class MagicTestCaseFactory: # magic: move/remove this
-    def new(self, tspec):
-        from libvvtest.testcase import TestCase
-        return TestCase( tspec )
-
 def construct_testcase_factory( rtdata ):
     ""
-    ppn = rtdata.plat.getComputeNodeSize()
-    naxnp,maxnd = rtdata.plat.getMaxSize()
+    from libvvtest.tcfactory import TestCaseFactory
 
-    rtdata.tcasefactory = MagicTestCaseFactory()
+    nodesize = rtdata.plat.getNodeSize()
+    rtdata.tcasefactory = TestCaseFactory( nodesize )
 
 
 def construct_test_scanner( rtdata, scandirs, opts ):
@@ -463,7 +464,7 @@ def construct_results_writers( rtdata, opts, optD ):
         conobj = construct_console_writer( rtdata.testdir, opts, optD )
         writers.addWriter( conobj )
 
-    if opts.qsub_id == None:
+    if opts.qsub_id is None:
 
         if opts.html:
             htmlobj = construct_html_writer( rtdata.testdir, opts, optD,
@@ -707,8 +708,6 @@ def run_tests( opts, optD, rtdata ):
     ""
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
-    adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
-
     tlist = rtdata.tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
@@ -740,7 +739,7 @@ def restart_tests( opts, optD, rtdata ):
     ""
     batchid = opts.qsub_id
 
-    if batchid == None:
+    if batchid is None:
         rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
     adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
@@ -749,7 +748,7 @@ def restart_tests( opts, optD, rtdata ):
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
-    if batchid == None:
+    if batchid is None:
         rtdata.tlm.readTestList()
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
@@ -765,7 +764,7 @@ def restart_tests( opts, optD, rtdata ):
 
     xstat = run_test_exec_list( opts, optD, rtdata )
 
-    if batchid == None:
+    if batchid is None:
         rtdata.plugin.callEpilogue( rtdata.testdir, tlist.getTests() )
 
     return xstat
@@ -852,8 +851,6 @@ def output_timings( opts, optD, rtdata ):
 
     if not rtdata.isrestart:
 
-        adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
-
         rtdata.scanner.scanPaths( tlist )
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
@@ -874,21 +871,13 @@ def output_timings( opts, optD, rtdata ):
     cwriter.timings( tlist )
 
 
-def adjust_filter_settings_for_batch( opts, plat, rtconfig ):
-    ""
-    if opts.batch:
-        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            # we are batching and no num procs limit is available
-            rtconfig.applyMaxProcsExpression( False )
-
-
 def adjust_filter_settings_for_restart( opts, rtconfig ):
     ""
-    if opts.dash_N == None:
+    if opts.dash_N is None:
         # no max procs filter unless -N was given on command line
         rtconfig.applyMaxProcsExpression( False )
 
-    if opts.max_devices == None:
+    if opts.max_devices is None:
         # no max devices filter unless --max-devices was given on command line
         rtconfig.applyMaxDevicesExpression( False )
 
@@ -1042,7 +1031,7 @@ def run_test_exec_list( opts, optD, rtdata ):
                                     shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
-        xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
+        xlist.createTestExecs( check_dependencies=(opts.qsub_id is None) )
 
         totaltime = get_total_timeout( opts.total_timeout )
 
@@ -1068,7 +1057,7 @@ def construct_direct_runner( rtdata, tlist, xlist, qsub_id, totaltime ):
                                  rtdata.rtinfo, rtdata.results_writer,
                                  rtdata.plat, totaltime )
 
-    if qsub_id != None:
+    if qsub_id is not None:
         drun.setQsubID( qsub_id )
 
     return drun
@@ -1096,7 +1085,7 @@ def create_Batcher( opts, optD, rtdata, namer,
     import batch.batching as batching
     from batch.qinterface import BatchQueueInterface
 
-    assert opts.qsub_id == None
+    assert opts.qsub_id is None
 
     batchitf = BatchQueueInterface()
     plat.initializeBatchSystem( batchitf )
