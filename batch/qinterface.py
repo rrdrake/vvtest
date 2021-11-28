@@ -69,7 +69,7 @@ class BatchQueueInterface:
         qt = self.attrs.get( 'walltime', queue_time )
 
         hdr = '#!/bin/bash\n' + \
-              self.batch.header( size, qt, qout_file, self.attrs ) + '\n'
+              self.batch.header( size, qt, qout_file ) + '\n'
 
         hdr += 'cd '+quote(workdir)+' || exit 1\n'
 

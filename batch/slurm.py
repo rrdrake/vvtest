@@ -24,7 +24,7 @@ class BatchSLURM:
         ""
         self.runcmd = run_function
 
-    def header(self, size, qtime, outfile, plat_attrs):
+    def header(self, size, qtime, outfile):
         ""
         nnodes = compute_num_nodes( size, self.ppn, self.dpn )
 

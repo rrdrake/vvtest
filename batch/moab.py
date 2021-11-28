@@ -27,7 +27,7 @@ class BatchMOAB:
         self.variation = attrs.get( 'variation', '' )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
-    def header(self, size, qtime, outfile, plat_attrs):
+    def header(self, size, qtime, outfile):
         """
         """
         np,ndevice = size

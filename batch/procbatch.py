@@ -21,7 +21,7 @@ class ProcessBatch:
 
         self.childids = []
 
-    def header(self, size, qtime, outfile, plat_attrs):
+    def header(self, size, qtime, outfile):
         """
         """
         np,ndevice = size

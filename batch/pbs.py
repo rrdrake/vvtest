@@ -34,7 +34,7 @@ class BatchPBS:
         ""
         self.runcmd = run_function
 
-    def header(self, size, qtime, outfile, plat_attrs):
+    def header(self, size, qtime, outfile):
         ""
         np,ndevice = size
 
