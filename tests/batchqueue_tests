@@ -86,7 +86,7 @@ class procbatch_tests( vtu.vvtestTestCase ):
 
         obj = ProcessBatch( 8 )
 
-        hdr = obj.header( (8,0), 123, workdir, abspath('out.txt') , {} )
+        hdr = obj.header( (8,0), 123, abspath('out.txt') , {} )
 
         cmd,out,jobid,err = obj.submit( script, workdir, outfile )
 
@@ -132,7 +132,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         obj = BatchSLURM( 16 )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {} )
+        hdr = obj.header( (8,0), 123, abspath('out.txt') , {} )
         assert 'SBATCH' in hdr and 'nodes=1' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -151,10 +151,10 @@ class slurm_tests( vtu.vvtestTestCase ):
         """
         from batch.slurm import BatchSLURM
 
-        obj = BatchSLURM( 16 )
+        obj = BatchSLURM( 16, QoS='long' )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {'QoS': 'long'} )
+        hdr = obj.header( (8,0), 123, abspath('out.txt') , {} )
         print("This is hdr", hdr)
         assert '#SBATCH --qos=long' in hdr
 
@@ -204,7 +204,7 @@ class lsf_tests( vtu.vvtestTestCase ):
         obj = BatchLSF( 44 )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt') , {} )
+        hdr = obj.header( (8,0), 123, abspath('out.txt') , {} )
         assert 'BSUB' in hdr and 'nnodes 1' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -257,7 +257,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
         obj = BatchCrayPBS( 16 )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt'), {} )
+        hdr = obj.header( (8,0), 123, abspath('out.txt'), {} )
         assert 'MSUB' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',
@@ -300,7 +300,7 @@ class pbs_tests( vtu.vvtestTestCase ):
         obj = BatchPBS( 16 )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, os.getcwd(), abspath('out.txt'), {})
+        hdr = obj.header( (8,0), 123, abspath('out.txt'), {})
         assert 'PBS' in hdr
 
         cmd,out,jobid,err = obj.submit( 'batchscript',

@@ -94,6 +94,9 @@ class PlatformConfig:
 
         self.batchspec = ( batch, ppn, kwargs )
 
+        for n,v in kwargs.items():
+            self.setattr( n, v )
+
         ppnattr = self.getattr( 'ppn', None )
         if ppnattr is None:
             self.setattr( 'ppn', ppn )

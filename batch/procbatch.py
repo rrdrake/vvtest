@@ -13,15 +13,15 @@ from .helpers import runcmd, format_extra_flags
 
 class ProcessBatch:
 
-    def __init__(self, ppn, **kwargs):
+    def __init__(self, ppn, **attrs):
         ""
         self.ppn = max( ppn, 1 )
-        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+        self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
         self.childids = []
 
-    def header(self, size, qtime, workdir, outfile, plat_attrs):
+    def header(self, size, qtime, outfile, plat_attrs):
         """
         """
         np,ndevice = size
@@ -30,14 +30,11 @@ class ProcessBatch:
               '# np = '+str(np) + '\n' + \
               '# ndevice = '+str(ndevice) + '\n' + \
               '# qtime = '+str(qtime) + '\n' + \
-              '# workdir = '+str(workdir) + '\n' + \
-              '# outfile = '+str(outfile) + '\n\n' + \
-              'cd '+workdir + ' || exit 1\n'
+              '# outfile = '+str(outfile) + '\n\n'
 
         return hdr
 
-    def submit(self, fname, workdir, outfile,
-                     queue=None, account=None, confirm=False, **kwargs):
+    def submit(self, fname, workdir, outfile, queue=None, account=None):
         """
         Executes the script 'fname' as a background process.
         Returns (cmd, out, job id, error message) where 'cmd' is
@@ -51,6 +48,7 @@ class ProcessBatch:
 
         jobid = os.fork()
 
+        # magic: move this use of workdir into the caller
         if jobid == 0:
             os.chdir(workdir)
             fpout = open( outfile, 'w' )

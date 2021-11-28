@@ -7,6 +7,12 @@
 import os
 import sys
 
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
+
+
 class BatchQueueInterface:
 
     def __init__(self):
@@ -51,7 +57,7 @@ class BatchQueueInterface:
         """
         assert type(qtype) == type('')
 
-        self.batch = batch_queue_factory( qtype, ppn, **kwargs )
+        self.batch = batch_queue_factory( qtype, ppn, self.attrs )
 
         self.setAttr( 'ppn', ppn )
 
@@ -63,7 +69,9 @@ class BatchQueueInterface:
         qt = self.attrs.get( 'walltime', queue_time )
 
         hdr = '#!/bin/bash\n' + \
-              self.batch.header( size, qt, workdir, qout_file, self.attrs ) + '\n'
+              self.batch.header( size, qt, qout_file, self.attrs ) + '\n'
+
+        hdr += 'cd '+quote(workdir)+' || exit 1\n'
 
         if qout_file:
             hdr += 'touch '+qout_file + ' || exit 1\n'
@@ -73,7 +81,6 @@ class BatchQueueInterface:
         with open( filename, 'wt' ) as fp:
 
             fp.writelines( [ hdr + '\n\n',
-                             'cd ' + workdir + ' || exit 1\n',
                              'echo "job start time = `date`"\n' + \
                              'echo "job time limit = ' + str(queue_time) + '"\n' ] )
 
@@ -115,26 +122,26 @@ class BatchQueueInterface:
                 self.batch.cancel( jid )
 
 
-def batch_queue_factory( qtype, ppn, **kwargs ):
+def batch_queue_factory( qtype, ppn, batchattrs ):
     ""
     if qtype == 'procbatch':
         from . import procbatch
-        batch = procbatch.ProcessBatch( ppn, **kwargs )
+        batch = procbatch.ProcessBatch( ppn, **batchattrs )
     elif qtype == 'craypbs':
         from . import craypbs
-        batch = craypbs.BatchCrayPBS( ppn, **kwargs )
+        batch = craypbs.BatchCrayPBS( ppn, **batchattrs )
     elif qtype == 'pbs':
         from . import pbs
-        batch = pbs.BatchPBS( ppn, **kwargs )
+        batch = pbs.BatchPBS( ppn, **batchattrs )
     elif qtype == 'slurm':
         from . import slurm
-        batch = slurm.BatchSLURM( ppn, **kwargs )
+        batch = slurm.BatchSLURM( ppn, **batchattrs )
     elif qtype == 'moab':
         from . import moab
-        batch = moab.BatchMOAB( ppn, **kwargs )
+        batch = moab.BatchMOAB( ppn, **batchattrs )
     elif qtype == 'lsf':
         from . import lsf
-        batch = lsf.BatchLSF( ppn, **kwargs )
+        batch = lsf.BatchLSF( ppn, **batchattrs )
     else:
         raise Exception( "Unknown batch system name: "+str(qtype) )
 

@@ -12,21 +12,21 @@ from .helpers import runcmd, format_extra_flags
 
 class BatchPBS:
 
-    def __init__(self, ppn, variation=None, **kwargs):
+    def __init__(self, ppn, **attrs):
         """
-        If 'variation' is given in the BatchPBS constructor, it causes the
-        header to be created a little differently.  The known values are:
+        The 'variation' attribute causes the header to be created a little
+        differently.  The only known value is:
 
           "select" : The -lselect= option is used instead of -lnodes= such as
                        -l select=<num nodes>:mpiprocs=<ppn>:ncpus=<ppn>
                      where <num nodes> is the number of nodes needed and <ppn>
                      is the number of processors per node.
 
-        By default, the -lnodes= method is used.
+        By default, the -lnodes method is used.
         """
         self.ppn = max( ppn, 1 )
-        self.variation = variation
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+        self.variation = attrs.get( 'variation', None )
+        self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
         self.runcmd = runcmd
 
@@ -34,7 +34,7 @@ class BatchPBS:
         ""
         self.runcmd = run_function
 
-    def header(self, size, qtime, workdir, outfile, plat_attrs):
+    def header(self, size, qtime, outfile, plat_attrs):
         ""
         np,ndevice = size
 
@@ -51,14 +51,12 @@ class BatchPBS:
 
         hdr = hdr +  '#PBS -l walltime=' + self.HMSformat(qtime) + '\n' + \
                      '#PBS -j oe\n' + \
-                     '#PBS -o ' + outfile + '\n' + \
-                     'cd ' + workdir + '\n'
+                     '#PBS -o ' + outfile + '\n'
 
         return hdr
 
 
-    def submit(self, fname, workdir, outfile,
-                     queue=None, account=None, confirm=False, **kwargs):
+    def submit(self, fname, workdir, outfile, queue=None, account=None):
         """
         Creates and executes a command to submit the given filename as a batch
         job to the resource manager.  Returns (cmd, out, job id, error message)
@@ -66,10 +64,6 @@ class BatchPBS:
         running the command.  The job id is None if an error occured, and error
         message is a string containing the error.  If successful, job id is an
         integer.
-
-        If 'confirm' is true, the job is submitted then the queue is queried
-        until the job id shows up.  If it does not show up in about 20 seconds,
-        an error is returned.
         """
         cmdL = ['qsub']+self.extra_flags
         if queue != None: cmdL.extend(['-q',queue])
@@ -93,19 +87,6 @@ class BatchPBS:
         if jobid == None:
             return cmd, out, None, "batch submission failed or could not parse " + \
                                    "output to obtain the job id"
-
-        if confirm:
-            time.sleep(1)
-            ok = 0
-            for i in range(20):
-                c,o,e,stateD = self.query([jobid])
-                if stateD.get(jobid,''):
-                    ok = 1
-                    break
-                time.sleep(1)
-            if not ok:
-                return cmd, out, None, "could not confirm that the job entered " + \
-                          "the queue after 20 seconds (job id " + str(jobid) + ")"
 
         return cmd, out, jobid, ""
 

@@ -16,11 +16,11 @@ jobpat = re.compile( r'Job\s+<\d+>\s+is submitted to' ) #, re.MULTILINE )
 
 class BatchLSF:
 
-    def __init__(self, ppn, **kwargs):
+    def __init__(self, ppn, **attrs):
         ""
         self.ppn = max( 1, ppn )
-        self.dpn = max( int( kwargs.get( 'devices_per_node', 0 ) ), 0 )
-        self.extra_flags = format_extra_flags(kwargs.get("extra_flags",None))
+        self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
+        self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
         self.runcmd = runcmd
 
@@ -28,20 +28,18 @@ class BatchLSF:
         ""
         self.runcmd = run_function
 
-    def header(self, size, qtime, workdir, outfile, plat_attrs):
+    def header(self, size, qtime, outfile, plat_attrs):
         ""
         nnodes = compute_num_nodes( size, self.ppn, self.dpn )
 
         hdr = '#BSUB -W ' + minutes_of_time(qtime) + '\n' + \
               '#BSUB -nnodes ' + str(nnodes) + '\n' + \
               '#BSUB -o ' + outfile + '\n' + \
-              '#BSUB -e ' + outfile + '\n' + \
-              'cd ' + workdir + ' || exit 1\n'
+              '#BSUB -e ' + outfile + '\n'
 
         return hdr
 
-    def submit(self, fname, workdir, outfile,
-                     queue=None, account=None, **kwargs):
+    def submit(self, fname, workdir, outfile, queue=None, account=None):
         """
         Creates and executes a command to submit the given filename as a batch
         job to the resource manager.  Returns (cmd, out, job id, error message)
