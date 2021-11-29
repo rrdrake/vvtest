@@ -93,15 +93,15 @@ class Platform:
 
     def initializeBatchSystem(self, batchitf):
         ""
+        for n,v in self.attrs.items():
+            batchitf.setAttr( n, v )
+
         if self.batchspec:
             qtype,ppn,kwargs = self.batchspec
             batchitf.setQueueType( qtype, ppn, **kwargs )
 
         for n,v in self.envD.items():
             batchitf.setEnviron( n, v )
-
-        for n,v in self.attrs.items():
-            batchitf.setAttr( n, v )
 
     def getDefaultQsubLimit(self):
         ""

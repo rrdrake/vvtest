@@ -209,13 +209,14 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         assert len( lines ) == 1
         assert lines[0].split( 'qtime =', 1 )[1].strip() == '1:30:00'
 
-        lines = util.grepfiles( 'queue = pickme',
-                                'TestResult*/batchset*/qbat-out.*' )
+        lines = util.grepfiles( 'batch attrs = ', 'TestResult*/batchset*/qbat-out.*' )
         assert len( lines ) == 1
-
-        lines = util.grepfiles( 'account = abc',
-                                'TestResult*/batchset*/qbat-out.*' )
-        assert len( lines ) == 1
+        attrs = eval( lines[0].split( 'batch attrs = ', 1 )[1].strip() )
+        # print ( attrs )
+        self.assertEqual( attrs, { 'queue': 'pickme',
+                                   'dpn': None,
+                                   'account': 'abc',
+                                   'walltime': '1:30:00' } )
 
     def test_restarting_a_killed_batch_run_three_times(self):
         """

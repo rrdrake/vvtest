@@ -95,10 +95,13 @@ class BatchQueueInterface:
 
     def submitJob(self, workdir, outfile, scriptname):
         ""
-        q = self.attrs.get( 'queue', None )
-        acnt = self.attrs.get( 'account', None )
-        cmd, out, jobid, err = \
-                self.batch.submit( scriptname, workdir, outfile, q, acnt )
+        cwd = os.getcwd()
+        os.chdir( workdir )
+        try:
+            cmd, out, jobid, err = self.batch.submit( scriptname, outfile )
+        finally:
+            os.chdir( cwd )
+
         if err:
             print3( cmd + os.linesep + out + os.linesep + err )
         else:
@@ -124,6 +127,10 @@ class BatchQueueInterface:
 
 def batch_queue_factory( qtype, ppn, batchattrs ):
     ""
+    # magic: remove ppn as a separate argument
+    ppn2 = batchattrs.pop( 'ppn', None )
+    assert ppn2 is None or ppn == ppn2
+
     if qtype == 'procbatch':
         from . import procbatch
         batch = procbatch.ProcessBatch( ppn, **batchattrs )

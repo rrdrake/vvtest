@@ -15,6 +15,7 @@ class ProcessBatch:
 
     def __init__(self, ppn, **attrs):
         ""
+        self.attrs = attrs
         self.ppn = max( ppn, 1 )
         self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
@@ -34,7 +35,7 @@ class ProcessBatch:
 
         return hdr
 
-    def submit(self, fname, workdir, outfile, queue=None, account=None):
+    def submit(self, fname, outfile):
         """
         Executes the script 'fname' as a background process.
         Returns (cmd, out, job id, error message) where 'cmd' is
@@ -48,14 +49,11 @@ class ProcessBatch:
 
         jobid = os.fork()
 
-        # magic: move this use of workdir into the caller
         if jobid == 0:
-            os.chdir(workdir)
             fpout = open( outfile, 'w' )
             os.dup2( fpout.fileno(), sys.stdout.fileno() )
             os.dup2( fpout.fileno(), sys.stderr.fileno() )
-            sys.stdout.write( 'queue = '+str(queue) + '\n' + \
-                              'account = '+str(account) + '\n\n' )
+            sys.stdout.write( 'batch attrs = '+str(self.attrs) + '\n\n' )
             sys.stdout.flush()
             os.execv( '/bin/bash', ['/bin/bash', fname] )
 

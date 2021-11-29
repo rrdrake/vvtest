@@ -22,6 +22,7 @@ class BatchMOAB:
 
             knl : Cray KNL partition
         """
+        self.attrs = attrs
         self.ppn = max( ppn, 1 )
         self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
         self.variation = attrs.get( 'variation', '' )
@@ -49,7 +50,7 @@ class BatchMOAB:
         return hdr
 
 
-    def submit(self, fname, workdir, outfile, queue=None, account=None):
+    def submit(self, fname, outfile):
         """
         Creates and executes a command to submit the given filename as a batch
         job to the resource manager.  Returns (cmd, out, job id, error message)
@@ -58,6 +59,9 @@ class BatchMOAB:
         message is a string containing the error.  If successful, job id is an
         integer.
         """
+        queue = self.attrs.get( 'queue', None )
+        account = self.attrs.get( 'account', None )
+
         cmdL = ['msub']+self.extra_flags
         if queue != None: cmdL.extend(['-q',queue])
         if account != None: cmdL.extend(['-A',account])
@@ -67,7 +71,7 @@ class BatchMOAB:
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
 
-        x, out = runcmd( cmdL, workdir )
+        x, out = runcmd( cmdL )
 
         # output should contain something like the following
         #    12345.ladmin1 or 12345.sdb

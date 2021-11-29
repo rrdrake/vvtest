@@ -64,7 +64,7 @@ def check_extra_batch_submit_flags( batch_type, mock_run_cmd ):
     for flags in ['-V', ['-v','var=val'], '-v var=val']:
         obj = batch_type( 16, extra_flags=flags)
         obj.setRunCommand( mock_run_cmd )
-        cmd,out,jobid,err = obj.submit( 'script', 'dir', 'out' )
+        cmd,out,jobid,err = obj.submit( 'script', 'out' )
         check = flags if type(flags)==type('') else ' '.join(flags)
         assert check in cmd, 'expected '+repr(check)+' to appear in '+repr(cmd)
 
@@ -78,7 +78,6 @@ class procbatch_tests( vtu.vvtestTestCase ):
             touch """+abspath( 'touch.txt' )+"""
             """ )
         script = abspath('script')
-        workdir = os.getcwd()
         outfile = abspath('out.txt')
         time.sleep(1)
 
@@ -88,7 +87,7 @@ class procbatch_tests( vtu.vvtestTestCase ):
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
 
-        cmd,out,jobid,err = obj.submit( script, workdir, outfile )
+        cmd,out,jobid,err = obj.submit( script, outfile )
 
         time.sleep(4)
         cmd,out,err,stateD = obj.query( [jobid] )
@@ -135,9 +134,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
         assert 'SBATCH' in hdr and 'nodes=1' in hdr
 
-        cmd,out,jobid,err = obj.submit( 'batchscript',
-                                        'work_directory',
-                                        'out_filename' )
+        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
         assert jobid == 291041
 
         cmd,out,err,stateD = obj.query( [ 16004368, 16014368 ] )
@@ -154,9 +151,9 @@ class slurm_tests( vtu.vvtestTestCase ):
         obj = BatchSLURM( 16, QoS='long' )
         obj.setRunCommand( self.mock_run_command )
 
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
-        print("This is hdr", hdr)
-        assert '#SBATCH --qos=long' in hdr
+        cmd, out, jid, err = obj.submit( 'foo', 'bar' )
+        print ( cmd )
+        assert '--qos=long' in cmd
 
     def test_cancel_function(self):
         ""
@@ -207,9 +204,7 @@ class lsf_tests( vtu.vvtestTestCase ):
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
         assert 'BSUB' in hdr and 'nnodes 1' in hdr
 
-        cmd,out,jobid,err = obj.submit( 'batchscript',
-                                        'work_directory',
-                                        'out_filename' )
+        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
         assert jobid == 68628
 
         cmd,out,err,stateD = obj.query( [ 68628, 68728, 38594 ] )
@@ -260,9 +255,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
         assert 'MSUB' in hdr
 
-        cmd,out,jobid,err = obj.submit( 'batchscript',
-                                        'work_directory',
-                                        'out_filename' )
+        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
         assert jobid == '12345.sdb'
 
         cmd,out,err,stateD = obj.query( [ '12345.sdb', '123457.sdb', '7345.sdb' ] )
@@ -303,9 +296,7 @@ class pbs_tests( vtu.vvtestTestCase ):
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
         assert 'PBS' in hdr
 
-        cmd,out,jobid,err = obj.submit( 'batchscript',
-                                        'work_directory',
-                                        'out_filename' )
+        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
         assert jobid == '12345.ladmin1'
 
         cmd,out,err,stateD = obj.query(

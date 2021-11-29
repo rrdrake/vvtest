@@ -18,6 +18,7 @@ class BatchLSF:
 
     def __init__(self, ppn, **attrs):
         ""
+        self.attrs = attrs
         self.ppn = max( 1, ppn )
         self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
@@ -39,7 +40,7 @@ class BatchLSF:
 
         return hdr
 
-    def submit(self, fname, workdir, outfile, queue=None, account=None):
+    def submit(self, fname, outfile):
         """
         Creates and executes a command to submit the given filename as a batch
         job to the resource manager.  Returns (cmd, out, job id, error message)
@@ -52,18 +53,19 @@ class BatchLSF:
         cmdL.extend( [ '-J', basename(fname) ] )
         cmdL.extend( [ '-e', outfile ] )
         cmdL.extend( [ '-o', outfile ] )
-        cmdL.extend( [ '-cwd', workdir ] )
 
+        queue = self.attrs.get( 'queue', None )
         if queue != None:
             cmdL.extend( [ '-q', queue ] )
 
+        account = self.attrs.get( 'account', None )
         if account != None:
             pass
 
         cmdL.append(fname)
         cmd = ' '.join( cmdL )
 
-        x, out = self.runcmd( cmdL, workdir )
+        x, out = self.runcmd( cmdL )
 
         # output should contain something like
         #    Job <68628> is submitted to default queue <normal>.

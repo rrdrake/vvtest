@@ -16,9 +16,20 @@ class BatchSLURM:
         self.attrs = attrs
         self.ppn = max( ppn, 1 )
         self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
-        self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
+
+        args = format_extra_flags( attrs.get("extra_flags",None) )
+        args.extend( self._attr_to_option( 'queue',   '--partition' ) )
+        args.extend( self._attr_to_option( 'account', '--account' ) )
+        args.extend( self._attr_to_option( 'QoS',     '--qos' ) )
+        self.submit_args = args
 
         self.runcmd = runcmd
+
+    def _attr_to_option(self, attr_name, option_name):
+        ""
+        if attr_name in self.attrs and self.attrs[attr_name] is not None:
+            return [ option_name+'='+self.attrs[attr_name] ]
+        return []
 
     def setRunCommand(self, run_function):
         ""
@@ -33,37 +44,24 @@ class BatchSLURM:
               '#SBATCH --output=' + outfile + '\n' + \
               '#SBATCH --error=' + outfile + '\n'
 
-        # Add a line for Quality of Service (QoS) if the user defined it.
-        QoS = self.attrs.get('QoS', None)
-        if QoS is not None:
-            hdr += '\n#SBATCH --qos=' + QoS
-
         return hdr
 
-    def submit(self, fname, workdir, outfile, queue=None, account=None):
+    def submit(self, fname, outfile):
         """
         Creates and executes a command to submit the given filename as a batch
         job to the resource manager.  Returns (cmd, out, job id, error message)
         where 'cmd' is the submit command executed, 'out' is the output from
         running the command.  The job id is None if an error occured, and error
-        message is a string containing the error.  If successful, job id is an
-        integer.
+        message is a string containing the error.
         """
-        cmdL = ['sbatch']+self.extra_flags
-        if queue != None:
-            cmdL.append('--partition='+queue)
-        if account != None:
-            cmdL.append('--account='+account)
-        if 'QoS' in self.attrs and self.attrs['QoS'] != None:
-            cmdL.append('--qos='+self.attrs['QoS'])
-
+        cmdL = ['sbatch']+self.submit_args
         cmdL.append('--output='+outfile)
         cmdL.append('--error='+outfile)
-        cmdL.append('--chdir='+workdir)
         cmdL.append(fname)
-        cmd = ' '.join( cmdL )
 
-        x, out = self.runcmd( cmdL, workdir )
+        cmdstr = ' '.join( cmdL )
+
+        x, out = self.runcmd( cmdL )
 
         # output should contain something like the following
         #    sbatch: Submitted batch job 291041
@@ -81,10 +79,11 @@ class BatchSLURM:
                         jobid = None
 
         if jobid == None:
-            return cmd, out, None, "batch submission failed or could not parse " + \
-                                   "output to obtain the job id"
+            return cmdstr, out, None, \
+                "batch submission failed or could not parse " + \
+                "output to obtain the job id"
 
-        return cmd, out, jobid, ""
+        return cmdstr, out, jobid, ""
 
     def query(self, jobidL):
         """
@@ -95,7 +94,7 @@ class BatchSLURM:
         contains an error message if an error occurred when getting the states.
         """
         cmdL = ['squeue', '--noheader', '-o', '%i %t']
-        cmd = ' '.join( cmdL )
+        cmdstr = ' '.join( cmdL )
         x, out = self.runcmd(cmdL)
 
         stateD = {}
@@ -124,7 +123,7 @@ class BatchSLURM:
                 e = sys.exc_info()[1]
                 err = "failed to parse squeue output: " + str(e)
 
-        return cmd, out, err, stateD
+        return cmdstr, out, err, stateD
 
     def cancel(self, jobid):
         ""
