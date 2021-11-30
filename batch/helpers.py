@@ -9,6 +9,19 @@ import shlex
 import subprocess
 
 
+def get_node_size( attrs ):
+    ""
+    ppn = max( 1, int( attrs.get( 'processors_per_node', attrs.get( 'ppn', 0 ) ) ) )
+
+    dpn = attrs.get( 'devices_per_node', attrs.get( 'dpn', 0 ) )
+    if dpn:
+        dpn = max( 0, dpn )
+    else:
+        dpn = 0
+
+    return ppn,dpn
+
+
 def compute_num_nodes( size, cores_per_node, devices_per_node ):
     ""
     np,ndevice = size

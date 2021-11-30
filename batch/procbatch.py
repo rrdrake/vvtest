@@ -9,15 +9,15 @@ import time
 import signal
 import subprocess
 
-from .helpers import runcmd, format_extra_flags
+from .helpers import runcmd, format_extra_flags, get_node_size
+
 
 class ProcessBatch:
 
-    def __init__(self, ppn, **attrs):
+    def __init__(self, **attrs):
         ""
         self.attrs = attrs
-        self.ppn = max( ppn, 1 )
-        self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
+        self.ppn,self.dpn = get_node_size( attrs )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
         self.childids = []

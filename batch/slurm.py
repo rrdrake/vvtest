@@ -7,15 +7,14 @@
 import os, sys
 import time
 
-from .helpers import runcmd, compute_num_nodes, format_extra_flags
+from .helpers import runcmd, compute_num_nodes, format_extra_flags, get_node_size
 
 class BatchSLURM:
 
-    def __init__(self, ppn, **attrs):
+    def __init__(self, **attrs):
         ""
         self.attrs = attrs
-        self.ppn = max( ppn, 1 )
-        self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
+        self.ppn,self.dpn = get_node_size( attrs )
 
         args = format_extra_flags( attrs.get("extra_flags",None) )
         args.extend( self._attr_to_option( 'queue',   '--partition' ) )

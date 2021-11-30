@@ -57,9 +57,9 @@ class BatchQueueInterface:
         """
         assert type(qtype) == type('')
 
-        self.batch = batch_queue_factory( qtype, ppn, self.attrs )
-
         self.setAttr( 'ppn', ppn )
+
+        self.batch = batch_queue_factory( qtype, self.attrs )
 
         return self.batch
 
@@ -125,30 +125,28 @@ class BatchQueueInterface:
                 self.batch.cancel( jid )
 
 
-def batch_queue_factory( qtype, ppn, batchattrs ):
+def batch_queue_factory( qtype, batchattrs ):
     ""
-    # magic: remove ppn as a separate argument
-    ppn2 = batchattrs.pop( 'ppn', None )
-    assert ppn2 is None or ppn == ppn2
+    assert batchattrs['ppn']
 
     if qtype == 'procbatch':
         from . import procbatch
-        batch = procbatch.ProcessBatch( ppn, **batchattrs )
+        batch = procbatch.ProcessBatch( **batchattrs )
     elif qtype == 'craypbs':
         from . import craypbs
-        batch = craypbs.BatchCrayPBS( ppn, **batchattrs )
+        batch = craypbs.BatchCrayPBS( **batchattrs )
     elif qtype == 'pbs':
         from . import pbs
-        batch = pbs.BatchPBS( ppn, **batchattrs )
+        batch = pbs.BatchPBS( **batchattrs )
     elif qtype == 'slurm':
         from . import slurm
-        batch = slurm.BatchSLURM( ppn, **batchattrs )
+        batch = slurm.BatchSLURM( **batchattrs )
     elif qtype == 'moab':
         from . import moab
-        batch = moab.BatchMOAB( ppn, **batchattrs )
+        batch = moab.BatchMOAB( **batchattrs )
     elif qtype == 'lsf':
         from . import lsf
-        batch = lsf.BatchLSF( ppn, **batchattrs )
+        batch = lsf.BatchLSF( **batchattrs )
     else:
         raise Exception( "Unknown batch system name: "+str(qtype) )
 

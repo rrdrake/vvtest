@@ -62,7 +62,7 @@ class general_tests( vtu.vvtestTestCase ):
 def check_extra_batch_submit_flags( batch_type, mock_run_cmd ):
     ""
     for flags in ['-V', ['-v','var=val'], '-v var=val']:
-        obj = batch_type( 16, extra_flags=flags)
+        obj = batch_type( extra_flags=flags)
         obj.setRunCommand( mock_run_cmd )
         cmd,out,jobid,err = obj.submit( 'script', 'out' )
         check = flags if type(flags)==type('') else ' '.join(flags)
@@ -83,7 +83,7 @@ class procbatch_tests( vtu.vvtestTestCase ):
 
         from batch.procbatch import ProcessBatch
 
-        obj = ProcessBatch( 8 )
+        obj = ProcessBatch( ppn=8 )
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
 
@@ -128,7 +128,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         ""
         from batch.slurm import BatchSLURM
 
-        obj = BatchSLURM( 16 )
+        obj = BatchSLURM( ppn=16 )
         obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
@@ -148,7 +148,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         """
         from batch.slurm import BatchSLURM
 
-        obj = BatchSLURM( 16, QoS='long' )
+        obj = BatchSLURM( ppn=16, QoS='long' )
         obj.setRunCommand( self.mock_run_command )
 
         cmd, out, jid, err = obj.submit( 'foo', 'bar' )
@@ -159,7 +159,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         ""
         from batch.slurm import BatchSLURM
 
-        obj = BatchSLURM( 16 )
+        obj = BatchSLURM( ppn=16 )
         obj.setRunCommand( self.mock_run_command )
 
         obj.cancel( 123456 )
@@ -169,7 +169,7 @@ class slurm_tests( vtu.vvtestTestCase ):
         ""
         from batch.slurm import BatchSLURM
         check_extra_batch_submit_flags( BatchSLURM, self.mock_run_command )
-        self.assertRaises( ValueError, BatchSLURM, 16, extra_flags=5 )
+        self.assertRaises( ValueError, BatchSLURM, ppn=16, extra_flags=5 )
 
 
 class lsf_tests( vtu.vvtestTestCase ):
@@ -198,7 +198,7 @@ class lsf_tests( vtu.vvtestTestCase ):
         ""
         from batch.lsf import BatchLSF
 
-        obj = BatchLSF( 44 )
+        obj = BatchLSF( ppn=44 )
         obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
@@ -217,7 +217,7 @@ class lsf_tests( vtu.vvtestTestCase ):
         ""
         from batch.lsf import BatchLSF
 
-        obj = BatchLSF( 44 )
+        obj = BatchLSF( ppn=44 )
         obj.setRunCommand( self.mock_run_command )
 
         obj.cancel( 123456 )
@@ -227,7 +227,7 @@ class lsf_tests( vtu.vvtestTestCase ):
         ""
         from batch.lsf import BatchLSF
         check_extra_batch_submit_flags( BatchLSF, self.mock_run_command )
-        self.assertRaises( ValueError, BatchLSF, 16, extra_flags=5 )
+        self.assertRaises( ValueError, BatchLSF, ppn=16, extra_flags=5 )
 
 
 class craypbs_tests( vtu.vvtestTestCase ):
@@ -249,7 +249,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
         ""
         from batch.craypbs import BatchCrayPBS
 
-        obj = BatchCrayPBS( 16 )
+        obj = BatchCrayPBS( ppn=16 )
         obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
@@ -268,7 +268,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
         ""
         from batch.craypbs import BatchCrayPBS
         check_extra_batch_submit_flags( BatchCrayPBS, self.mock_run_command )
-        self.assertRaises( ValueError, BatchCrayPBS, 16, extra_flags=5 )
+        self.assertRaises( ValueError, BatchCrayPBS, ppn=16, extra_flags=5 )
 
 
 class pbs_tests( vtu.vvtestTestCase ):
@@ -290,7 +290,7 @@ class pbs_tests( vtu.vvtestTestCase ):
         ""
         from batch.pbs import BatchPBS
 
-        obj = BatchPBS( 16 )
+        obj = BatchPBS( ppn=16 )
         obj.setRunCommand( self.mock_run_command )
 
         hdr = obj.header( (8,0), 123, abspath('out.txt') )
@@ -310,7 +310,7 @@ class pbs_tests( vtu.vvtestTestCase ):
         ""
         from batch.pbs import BatchPBS
         check_extra_batch_submit_flags( BatchPBS, self.mock_run_command )
-        self.assertRaises( ValueError, BatchPBS, 16, extra_flags=5 )
+        self.assertRaises( ValueError, BatchPBS, ppn=16, extra_flags=5 )
 
 
 ############################################################################

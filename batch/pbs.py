@@ -8,11 +8,11 @@ import os, sys
 import time
 import shlex
 
-from .helpers import runcmd, format_extra_flags
+from .helpers import runcmd, format_extra_flags, get_node_size
 
 class BatchPBS:
 
-    def __init__(self, ppn, **attrs):
+    def __init__(self, **attrs):
         """
         The 'variation' attribute causes the header to be created a little
         differently.  The only known value is:
@@ -25,7 +25,7 @@ class BatchPBS:
         By default, the -lnodes method is used.
         """
         self.attrs = attrs
-        self.ppn = max( ppn, 1 )
+        self.ppn,self.dpn = get_node_size( attrs )
         self.variation = attrs.get( 'variation', None )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 

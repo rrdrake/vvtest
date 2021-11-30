@@ -215,6 +215,7 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         # print ( attrs )
         self.assertEqual( attrs, { 'queue': 'pickme',
                                    'dpn': None,
+                                   'ppn': 2,
                                    'account': 'abc',
                                    'walltime': '1:30:00' } )
 

@@ -12,19 +12,18 @@ This batch handler was written for Trinity, but it may also work for general
 MOAB systems.
 """
 
-from .helpers import runcmd, format_extra_flags
+from .helpers import runcmd, format_extra_flags, get_node_size
 
 class BatchMOAB:
 
-    def __init__(self, ppn, **attrs):
+    def __init__(self, **attrs):
         """
         The 'variation' keyword can be
 
             knl : Cray KNL partition
         """
         self.attrs = attrs
-        self.ppn = max( ppn, 1 )
-        self.dpn = max( int( attrs.get( 'devices_per_node', 0 ) ), 0 )
+        self.ppn,self.dpn = get_node_size( attrs )
         self.variation = attrs.get( 'variation', '' )
         self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
 
