@@ -16,8 +16,7 @@ class Platform:
     def __init__(self, platname, mode='direct',
                                  cplrname=None,
                                  environ={},
-                                 attrs={},
-                                 batchspec=None):
+                                 attrs={} ):
         ""
         self.platname = platname
         self.cplrname = cplrname
@@ -25,7 +24,6 @@ class Platform:
 
         self.envD = environ
         self.attrs = attrs
-        self.batchspec = batchspec
 
         self.procpool = rpool.ResourcePool( 1, 1 )
         self.devicepool = None
@@ -55,17 +53,17 @@ class Platform:
 
     def getNodeSize(self):
         ""
-        if self.batchspec is None or self.batchspec[0] == 'procbatch':
-            return self.getMaxSize()[0]
+        if 'ppn' in self.attrs:
+            return self.attrs['ppn']
         else:
-            return self.batchspec[1]
+            return self.getMaxSize()[0]
 
     def display(self):
         ""
         s = "Platform " + self.platname
         if self.mode == 'batch':
-            s += ', batch system='+str(self.batchspec[0])
-            s += ', ppn='+str(self.batchspec[1])
+            s += ', batch system='+str(self.attrs.get('batchsys',None))
+            s += ', ppn='+str(self.attrs.get('ppn',None))
         else:
             np,nd = self.getSize()
             maxnp,maxnd = self.getMaxSize()
@@ -96,9 +94,7 @@ class Platform:
         for n,v in self.attrs.items():
             batchitf.setAttr( n, v )
 
-        if self.batchspec:
-            qtype,ppn,kwargs = self.batchspec
-            batchitf.setQueueType( qtype, ppn, **kwargs )
+        batchitf.setQueueType( self.attrs['batchsys'] )
 
         for n,v in self.envD.items():
             batchitf.setEnviron( n, v )
@@ -135,12 +131,14 @@ class Platform:
             assert maxdev is not None
             self.devicepool = rpool.ResourcePool( nd, maxdev )
 
-        if self.mode == 'batch' and self.batchspec is None:
+        if self.mode == 'batch' and \
+           self.attrs.get( 'batchsys', 'procbatch' ) == 'procbatch':
+
+            self.attrs['batchsys'] = 'procbatch'
             if not maxnp:
                 maxnp = rprobe.probe_num_processors( 4 )
             np = self.attrs.get( 'ppn', self.attrs.get( 'processors_per_node', maxnp ) )
             nd = self.attrs.get( 'dpn', self.attrs.get( 'devices_per_node', maxdev ) )
-            self.batchspec = ( 'procbatch', np, {} )
             self.attrs['ppn'] = np
             self.attrs['dpn'] = nd
 

@@ -35,8 +35,7 @@ def create_Platform_instance( vvtestdir, platname, mode, platopts,
     plat = Platform( platname, mode=mode,
                      cplrname=cplrname,
                      environ=platcfg.envD,
-                     attrs=platcfg.attrs,
-                     batchspec=platcfg.batchspec )
+                     attrs=platcfg.attrs )
 
     plat.initProcs( numprocs, maxprocs, devices, max_devices )
 
@@ -53,13 +52,12 @@ class PlatformConfig:
 
     def __init__(self, optdict, platname, cplrname):
         ""
+        self.optdict = optdict
         self.platname = platname
         self.cplrname = cplrname
-        self.optdict = optdict
 
         self.envD = {}
         self.attrs = {}
-        self.batchspec = None
 
     def getName(self):  return self.platname
     def getCompiler(self): return self.cplrname
@@ -88,21 +86,38 @@ class PlatformConfig:
         else:
             return self.attrs[name]
 
-    def setBatchSystem(self, batch, ppn, **kwargs ):
+    def setBatchSystem(self, batchsys, ppnarg, **kwargs ):
         ""
+        ppn = kwargs.get( 'ppn', kwargs.get( 'processors_per_node', ppnarg ) )
         assert ppn and ppn > 0
 
-        self.batchspec = ( batch, ppn, kwargs )
+        self.setattr( 'batchsys', batchsys )
 
         for n,v in kwargs.items():
             self.setattr( n, v )
 
-        ppnattr = self.getattr( 'ppn', None )
-        if ppnattr is None:
+        if 'ppn' not in self.attrs:
             self.setattr( 'ppn', ppn )
-        else:
-            # ppn was set using --platopts, which takes precedence
-            self.batchspec[1] = ppnattr
+
+
+# def get_aliased_attr( attrs, attrname, aliasname, valtype=str ):
+#     ""
+#     if attrname in attrs:
+#         if aliasname in attrs:
+#             a1 = valtype( attrs[attrname] )
+#             a2 = valtype( attrs[aliasname] )
+#             if a1 != a2:
+#                 raise Exception( 'Platform attribute name and its alias were '
+#                     'both given values, but they differ: ' + \
+#                     attrname+'='+repr(attrs[attrname]) + ' != ' +\
+#                     aliasname+'='+repr(attrs[aliasname]) )
+#             attrs.pop( aliasname )
+#         attrs[attrname] = valtype( attrs[attrname] )
+#     elif aliasname in attrs:
+#         attrs[attrname] = valtype( attrs[aliasname] )
+#         attrs.pop( aliasname )
+
+#     return attrs.get( attrname, None )
 
 
 def set_platform_options( platcfg, platopts ):

@@ -213,7 +213,8 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
         assert len( lines ) == 1
         attrs = eval( lines[0].split( 'batch attrs = ', 1 )[1].strip() )
         # print ( attrs )
-        self.assertEqual( attrs, { 'queue': 'pickme',
+        self.assertEqual( attrs, { 'batchsys':'procbatch',
+                                   'queue': 'pickme',
                                    'dpn': None,
                                    'ppn': 2,
                                    'account': 'abc',

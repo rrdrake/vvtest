@@ -45,7 +45,7 @@ class BatchQueueInterface:
         ""
         self.envD[name] = value
 
-    def setQueueType(self, qtype, ppn, **kwargs):
+    def setQueueType(self, qtype):
         """
         Set the batch system to one of these values:
 
@@ -56,8 +56,6 @@ class BatchQueueInterface:
               pbs       : standard PBS system
         """
         assert type(qtype) == type('')
-
-        self.setAttr( 'ppn', ppn )
 
         self.batch = batch_queue_factory( qtype, self.attrs )
 

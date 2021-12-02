@@ -37,7 +37,8 @@ class general_tests( vtu.vvtestTestCase ):
         for qtype in ['procbatch','craypbs','pbs','slurm','moab','lsf']:
             bq = BatchQueueInterface()
             assert not bq.isBatched()
-            bq.setQueueType( qtype, 12 )
+            bq.setAttr( 'ppn', 12 )
+            bq.setQueueType( qtype )
             assert bq.isBatched()
 
     def test_num_nodes_computation(self):
