@@ -13,17 +13,18 @@ from . import rprobe
 
 class Platform:
 
-    def __init__(self, platname, mode='direct',
-                                 cplrname=None,
-                                 environ={},
-                                 attrs={} ):
+    def __init__(self, mode='direct',
+                       platname=platform.uname()[0],
+                       cplrname=None,
+                       environ={},
+                       attrs={} ):
         ""
+        self.mode = mode
         self.platname = platname
         self.cplrname = cplrname
-        self.mode = mode
 
-        self.envD = environ
-        self.attrs = attrs
+        self.envD = dict( environ )
+        self.attrs = dict( attrs )
 
         self.procpool = rpool.ResourcePool( 1, 1 )
         self.devicepool = None
@@ -80,6 +81,10 @@ class Platform:
         """
         return self.envD
 
+    def getAttributes(self):
+        ""
+        return self.attrs
+
     # ----------------------------------------------------------------
 
     def getattr(self, name, *default):
@@ -89,22 +94,12 @@ class Platform:
         else:
             return self.attrs[name]
 
-    def initializeBatchSystem(self, batchitf):
-        ""
-        for n,v in self.attrs.items():
-            batchitf.setAttr( n, v )
-
-        batchitf.setQueueType( self.attrs['batchsys'] )
-
-        for n,v in self.envD.items():
-            batchitf.setEnviron( n, v )
-
     def getDefaultQsubLimit(self):
         ""
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
-    def initProcs(self, num_procs, max_procs, num_devices, max_devices ):
+    def initialize(self, num_procs, max_procs, num_devices, max_devices ):
         """
         Determine and set the number of CPU cores and devices.  The arguments
         are from the command line:

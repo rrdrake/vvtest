@@ -32,12 +32,13 @@ def create_Platform_instance( vvtestdir, platname, mode, platopts,
 
     initialize_platform( platcfg )
 
-    plat = Platform( platname, mode=mode,
+    plat = Platform( mode=mode,
+                     platname=platname,
                      cplrname=cplrname,
                      environ=platcfg.envD,
                      attrs=platcfg.attrs )
 
-    plat.initProcs( numprocs, maxprocs, devices, max_devices )
+    plat.initialize( numprocs, maxprocs, devices, max_devices )
 
     return plat
 

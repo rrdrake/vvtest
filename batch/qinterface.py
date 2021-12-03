@@ -15,17 +15,15 @@ except Exception:
 
 class BatchQueueInterface:
 
-    def __init__(self):
+    def __init__(self, attrs={}, envD={}):
         ""
         self.batch = None
-        self.envD = {}
-        self.attrs = {}
+        self.attrs = dict( attrs )
+        self.envD = dict( envD )
 
         self.clean_exit_marker = "queue job finished cleanly"
 
-    def isBatched(self):
-        ""
-        return self.batch is not None
+        self._construct_queue_interface()
 
     def getNodeSize(self):
         ""
@@ -45,7 +43,7 @@ class BatchQueueInterface:
         ""
         self.envD[name] = value
 
-    def setQueueType(self, qtype):
+    def _construct_queue_interface(self):
         """
         Set the batch system to one of these values:
 
@@ -55,11 +53,8 @@ class BatchQueueInterface:
               moab      : for Cray machines running Moab (may work in general)
               pbs       : standard PBS system
         """
-        assert type(qtype) == type('')
-
-        self.batch = batch_queue_factory( qtype, self.attrs )
-
-        return self.batch
+        assert 'batchsys' in self.attrs
+        self.batch = batch_queue_factory( self.attrs )
 
     def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):
@@ -123,9 +118,11 @@ class BatchQueueInterface:
                 self.batch.cancel( jid )
 
 
-def batch_queue_factory( qtype, batchattrs ):
+def batch_queue_factory( batchattrs ):
     ""
     assert batchattrs['ppn']
+
+    qtype = batchattrs['batchsys']
 
     if qtype == 'procbatch':
         from . import procbatch

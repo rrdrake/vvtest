@@ -1087,8 +1087,8 @@ def create_Batcher( opts, optD, rtdata, namer,
 
     assert opts.qsub_id is None
 
-    batchitf = BatchQueueInterface()
-    plat.initializeBatchSystem( batchitf )
+    batchitf = BatchQueueInterface( plat.getAttributes(),
+                                    plat.getEnvironment() )
 
     qsublimit = opts.batch_limit
     if qsublimit == None:

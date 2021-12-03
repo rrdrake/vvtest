@@ -28,16 +28,16 @@ class unit( vtu.vvtestTestCase ):
 
     def test_platform_compute_node_size(self):
         ""
-        plat = Platform( 'wopr' )
-        plat.initProcs( 4, 8, 0, 0 )
+        plat = Platform()
+        plat.initialize( 4, 8, 0, 0 )
         assert plat.getNodeSize() == 8
 
-        plat = Platform( 'wopr', attrs={'batchsys':'procbatch'} )
-        plat.initProcs( 4, 8, 0, 0 )
+        plat = Platform( attrs={'batchsys':'procbatch'} )
+        plat.initialize( 4, 8, 0, 0 )
         assert plat.getNodeSize() == 8
 
-        plat = Platform( 'wopr', attrs={'ppn':23} )
-        plat.initProcs( 4, 8, 0, 0 )
+        plat = Platform( attrs={'ppn':23} )
+        plat.initialize( 4, 8, 0, 0 )
         assert plat.getNodeSize() == 23
 
     def test_sizing_with_np_and_ndevice(self):

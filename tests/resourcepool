@@ -148,8 +148,8 @@ class integration_tests( vtu.vvtestTestCase ):
 
     def test_the_platform_np_and_ndevice_resource_pools(self):
         ""
-        plat = vvplatform.Platform( 'fake' )
-        plat.initProcs( None, 16, None, 4 )
+        plat = vvplatform.Platform()
+        plat.initialize( None, 16, None, 4 )
 
         assert plat.sizeAvailable() == (16,4)
 
