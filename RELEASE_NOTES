@@ -38,12 +38,16 @@ Fixes:
 
 Changes:
 
+    - Platform options are now examined to make sure they are known. They
+      are set via vvtest command line option --platopt name=value, and in
+      the config/platform_plugin.py file.
+
     - When running vvtest --batch mode, the batch scripts are written to
       a working directory and submitted to the batch queue, then monitored.
       There was a mechanism to insert code (called a shim) into this batch
       script in order to setup the environment. This shim capability has
       been removed. It is not being used and is not really necessary, because
-      batch system will forward the environment from the login nodes to the
+      batch systems will forward the environment from the login nodes to the
       batch job anyway.
 
     - The CPU probe now returns the physical number of cores (rather than
