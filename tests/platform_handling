@@ -51,12 +51,12 @@ class idplatform( vtu.vvtestTestCase ):
 
         # None is returned if idplatform.py not in sys.path
         with vtu.clean_sys_path():
-            assert makeplatform.import_idplatform() is None
+            assert makeplatform.import_plugin_file( 'idplatform.py' ) is None
 
         # module returned if idplatform.py is in sys.path
         with vtu.clean_sys_path():
             sys.path.insert( 0, adir )
-            idp = makeplatform.import_idplatform()
+            idp = makeplatform.import_plugin_file( 'idplatform.py' )
             assert idp.hello() == 'world'
 
     def test_using_idplatform_to_define_platform_and_compiler(self):
@@ -86,80 +86,99 @@ class idplatform( vtu.vvtestTestCase ):
 
 class construction( vtu.vvtestTestCase ):
 
-    # def test_get_alias_attr_utility_function(self):
-    #     ""
-    #     assert makeplatform.get_aliased_attr( {}, 'foo', 'bar' ) is None
+    def test_parsing_attributes(self):
+        ""
+        psr = makeplatform.AttrParser( [['foo',str,'desc']] )
+        attrs = psr.parse_in_place( {} )
+        self.assertEqual( attrs, {} )
+        attrs = psr.parse_in_place( {'foo':'fooval'} )
+        self.assertEqual( attrs, {'foo':'fooval'} )
 
-    #     aD = { 'foo':'val' }
-    #     val = makeplatform.get_aliased_attr( aD, 'foo', 'bar' )
-    #     assert val == 'val' and aD == { 'foo':'val' }
+        psr = makeplatform.AttrParser( [['foo',int,'desc']] )
+        attrs = psr.parse_in_place( {'foo':'3'} )
+        self.assertEqual( attrs, {'foo':3} )
+        attrs = psr.parse_in_place( {'foo':3} )
+        self.assertEqual( attrs, {'foo':3} )
+        self.assertRaises( Exception, psr.parse_in_place, {'foo':'bar'} )
 
-    #     aD = { 'foo':'val' }
-    #     val = makeplatform.get_aliased_attr( aD, 'baz', 'jaz' )
-    #     assert val is None and aD == {'foo':'val'}
+        psr = makeplatform.AttrParser( [['foo',int,'bar','desc']] )
+        attrs = psr.parse_in_place( {'foo':3} )
+        self.assertEqual( attrs, {'foo':3} )
+        attrs = psr.parse_in_place( {'bar':3} )
+        self.assertEqual( attrs, {'foo':3} )
+        attrs = psr.parse_in_place( {'bar':3, 'foo':'3'} )
+        self.assertEqual( attrs, {'foo':3} )
+        self.assertRaises( Exception, psr.parse_in_place, {'bar':'3', 'foo':'4'} )
 
-    #     aD = { 'bar':'val' }
-    #     val = makeplatform.get_aliased_attr( aD, 'foo', 'bar' )
-    #     assert val == 'val' and aD == { 'foo':'val' }
+        psr = makeplatform.AttrParser( [['foo',int,'bar','baz','desc']] )
+        self.assertEqual( psr.parse_in_place( {'foo':3} ), {'foo':3} )
+        self.assertEqual( psr.parse_in_place( {'bar':3} ), {'foo':3} )
+        self.assertEqual( psr.parse_in_place( {'baz':3} ), {'foo':3} )
 
-    #     aD = { 'bar':'val', 'foo':'val' }
-    #     val = makeplatform.get_aliased_attr( aD, 'foo', 'bar' )
-    #     assert val == 'val' and aD == { 'foo':'val' }
+        psr = makeplatform.AttrParser( [['foo',str,'desc1'],
+                                        ['bar',int,'baz','desc2']] )
+        self.assertEqual( psr.parse_in_place( {'foo':'a'} ), {'foo':'a'} )
+        self.assertEqual( psr.parse_in_place( {'baz':2} ), {'bar':2} )
+        attrs = psr.parse_in_place( {'baz':2,'foo':'b'} )
+        self.assertEqual( attrs, {'foo':'b', 'bar':2} )
 
-    #     try:
-    #         aD = { 'bar':'val1', 'foo':'val2' }
-    #         val = makeplatform.get_aliased_attr( aD, 'foo', 'bar' )
-    #     except Exception as e:
-    #         assert 'both given values' in str(e)
-    #     else:
-    #         raise Exception( 'expected an exception' )
+        psr = makeplatform.AttrParser( [['foo',int,'desc']] )
+        self.assertRaises( Exception, psr.parse_in_place, {'bar':5} )
 
     def test_initialize_platformconfig_from_platform_plugin(self):
         ""
         util.writefile( 'adir/platform_plugin.py', """
             def initialize( platobj ):
-                platobj.setattr( 'foo', 'bar' )
+                platobj.setattr( 'ppn', 3 )
             """ )
         adir = abspath( 'adir' )
-        time.sleep(1)
+
+        apsr = makeplatform.AttrParser()
 
         with vtu.clean_sys_path():
-            plat = makeplatform.PlatformConfig( {}, None, None )
+            plat = makeplatform.PlatformConfig( apsr, {}, None, None )
             makeplatform.initialize_platform( plat )
-            assert plat.getattr( 'foo', None ) == None
+            assert plat.getattr( 'ppn', None ) == None
 
         with vtu.clean_sys_path():
-            plat = makeplatform.PlatformConfig( {}, None, None )
+            plat = makeplatform.PlatformConfig( apsr, {}, None, None )
             sys.path.insert( 0, adir )
             makeplatform.initialize_platform( plat )
-            assert plat.getattr( 'foo', None ) == 'bar'
+            assert plat.getattr( 'ppn', None ) == 3
 
     def test_setting_platformconfig_options(self):
         ""
-        platcfg = makeplatform.PlatformConfig( {}, None, None )
-        makeplatform.set_platform_options( platcfg, {} )
+        apsr = makeplatform.AttrParser()
+        platcfg = makeplatform.PlatformConfig( apsr, {}, None, None )
 
         popts = { 'q':'admin',
                   'PT':'fy666',
                   'walltime':'2:34',
-                  'QoS':'long' }
-        makeplatform.set_platform_options( platcfg, popts )
+                  'QoS':'long',
+                  'extra_flags':'--foo=bar',
+                  'maxqtime':3600,
+                  'variation':'knl',
+                  'maxsubs':11 }
+        apsr.parse_in_place( popts )
 
-        assert platcfg.getattr( 'queue' ) == 'admin'
-        assert platcfg.getattr( 'account' ) == 'fy666'
-        assert platcfg.getattr( 'walltime' ) == '2:34'
-        assert platcfg.getattr( 'QoS' ) == 'long'
+        assert popts['queue']       == 'admin'
+        assert popts['account']     == 'fy666'
+        assert popts['walltime']    == '2:34'
+        assert popts['QoS']         == 'long'
+        assert popts['extra_flags'] == '--foo=bar'
+        assert popts['maxqtime']    == 3600
+        assert popts['variation']   == 'knl'
+        assert popts['maxsubs']     == 11
 
     def test_the_create_Platform_instance_function(self):
         ""
         plat = makeplatform.create_Platform_instance(
-                    os.getcwd(), None, 'direct', {},
+                    None, 'direct', {},
                     None, None, None, None,
                     None, None )
 
-        optD = { 'q':'justdoit', 'knl':'', 'PT':'fy666', 'walltime':'2:34' }
+        optD = { 'q':'justdoit', 'variation':'knl', 'PT':'fy666', 'walltime':'2:34' }
         plat = makeplatform.create_Platform_instance(
-                    os.getcwd(),
                     'XBox', 'batch',
                     optD,
                     10, 20, None, None,
@@ -227,7 +246,7 @@ def check_maxsize( cfgdir, mode, setmax=(None,None), expected=None ):
         sys.path.insert( 0, cfgdir )
 
         plat = makeplatform.create_Platform_instance(
-                    os.getcwd(), None, mode, {},
+                    None, mode, {},
                     None, nprocs, None, ndevice, None, None )
 
         mxsz = plat.getMaxSize()

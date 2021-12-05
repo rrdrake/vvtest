@@ -84,7 +84,7 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     construct_runtime_info( rtdata, argv, vvtestdir, start_epoch )
     create_configuration( rtdata.rtconfig, opts, optD, vvtestdir, configdirs )
 
-    construct_platform( rtdata, vvtestdir, opts, optD )
+    construct_platform( rtdata, opts, optD )
     compute_testing_directory( rtdata, opts, optD )
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
@@ -229,7 +229,7 @@ def create_configuration( rtconfig, opts, optD, vvtestdir, configdirs ):
         rtconfig.setAttr( 'testargs', argL )
 
 
-def construct_platform( rtdata, vvtestdir, opts, optD ):
+def construct_platform( rtdata, opts, optD ):
     ""
     from libvvtest.makeplatform import create_Platform_instance
 
@@ -240,7 +240,6 @@ def construct_platform( rtdata, vvtestdir, opts, optD ):
         mode = 'batchjob'
 
     plat = create_Platform_instance(
-                vvtestdir,
                 opts.plat, mode,
                 optD['platopt_dict'],  # --platopt
                 opts.dash_n,
@@ -1144,7 +1143,7 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
             if v:
-                cmd += ' --platopt ' + k + '=' + quote(v)
+                cmd += ' --platopt ' + k + '=' + quote(str(v))
             else:
                 cmd += ' --platopt ' + k
 

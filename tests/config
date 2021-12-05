@@ -165,13 +165,13 @@ class config_tests( vtu.vvtestTestCase ):
             def initialize( plat ):
                 opts = plat.getOptions()
                 assert '--platopt' in opts
-                assert opts['--platopt']['foo'] == 'bar'
+                assert opts['--platopt']['account'] == 'foo'
                 print ( 'initialize successFUL' )
             """ )
         util.writefile( 'atest.vvt', 'pass' )
         time.sleep(1)
 
-        vrun = vtu.runvvtest( '--config config --platopt foo=bar' )
+        vrun = vtu.runvvtest( '--config config --platopt account=foo' )
         vrun.assertCounts( total=1, npass=1 )
         assert 'initialize successFUL' in vrun.out
 
@@ -197,7 +197,7 @@ class config_tests( vtu.vvtestTestCase ):
             assert plat.save[1] == 32
             assert 'variation' not in plat.save[2]
 
-            platopt = { '--platopt': { 'knl':'' } }
+            platopt = { '--platopt': { 'variation':'knl' } }
             plat = MockPlatform( 'CrayXC', platopt=platopt )
             plug.initialize( plat )
             assert plat.save[0] == 'slurm'

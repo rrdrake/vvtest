@@ -126,16 +126,14 @@ class Platform:
             assert maxdev is not None
             self.devicepool = rpool.ResourcePool( nd, maxdev )
 
-        if self.mode == 'batch' and \
-           self.attrs.get( 'batchsys', 'procbatch' ) == 'procbatch':
+        bsys = self.attrs.get( 'batchsys', None )
+        if self.mode == 'batch' and (bsys is None or bsys == 'procbatch'):
 
             self.attrs['batchsys'] = 'procbatch'
             if not maxnp:
                 maxnp = rprobe.probe_num_processors( 4 )
-            np = self.attrs.get( 'ppn', self.attrs.get( 'processors_per_node', maxnp ) )
-            nd = self.attrs.get( 'dpn', self.attrs.get( 'devices_per_node', maxdev ) )
-            self.attrs['ppn'] = np
-            self.attrs['dpn'] = nd
+            self.attrs['ppn'] = self.attrs.get( 'ppn', maxnp )
+            self.attrs['dpn'] = self.attrs.get( 'dpn', maxdev )
 
     def sizeAvailable(self):
         ""

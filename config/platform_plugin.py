@@ -25,8 +25,8 @@ def initialize( plat ):
 
     elif platname == "CrayXC":
 
-        if 'knl' in platopts:
-            plat.setBatchSystem( "slurm", 64, variation='knl' )
+        if 'variation' in platopts:
+            plat.setBatchSystem( "slurm", 64, variation=platopts['variation'] )
         else:
             plat.setBatchSystem( "slurm", 32 )
 
