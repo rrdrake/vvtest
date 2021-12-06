@@ -9,33 +9,23 @@ import fnmatch
 import glob
 import platform
 
-debug = False
-
 uname = platform.uname()
 osname,nodename,osrelease,machine = uname[0], uname[1], uname[2], uname[4]
 
 def platform( opts ):
     """
     """
-    if '--plat' in opts:
-        return opts['--plat']
+    if 'VVTEST_PLATFORM' in os.environ:
+        return os.environ['VVTEST_PLATFORM']
+
+    snlsystem  = os.environ.get( 'SNLSYSTEM', '' )
+    snlcluster = os.environ.get( 'SNLCLUSTER', '' )
 
     pbshost = os.environ.get('PBS_O_HOST','')
     lsfhost = os.environ.get('LSB_SUB_HOST','')
-    cluster = os.environ.get('SNLCLUSTER','')
-
-    if debug:
-        print3( 'idplatform.platform: uname =', osname, nodename, osrelease, machine )
-        print3( 'idplatform.platform: pbshost, cluster', pbshost, cluster )
 
     if base_match( [nodename,lsfhost], ['vortex','rzansel','sierra'] ):
         return 'ATS2'
-
-    if base_match( [nodename,pbshost],
-                   ['ci-fe','ci-login','ci-vizlogin','mzlogin'] ) or \
-       shell_match( [nodename,pbshost], ['batch[0-9][0-9]-wlm'] ):
-        # old Cray machines
-        return 'Cray'
 
     if shell_match( [nodename,pbshost],
                     ['excalibur[0-9]*','batch[0-9]*','clogin*','nid*'] ):
@@ -52,24 +42,21 @@ def platform( opts ):
         # DoD IBM DataPlex ?
         return 'IBMidp'
 
-    if base_match( [nodename,pbshost,cluster],
-                   ['solo','serrano','cayenne','ghost','eclipse','attaway','manzano'] ):
+    if snlsystem == 'cts1':
         # Capacity Technology System, running TOSS
         return 'CTS1'
 
-    if base_match( [nodename,pbshost,cluster], ['astra','stria'] ):
+    if base_match( [nodename,pbshost,snlcluster], ['astra','stria'] ):
         # Vanguard System
         return 'ASTRA'
 
-    if base_match( [nodename,pbshost,cluster],
-                   ['chama','uno','pecos','jemez','skybridge'] ) or \
-       shell_match( [nodename], ['sb[0-9]*'] ):
+    if snlsystem in ['tlcc2','uno']:
         # Tri-Lab Computing Cluster, running TOSS
         return 'TLCC2'
 
-    if base_match( [nodename,pbshost,cluster], ['godzilla'] ) or \
+    if base_match( [nodename,pbshost,snlcluster], ['godzilla'] ) or \
        shell_match( [nodename], ['gn[0-9]','gn[0-9][0-9]'] ):
-        # see Kyle Cochrane
+        # see Kyle Cochrane; may be decommissioned
         return 'Godzilla'
 
     if base_match( [osname], ['CYGWIN'] ):
@@ -81,50 +68,9 @@ def platform( opts ):
     if osname == 'Linux' and machine == 'ia64':
         return 'Altix'
 
-    if osname == 'Linux' and CEELAN():
+    if osname == 'Linux' and snlsystem == 'cee':
         # Sandia CEE LAN
         return 'ceelan'
-
-    if debug:
-        print3( 'idplatform.platform: returning' )
-
-
-def CEELAN():
-    """
-    Returns True if the current machine appears to be on the Sandia CEE LAN.
-    """
-    if os.environ.get( 'SNLSYSTEM', '' ) == 'cee':
-        return True
-
-    netfile = '/etc/sysconfig/network'
-    if os.path.exists( netfile ):
-        try:
-            fp = open( netfile, 'r' )
-            L = fp.readlines()
-            fp.close()
-        except Exception:
-            pass
-        else:
-            for line in L:
-                if line.strip() in [ 'NISDOMAIN=hotair.engsci.sandia.gov',
-                                     'NISDOMAIN=wizard.sandia.gov' ]:
-                    return True
-
-    return False
-
-#       rhat = 0
-#       rhfile = '/etc/redhat-release'
-#       if os.path.exists( rhfile ):
-#         try:
-#           fp = open( rhfile, 'rb' ) ; s = fp.read() ; fp.close()
-#         except:
-#           pass
-#         else:
-#           L = s.split()
-#           if L.count('5.7') > 0:
-#             rhat = 5
-#           elif L.count('6.4') > 0 or L.count('6.3') > 0:
-#             rhat = 6
 
 
 #######################################################################
@@ -156,19 +102,14 @@ def shell_match( namelist, matchlist ):
 
 #######################################################################
 
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
-
-
 if __name__ == "__main__":
     """
     Can execute this script as a quick check of the logic and results.
     """
     import getopt
-    optL,argL = getopt.getopt( sys.argv[1:], 'o:', ['plat='] )
+    optL,argL = getopt.getopt( sys.argv[1:], 'o:', [] )
     optD = {}
     for n,v in optL:
         optD[n] = v
     p = platform( optD )
-    print3( p )
+    print ( p )

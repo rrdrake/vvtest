@@ -10,6 +10,7 @@ import signal
 import time
 import traceback
 import platform
+from contextlib import contextmanager
 
 not_windows = not platform.uname()[0].lower().startswith('win')
 
@@ -66,7 +67,7 @@ class TestExec:
         ""
         return self.resource_obj
 
-    def start(self, execute_test_func, rtconfig, is_baseline, perms,
+    def start(self, prepare_for_launch, logfile, is_baseline, perms,
                     fork_supported=True):
         """
         Launches the child process.
@@ -77,7 +78,7 @@ class TestExec:
 
         sys.stdout.flush()
         sys.stderr.flush()
-        logfp = self._open_logfile( rtconfig, is_baseline, perms )
+        logfp = self._open_logfile( logfile, is_baseline, perms )
 
         cwd = os.getcwd()
         try:
@@ -85,20 +86,16 @@ class TestExec:
 
             if fork_supported:
                 self.pid = self.prepare_then_execute(
-                                    execute_test_func, is_baseline, logfp )
+                                    prepare_for_launch, is_baseline, logfp )
             else:
                 self.subpid = self.forkless_prepare_then_execute(
-                                    execute_test_func, is_baseline, logfp )
+                                    prepare_for_launch, is_baseline, logfp )
         finally:
             self._close_logfile( logfp )
             os.chdir( cwd )
 
-    def _open_logfile(self, rtconfig, is_baseline, perms):
+    def _open_logfile(self, logfile, is_baseline, perms):
         ""
-        logfile = None
-        if rtconfig.getAttr('logfile'):
-            logfile = self.tcase.getSpec().getLogFilename( is_baseline )
-
         if logfile:
             if not os.path.isabs( logfile ):
                 logfile = os.path.join( self.rundir, logfile )
@@ -221,7 +218,7 @@ class TestExec:
         
         return t1 or t2
 
-    def prepare_then_execute(self, execute_test_func, is_baseline, logfp):
+    def prepare_then_execute(self, prepare_for_launch, is_baseline, logfp):
         ""
         pid = os_fork_with_retry( 10 )
         if pid == 0:
@@ -230,7 +227,7 @@ class TestExec:
             redirect_stdout_err( logfp )
 
             try:
-                cmd_list = execute_test_func( self, is_baseline )
+                cmd_list = prepare_for_launch( self, is_baseline )
 
                 sys.stdout.flush() ; sys.stderr.flush()
 
@@ -249,60 +246,47 @@ class TestExec:
 
         return pid
 
-    def forkless_prepare_then_execute(self, execute_test_func, is_baseline, logfp):
+    def forkless_prepare_then_execute(self, prepare_for_launch, is_baseline, logfp):
         ""
         subpid = None
-        with redirect_output( logfp ):
-            try:
-                cmd_list = execute_test_func( self, is_baseline )
-                if cmd_list is None:
-                    # can only happen in baseline mode
-                    self.exit_status = 0
-                elif logfp is None:
-                    subpid = subprocess.Popen( cmd_list )
-                else:
-                    subpid = subprocess.Popen( cmd_list,
-                                               stdout=logfp.fileno(),
-                                               stderr=subprocess.STDOUT )
-            except Exception:
-                sys.stdout.flush() ; sys.stderr.flush()
-                traceback.print_exc()
 
-                self.exit_status = 1
+        try:
+            with redirect_output(logfp):
+                cmd_list = prepare_for_launch( self, is_baseline )
+
+            if cmd_list is None:
+                # can only happen in baseline mode
+                self.exit_status = 0
+            elif logfp is None:
+                subpid = subprocess.Popen( cmd_list )
+            else:
+                sys.stdout.flush() ; sys.stderr.flush()
+                subpid = subprocess.Popen( cmd_list,
+                                           stdout=logfp.fileno(),
+                                           stderr=subprocess.STDOUT )
+
+        except Exception:
+            traceback.print_exc( file=logfp )
+            self.exit_status = 1
 
         return subpid
 
 
-class redirect_output:
-    """
-    with redirect_output( fileobj ):
-        do_something()
-    """
-
-    def __init__(self, fileptr):
-        ""
-        self.fp = fileptr
-
-    def __enter__(self):
-        ""
-        if self.fp is not None:
-            self.save_stdout_fd = os.dup(1)
-            os.dup2( self.fp.fileno(), 1 )
-
-            self.save_stderr_fd = os.dup(2)
-            os.dup2( self.fp.fileno(), 2 )
-
-    def __exit__(self, type, value, traceback):
-        ""
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        if self.fp is not None:
-            os.dup2( self.save_stdout_fd, 1 )
-            os.close( self.save_stdout_fd )
-
-            os.dup2( self.save_stderr_fd, 2 )
-            os.close( self.save_stderr_fd )
+@contextmanager
+def redirect_output( fileptr ):
+    ""
+    if fileptr is None:
+        yield fileptr
+    else:
+        save_stdout = sys.stdout
+        save_stderr = sys.stderr
+        sys.stdout = fileptr
+        sys.stderr = fileptr
+        try:
+            yield fileptr
+        finally:
+            sys.stdout = save_stdout
+            sys.stderr = save_stderr
 
 
 def redirect_stdout_err( logfp ):

@@ -17,10 +17,6 @@ import vvtestutils as vtu
 import testutils as util
 from testutils import print3
 
-import libvvtest.testcreator as testcreator
-from libvvtest.ScriptReader import ScriptReader
-import libvvtest.parsevvt as parsevvt
-
 
 class config_tests( vtu.vvtestTestCase ):
 

@@ -638,7 +638,7 @@ class TestExec_class_functions( vtu.vvtestTestCase ):
         texec = testexec.TestExec( tcase )
         texec.setRunDirectory( 'rdir' )
 
-        rtcfg = vtu.make_RuntimeConfig()
+        logfile = tcase.getSpec().getLogFilename( False )
         perms = vtu.make_fake_PermissionSetter()
 
         # poor way to test; will need to change with testexec implementation
@@ -647,7 +647,7 @@ class TestExec_class_functions( vtu.vvtestTestCase ):
             testexec.os_fork_with_retry = None
 
             assert not texec.isStarted()
-            texec.start( mock_execute_func, rtcfg, False, perms,
+            texec.start( mock_execute_func, logfile, False, perms,
                          fork_supported=False )
             assert texec.isStarted()
             assert not texec.isDone()

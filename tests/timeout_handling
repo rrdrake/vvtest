@@ -18,6 +18,7 @@ from testutils import print3
 
 import libvvtest.timehandler as timehandler
 from libvvtest.fmtresults import LookupCache
+import libvvtest.testcreator as testcreator
 
 
 class timeout_handler_tests( vtu.vvtestTestCase ):
@@ -306,9 +307,6 @@ class test_timeouts( vtu.vvtestTestCase ):
 
     def test_parsing_timeout_in_xml_specification_files(self):
         ""
-        import libvvtest.parsexml as parsexml
-        import libvvtest.testcreator as testcreator
-
         util.writefile( 'atest.xml', """
             <rtest name="atest">
               <timeout value="5"/>
@@ -348,9 +346,6 @@ class test_timeouts( vtu.vvtestTestCase ):
 
     def test_parsing_timeout_in_vvt_specification_files(self):
         ""
-        import libvvtest.parsevvt as parsevvt
-        import libvvtest.testcreator as testcreator
-
         util.writefile( 'atest.vvt', """
             #VVT: timeout = 5
             pass
