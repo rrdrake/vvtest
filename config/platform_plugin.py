@@ -46,11 +46,4 @@ def initialize( plat ):
         plat.setBatchSystem( "slurm", 20 )
 
     elif platname == 'ATS2':
-        # Because there aren't different partitions, we cue off of
-        # an option (-o) instead of a platform option (--platopt).
-        if "gpu" in opts.get("-o", []):
-            # 4 gpus per node
-            plat.setBatchSystem( "lsf", 4 )
-        else:
-            # 44 cpus per node
-            plat.setBatchSystem( "lsf", 44, devices_per_node=4 )
+        plat.setBatchSystem( "lsf", 44, devices_per_node=4 )
