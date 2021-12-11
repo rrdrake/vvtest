@@ -264,36 +264,11 @@ class BatchJobHandler:
         else:
             return False
 
-    def scanBatchOutput(self, outfile):
+    def checkBatchOutputForExit(self, outfile):
         """
-        Tries to read the batch output file, then looks for the marker
-        indicating a clean job script finish.  Returns true for a clean finish.
+        Returns True if the log file shows the batch job ran and finished.
         """
-        clean = False
-
-        try:
-            # compute file seek offset, and open the file
-            sz = os.path.getsize( outfile )
-            off = max(sz-512, 0)
-            fp = open( outfile, 'r' )
-        except Exception:
-            pass
-        else:
-            try:
-                # only read the end of the file
-                fp.seek(off)
-                buf = fp.read(512)
-            except Exception:
-                pass
-            else:
-                if self.batchitf.getCleanExitMarker() in buf:
-                    clean = True
-            try:
-                fp.close()
-            except Exception:
-                pass
-
-        return clean
+        return self.batchitf.checkForJobScriptExit( outfile )
 
     def markNotStartedJobsAsDone(self):
         ""

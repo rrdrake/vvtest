@@ -44,9 +44,35 @@ class BatchQueueInterface:
         nd = self.attrs.get( 'dpn', None )
         return np,nd
 
-    def getCleanExitMarker(self):
-        ""
-        return self.clean_exit_marker
+    def checkForJobScriptExit(self, outfile):
+        """
+        Returns True if 'outfile' exists and contains the clean exit marker.
+        """
+        clean = False
+
+        try:
+            # compute file seek offset, and open the file
+            sz = os.path.getsize( outfile )
+            off = max(sz-512, 0)
+            fp = open( outfile, 'rt' )
+        except Exception:
+            pass
+        else:
+            try:
+                # only read the end of the file
+                fp.seek(off)
+                buf = fp.read(512)
+            except Exception:
+                pass
+            else:
+                if self.clean_exit_marker in buf:
+                    clean = True
+            try:
+                fp.close()
+            except Exception:
+                pass
+
+        return clean
 
     def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):

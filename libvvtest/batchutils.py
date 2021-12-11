@@ -248,7 +248,7 @@ class Batcher:
         rfile = bjob.getAttr('testlist').getResultsFilename()
 
         finished = False
-        if self.jobhandler.scanBatchOutput( ofile ):
+        if self.jobhandler.checkBatchOutputForExit( ofile ):
             finished = testlistio.file_is_marked_finished( rfile )
 
         return finished

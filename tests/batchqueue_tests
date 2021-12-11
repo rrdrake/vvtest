@@ -73,6 +73,17 @@ class function_tests( vtu.vvtestTestCase ):
         self.assertEqual( helpers.format_extra_flags( '-v var=val' ), ['-v','var=val'] )
         self.assertRaises( ValueError, helpers.format_extra_flags, 23 )
 
+    def test_clean_exit_marker_mechanism(self):
+        ""
+        bq = BatchQueueInterface( {'batchsys':'subprocs', 'ppn':12} )
+        bq.writeJobScript( (1,1,0), 60, os.getcwd(), 'log', 'scr', 'sleep 3' )
+        assert bq.checkForJobScriptExit( 'log' ) is False
+        bq.submitJob( os.getcwd(), 'log', 'scr' )
+        time.sleep(1)
+        assert bq.checkForJobScriptExit( 'log' ) is False
+        time.sleep(3)
+        assert bq.checkForJobScriptExit( 'log' ) is True
+
 
 class subprocs_tests( vtu.vvtestTestCase ):
 
