@@ -202,16 +202,19 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
 
         assert len( glob.glob( 'TestResult*/testA/testA.txt' ) ) == 1
 
-        lines = util.grepfiles( 'np = 2', 'TestResult*/batchset*/qbat.*' )
+        lines = util.grepfiles( '# size = ', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
+        szL = eval( lines[0].strip().split( '# size = ' )[1].strip() )
+        self.assertEqual( szL, (1,1,0) )
 
         lines = util.grepfiles( 'qtime =', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
-        assert lines[0].split( 'qtime =', 1 )[1].strip() == '1:30:00'
+        qt = eval( lines[0].split( 'qtime =', 1 )[1].strip() )
+        self.assertEqual( qt, '1:30:00' )
 
-        lines = util.grepfiles( 'batch attrs = ', 'TestResult*/batchset*/qbat-out.*' )
+        lines = util.grepfiles( '# attributes: ', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
-        attrs = eval( lines[0].split( 'batch attrs = ', 1 )[1].strip() )
+        attrs = eval( lines[0].split( '# attributes: ', 1 )[1].strip() )
         # print ( attrs )
         self.assertEqual( attrs, { 'batchsys':'procbatch',
                                    'queue': 'pickme',

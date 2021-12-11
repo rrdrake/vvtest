@@ -9,102 +9,77 @@ import time
 import signal
 import subprocess
 
-from .helpers import runcmd, format_extra_flags, get_node_size
 
-
-class ProcessBatch:
+class SubProcs:
 
     def __init__(self, **attrs):
         ""
         self.attrs = attrs
-        self.ppn,self.dpn = get_node_size( attrs )
-        self.extra_flags = format_extra_flags(attrs.get("extra_flags",None))
-
-        self.childids = []
+        self.kids = {}  # pid -> Popen object
 
     def header(self, size, qtime, outfile):
-        """
-        """
-        np,ndevice = size
-
-        hdr = '\n' + \
-              '# np = '+str(np) + '\n' + \
-              '# ndevice = '+str(ndevice) + '\n' + \
-              '# qtime = '+str(qtime) + '\n' + \
-              '# outfile = '+str(outfile) + '\n\n'
-
-        return hdr
+        ""
+        return [ '# size = '+repr(size),
+                 '# qtime = '+repr(qtime),
+                 '# outfile = '+repr(outfile) ]
 
     def submit(self, fname, outfile):
         """
-        Executes the script 'fname' as a background process.
-        Returns (cmd, out, job id, error message) where 'cmd' is
-        (approximately) the fork command and 'out' is a little informational
-        message.  The job id is None if an error occured, and error
-        message is a string containing the error.  If successful, job id is an
-        integer.
+        Submit 'fname' to the batch system. Should return
+            ( jobid, submit command, raw output from submit command )
+        where jobid is None if an error occurred.
         """
-        sys.stdout.flush()
-        sys.stderr.flush()
-
-        jobid = os.fork()
-
-        if jobid == 0:
-            fpout = open( outfile, 'w' )
-            os.dup2( fpout.fileno(), sys.stdout.fileno() )
-            os.dup2( fpout.fileno(), sys.stderr.fileno() )
-            sys.stdout.write( 'batch attrs = '+str(self.attrs) + '\n\n' )
-            sys.stdout.flush()
-            os.execv( '/bin/bash', ['/bin/bash', fname] )
-
         cmd = '/bin/bash ' + fname + ' >& ' + outfile
-        out = '[forked process '+str(jobid)+']'
 
-        # keep the child process ids as the queue ids
-        self.childids.append( jobid )
+        with open( outfile, 'wt' ) as fp:
+            child = subprocess.Popen( ['/bin/bash', fname],
+                                      stdout=fp.fileno(),
+                                      stderr=subprocess.STDOUT )
 
-        return cmd, out, jobid, ''
+        # use the child processes as the queue ids
+        jobid = child.pid
+        self.kids[jobid] = child
 
-    def query(self, jobidL):
+        out = '[subprocess '+str(jobid)+']'
+
+        return jobid,cmd,out
+
+    def query(self, jobids):
         """
-        Determine the state of the given job ids.  Returns (cmd, out, err, stateD)
-        where stateD is dictionary mapping the job ids to a string equal to
-        'pending', 'running', or '' (empty) and empty means either the job was
-        not listed or it was listed but not pending or running.  The err value
-        contains an error message if an error occurred when getting the states.
+        Determine the state of the given job ids.  Should return
+            ( status dictionary, query command, raw output )
+        where the status dictionary maps
+            job id -> "running" or "pending" (waiting to run)
+        Exclude job ids that are not running or pending.
         """
-        doneL = []
         jobD = {}
-        for jobid in jobidL:
-            if jobid in self.childids:
-                cpid,xcode = os.waitpid( jobid, os.WNOHANG )
-                if cpid > 0:
-                    # child finished; empty string means done
-                    jobD[jobid] = ''
-                    doneL.append( jobid )
-                else:
+        out = ''
+        for jobid,child in list( self.kids.items() ):
+            if child.poll() is None:
+                out += str(jobid)+' running\n'
+                if jobid in jobids:
                     jobD[jobid] = 'running'
             else:
-                jobD[jobid] = ''
+                out += str(jobid)+' done\n'
+                self.kids.pop( jobid )  # child is done
 
-        for jobid in doneL:
-            self.childids.remove( jobid )
-
-        out = ' '.join( [ str(jid) for jid in jobidL ] )
-        return 'ps', out, '', jobD
+        return jobD,'ps',out
 
     def cancel(self, jobid):
         ""
         print ( 'kill -s '+str(int(signal.SIGINT))+' '+str(jobid) )
-        for pid in get_process_descendants( int(jobid) ):
+        for pid in get_process_descendants( jobid ):
             os.kill( pid, signal.SIGINT )
+        if jobid in self.kids:
+            child = self.kids.pop( jobid )
+            child.wait()
 
 
 def get_process_descendants( parent ):
     ""
     lineL = get_process_list()
 
-    pidset = set( [ parent ] )
+    pidset = set( [ int(parent) ] )
 
     setlen = len( pidset )
     while True:
@@ -130,7 +105,10 @@ def get_process_list():
                           shell=True, stdout=subprocess.PIPE )
     sout,serr = p.communicate()
 
-    sout = _STRING_(sout).strip()+'\n'
+    if sys.version_info[0] < 3:
+        sout = sout if sout else ''
+    else:
+        sout = sout.decode() if sout else ''
 
     # strip off first non-empty line (the header)
 
@@ -153,20 +131,3 @@ def get_process_list():
                         lineL.append( L )
 
     return lineL
-
-if sys.version_info[0] < 3:
-    def _STRING_(b): return b
-
-else:
-    bytes_type = type( ''.encode() )
-
-    def _STRING_(b):
-        if type(b) == bytes_type:
-            return b.decode()
-        return b
-
-
-#########################################################################
-
-if __name__ == "__main__":
-    pass

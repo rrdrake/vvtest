@@ -16,59 +16,67 @@ from textwrap import dedent
 
 import vvtestutils as vtu
 import testutils as util
-from testutils import print3
 
 from batch.qinterface import BatchQueueInterface
+from batch.qinterface import batch_system_factory
+
+import batch.helpers as helpers
+import batch.procbatch as procbatch
+import batch.slurm as slurm
+import batch.lsf as lsf
+import batch.craypbs as craypbs
+import batch.pbs as pbs
+import batch.moab as moab
 
 
-class general_tests( vtu.vvtestTestCase ):
+class function_tests( vtu.vvtestTestCase ):
 
-    def test_the_runcmd_function_which_lives_in_its_own_file(self):
+    def test_the_runcmd_function(self):
         ""
-        from batch.helpers import runcmd
+        os.mkdir('work')
 
-        x,out = runcmd( [ 'uname', '-a' ] )
+        x,cmd,out = helpers.runcmd( [ 'uname', '-a' ] )
 
         assert x == 0
         assert os.uname()[1] in out.strip()
+        assert 'uname' in cmd
+
+        x,cmd,out = helpers.runcmd( ['diff','fakefile1','fakefile2'] )
+        assert x != 0
+
+        x,cmd,out = helpers.runcmd( ['/some/fake/path/asdjkfjkdskdfks'] )
+        assert x != 0
+
+        cmdL = [sys.executable,'-c','fp = open("mark","wt"); fp.close()']
+        x,cmd,out = helpers.runcmd( cmdL, chdir='work' )
+        assert x == 0 and os.path.isfile( 'work/mark' )
+
+        cmdL = [sys.executable,'-c','print ( "grep_this_string" )']
+        rtn,cout,cerr = util.call_capture_output( helpers.runcmd, cmdL, echo=True )
+        x,cmd,out = rtn
+        assert x == 0 and sys.executable in cmd and 'grep_this_string' in out
+        assert sys.executable in cout and 'grep_this_string' in cout
+        assert not cerr
 
     def test_queue_type_construction(self):
         ""
         for qtype in ['procbatch','craypbs','pbs','slurm','moab','lsf']:
             bq = BatchQueueInterface( {'batchsys':qtype, 'ppn':12} )
+            assert bq.getNodeSize() == (12,None)
 
-    def test_num_nodes_computation(self):
+    def test_formatting_extra_flags(self):
         ""
-        from batch.helpers import compute_num_nodes
-
-        assert compute_num_nodes( (1,0), 16, None ) == 1
-        assert compute_num_nodes( (16,0), 16, None ) == 1
-        assert compute_num_nodes( (17,0), 16, None ) == 2
-        assert compute_num_nodes( (31,0), 16, None ) == 2
-        assert compute_num_nodes( (31,None), 16, None ) == 2
-
-        assert compute_num_nodes( (4,0), 16, 4 ) == 1
-        assert compute_num_nodes( (1,2), 16, 4 ) == 1
-        assert compute_num_nodes( (1,4), 16, 4 ) == 1
-        assert compute_num_nodes( (32,4), 16, 4 ) == 2
-        assert compute_num_nodes( (16,6), 16, 4 ) == 2
-        assert compute_num_nodes( (32,6), 16, 4 ) == 2
-        assert compute_num_nodes( (31,None), 16, 4 ) == 2
-
-
-def check_extra_batch_submit_flags( batch_type, mock_run_cmd ):
-    ""
-    for flags in ['-V', ['-v','var=val'], '-v var=val']:
-        obj = batch_type( extra_flags=flags)
-        obj.setRunCommand( mock_run_cmd )
-        cmd,out,jobid,err = obj.submit( 'script', 'out' )
-        check = flags if type(flags)==type('') else ' '.join(flags)
-        assert check in cmd, 'expected '+repr(check)+' to appear in '+repr(cmd)
+        self.assertEqual( helpers.format_extra_flags( None ), [] )
+        self.assertEqual( helpers.format_extra_flags( ('-f',) ), ['-f'] )
+        self.assertEqual( helpers.format_extra_flags( '-V' ), ['-V'] )
+        self.assertEqual( helpers.format_extra_flags( ['-v','var=val'] ), ['-v','var=val'] )
+        self.assertEqual( helpers.format_extra_flags( '-v var=val' ), ['-v','var=val'] )
+        self.assertRaises( ValueError, helpers.format_extra_flags, 23 )
 
 
 class procbatch_tests( vtu.vvtestTestCase ):
 
-    def test_smoke_test(self):
+    def test_nominal_execution(self):
         ""
         util.writefile( 'script', """
             echo "running script"
@@ -76,21 +84,21 @@ class procbatch_tests( vtu.vvtestTestCase ):
             """ )
         script = abspath('script')
         outfile = abspath('out.txt')
+
+        obj = batch_system_factory( {'batchsys':'procbatch', 'ppn':8} )
+
+        hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
+
+        jobid,cmd,out = obj.submit( script, outfile )
+
         time.sleep(1)
-
-        from batch.procbatch import ProcessBatch
-
-        obj = ProcessBatch( ppn=8 )
-
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
-
-        cmd,out,jobid,err = obj.submit( script, outfile )
-
-        time.sleep(4)
-        cmd,out,err,stateD = obj.query( [jobid] )
-
-        assert len( stateD ) == 1
-        assert stateD[ jobid ] == ''
+        while True:
+            jobD,cmd,out = obj.query( [jobid] )
+            if len(jobD) > 0:
+                assert len( jobD ) == 1
+                assert jobD[jobid] == 'running'
+            else:
+                break
 
         assert os.path.exists( 'touch.txt' )
         assert len( util.grepfiles( 'running script', 'out.txt' ) ) == 1
@@ -98,216 +106,316 @@ class procbatch_tests( vtu.vvtestTestCase ):
 
 class slurm_tests( vtu.vvtestTestCase ):
 
-    save_cmds = []
-
-    def mock_run_command(self, cmdL, changedir=None):
+    def setUp(self):
         ""
-        slurm_tests.save_cmds.append( cmdL )
+        vtu.vvtestTestCase.setUp(self)
 
-        if cmdL[0] == 'sbatch':
-            return 0, 'Submitted batch job 291041'
+        write_mock_script( 'bin/sbatch', """
+            Submitted batch job 291041
+            """ )
 
-        if cmdL[0] == 'squeue':
-            return 0, dedent( """
-                              15994641 PD
-                              16004759 PD
-                              16004368 R
-                              16001384 R
-                              16001384 CD
-                              """ )
+        write_mock_script( 'bin/squeue', """
+            15994641 PD
+            16004759 PD
+            16004368 R
+            291041 PD
+            16001384 CD
+            """ )
 
-        if cmdL[0] == 'scancel':
-            return 0, ''
+        write_mock_script( 'bin/scancel', "" )
 
-        raise Exception( 'mock failure' )
+        self.save_PATH = os.environ.get( 'PATH', None )
+        os.environ['PATH'] = abspath('bin')+':'+os.environ.get( 'PATH', '/bin' )
 
-    def test_smoke_test(self):
+    def tearDown(self):
         ""
-        from batch.slurm import BatchSLURM
+        os.environ['PATH'] = self.save_PATH
 
-        obj = BatchSLURM( ppn=16 )
-        obj.setRunCommand( self.mock_run_command )
-
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
-        assert 'SBATCH' in hdr and 'nodes=1' in hdr
-
-        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
-        assert jobid == 291041
-
-        cmd,out,err,stateD = obj.query( [ 16004368, 16014368 ] )
-        assert len( stateD ) == 2
-        assert stateD[ 16004368 ] == 'running'
-        assert stateD[ 16014368 ] == ''
-
-    def test_qos_test(self):
-        """
-        Make sure the header function can correctly include the --qos tag.
-        """
-        from batch.slurm import BatchSLURM
-
-        obj = BatchSLURM( ppn=16, QoS='long' )
-        obj.setRunCommand( self.mock_run_command )
-
-        cmd, out, jid, err = obj.submit( 'foo', 'bar' )
-        print ( cmd )
-        assert '--qos=long' in cmd
-
-    def test_cancel_function(self):
+    def test_implementation_functions(self):
         ""
-        from batch.slurm import BatchSLURM
+        obj = batch_system_factory( { 'batchsys':'slurm',
+                                      'ppn':16,
+                                      'account':'foo',
+                                      'QoS':'bar' } )
 
-        obj = BatchSLURM( ppn=16 )
-        obj.setRunCommand( self.mock_run_command )
+        hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
 
-        obj.cancel( 123456 )
-        assert int( slurm_tests.save_cmds[-1][-1] ) == 123456
+        assert len( util.greplines( 'SBATCH *--nodes=3', hdrL ) ) == 1
+        assert len( util.greplines( 'SBATCH *--account=foo', hdrL ) ) == 1
+        assert len( util.greplines( 'SBATCH *--qos=bar', hdrL ) ) == 1
 
-    def test_extra_flags(self):
+        jobid,cmd,out = obj.submit( 'batchscript', 'out_filename' )
+        self.assertEqual( jobid, '291041' )
+
+        jobs,cmd,out = obj.query( [ '16004368', '16014368' ] )
+        self.assertEqual( jobs, {'16004368':'running'} )
+
+        obj.cancel( '123456' )
+        cmdL = eval( util.readfile( 'bin/scancel.out' ).strip() )
+        self.assertEqual( cmdL[1], '123456' )
+
+    def test_submit_error(self):
         ""
-        from batch.slurm import BatchSLURM
-        check_extra_batch_submit_flags( BatchSLURM, self.mock_run_command )
-        self.assertRaises( ValueError, BatchSLURM, ppn=16, extra_flags=5 )
+        util.writescript( 'bin/sbatch', """
+            #!"""+sys.executable+"""
+            raise Exception( 'fake exception' )
+            """ )
+
+        obj = batch_system_factory( { 'batchsys':'slurm'} )
+        jobid,cmd,out = obj.submit( 'foo', 'bar' )
+        # print ( out )
+        assert jobid is None
+        assert 'sbatch' in cmd
+        assert 'fake exception' in out
+
+    def test_batch_queue_interface(self):
+        ""
+        check_batch_queue_interface( 'slurm', '291041',
+                                     {'extra_flags':'--fake-flag fakevalue'} )
+
+        cmdL = eval( util.readfile( 'bin/sbatch.out' ) )
+        i = cmdL.index( '--fake-flag' )
+        self.assertEqual( cmdL[i+1], 'fakevalue' )
+
+        assert 'scancel' in util.readfile( 'bin/scancel.out' )
 
 
 class lsf_tests( vtu.vvtestTestCase ):
 
-    save_cmds = []
-
-    def mock_run_command(self, cmdL, changedir=None):
+    def setUp(self):
         ""
-        lsf_tests.save_cmds.append( cmdL )
+        vtu.vvtestTestCase.setUp(self)
 
-        if cmdL[0] == 'bsub':
-            return 0, 'Job <68628> is submitted to default queue <normal>.'
+        write_mock_script( 'bin/bsub', """
+            Job <68628> is submitted to default queue <normal>.
+            """ )
 
-        if cmdL[0] == 'bjobs':
-            return 0, dedent( """
-                              68628   PEND
-                              68728   RUN
-                              """ )
+        write_mock_script( 'bin/bjobs', """
+            68628   PEND
+            68728   RUN
+            """ )
 
-        if cmdL[0] == 'bkill':
-            return 0, ''
+        write_mock_script( 'bin/bkill', "" )
 
-        raise Exception( 'mock failure' )
+        self.save_PATH = os.environ.get( 'PATH', None )
+        os.environ['PATH'] = abspath('bin')+':'+os.environ.get( 'PATH', '/bin' )
 
-    def test_smoke_test(self):
+    def tearDown(self):
         ""
-        from batch.lsf import BatchLSF
+        os.environ['PATH'] = self.save_PATH
 
-        obj = BatchLSF( ppn=44 )
-        obj.setRunCommand( self.mock_run_command )
-
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
-        assert 'BSUB' in hdr and 'nnodes 1' in hdr
-
-        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
-        assert jobid == 68628
-
-        cmd,out,err,stateD = obj.query( [ 68628, 68728, 38594 ] )
-        assert len( stateD ) == 3
-        assert stateD[ 68628 ] == 'pending'
-        assert stateD[ 68728 ] == 'running'
-        assert stateD[ 38594 ] == ''
-
-    def test_cancel_function(self):
+    def test_implementation_functions(self):
         ""
-        from batch.lsf import BatchLSF
+        obj = batch_system_factory( {'batchsys':'lsf', 'ppn':44} )
 
-        obj = BatchLSF( ppn=44 )
-        obj.setRunCommand( self.mock_run_command )
+        hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
+        assert len( util.greplines( 'BSUB *-nnodes 3', hdrL ) ) == 1
 
-        obj.cancel( 123456 )
-        assert int( lsf_tests.save_cmds[-1][-1] ) == 123456
+        jobid,cmd,out = obj.submit( 'batchscript', 'out_filename' )
+        self.assertEqual( jobid, '68628' )
 
-    def test_extra_flags(self):
+        jobs,cmd,out = obj.query( [ '68628', '68728', '38594' ] )
+        self.assertEqual( jobs, {'68628': 'pending', '68728': 'running'} )
+
+        obj.cancel( '123456' )
+        cmdL = eval( util.readfile( 'bin/bkill.out' ).strip() )
+        assert len(cmdL) == 2 and cmdL[1] == '123456'
+
+    def test_batch_queue_interface(self):
         ""
-        from batch.lsf import BatchLSF
-        check_extra_batch_submit_flags( BatchLSF, self.mock_run_command )
-        self.assertRaises( ValueError, BatchLSF, ppn=16, extra_flags=5 )
+        check_batch_queue_interface( 'lsf', '68628',
+                                     {'extra_flags':'--fake-flag fakevalue'} )
+
+        cmdL = eval( util.readfile( 'bin/bsub.out' ) )
+        i = cmdL.index( '--fake-flag' )
+        self.assertEqual( cmdL[i+1], 'fakevalue' )
+
+        assert 'bkill' in util.readfile( 'bin/bkill.out' )
 
 
 class craypbs_tests( vtu.vvtestTestCase ):
 
-    def mock_run_command(self, cmdL, changedir=None):
+    def setUp(self):
         ""
-        if cmdL[0] == 'msub':
-            return 0, '12345.sdb'
+        vtu.vvtestTestCase.setUp(self)
 
-        if cmdL[0] == 'showq':
-            return 0, dedent( """
-                              123456.sdb n/a Running field
-                              12345.sdb n/a Running field
-                              123457.sdb n/a Idle field
-                              """ )
-        raise Exception( 'mock failure' )
+        write_mock_script( 'bin/msub', """
+            123457.sdb
+            """ )
 
-    def test_smoke_test(self):
+        write_mock_script( 'bin/showq', """
+            123456.sdb n/a Running field
+            12345.sdb n/a Running field
+            123457.sdb n/a Idle field
+            """ )
+
+        # batch cancel not implemented for craypbs
+
+        self.save_PATH = os.environ.get( 'PATH', None )
+        os.environ['PATH'] = abspath('bin')+':'+os.environ.get( 'PATH', '/bin' )
+
+    def tearDown(self):
         ""
-        from batch.craypbs import BatchCrayPBS
+        os.environ['PATH'] = self.save_PATH
 
-        obj = BatchCrayPBS( ppn=16 )
-        obj.setRunCommand( self.mock_run_command )
-
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
-        assert 'MSUB' in hdr
-
-        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
-        assert jobid == '12345.sdb'
-
-        cmd,out,err,stateD = obj.query( [ '12345.sdb', '123457.sdb', '7345.sdb' ] )
-        assert len( stateD ) == 3
-        assert stateD[ '12345.sdb' ] == 'running'
-        assert stateD[ '123457.sdb' ] == 'pending'
-        assert stateD[ '7345.sdb' ] == ''
-
-    def test_extra_flags(self):
+    def test_implementation_functions(self):
         ""
-        from batch.craypbs import BatchCrayPBS
-        check_extra_batch_submit_flags( BatchCrayPBS, self.mock_run_command )
-        self.assertRaises( ValueError, BatchCrayPBS, ppn=16, extra_flags=5 )
+        obj = batch_system_factory( {'batchsys':'craypbs', 'ppn':16} )
+
+        hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
+        assert len( util.greplines( 'MSUB*nodes*3', hdrL ) ) == 1
+
+        jobid,cmd,out = obj.submit( 'batchscript', 'out_filename' )
+        self.assertEqual( jobid, '123457.sdb' )
+
+        jobs,cmd,out = obj.query( [ '12345.sdb', '123457.sdb', '7345.sdb' ] )
+        self.assertEqual( jobs, {'123457.sdb':'pending', '12345.sdb':'running'} )
+
+    def test_batch_queue_interface(self):
+        ""
+        check_batch_queue_interface( 'craypbs', '123457.sdb',
+                                     {'extra_flags':'--fake-flag fakevalue'} )
+
+        cmdL = eval( util.readfile( 'bin/msub.out' ) )
+        i = cmdL.index( '--fake-flag' )
+        self.assertEqual( cmdL[i+1], 'fakevalue' )
 
 
 class pbs_tests( vtu.vvtestTestCase ):
 
-    def mock_run_command(self, cmdL, changedir=None):
+    def setUp(self):
         ""
-        if cmdL[0] == 'qsub':
-            return 0, '12345.ladmin1'
+        vtu.vvtestTestCase.setUp(self)
 
-        if cmdL[0] == 'qstat':
-            return 0, dedent( """
-                              123456.ladmin1 field1 field2 field3 Q field6
-                              12345.ladmin1 field1 field2 field3 R field6
-                              123457.ladmin1 field1 field2 field3 C field6
-                              """ )
-        raise Exception( 'mock failure' )
+        write_mock_script( 'bin/qsub', """
+            123456.ladmin1
+            """ )
 
-    def test_smoke_test(self):
+        write_mock_script( 'bin/qstat', """
+            123456.ladmin1 field1 field2 field3 Q field6
+            12345.ladmin1 field1 field2 field3 R field6
+            123457.ladmin1 field1 field2 field3 C field6
+            """ )
+
+        # batch cancel not implemented for pbs
+
+        self.save_PATH = os.environ.get( 'PATH', None )
+        os.environ['PATH'] = abspath('bin')+':'+os.environ.get( 'PATH', '/bin' )
+
+    def tearDown(self):
         ""
-        from batch.pbs import BatchPBS
+        os.environ['PATH'] = self.save_PATH
 
-        obj = BatchPBS( ppn=16 )
-        obj.setRunCommand( self.mock_run_command )
+    def test_implementation_functions(self):
+        ""
+        obj = batch_system_factory( {'batchsys':'pbs', 'ppn':16} )
 
-        hdr = obj.header( (8,0), 123, abspath('out.txt') )
+        hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
         assert 'PBS' in hdr
 
-        cmd,out,jobid,err = obj.submit( 'batchscript', 'out_filename' )
-        assert jobid == '12345.ladmin1'
+        jobid,cmd,out = obj.submit( 'batchscript', 'out_filename' )
+        self.assertEqual( jobid, '123456.ladmin1' )
 
-        cmd,out,err,stateD = obj.query(
+        jobs,cmd,out = obj.query(
                     [ '12345.ladmin1', '123456.ladmin1', '7345.ladmin1' ] )
-        assert len( stateD ) == 3
-        assert stateD[ '12345.ladmin1' ] == 'running'
-        assert stateD[ '123456.ladmin1' ] == 'pending'
-        assert stateD[ '7345.ladmin1' ] == ''
+        self.assertEqual( jobs, {'123456.ladmin1':'pending',
+                                 '12345.ladmin1':'running'} )
 
-    def test_extra_flags(self):
+    def test_batch_queue_interface(self):
         ""
-        from batch.pbs import BatchPBS
-        check_extra_batch_submit_flags( BatchPBS, self.mock_run_command )
-        self.assertRaises( ValueError, BatchPBS, ppn=16, extra_flags=5 )
+        check_batch_queue_interface( 'pbs', '123456.ladmin1',
+                                     {'extra_flags':'--fake-flag fakevalue'} )
+
+        cmdL = eval( util.readfile( 'bin/qsub.out' ) )
+        i = cmdL.index( '--fake-flag' )
+        self.assertEqual( cmdL[i+1], 'fakevalue' )
+
+
+class moab_tests( vtu.vvtestTestCase ):
+
+    def setUp(self):
+        ""
+        vtu.vvtestTestCase.setUp(self)
+
+        write_mock_script( 'bin/msub', """
+            123456.ladmin1
+            """ )
+
+        write_mock_script( 'bin/showq', """
+            123456.ladmin1 field1 Deferred field3
+            12345.ladmin1 field1 Running field3
+            123457.ladmin1 field1 Idle field3
+            """ )
+
+        # batch cancel not implemented for moab
+
+        self.save_PATH = os.environ.get( 'PATH', None )
+        os.environ['PATH'] = abspath('bin')+':'+os.environ.get( 'PATH', '/bin' )
+
+    def tearDown(self):
+        ""
+        os.environ['PATH'] = self.save_PATH
+
+    def test_implementation_functions(self):
+        ""
+        obj = batch_system_factory( {'batchsys':'moab', 'ppn':16} )
+
+        hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
+        assert 'MSUB' in hdr
+
+        jobid,cmd,out = obj.submit( 'batchscript', 'out_filename' )
+        self.assertEqual( jobid, '123456.ladmin1' )
+
+        jobs,cmd,out = obj.query(
+                    [ '12345.ladmin1', '123456.ladmin1', '7345.ladmin1' ] )
+        self.assertEqual( jobs, {'123456.ladmin1':'pending',
+                                 '12345.ladmin1':'running'} )
+
+    def test_batch_queue_interface(self):
+        ""
+        check_batch_queue_interface( 'moab', '123456.ladmin1',
+                                     {'extra_flags':'--fake-flag fakevalue'} )
+
+        cmdL = eval( util.readfile( 'bin/msub.out' ) )
+        i = cmdL.index( '--fake-flag' )
+        self.assertEqual( cmdL[i+1], 'fakevalue' )
+
+
+def check_batch_queue_interface( batchsys, jobid, add_attrs={} ):
+    ""
+    os.mkdir('work')
+    wrk,out,scr = abspath('work'), abspath('work/out'), abspath('work/scr')
+
+    attrs = {'batchsys':batchsys, 'ppn':13}
+    attrs.update( add_attrs )
+    bq = BatchQueueInterface( attrs )
+
+    bq.writeJobScript( (1,1,0), 60, wrk, out, scr, 'fake command' )
+    assert 'fake command' in util.readfile( scr )
+
+    jid = bq.submitJob( wrk, out, scr )
+    assert jid == jobid
+
+    jobD = bq.queryJobs( [jid] )
+    assert jobD == {jobid:'pending'}
+
+    bq.cancelJobs( [123] )
+
+
+def write_mock_script( filename, print_this ):
+    ""
+    lines = [ '#!'+sys.executable,
+              'import os, sys' ]
+    if print_this:
+        lines.extend( [
+            "print ( '''",
+            dedent( print_this ).strip(),
+            "''' )" ] )
+    # a file is always written that contains the script arguments
+    lines.extend( [
+            "with open( '"+abspath(filename)+'.out'+"', 'wt' ) as fp:",
+            "    fp.write( str(sys.argv) + os.linesep )" ] )
+    util.writescript( filename, '\n'.join(lines)+'\n' )
 
 
 ############################################################################

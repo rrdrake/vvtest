@@ -16,97 +16,99 @@ except Exception:
 class BatchQueueInterface:
 
     def __init__(self, attrs={}, envD={}):
-        ""
+        """
+        The 'attrs' must have a "batchsys" key with one of these values:
+
+            slurm     : standard SLURM system
+            lsf       : LSF, such as the Sierra platform
+            craypbs   : for Cray machines running PBS (or PBS-like)
+            moab      : for Cray machines running Moab (may work in general)
+            pbs       : standard PBS system
+            procbatch : simulate batch processing with subprocesses
+        """
         self.batch = None
         self.attrs = dict( attrs )
         self.envD = dict( envD )
 
-        self.clean_exit_marker = "queue job finished cleanly"
+        assert 'batchsys' in self.attrs
+        assert self.attrs['ppn'] and self.attrs['ppn'] > 0
+        self.batch = batch_system_factory( self.attrs )
 
-        self._construct_queue_interface()
+        self.clean_exit_marker = "queue job finished cleanly"
 
     def getNodeSize(self):
         ""
-        np = self.attrs.get( 'ppn', self.attrs.get( 'processors_per_node', None ) )
-        nd = self.attrs.get( 'dpn', self.attrs.get( 'devices_per_node', None ) )
+        np = self.attrs.get( 'ppn', None )
+        nd = self.attrs.get( 'dpn', None )
         return np,nd
 
     def getCleanExitMarker(self):
         ""
         return self.clean_exit_marker
 
-    def setAttr(self, name, value):
-        ""
-        self.attrs[name] = value
-
-    def setEnviron(self, name, value):
-        ""
-        self.envD[name] = value
-
-    def _construct_queue_interface(self):
-        """
-        Set the batch system to one of these values:
-
-              slurm     : standard SLURM system
-              lsf       : LSF, such as the Sierra platform
-              craypbs   : for Cray machines running PBS (or PBS-like)
-              moab      : for Cray machines running Moab (may work in general)
-              pbs       : standard PBS system
-        """
-        assert 'batchsys' in self.attrs
-        self.batch = batch_queue_factory( self.attrs )
-
     def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):
         ""
         qt = self.attrs.get( 'walltime', queue_time )
 
-        hdr = '#!/bin/bash\n' + \
-              self.batch.header( size, qt, qout_file ) + '\n'
+        bufL = [ '#!/bin/bash' ]
 
-        hdr += 'cd '+quote(workdir)+' || exit 1\n'
+        bhead = self.batch.header( size, qt, qout_file )
+        if type(bhead) == type(''):
+            bufL.append( bhead )
+        else:
+            bufL.extend( list(bhead) )
 
+        bufL.extend( [ '# attributes: '+str(self.attrs),
+                       '',
+                       'cd '+quote(workdir)+' || exit 1' ] )
         if qout_file:
-            hdr += 'touch '+qout_file + ' || exit 1\n'
+            bufL.append( 'touch '+quote(qout_file) + ' || exit 1' )
 
-        hdr += '\n'
+        bufL.extend( [ '',
+                       'echo "job start time = `date`"',
+                       'echo "job time limit = '+str(queue_time)+'"' ] )
+
+        # set the environment variables from the platform into the script
+        for k,v in self.envD.items():
+            bufL.append( 'export '+k+'="'+v +'"' )
+
+        bufL.extend( [ '',
+                       command,
+                       '',
+                       'echo "'+self.clean_exit_marker+'"' ] )
 
         with open( filename, 'wt' ) as fp:
-
-            fp.writelines( [ hdr + '\n\n',
-                             'echo "job start time = `date`"\n' + \
-                             'echo "job time limit = ' + str(queue_time) + '"\n' ] )
-
-            # set the environment variables from the platform into the script
-            for k,v in self.envD.items():
-                fp.write( 'export ' + k + '="' + v  + '"\n' )
-
-            fp.writelines( [ command+'\n\n' ] )
-
-            # echo a marker to determine when a clean batch job exit has occurred
-            fp.writelines( [ 'echo "'+self.clean_exit_marker+'"\n' ] )
+            fp.write( '\n'.join( bufL ) + '\n' )
 
     def submitJob(self, workdir, outfile, scriptname):
         ""
         cwd = os.getcwd()
         os.chdir( workdir )
         try:
-            cmd, out, jobid, err = self.batch.submit( scriptname, outfile )
+            jobid,cmd,out = self.batch.submit( scriptname, outfile )
         finally:
             os.chdir( cwd )
 
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
+        if jobid is None:
+            print3( cmd+'\n'+out )
+            print3( '*** Batch submission failed or could not parse '
+                    'output to get job id' )
         else:
             print3( "Job script", scriptname, "submitted with id", jobid )
 
         return jobid
 
     def queryJobs(self, jobidL):
-        ""
-        cmd, out, err, jobD = self.batch.query( jobidL )
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
+        """
+        returns a dict mapping jobid to a string, where the string is empty if
+        the jobid is not in the queue (or is done), or "running" or "pending"
+        """
+        jobD,cmd,out = self.batch.query( jobidL )
+
+        for jobid in jobidL:
+            if jobid not in jobD:
+                jobD[jobid] = ''
 
         return jobD
 
@@ -118,15 +120,13 @@ class BatchQueueInterface:
                 self.batch.cancel( jid )
 
 
-def batch_queue_factory( batchattrs ):
+def batch_system_factory( batchattrs ):
     ""
-    assert batchattrs['ppn']
-
     qtype = batchattrs['batchsys']
 
     if qtype == 'procbatch':
         from . import procbatch
-        batch = procbatch.ProcessBatch( **batchattrs )
+        batch = procbatch.SubProcs( **batchattrs )
     elif qtype == 'craypbs':
         from . import craypbs
         batch = craypbs.BatchCrayPBS( **batchattrs )

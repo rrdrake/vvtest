@@ -72,6 +72,10 @@ class unit( vtu.vvtestTestCase ):
 
     def test_magic(self):
         ""
+        # magic:
+        #   - still need to test the max procs and max devices given to
+        #     batch jobs
+
         util.writefile( 'cfgdir/platform_plugin.py', """
             def initialize( platobj ):
                 platobj.setBatchSystem( 'procbatch', 7 )

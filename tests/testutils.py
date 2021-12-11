@@ -581,8 +581,12 @@ def greplines( shell_pattern, string_output ):
     pattern = adjust_shell_pattern_to_work_with_fnmatch( shell_pattern )
 
     matchlines = []
+    if type(string_output) == type(''):
+        lines = list( string_output.splitlines() )
+    else:
+        lines = string_output
 
-    for line in string_output.splitlines():
+    for line in lines:
         if fnmatch.fnmatch( line, pattern ):
             matchlines.append( line )
 

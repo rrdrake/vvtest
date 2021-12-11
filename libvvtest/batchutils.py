@@ -186,11 +186,12 @@ class Batcher:
             if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
             else:           cmd += ' -T ' + str(qtime-120)
 
-        np,nd = bjob.getJobSize()
-        if np:
-            cmd += ' -N '+str(np)
-        if nd:
-            cmd += ' --max-devices '+str(nd)
+        nn,np,nd = bjob.getJobSize()
+        ppn,dpn = self.jobhandler.getNodeSize()
+        if nn and ppn:
+            cmd += ' -N '+str(nn*ppn)
+        if nn and dpn:
+            cmd += ' --max-devices '+str(nn*dpn)
 
         cmd += ' || exit 1'
 
@@ -432,10 +433,7 @@ def compute_job_size( tlist, nodesize ):
             numnd += 1
         nn = max( nn, numnd )
 
-    np = nn*ppn if ppn else mxnp
-    nd = nn*dpn if dpn else mxnd
-
-    return np,nd
+    return nn,mxnp,mxnd
 
 
 def apply_queue_timeout_bump_factor( qtime ):
