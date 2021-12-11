@@ -18,10 +18,10 @@ import vvtestutils as vtu
 import testutils as util
 
 from batch.qinterface import BatchQueueInterface
-from batch.qinterface import batch_system_factory
+from batch.batchfactory import construct_batch_system
 
 import batch.helpers as helpers
-import batch.procbatch as procbatch
+import batch.subprocs as subprocs
 import batch.slurm as slurm
 import batch.lsf as lsf
 import batch.craypbs as craypbs
@@ -60,7 +60,7 @@ class function_tests( vtu.vvtestTestCase ):
 
     def test_queue_type_construction(self):
         ""
-        for qtype in ['procbatch','craypbs','pbs','slurm','moab','lsf']:
+        for qtype in ['subprocs','craypbs','pbs','slurm','moab','lsf']:
             bq = BatchQueueInterface( {'batchsys':qtype, 'ppn':12} )
             assert bq.getNodeSize() == (12,None)
 
@@ -74,7 +74,7 @@ class function_tests( vtu.vvtestTestCase ):
         self.assertRaises( ValueError, helpers.format_extra_flags, 23 )
 
 
-class procbatch_tests( vtu.vvtestTestCase ):
+class subprocs_tests( vtu.vvtestTestCase ):
 
     def test_nominal_execution(self):
         ""
@@ -85,7 +85,7 @@ class procbatch_tests( vtu.vvtestTestCase ):
         script = abspath('script')
         outfile = abspath('out.txt')
 
-        obj = batch_system_factory( {'batchsys':'procbatch', 'ppn':8} )
+        obj = construct_batch_system( {'batchsys':'subprocs', 'ppn':8} )
 
         hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
 
@@ -133,10 +133,10 @@ class slurm_tests( vtu.vvtestTestCase ):
 
     def test_implementation_functions(self):
         ""
-        obj = batch_system_factory( { 'batchsys':'slurm',
-                                      'ppn':16,
-                                      'account':'foo',
-                                      'QoS':'bar' } )
+        obj = construct_batch_system( { 'batchsys':'slurm',
+                                        'ppn':16,
+                                        'account':'foo',
+                                        'QoS':'bar' } )
 
         hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
 
@@ -161,7 +161,7 @@ class slurm_tests( vtu.vvtestTestCase ):
             raise Exception( 'fake exception' )
             """ )
 
-        obj = batch_system_factory( { 'batchsys':'slurm'} )
+        obj = construct_batch_system( { 'batchsys':'slurm'} )
         jobid,cmd,out = obj.submit( 'foo', 'bar' )
         # print ( out )
         assert jobid is None
@@ -206,7 +206,7 @@ class lsf_tests( vtu.vvtestTestCase ):
 
     def test_implementation_functions(self):
         ""
-        obj = batch_system_factory( {'batchsys':'lsf', 'ppn':44} )
+        obj = construct_batch_system( {'batchsys':'lsf', 'ppn':44} )
 
         hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
         assert len( util.greplines( 'BSUB *-nnodes 3', hdrL ) ) == 1
@@ -260,7 +260,7 @@ class craypbs_tests( vtu.vvtestTestCase ):
 
     def test_implementation_functions(self):
         ""
-        obj = batch_system_factory( {'batchsys':'craypbs', 'ppn':16} )
+        obj = construct_batch_system( {'batchsys':'craypbs', 'ppn':16} )
 
         hdrL = obj.header( (3,8,0), 123, abspath('out.txt') )
         assert len( util.greplines( 'MSUB*nodes*3', hdrL ) ) == 1
@@ -308,7 +308,7 @@ class pbs_tests( vtu.vvtestTestCase ):
 
     def test_implementation_functions(self):
         ""
-        obj = batch_system_factory( {'batchsys':'pbs', 'ppn':16} )
+        obj = construct_batch_system( {'batchsys':'pbs', 'ppn':16} )
 
         hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
         assert 'PBS' in hdr
@@ -358,7 +358,7 @@ class moab_tests( vtu.vvtestTestCase ):
 
     def test_implementation_functions(self):
         ""
-        obj = batch_system_factory( {'batchsys':'moab', 'ppn':16} )
+        obj = construct_batch_system( {'batchsys':'moab', 'ppn':16} )
 
         hdr = obj.header( (1,8,0), 123, abspath('out.txt') )
         assert 'MSUB' in hdr

@@ -12,6 +12,8 @@ try:
 except Exception:
     from pipes import quote
 
+from .batchfactory import construct_batch_system
+
 
 class BatchQueueInterface:
 
@@ -19,12 +21,12 @@ class BatchQueueInterface:
         """
         The 'attrs' must have a "batchsys" key with one of these values:
 
-            slurm     : standard SLURM system
-            lsf       : LSF, such as the Sierra platform
-            craypbs   : for Cray machines running PBS (or PBS-like)
-            moab      : for Cray machines running Moab (may work in general)
-            pbs       : standard PBS system
-            procbatch : simulate batch processing with subprocesses
+            slurm    : standard SLURM system
+            lsf      : LSF, such as the Sierra platform
+            craypbs  : for Cray machines running PBS (or PBS-like)
+            moab     : for Cray machines running Moab (may work in general)
+            pbs      : standard PBS system
+            subprocs : simulate batch processing with subprocesses
         """
         self.batch = None
         self.attrs = dict( attrs )
@@ -32,7 +34,7 @@ class BatchQueueInterface:
 
         assert 'batchsys' in self.attrs
         assert self.attrs['ppn'] and self.attrs['ppn'] > 0
-        self.batch = batch_system_factory( self.attrs )
+        self.batch = construct_batch_system( self.attrs )
 
         self.clean_exit_marker = "queue job finished cleanly"
 
@@ -118,34 +120,6 @@ class BatchQueueInterface:
             print3( '\nCancelling jobs:', jobidL )
             for jid in jobidL:
                 self.batch.cancel( jid )
-
-
-def batch_system_factory( batchattrs ):
-    ""
-    qtype = batchattrs['batchsys']
-
-    if qtype == 'procbatch':
-        from . import procbatch
-        batch = procbatch.SubProcs( **batchattrs )
-    elif qtype == 'craypbs':
-        from . import craypbs
-        batch = craypbs.BatchCrayPBS( **batchattrs )
-    elif qtype == 'pbs':
-        from . import pbs
-        batch = pbs.BatchPBS( **batchattrs )
-    elif qtype == 'slurm':
-        from . import slurm
-        batch = slurm.BatchSLURM( **batchattrs )
-    elif qtype == 'moab':
-        from . import moab
-        batch = moab.BatchMOAB( **batchattrs )
-    elif qtype == 'lsf':
-        from . import lsf
-        batch = lsf.BatchLSF( **batchattrs )
-    else:
-        raise Exception( "Unknown batch system name: "+str(qtype) )
-
-    return batch
 
 
 def print3( *args ):

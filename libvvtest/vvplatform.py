@@ -127,9 +127,9 @@ class Platform:
             self.devicepool = rpool.ResourcePool( nd, maxdev )
 
         bsys = self.attrs.get( 'batchsys', None )
-        if self.mode == 'batch' and (bsys is None or bsys == 'procbatch'):
+        if self.mode == 'batch' and (bsys is None or bsys == 'subprocs'):
 
-            self.attrs['batchsys'] = 'procbatch'
+            self.attrs['batchsys'] = 'subprocs'
             if not maxnp:
                 maxnp = rprobe.probe_num_processors( 4 )
             self.attrs['ppn'] = self.attrs.get( 'ppn', maxnp )

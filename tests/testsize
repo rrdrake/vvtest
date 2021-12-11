@@ -32,7 +32,7 @@ class unit( vtu.vvtestTestCase ):
         plat.initialize( 4, 8, 0, 0 )
         assert plat.getNodeSize() == 8
 
-        plat = Platform( attrs={'batchsys':'procbatch'} )
+        plat = Platform( attrs={'batchsys':'subprocs'} )
         plat.initialize( 4, 8, 0, 0 )
         assert plat.getNodeSize() == 8
 
@@ -78,7 +78,7 @@ class unit( vtu.vvtestTestCase ):
 
         util.writefile( 'cfgdir/platform_plugin.py', """
             def initialize( platobj ):
-                platobj.setBatchSystem( 'procbatch', 7 )
+                platobj.setBatchSystem( 'subprocs', 7 )
             """ )
 
         util.writefile( 'atest.vvt', """
