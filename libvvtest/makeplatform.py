@@ -115,12 +115,13 @@ def create_Platform_instance( platname, mode, platopts,
                               numprocs, maxprocs, devices, max_devices,
                               onopts, offopts ):
     """
-    The name=value options given to the Platform object originate from one
-    of three places:
+    The name=value options given to the Platform object originate from these
+    places:
 
-        (1) platopts : from command line, --platopts name=value
-        (2) opts given to setBatchSystem() : ppn and kwargs
-        (3) platform attrs : set in platform plugin using plat.setattr()
+        (1) direct from command line, such as -N and --max-devices
+        (2) indirect from command line, --platopts name=value
+        (3) options given to setBatchSystem() in platform_plugin.py
+        (4) set via platcfg.setattr() in platform_plugin.py
     """
     assert mode in ['direct','batch','batchjob']
 
@@ -129,24 +130,24 @@ def create_Platform_instance( platname, mode, platopts,
     apsr.parse_in_place( platopts )
 
     optdict = {}
-    if platname:         optdict['--plat']    = platname
-    if platopts:         optdict['--platopt'] = platopts
-    if onopts:           optdict['-o']        = onopts
-    if offopts:          optdict['-O']        = offopts
+    if platname: optdict['--plat']    = platname
+    if platopts: optdict['--platopt'] = platopts
+    if onopts:   optdict['-o']        = onopts
+    if offopts:  optdict['-O']        = offopts
 
     platname,cplrname = determine_platform_and_compiler( platname, onopts, offopts )
 
-    # options (1) are available to platform plugin through the 'optdict' (yuck!)
+    # options (2) are available to platform plugin through the 'optdict' (yuck!)
     platcfg = PlatformConfig( apsr, optdict, platname, cplrname )
 
-    # options (1) are transferred to the platconfig object attrs
+    # platform plugin can set attrs via:
+    #   - options (3) by calling setBatchSystem()
+    #   - options (4) by calling setattr() directly
+    initialize_platform( platcfg )
+
+    # options (2) are transferred/overwritten to the platconfig object attrs
     for n,v in platopts.items():
         platcfg.setattr( n, v )
-
-    # platform plugin can add or overwrite attrs via:
-    #   - options (2) by calling setBatchSystem()
-    #   - options (3) by calling setattr() directly
-    initialize_platform( platcfg )
 
     # the union of all options are given to Platform object
     plat = Platform( mode=mode,
@@ -155,7 +156,7 @@ def create_Platform_instance( platname, mode, platopts,
                      environ=platcfg.envD,
                      attrs=platcfg.attrs )
 
-    # the initialize may add 'batchsys', 'ppn' and 'dpn' attributes
+    # options (1) are selected first in here if non-None
     plat.initialize( numprocs, maxprocs, devices, max_devices )
 
     return plat

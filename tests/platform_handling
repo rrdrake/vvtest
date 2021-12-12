@@ -125,7 +125,45 @@ class construction( vtu.vvtestTestCase ):
         psr = makeplatform.AttrParser( [['foo',int,'desc']] )
         self.assertRaises( Exception, psr.parse_in_place, {'bar':5} )
 
-    def test_initialize_platformconfig_from_platform_plugin(self):
+    def test_the_preset_platform_options(self):
+        ""
+        apsr = makeplatform.AttrParser()
+
+        popts = { 'batchsys':'slurm',          'ppn':'5',
+                  'dpn':'7',                   'queue':'admin',
+                  'account':'fy666',           'variation':'knl',
+                  'walltime':'2:34',           'maxprocs':'23',
+                  'maxdevices':'33',           'maxqtime':'3600',
+                  'maxsubs':'11',              'QoS':'long',
+                  'testingdir':'/path',        'extra_flags':'--foo=bar',
+                }
+        apsr.parse_in_place( popts )
+        self.assertEqual( popts,
+                { 'batchsys':'slurm',          'ppn':5,
+                  'dpn':7,                     'queue':'admin',
+                  'account':'fy666',           'variation':'knl',
+                  'walltime':'2:34',           'maxprocs':23,
+                  'maxdevices':33,             'maxqtime':3600,
+                  'maxsubs':11,                'QoS':'long',
+                  'testingdir':'/path',        'extra_flags':'--foo=bar',
+                } )
+
+        popts = { 'processors_per_node':'5',   'devices_per_node':'7',
+                  'q':'admin',                 'PT':'fy666',
+                  'submit_flags':'--foo=bar',
+                }
+        apsr.parse_in_place( popts )
+        self.assertEqual( popts,
+                { 'ppn':5,                     'dpn':7,
+                  'queue':'admin',             'account':'fy666',
+                  'extra_flags':'--foo=bar',
+                } )
+
+        popts = { 'cores_per_node':'5', 'partition':'admin', }
+        apsr.parse_in_place( popts )
+        self.assertEqual( popts, { 'ppn':5, 'queue':'admin', } )
+
+    def test_initialize_platform_config_from_platform_plugin(self):
         ""
         util.writefile( 'adir/platform_plugin.py', """
             def initialize( platobj ):
@@ -136,60 +174,84 @@ class construction( vtu.vvtestTestCase ):
         apsr = makeplatform.AttrParser()
 
         with vtu.clean_sys_path():
-            plat = makeplatform.PlatformConfig( apsr, {}, None, None )
-            makeplatform.initialize_platform( plat )
-            assert plat.getattr( 'ppn', None ) == None
+            platcfg = makeplatform.PlatformConfig( apsr, {}, None, None )
+            makeplatform.initialize_platform( platcfg )
+            assert platcfg.getattr( 'ppn', None ) is None
 
         with vtu.clean_sys_path():
-            plat = makeplatform.PlatformConfig( apsr, {}, None, None )
+            platcfg = makeplatform.PlatformConfig( apsr, {}, None, None )
             sys.path.insert( 0, adir )
-            makeplatform.initialize_platform( plat )
-            assert plat.getattr( 'ppn', None ) == 3
+            makeplatform.initialize_platform( platcfg )
+            self.assertEqual( platcfg.getattr( 'ppn', None ), 3 )
 
-    def test_setting_platformconfig_options(self):
-        ""
-        apsr = makeplatform.AttrParser()
-        platcfg = makeplatform.PlatformConfig( apsr, {}, None, None )
-
-        popts = { 'q':'admin',
-                  'PT':'fy666',
-                  'walltime':'2:34',
-                  'QoS':'long',
-                  'extra_flags':'--foo=bar',
-                  'maxqtime':3600,
-                  'variation':'knl',
-                  'maxsubs':11 }
-        apsr.parse_in_place( popts )
-
-        assert popts['queue']       == 'admin'
-        assert popts['account']     == 'fy666'
-        assert popts['walltime']    == '2:34'
-        assert popts['QoS']         == 'long'
-        assert popts['extra_flags'] == '--foo=bar'
-        assert popts['maxqtime']    == 3600
-        assert popts['variation']   == 'knl'
-        assert popts['maxsubs']     == 11
-
-    def test_the_create_Platform_instance_function(self):
+    def test_Platform_object_construction(self):
         ""
         plat = makeplatform.create_Platform_instance(
                     None, 'direct', {},
                     None, None, None, None,
                     None, None )
 
-        optD = { 'q':'justdoit', 'variation':'knl', 'PT':'fy666', 'walltime':'2:34' }
+        platopts = { 'q':'justdoit', 'PT':'fy666', 'walltime':'2:34' }
         plat = makeplatform.create_Platform_instance(
-                    'XBox', 'batch',
-                    optD,
-                    10, 20, None, None,
+                    'XBox', 'batch', platopts,
+                    10, 20, 2, 4,
                     ['dbg'], ['symbols'] )
 
         assert plat.getName() == 'XBox'
-        assert plat.getMaxSize() == (20,0)
-        assert plat.getSize() == (10,0)
+        assert plat.getMaxSize() == (20,4)
+        assert plat.getSize() == (10,2)
         assert plat.getattr( 'queue' ) == 'justdoit'
         assert plat.getattr( 'account' ) == 'fy666'
         assert plat.getattr( 'walltime' ) == '2:34'
+
+    def test_platform_option_precedence(self):
+        """
+            1) command line dedicated, such as -N
+            2) --platopts on command line
+            3) platform plugin
+            4) probing
+        """
+        util.writefile( 'adir/platform_plugin.py', """
+            def initialize( platobj ):
+                platobj.setattr( 'maxprocs', 3 )
+                platobj.setattr( 'maxdevices', 9 )
+            """ )
+        adir = abspath( 'adir' )
+
+        with vtu.clean_sys_path():
+
+            # no plugin or command line
+            plat = makeplatform.create_Platform_instance(
+                        'XBox', 'direct', {},
+                        None, None, None, None,
+                        [], [] )
+            mxnp,mxnd = plat.getMaxSize()
+            assert mxnp and mxnp > 0 and mxnd == 0
+
+            sys.path.insert( 0, adir )
+
+            # just plugin
+            plat = makeplatform.create_Platform_instance(
+                        'XBox', 'direct', {},
+                        None, None, None, None,
+                        [], [] )
+            self.assertEqual( list( plat.getMaxSize() ), [3,9] )
+
+            # plugin plus --platopts
+            platopts = { 'maxprocs':'5', 'maxdevices':'7' }
+            plat = makeplatform.create_Platform_instance(
+                        'XBox', 'direct', platopts,
+                        None, None, None, None,
+                        [], [] )
+            self.assertEqual( list( plat.getMaxSize() ), [5,7] )
+
+            # plugin plus --platopts plus dedicated command line
+            platopts = { 'maxprocs':'5', 'maxdevices':'7' }
+            plat = makeplatform.create_Platform_instance(
+                        'XBox', 'direct', platopts,
+                        None, 20, None, 4,
+                        [], [] )
+            self.assertEqual( list( plat.getMaxSize() ), [20,4] )
 
 
 class modes( vtu.vvtestTestCase ):
