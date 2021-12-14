@@ -188,10 +188,10 @@ class Batcher:
 
         nn,np,nd = bjob.getJobSize()
         ppn,dpn = self.jobhandler.getNodeSize()
-        if nn and ppn:
-            cmd += ' -N '+str(nn*ppn)
-        if nn and dpn:
-            cmd += ' --max-devices '+str(nn*dpn)
+        assert nn and ppn
+        cmd += ' -N '+str(nn*ppn)+' --platopt ppn='+str(ppn)
+        if dpn:
+            cmd += ' --max-devices '+str(nn*dpn)+' --platopt dpn='+str(dpn)
 
         cmd += ' || exit 1'
 

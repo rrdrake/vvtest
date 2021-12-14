@@ -7,10 +7,15 @@
 
 class ResourcePool:
 
-    def __init__(self, total, maxavail):
+    def __init__(self, total, maxavail=None):
         ""
+        assert total and total > 0
         self.total = total
-        self.maxavail = maxavail
+        if maxavail is None:
+            self.maxavail = total
+        else:
+            assert maxavail and maxavail > 0
+            self.maxavail = maxavail
 
         self.pool = None  # maps hardware id to num available
 

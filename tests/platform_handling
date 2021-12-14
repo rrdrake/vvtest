@@ -199,7 +199,6 @@ class construction( vtu.vvtestTestCase ):
 
         assert plat.getName() == 'XBox'
         assert plat.getMaxSize() == (20,4)
-        assert plat.getSize() == (10,2)
         assert plat.getattr( 'queue' ) == 'justdoit'
         assert plat.getattr( 'account' ) == 'fy666'
         assert plat.getattr( 'walltime' ) == '2:34'
@@ -264,6 +263,8 @@ class modes( vtu.vvtestTestCase ):
             def initialize( platobj ):
                 platobj.setattr( 'maxprocs', 27 )
                 platobj.setattr( 'maxdevices', 11 )
+                platobj.setattr( 'cores_per_node', 17 )
+                platobj.setattr( 'devices_per_node', 19 )
             """ )
         self.cfgdir = abspath( 'cfg' )
 
@@ -275,47 +276,234 @@ class modes( vtu.vvtestTestCase ):
 
     def test_direct_mode_getMaxSize(self):
         ""
-        # precedence:
-        #   1. command line options
-        #   2. plugin value
-        #   3. CPU probe (no device probe yet)
+        # the system probe should always return a positive integer for np
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(None,None) )
+        np,nd = plat.getMaxSize()
+        assert type(np) == type(2) and np > 0 and nd == 0
 
-        check_maxsize( self.nocfg,  'direct', setmax=(23,None),   expected=(23,0) )
-        check_maxsize( self.nocfg,  'direct', setmax=(23,7),      expected=(23,7) )
-        check_maxsize( self.cfgdir, 'direct', setmax=(None,None), expected=(27,11) )
-        check_maxsize( self.cfgdir, 'direct', setmax=(23,7),      expected=(23,7) )
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(23,None), )
+        self.assertEqual( plat.getMaxSize(), (23,0) )
 
-        # the system probe should always return a positive integer
-        np,nd = check_maxsize( self.nocfg, 'direct', setmax=(None,None) )
-        assert type(np) == type(2) and np > 0
-        assert nd == 0
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(None,None) )
+        self.assertEqual( plat.getMaxSize(), (27,11) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
 
     def test_batch_mode_getMaxSize(self):
         ""
-        check_maxsize( self.nocfg,  'batch', setmax=(23,None),   expected=(23,0) )
-        check_maxsize( self.nocfg,  'batch', setmax=(23,7),      expected=(23,7) )
-        check_maxsize( self.cfgdir, 'batch', setmax=(None,None), expected=(27,11) )
-        check_maxsize( self.cfgdir, 'batch', setmax=(23,7),      expected=(23,7) )
-        # no max procs by default in batch mode:
-        check_maxsize( self.nocfg,  'batch', setmax=(None,None), expected=(None,0) )
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None) )
+        self.assertEqual( plat.getMaxSize(), (None,None) )
+
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(23,None) )
+        self.assertEqual( plat.getMaxSize(), (23,None) )
+
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
+        plat = newplatform( self.cfgdir, 'batch', cmdmax=(None,None) )
+        self.assertEqual( plat.getMaxSize(), (27,11) )
+
+        plat = newplatform( self.cfgdir, 'batch', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
+    def test_batchjob_mode_getMaxSize(self):
+        """
+        Since procs per node is always positive, the max np is always num_nodes*ppn
+        If devices per node is positive, then max devices will be num_nodes*dpn
+        These values will be set on the batch job vvtest command line with -N
+        and --max-devices
+        """
+        plat = newplatform( self.nocfg, 'batchjob', cmdmax=(23,None) )
+        self.assertEqual( plat.getMaxSize(), (23,None) )
+
+        plat = newplatform( self.nocfg, 'batchjob', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdmax=(23,None) )
+        self.assertEqual( plat.getMaxSize(), (23,None) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdmax=(23,7) )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
+    def test_direct_mode_num_cores_and_num_devices(self):
+        ""
+        # the system probe should always return a positive integer for np
+        plat = newplatform( self.nocfg, 'direct', cmdsize=(None,None) )
+        np,nd = plat.getSize()
+        assert type(np) == type(2) and np > 0 and nd is None
+
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(23,None) )
+        self.assertEqual( plat.getSize(), (23,None) )
+
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(23,7) )
+        self.assertEqual( plat.getSize(), (23,7) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(None,None) )
+        self.assertEqual( plat.getSize(), (27,11) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(23,7) )
+        self.assertEqual( plat.getSize(), (23,7) )
+
+        plat = newplatform( self.nocfg,  'direct', cmdsize=(2,None), cmdmax=(23,None) )
+        self.assertEqual( plat.getSize(), (2,None) )
+
+        plat = newplatform( self.nocfg,  'direct', cmdsize=(2,5),    cmdmax=(23,7) )
+        self.assertEqual( plat.getSize(), (2,5) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdsize=(2,None), cmdmax=(None,None) )
+        self.assertEqual( plat.getSize(), (2,11) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdsize=(2,5),    cmdmax=(23,7) )
+        self.assertEqual( plat.getSize(), (2,5) )
+
+    def test_batch_mode_num_cores_and_num_devices(self):
+        """
+        Since no tests are run in batch mode, the number of cores/devices is
+        not used.
+        """
+        plat = newplatform( self.nocfg, 'batch', cmdsize=(None,None) )
+        self.assertEqual( plat.getSize(), (None,None) )
+        self.assertEqual( plat.getMaxSize(), (None,None) )
+
+        plat = newplatform( self.nocfg, 'batch', cmdsize=(8,4) )
+        self.assertEqual( plat.getSize(), (8,4) )
+        self.assertEqual( plat.getMaxSize(), (None,None) )
+
+    def test_batchjob_mode_num_cores_and_num_devices(self):
+        """
+        For batch jobs, only the command line options should be used. Either
+            1) num cores/devices is specified, or
+            2) max num cores/devices is specified
+        If max is given but not number, then the number will be set to the max.
+        """
+        plat = newplatform( self.nocfg, 'batchjob', cmdsize=(4,2) )
+        self.assertEqual( plat.getSize(), (4,2) )
+
+        plat = newplatform( self.nocfg, 'batchjob', cmdsize=(None,None), cmdmax=(5,3) )
+        self.assertEqual( plat.getSize(), (5,3) )
+
+        plat = newplatform( self.nocfg, 'batchjob', cmdsize=(4,2), cmdmax=(5,3) )
+        self.assertEqual( plat.getSize(), (4,2) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdsize=(4,2) )
+        self.assertEqual( plat.getSize(), (4,2) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdsize=(None,None), cmdmax=(5,3) )
+        self.assertEqual( plat.getSize(), (5,3) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdsize=(4,2), cmdmax=(5,3) )
+        self.assertEqual( plat.getSize(), (4,2) )
+
+        # this is unrealistic, but correct in theory
+        plat = newplatform( self.nocfg, 'batchjob', cmdsize=(None,None) )
+        self.assertEqual( plat.getSize(), (None,None) )
+
+        plat = newplatform( self.cfgdir, 'batchjob', cmdsize=(None,None) )
+        self.assertEqual( plat.getSize(), (None,None) )
+
+    def test_direct_mode_compute_node_size(self):
+        """
+        By default in direct mode, the whole workstation is treated as a single
+        node. But it uses values for ppn and dpn if given on the command line
+        or in the platform plugin.
+        """
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(None,None), attrs={} )
+        ppn,dpn = plat.getNodeSize()
+        assert ppn and ppn > 0 and dpn is None
+
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(5,7), attrs={} )
+        self.assertEqual( plat.getNodeSize(), (5,7) )
+
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(None,None),
+                            attrs={'ppn':5,'dpn':7} )
+        self.assertEqual( plat.getNodeSize(), (5,7) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(None,None), attrs={} )
+        self.assertEqual( plat.getNodeSize(), (17,19) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(5,7), attrs={} )
+        self.assertEqual( plat.getNodeSize(), (17,19) )
+
+        plat = newplatform( self.cfgdir, 'direct', cmdmax=(None,None),
+                            attrs={'ppn':5,'dpn':7} )
+        self.assertEqual( plat.getNodeSize(), (5,7) )
+
+    def test_batch_mode_compute_node_size(self):
+        """
+        In batch mode, the "subprocs" batch system is special - it uses ppn
+        and dpn if defined, otherwise it uses the max cores/devices.
+        For other batch systems, at least ppn must be set; it is an error
+        otherwise.
+        """
+        attrs = {'batchsys':'subprocs'}
+
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None), attrs=attrs )
+        ppn,dpn = plat.getNodeSize()
+        assert ppn and ppn > 0 and dpn is None
+
+        plat = newplatform( self.cfgdir, 'batch', attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (17,19) )
+
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (5,7) )
+
+        attrs = {'batchsys':'subprocs','ppn':'8','dpn':'3'}
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (8,3) )
+
+        attrs = {'batchsys':'slurm'}
+
+        # ppn must get set
+        self.assertRaises( Exception,
+            newplatform, self.nocfg, 'batch', cmdmax=(5,7), attrs=attrs )
+
+        plat = newplatform( self.cfgdir, 'batch', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (17,19) )
+
+        attrs = {'batchsys':'slurm','ppn':'9'}
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (9,None) )
+
+        attrs = {'batchsys':'slurm','ppn':'9','dpn':'25'}
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (9,25) )
+
+    def test_batchjob_mode_compute_node_size(self):
+        """
+        In batch jobs, the ppn and dpn are specified on the vvtest command line.
+        """
+        # ppn must get set
+        self.assertRaises( Exception,
+            newplatform, self.nocfg, 'batchjob', cmdmax=(5,7), attrs={} )
+
+        attrs = {'ppn':'5','dpn':7}
+        plat = newplatform( self.nocfg, 'batchjob', cmdmax=(5,7), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (5,7) )
+
+        attrs = {'ppn':'5'}
+        plat = newplatform( self.nocfg, 'batchjob', cmdmax=(5,None), attrs=attrs )
+        self.assertEqual( plat.getNodeSize(), (5,None) )
 
 
-def check_maxsize( cfgdir, mode, setmax=(None,None), expected=None ):
+def newplatform( cfgdir, mode, cmdsize=(None,None),
+                               cmdmax=(None,None),
+                               attrs={'ppn':1} ):
     ""
-    nprocs,ndevice = setmax
+    np,nd = cmdsize
+    nprocs,ndevice = cmdmax
 
     with vtu.clean_sys_path():
         sys.path.insert( 0, cfgdir )
 
         plat = makeplatform.create_Platform_instance(
-                    None, mode, {},
-                    None, nprocs, None, ndevice, None, None )
+                    None, mode, attrs,
+                    np, nprocs, nd, ndevice, None, None )
 
-        mxsz = plat.getMaxSize()
-        if expected is not None:
-            assert mxsz == expected
-
-    return mxsz
+    return plat
 
 
 ############################################################################

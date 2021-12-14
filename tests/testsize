@@ -30,15 +30,15 @@ class unit( vtu.vvtestTestCase ):
         ""
         plat = Platform()
         plat.initialize( 4, 8, 0, 0 )
-        assert plat.getNodeSize() == 8
+        self.assertEqual( list(plat.getNodeSize()), [8,None] )
 
         plat = Platform( attrs={'batchsys':'subprocs'} )
         plat.initialize( 4, 8, 0, 0 )
-        assert plat.getNodeSize() == 8
+        self.assertEqual( list(plat.getNodeSize()), [8,None] )
 
         plat = Platform( attrs={'ppn':23} )
         plat.initialize( 4, 8, 0, 0 )
-        assert plat.getNodeSize() == 23
+        self.assertEqual( list(plat.getNodeSize()), [23,None] )
 
     def test_sizing_with_np_and_ndevice(self):
         ""
@@ -53,19 +53,19 @@ class unit( vtu.vvtestTestCase ):
 
     def test_sizing_with_nnodes_parameter(self):
         ""
-        tc = make_testcase( { 'nnode':'1' }, 8 )
+        tc = make_testcase( { 'nnode':'1' }, (8,None) )
         assert tc.getSize() == (8,0)
 
-        tc = make_testcase( { 'nnode':'2' }, 7 )
+        tc = make_testcase( { 'nnode':'2' }, (7,None) )
         assert tc.getSize() == (14,0)
 
-        tc = make_testcase( { 'np':'8', 'nnode':'2' }, 7 )
+        tc = make_testcase( { 'np':'8', 'nnode':'2' }, (7,None) )
         assert tc.getSize() == (14,0)
 
-        tc = make_testcase( { 'np':'8', 'nnode':'1' }, 7 )
+        tc = make_testcase( { 'np':'8', 'nnode':'1' }, (7,None) )
         assert tc.getSize() == (8,0)
 
-        tc = make_testcase( { 'nnode':'2' }, None )
+        tc = make_testcase( { 'nnode':'2' } )
         assert tc.getSize() == (1,0)
 
 
@@ -92,7 +92,7 @@ class unit( vtu.vvtestTestCase ):
         # vrun.assertCounts( total=2, npass=2 )
 
 
-def make_testcase( paramD, nodesize=None ):
+def make_testcase( paramD, nodesize=(None,None) ):
     ""
     ts = testspec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
     ts.setParameters( paramD )

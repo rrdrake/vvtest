@@ -27,6 +27,20 @@ class unit_tests( vtu.vvtestTestCase ):
     def setUp(self):
         vtu.vvtestTestCase.setUp( self, cleanout=False )
 
+    def test_constructor_arguments(self):
+        ""
+        pool = rpool.ResourcePool( 10, 11 )
+        self.assertEqual( pool.numTotal(), 10 )
+        self.assertEqual( pool.maxAvailable(), 11 )
+
+        pool = rpool.ResourcePool( 10 )
+        self.assertEqual( pool.numTotal(), 10 )
+        self.assertEqual( pool.maxAvailable(), 10 )
+
+        self.assertRaises( Exception, rpool.ResourcePool, None )
+        self.assertRaises( Exception, rpool.ResourcePool, 0 )
+        self.assertRaises( Exception, rpool.ResourcePool, -1 )
+
     def test_resources_are_given_out_as_a_list_of_indexes(self):
         ""
         pool = rpool.ResourcePool( 10, 10 )

@@ -492,10 +492,10 @@ def extract_maxprocs( vvtest_output ):
     ""
     maxprocs = None
 
-    L1 = util.greplines( 'max procs', vvtest_output )
+    L1 = util.greplines( 'max cores', vvtest_output )
     if len(L1) > 0:
-        smax = L1[0].split( 'max procs', 1 )[1].strip().lstrip('=').strip()
-        maxprocs = int( smax )
+        L2 = L1[0].split( 'max cores', 1 )[1].strip().strip('=').split(',')
+        maxprocs = int( L2[0].strip() )
 
     return maxprocs
 

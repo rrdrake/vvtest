@@ -99,11 +99,15 @@ def compute_test_size( params, nodesize ):
     np = max( 1, int( params['np'] ) ) if 'np' in params else 0
     nn = max( 1, int( params['nnode'] ) ) if 'nnode' in params else 0
 
+    ppn = None
     if nodesize:
+        ppn,dpn = nodesize
+
+    if ppn:
         if np and nn:
-            np = max( np, nn*nodesize )
+            np = max( np, nn*ppn )
         elif nn:
-            np = nn*nodesize
+            np = nn*ppn
     if not np:
         np = 1
 

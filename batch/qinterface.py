@@ -17,7 +17,7 @@ from .batchfactory import construct_batch_system
 
 class BatchQueueInterface:
 
-    def __init__(self, attrs={}, envD={}):
+    def __init__(self, node_size, attrs={}, envD={}):
         """
         The 'attrs' must have a "batchsys" key with one of these values:
 
@@ -32,17 +32,17 @@ class BatchQueueInterface:
         self.attrs = dict( attrs )
         self.envD = dict( envD )
 
+        assert node_size[0] and node_size[0] > 0
+        self.nodesize = node_size
+
         assert 'batchsys' in self.attrs
-        assert self.attrs['ppn'] and self.attrs['ppn'] > 0
         self.batch = construct_batch_system( self.attrs )
 
         self.clean_exit_marker = "queue job finished cleanly"
 
     def getNodeSize(self):
         ""
-        np = self.attrs.get( 'ppn', None )
-        nd = self.attrs.get( 'dpn', None )
-        return np,nd
+        return self.nodesize
 
     def checkForJobScriptExit(self, outfile):
         """

@@ -61,7 +61,7 @@ class function_tests( vtu.vvtestTestCase ):
     def test_queue_type_construction(self):
         ""
         for qtype in ['subprocs','craypbs','pbs','slurm','moab','lsf']:
-            bq = BatchQueueInterface( {'batchsys':qtype, 'ppn':12} )
+            bq = BatchQueueInterface( (12,None), {'batchsys':qtype} )
             assert bq.getNodeSize() == (12,None)
 
     def test_formatting_extra_flags(self):
@@ -75,7 +75,7 @@ class function_tests( vtu.vvtestTestCase ):
 
     def test_clean_exit_marker_mechanism(self):
         ""
-        bq = BatchQueueInterface( {'batchsys':'subprocs', 'ppn':12} )
+        bq = BatchQueueInterface( (12,None), {'batchsys':'subprocs'} )
         bq.writeJobScript( (1,1,0), 60, os.getcwd(), 'log', 'scr', 'sleep 3' )
         assert bq.checkForJobScriptExit( 'log' ) is False
         bq.submitJob( os.getcwd(), 'log', 'scr' )
@@ -397,9 +397,9 @@ def check_batch_queue_interface( batchsys, jobid, add_attrs={} ):
     os.mkdir('work')
     wrk,out,scr = abspath('work'), abspath('work/out'), abspath('work/scr')
 
-    attrs = {'batchsys':batchsys, 'ppn':13}
+    attrs = {'batchsys':batchsys}
     attrs.update( add_attrs )
-    bq = BatchQueueInterface( attrs )
+    bq = BatchQueueInterface( (13,None), attrs )
 
     bq.writeJobScript( (1,1,0), 60, wrk, out, scr, 'fake command' )
     assert 'fake command' in util.readfile( scr )

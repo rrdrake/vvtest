@@ -26,7 +26,11 @@ class Platform:
         self.envD = dict( environ )
         self.attrs = dict( attrs )
 
-        self.procpool = rpool.ResourcePool( 1, 1 )
+        self.maxsize  = (None,None)  # max core, max device
+        self.size     = (None,None)  # num core, num device
+        self.nodesize = (None,None)  # ppn, dpn
+
+        self.procpool = None
         self.devicepool = None
 
     # ----------------------------------------------------------------
@@ -36,44 +40,15 @@ class Platform:
 
     def getMaxSize(self):
         ""
-        maxnp = self.procpool.maxAvailable()
-        if self.devicepool is not None:
-            maxnd = self.devicepool.maxAvailable()
-        else:
-            maxnd = 0
-        return (maxnp,maxnd)
+        return self.maxsize
 
     def getSize(self):
         ""
-        np = self.procpool.numTotal()
-        if self.devicepool is not None:
-            nd = self.devicepool.numTotal()
-        else:
-            nd = 0
-        return (np,nd)
+        return self.size
 
     def getNodeSize(self):
         ""
-        if 'ppn' in self.attrs:
-            return self.attrs['ppn']
-        else:
-            return self.getMaxSize()[0]
-
-    def display(self):
-        ""
-        s = "Platform " + self.platname
-        if self.mode == 'batch':
-            s += ', batch system='+str(self.attrs.get('batchsys',None))
-            s += ', ppn='+str(self.attrs.get('ppn',None))
-        else:
-            np,nd = self.getSize()
-            maxnp,maxnd = self.getMaxSize()
-            s += ", num procs = " + str(np)
-            s += ", max procs = " + str(maxnp)
-            if self.devicepool is not None:
-                s += ', num devices = '+str(nd)
-                s += ', max devices = '+str(maxnd)
-        print ( s )
+        return self.nodesize
 
     def getEnvironment(self):
         """
@@ -85,7 +60,22 @@ class Platform:
         ""
         return self.attrs
 
-    # ----------------------------------------------------------------
+    def display(self):
+        ""
+        s = "Platform " + self.platname
+        if self.mode == 'batch':
+            s += ', batchsys='+str(self.attrs.get('batchsys',None))
+            s += ', ppn='+str(self.attrs.get('ppn',None))
+        else:
+            np,nd = self.getSize()
+            maxnp,maxnd = self.getMaxSize()
+            if np    is not None: s += ', num cores = '+str(np)
+            if maxnp is not None: s += ', max cores = '+str(maxnp)
+            if nd    is not None: s += ', num devices = '+str(nd)
+            if maxnd is not None: s += ', max devices = '+str(maxnd)
+        print ( s )
+
+    ##################################################################
 
     def getattr(self, name, *default):
         ""
@@ -109,36 +99,122 @@ class Platform:
             max_procs   is -N
             max_devices is --max-devices
         """
-        np,maxnp = \
-            determine_processor_cores( num_procs,
-                                       max_procs,
-                                       self.attrs.get( 'maxprocs', None ),
-                                       use_probe=self.mode != 'batch' )
+        self._init_size( num_procs, max_procs, num_devices, max_devices )
 
-        nd,maxdev = \
-            determine_device_count( num_devices,
-                                    max_devices,
-                                    self.attrs.get( 'maxdevices', None ) )
-
-        self.procpool = rpool.ResourcePool( np, maxnp )
-
-        if nd is not None:
-            assert maxdev is not None
-            self.devicepool = rpool.ResourcePool( nd, maxdev )
+        if self.mode != 'batch':
+            self._construct_resource_pools()
 
         bsys = self.attrs.get( 'batchsys', None )
         if self.mode == 'batch' and (bsys is None or bsys == 'subprocs'):
+            self._set_subprocess_batching()
 
-            self.attrs['batchsys'] = 'subprocs'
-            if not maxnp:
-                maxnp = rprobe.probe_num_processors( 4 )
-            self.attrs['ppn'] = self.attrs.get( 'ppn', maxnp )
-            self.attrs['dpn'] = self.attrs.get( 'dpn', maxdev )
+        if self.mode == 'direct':
+            self._set_workstation_node_size()
+        else:
+            self._set_batch_node_size()
+
+    def _init_size(self, num_procs, max_procs, num_devices, max_devices):
+        ""
+        plugmax = self._get_max_size_from_plugin( 'maxprocs' )
+        np,maxnp = self._select_size( num_procs, max_procs, plugmax,
+                                      self.probe_num_cpus )
+
+        plugmax = self._get_max_size_from_plugin( 'maxdevices' )
+        nd,maxnd = self._select_size( num_devices, max_devices, plugmax )
+
+        if self.mode == 'direct' and maxnd is None:
+            if num_devices is None:
+                maxnd = 0
+            else:
+                maxnd = num_devices
+
+        self.size = (np,nd)
+        self.maxsize = (maxnp,maxnd)
+
+    def _get_max_size_from_plugin(self, attrname):
+        ""
+        if self.mode == 'batchjob':
+            # don't use the plugin value for batch jobs
+            plugmax = None
+        else:
+            plugmax = self.attrs.get( attrname, None )
+
+        return plugmax
+
+    def _select_size(self, cmd_num, cmd_max, plugin_max, probe=None):
+        ""
+        mx = cmd_max
+        if mx is None:
+            mx = plugin_max
+            if mx is None:
+                if probe is not None:
+                    mx = probe()
+
+        np = cmd_num
+        if np is None:
+            np = mx
+
+        return np,mx
+
+    def probe_num_cpus(self):
+        ""
+        if self.mode == 'direct':
+            return rprobe.probe_num_processors( 4 )
+        else:
+            return None
+
+    def _set_batch_node_size(self):
+        ""
+        if 'ppn' not in self.attrs or self.attrs['ppn'] <= 0:
+            raise Exception( 'batch mode requested, but "cores_per_node" '
+                             'not set on the command line or in the plugin' )
+
+        self.nodesize = ( self.attrs['ppn'], self.attrs.get('dpn',None) )
+
+    def _set_workstation_node_size(self):
+        ""
+        maxnp,maxnd = self.maxsize
+
+        ppn = self.attrs.get( 'ppn', None )
+        if not ppn:
+            ppn = maxnp or None
+
+        dpn = self.attrs.get( 'dpn', None )
+        if not dpn:
+            dpn = maxnd or None
+
+        self.nodesize = ( ppn, dpn )
+
+    def _construct_resource_pools(self):
+        ""
+        np,nd = self.size
+        maxnp,maxnd = self.maxsize
+
+        if np:
+            self.procpool = rpool.ResourcePool( np, maxnp )
+
+        if nd:
+            self.devicepool = rpool.ResourcePool( nd, maxnd )
+
+    def _set_subprocess_batching(self):
+        """
+        If cores/devices per node is not set, we set the compute node size
+        to the size of the workstation. This is an arbitrary choice, but
+        makes sense for the "nnode" parameterization.
+        """
+        self.attrs['batchsys'] = 'subprocs'
+
+        maxnp,maxnd = self.maxsize
+        if not maxnp:
+            maxnp = rprobe.probe_num_processors( 4 )
+
+        self.attrs['ppn'] = self.attrs.get( 'ppn', maxnp )
+        self.attrs['dpn'] = self.attrs.get( 'dpn', maxnd )
 
     def sizeAvailable(self):
         ""
         sznp = self.procpool.numAvailable()
-        if self.devicepool == None:
+        if self.devicepool is None:
             return ( sznp, 0 )
         else:
             return ( sznp, self.devicepool.numAvailable() )
@@ -210,9 +286,6 @@ def determine_device_count( num_devices, max_devices, plugin_max ):
         nd = mx
     else:
         nd = num_devices
-        if mx is None:
-            # could probe for devices to get a better max
-            mx = num_devices
 
     return nd,mx
 
