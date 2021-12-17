@@ -114,10 +114,16 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
                'RESOURCE_IDS_np = '+repr(resourceobj.procs),
                'RESOURCE_TOTAL_np = '+repr(resourceobj.maxprocs) )
 
-        if resourceobj.devices != None:
+        if 'np' not in paramD:
+            w.add( 'np = '+repr(len(resourceobj.procs)) )
+
+        if resourceobj.devices is not None:
             w.add( '',
                'RESOURCE_IDS_ndevice = '+repr(resourceobj.devices),
                'RESOURCE_TOTAL_ndevice = '+repr(resourceobj.maxdevices) )
+
+            if 'ndevice' not in paramD:
+                w.add( 'ndevice = '+repr(len(resourceobj.devices)) )
 
         ###################################################################
     
@@ -207,11 +213,17 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
                'RESOURCE_IDS_np="'+' '.join(sprocs)+'"',
                'RESOURCE_TOTAL_np="'+str(resourceobj.maxprocs)+'"' )
 
+        if 'np' not in paramD:
+            w.add( 'np="'+repr(len(resourceobj.procs))+'"' )
+
         if resourceobj.devices != None:
             sdevs = [ str(devid) for devid in resourceobj.devices ]
             w.add( '',
                'RESOURCE_IDS_ndevice = '+' '.join(sdevs),
                'RESOURCE_TOTAL_ndevice = "'+str(resourceobj.maxdevices)+'"' )
+
+            if 'ndevice' not in paramD:
+                w.add( 'ndevice="'+repr(len(resourceobj.devices))+'"' )
 
         w.add( '',
                'source $VVTESTSRC/config/script_util.sh' )

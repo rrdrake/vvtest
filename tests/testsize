@@ -26,79 +26,121 @@ from libvvtest.tcfactory import TestCaseFactory
 
 class unit( vtu.vvtestTestCase ):
 
-    def test_platform_compute_node_size(self):
-        ""
-        plat = Platform()
-        plat.initialize( 4, 8, 0, 0 )
-        self.assertEqual( list(plat.getNodeSize()), [8,None] )
-
-        plat = Platform( attrs={'batchsys':'subprocs'} )
-        plat.initialize( 4, 8, 0, 0 )
-        self.assertEqual( list(plat.getNodeSize()), [8,None] )
-
-        plat = Platform( attrs={'ppn':23} )
-        plat.initialize( 4, 8, 0, 0 )
-        self.assertEqual( list(plat.getNodeSize()), [23,None] )
-
     def test_sizing_with_np_and_ndevice(self):
         ""
         tc = make_testcase( { 'np':'6' } )
-        assert tc.getSize() == (6,0)
+        self.assertEqual( tc.getSize(), (6,0) )
 
         tc = make_testcase( {} )
-        assert tc.getSize() == (1,0)
+        self.assertEqual( tc.getSize(), (1,0) )
+
+        tc = make_testcase( {'np':'0'} )
+        self.assertEqual( tc.getSize(), (1,0) )
 
         tc = make_testcase( { 'ndevice':'3' } )
-        assert tc.getSize() == (1,3)
+        self.assertEqual( tc.getSize(), (1,3) )
 
-    def test_sizing_with_nnodes_parameter(self):
+        tc = make_testcase( { 'ndevice':'0' } )
+        self.assertEqual( tc.getSize(), (1,0) )
+
+    def test_sizing_with_nnode_parameter(self):
         ""
         tc = make_testcase( { 'nnode':'1' }, (8,None) )
-        assert tc.getSize() == (8,0)
+        self.assertEqual( tc.getSize(), (8,0) )
 
         tc = make_testcase( { 'nnode':'2' }, (7,None) )
-        assert tc.getSize() == (14,0)
+        self.assertEqual( tc.getSize(), (14,0) )
 
         tc = make_testcase( { 'np':'8', 'nnode':'2' }, (7,None) )
-        assert tc.getSize() == (14,0)
+        self.assertEqual( tc.getSize(), (14,0) )
 
         tc = make_testcase( { 'np':'8', 'nnode':'1' }, (7,None) )
-        assert tc.getSize() == (8,0)
+        self.assertEqual( tc.getSize(), (8,0) )
 
         tc = make_testcase( { 'nnode':'2' } )
-        assert tc.getSize() == (1,0)
+        self.assertEqual( tc.getSize(), (1,0) )
 
-
-
-    def test_magic(self):
+    def test_using_nnode_parameter_in_direct_mode(self):
         ""
-        # magic:
-        #   - still need to test the max procs and max devices given to
-        #     batch jobs
+        write_nnode_test_file( 'atest.vvt' )
 
-        util.writefile( 'cfgdir/platform_plugin.py', """
-            def initialize( platobj ):
-                platobj.setBatchSystem( 'subprocs', 7 )
-            """ )
+        vrun = vtu.runvvtest( '-N 7' )
+        vrun.assertCounts( total=1, npass=1 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':7} )
+        self.assertEqual( extract_values( vrun, 'NDEVICE VALUE=' ), {} )
 
-        util.writefile( 'atest.vvt', """
-            #VVT: parameterize : nnode = 1 2
-            """ )
+        vrun = vtu.runvvtest( '-w -N 7 --platopt ppn=3' )
+        vrun.assertCounts( total=2, npass=2 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':3, 'atest.nnode=2':6} )
+        self.assertEqual( extract_values( vrun, 'NDEVICE VALUE=' ), {} )
 
-        cfgdir = abspath( 'cfgdir' )
+        vrun = vtu.runvvtest( '-w -N 7 --max-devices 5' )
+        vrun.assertCounts( total=1, npass=1 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':7} )
+        vals = extract_values( vrun, 'NDEVICE VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':5} )
 
-        vrun = vtu.runvvtest( '-N 3 --config '+cfgdir, batch=True )
-        tdir = vrun.resultsDir()
-        # vrun.assertCounts( total=2, npass=2 )
+        vrun = vtu.runvvtest( '-w -N 7 --platopt dpn=2' )
+        vrun.assertCounts( total=1, npass=1 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':7} )
+        vals = extract_values( vrun, 'NDEVICE VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=1':2} )
+
+    def test_using_nnode_parameter_in_batch_mode(self):
+        ""
+        write_nnode_test_file( 'atest.vvt' )
+
+        vrun = vtu.runvvtest( '-w --plat Linux --batch --platopt ppn=3' )
+        vrun.assertCounts( total=2, npass=2 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=2': 6, 'atest.nnode=1': 3} )
+        self.assertEqual( extract_values( vrun, 'NDEVICE VALUE=' ), {} )
+
+        vrun = vtu.runvvtest( '-w --plat Linux --batch --platopt ppn=5 --platopt dpn=3' )
+        vrun.assertCounts( total=2, npass=2 )
+        vals = extract_values( vrun, 'NP VALUE=' )
+        self.assertEqual( vals, {'atest.nnode=2': 10, 'atest.nnode=1': 5} )
+        self.assertEqual( extract_values( vrun, 'NDEVICE VALUE=' ),
+                          {'atest.nnode=1': 3, 'atest.nnode=2': 6} )
 
 
-def make_testcase( paramD, nodesize=(None,None) ):
+def make_testcase( paramD, nodesize=None ):
     ""
     ts = testspec.TestSpec( 'atest', os.getcwd(), 'atest.vvt' )
     ts.setParameters( paramD )
 
-    fact = TestCaseFactory( nodesize )
+    if nodesize is None:
+        fact = TestCaseFactory()
+    else:
+        fact = TestCaseFactory( nodesize )
+
     return fact.new( ts )
+
+
+def write_nnode_test_file( filename ):
+    ""
+    util.writefile( filename, """
+        #VVT: parameterize : nnode = 1 2
+        import vvtest_util as vvt
+        print ( 'NP VALUE='+repr(vvt.np) )
+        if hasattr( vvt, 'ndevice' ):
+            print ( 'NDEVICE VALUE='+repr(vvt.ndevice) )
+        """ )
+
+
+def extract_values( vrun, pat ):
+    ""
+    npvals = {}
+    for testid in vrun.getTestIds():
+        lines = vrun.greplogs( '^'+pat, testid )
+        if len(lines) == 1:
+            np = eval( lines[0].split(pat,1)[1].strip() )
+            npvals[testid] = np
+    return npvals
 
 
 ############################################################################

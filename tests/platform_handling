@@ -275,7 +275,20 @@ class modes( vtu.vvtestTestCase ):
         self.nocfg = abspath( 'nocfg' )
 
     def test_direct_mode_getMaxSize(self):
-        ""
+        """
+        max procs:
+            1) command line max
+            2) plugin max
+            3) procs per node
+            4) system probe
+            5) the value 4
+        max devices:
+            1) command line max
+            2) plugin max
+            3) devices per node
+            4) command line num devices
+            5) zero
+        """
         # the system probe should always return a positive integer for np
         plat = newplatform( self.nocfg, 'direct', cmdmax=(None,None) )
         np,nd = plat.getMaxSize()
@@ -287,14 +300,39 @@ class modes( vtu.vvtestTestCase ):
         plat = newplatform( self.nocfg, 'direct', cmdmax=(23,7) )
         self.assertEqual( plat.getMaxSize(), (23,7) )
 
+        plat = newplatform( self.nocfg, 'direct', cmdsize=(None,15), cmdmax=(None,None) )
+        np,nd = plat.getMaxSize()
+        self.assertEqual( nd, 15 )
+
+        plat = newplatform( self.nocfg, 'direct', cmdsize=(None,15), cmdmax=(None,13) )
+        np,nd = plat.getMaxSize()
+        self.assertEqual( nd, 13 )
+
         plat = newplatform( self.cfgdir, 'direct', cmdmax=(None,None) )
         self.assertEqual( plat.getMaxSize(), (27,11) )
 
         plat = newplatform( self.cfgdir, 'direct', cmdmax=(23,7) )
         self.assertEqual( plat.getMaxSize(), (23,7) )
 
+        attrs = {'ppn':'13','dpn':'15'}
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(None,None), attrs=attrs )
+        self.assertEqual( plat.getMaxSize(), (13,15) )
+
+        attrs = {'ppn':'13','dpn':'15'}
+        plat = newplatform( self.nocfg, 'direct', cmdmax=(23,7), attrs=attrs )
+        self.assertEqual( plat.getMaxSize(), (23,7) )
+
     def test_batch_mode_getMaxSize(self):
-        ""
+        """
+        max procs:
+            1) command line max
+            2) plugin max
+            3) None (no maximum)
+        max devices:
+            1) command line max
+            2) plugin max
+            3) None (no maximum)
+        """
         plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None) )
         self.assertEqual( plat.getMaxSize(), (None,None) )
 

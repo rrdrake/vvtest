@@ -661,7 +661,7 @@ def check_parameter_values( value_list, lineno ):
 
 def check_special_parameters( param_name, value_list, lineno ):
     ""
-    if param_name in [ 'np', 'ndevice' ]:
+    if param_name in [ 'np', 'ndevice', 'nnode' ]:
         for val in value_list:
             try:
                 ival = int(val)
@@ -669,8 +669,8 @@ def check_special_parameters( param_name, value_list, lineno ):
                 ival = None
 
             if ival == None or ival < 0:
-                raise TestSpecError( 'np and ndevice parameter values '
-                                     'must be non-negative integers: "' + \
+                raise TestSpecError( 'the parameter "'+param_name+'" '
+                                     'must be a non-negative integer: "' + \
                                      val+'", line ' + str(lineno) )
 
 

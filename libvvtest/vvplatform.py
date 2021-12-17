@@ -117,16 +117,11 @@ class Platform:
         ""
         plugmax = self._get_max_size_from_plugin( 'maxprocs' )
         np,maxnp = self._select_size( num_procs, max_procs, plugmax,
-                                      self.probe_num_cpus )
+                                      self._backup_max_procs )
 
         plugmax = self._get_max_size_from_plugin( 'maxdevices' )
-        nd,maxnd = self._select_size( num_devices, max_devices, plugmax )
-
-        if self.mode == 'direct' and maxnd is None:
-            if num_devices is None:
-                maxnd = 0
-            else:
-                maxnd = num_devices
+        nd,maxnd = self._select_size( num_devices, max_devices, plugmax,
+                                      self._backup_max_devices )
 
         self.size = (np,nd)
         self.maxsize = (maxnp,maxnd)
@@ -141,25 +136,41 @@ class Platform:
 
         return plugmax
 
-    def _select_size(self, cmd_num, cmd_max, plugin_max, probe=None):
+    def _select_size(self, cmd_num, cmd_max, plugin_max, backup):
         ""
         mx = cmd_max
         if mx is None:
             mx = plugin_max
             if mx is None:
-                if probe is not None:
-                    mx = probe()
+                mx = backup( cmd_num )
 
-        np = cmd_num
-        if np is None:
-            np = mx
+        num = cmd_num
+        if num is None and mx:
+            num = mx
 
-        return np,mx
+        return num,mx
 
-    def probe_num_cpus(self):
+    def _backup_max_procs(self, num_procs):
         ""
         if self.mode == 'direct':
-            return rprobe.probe_num_processors( 4 )
+            ppn = self.attrs.get( 'ppn', None )
+            if ppn:
+                return ppn
+            else:
+                return rprobe.probe_num_processors( 4 )
+        else:
+            return None
+
+    def _backup_max_devices(self, num_devices):
+        ""
+        if self.mode == 'direct':
+            dpn = self.attrs.get( 'dpn', None )
+            if dpn:
+                return dpn
+            elif num_devices is None:
+                return 0
+            else:
+                return num_devices
         else:
             return None
 
@@ -316,7 +327,7 @@ def construct_job_info( procs, procpool,
 
     job_info = JobInfo( procs, maxprocs )
 
-    if devices != None:
+    if devices is not None:
         job_info.devices = devices
         job_info.maxdevices = devicepool.maxAvailable()
 
