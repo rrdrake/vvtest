@@ -331,13 +331,17 @@ class modes( vtu.vvtestTestCase ):
         max devices:
             1) command line max
             2) plugin max
-            3) None (no maximum)
+            3) if dpn set, then None (no maximum), else zero
         """
         plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None) )
+        self.assertEqual( plat.getMaxSize(), (None,0) )
+
+        attrs = {'dpn':3}
+        plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None), attrs=attrs )
         self.assertEqual( plat.getMaxSize(), (None,None) )
 
         plat = newplatform( self.nocfg, 'batch', cmdmax=(23,None) )
-        self.assertEqual( plat.getMaxSize(), (23,None) )
+        self.assertEqual( plat.getMaxSize(), (23,0) )
 
         plat = newplatform( self.nocfg, 'batch', cmdmax=(23,7) )
         self.assertEqual( plat.getMaxSize(), (23,7) )
@@ -405,11 +409,11 @@ class modes( vtu.vvtestTestCase ):
         """
         plat = newplatform( self.nocfg, 'batch', cmdsize=(None,None) )
         self.assertEqual( plat.getSize(), (None,None) )
-        self.assertEqual( plat.getMaxSize(), (None,None) )
+        self.assertEqual( plat.getMaxSize(), (None,0) )
 
         plat = newplatform( self.nocfg, 'batch', cmdsize=(8,4) )
         self.assertEqual( plat.getSize(), (8,4) )
-        self.assertEqual( plat.getMaxSize(), (None,None) )
+        self.assertEqual( plat.getMaxSize(), (None,0) )
 
     def test_batchjob_mode_num_cores_and_num_devices(self):
         """
@@ -481,7 +485,7 @@ class modes( vtu.vvtestTestCase ):
 
         plat = newplatform( self.nocfg, 'batch', cmdmax=(None,None), attrs=attrs )
         ppn,dpn = plat.getNodeSize()
-        assert ppn and ppn > 0 and dpn is None
+        assert ppn and ppn > 0 and dpn == 0
 
         plat = newplatform( self.cfgdir, 'batch', attrs=attrs )
         self.assertEqual( plat.getNodeSize(), (17,19) )

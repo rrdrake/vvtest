@@ -163,14 +163,20 @@ class Platform:
 
     def _backup_max_devices(self, num_devices):
         ""
+        dpn = self.attrs.get( 'dpn', None )
+
         if self.mode == 'direct':
-            dpn = self.attrs.get( 'dpn', None )
             if dpn:
                 return dpn
             elif num_devices is None:
                 return 0
             else:
                 return num_devices
+        elif self.mode == 'batch':
+            if dpn and dpn > 0:
+                return None
+            else:
+                return 0
         else:
             return None
 
