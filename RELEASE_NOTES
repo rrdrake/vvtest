@@ -1,6 +1,19 @@
 
 Improvements:
 
+    - A test can now define the number of resources using the 'nnode' parameter.
+      For example,
+
+          #VVT: parameterize : nnode = 1 2 4
+
+      A test instance with nnode=1 will occupy a single compute node on a
+      batched system or the whole workstation in direct mode. A test with
+      nnode=2 will occupy two compute nodes.
+
+      Note that for tests that specify 'nnode' but not 'np', there will still
+      be an 'np' variable set in the vvtest_util.py file for each test.
+      Similarly for 'ndevice' if the machine has devices.
+
     - Add handling of a VVTEST_PLATFORM environment variable in the
       config/idplatform.py configuration script.  Now if that environment
       variable is defined, then the value is used as the platform name.
@@ -34,9 +47,29 @@ Improvements:
 
 Fixes:
 
-    - 
+    - For running on batched systems, filtering based on num cores (np) and
+      num devices (ndevice) is now turned off by default (where default is
+      no max given in the platform plugin or on the command line). However,
+      for devices (GPUs), the max will be zero unless devices_per_node is
+      set for the platform.
 
 Changes:
+
+    - Platform options are now examined to make sure they are known. They
+      are set via the vvtest command line option --platopt name=value, and in
+      the config/platform_plugin.py file.
+
+    - When running vvtest --batch mode, the batch scripts are written to
+      a working directory and submitted to the batch queue, then monitored.
+      There was a mechanism to insert code (called a shim) into this batch
+      script in order to setup the environment. This shim capability has
+      been removed. It is not being used and is not really necessary, because
+      batch systems will forward the environment from the login nodes to the
+      batch job anyway.
+
+    - The CPU probe now returns the physical number of cores (rather than
+      the hyperthreaded count). This may affect the number of concurrent
+      tests run on a workstation. It can be overridden with -N <integer>.
 
     - The VVTEST_TIMEOUT environment variable made available to each test
       execution used to add a "bump factor". This bump has been removed.

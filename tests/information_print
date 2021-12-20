@@ -32,6 +32,7 @@ from batch.namer import BatchFileNamer
 from libvvtest.execlist import TestExecList
 from libvvtest.TestList import TestList
 import libvvtest.consolewriter as consolewriter
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class InformationPrinter( vtu.vvtestTestCase ):
@@ -202,7 +203,7 @@ class timing_output_tests( vtu.vvtestTestCase ):
 
 def make_fake_TestExecList():
     ""
-    tlist = TestList()
+    tlist = TestList( TestCaseFactory() )
 
     txL = []
 
@@ -232,7 +233,7 @@ def make_fake_Batcher( tlist ):
                                 tlist, None, None,
                                 None,
                                 None, None,
-                                None, jobhandler )
+                                None, jobhandler, None )
 
     bjob = jobhandler.createJob()
     bjob.setAttr( 'testlist', tlist )

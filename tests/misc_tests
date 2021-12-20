@@ -33,6 +33,7 @@ import libvvtest.testlistio as testlistio
 from libvvtest.permsetter import PermissionSetter
 from libvvtest.errors import FatalError
 from libvvtest.teststatus import DIFF_EXIT_STATUS
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class Function_find_vvtest_test_root_file( vtu.vvtestTestCase ):
@@ -518,7 +519,7 @@ class exit_status_controls( vtu.vvtestTestCase ):
         vrun.assertCounts( total=3, npass=1, diff=1, fail=1 )
 
         fn = util.globfile( tdir+'/testlist.*' )
-        rd = testlistio.TestListReader( fn )
+        rd = testlistio.TestListReader( TestCaseFactory(), fn )
         rd.read()
 
         testD = rd.getTests()
@@ -542,7 +543,7 @@ def get_command_line( filepat ):
     ""
     rf = util.globfile( filepat )
 
-    lr = testlistio.TestListReader( rf )
+    lr = testlistio.TestListReader( TestCaseFactory(), rf )
     lr.read()
 
     cmdl = lr.getAttr( 'cmdline' )

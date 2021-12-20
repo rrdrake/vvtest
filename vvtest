@@ -54,6 +54,7 @@ class RuntimeData:
         self.isrestart      = False  # True if inside a test results tree
         self.perms          = None   # Permissions object
         self.results_writer = None   # ResultsWriters object
+        self.tcasefactory   = None   # TestCaseFactory object
         self.creator        = None   # TestCreator object
         self.scanner        = None   # TestFileScanner object
         self.selector       = None   # TestSelector object
@@ -83,10 +84,11 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     construct_runtime_info( rtdata, argv, vvtestdir, start_epoch )
     create_configuration( rtdata.rtconfig, opts, optD, vvtestdir, configdirs )
 
-    construct_platform( rtdata, vvtestdir, opts, optD )
+    construct_platform( rtdata, opts, optD )
     compute_testing_directory( rtdata, opts, optD )
     construct_permission_setter( rtdata, opts )
     construct_results_writers( rtdata, opts, optD )
+    construct_testcase_factory( rtdata )
     construct_testcase_creator( rtdata, opts, optD )
     construct_test_scanner( rtdata, scandirs, opts )
     import_plugin_module( rtdata )
@@ -227,13 +229,18 @@ def create_configuration( rtconfig, opts, optD, vvtestdir, configdirs ):
         rtconfig.setAttr( 'testargs', argL )
 
 
-def construct_platform( rtdata, vvtestdir, opts, optD ):
+def construct_platform( rtdata, opts, optD ):
     ""
-    import libvvtest.vvplatform as vvplatform
+    from libvvtest.makeplatform import create_Platform_instance
 
-    plat = vvplatform.create_Platform_instance(
-                vvtestdir,
-                opts.plat, opts.batch,
+    mode = 'direct'
+    if opts.batch:
+        mode = 'batch'
+    elif opts.qsub_id is not None:
+        mode = 'batchjob'
+
+    plat = create_Platform_instance(
+                opts.plat, mode,
                 optD['platopt_dict'],  # --platopt
                 opts.dash_n,
                 opts.dash_N,
@@ -312,6 +319,14 @@ def make_idtraits( opts ):
     return idtraits
 
 
+def construct_testcase_factory( rtdata ):
+    ""
+    from libvvtest.tcfactory import TestCaseFactory
+
+    nodesize = rtdata.plat.getNodeSize()
+    rtdata.tcasefactory = TestCaseFactory( nodesize )
+
+
 def construct_test_scanner( rtdata, scandirs, opts ):
     ""
     from libvvtest.scanner import TestFileScanner
@@ -320,8 +335,8 @@ def construct_test_scanner( rtdata, scandirs, opts ):
         # scan current working directory by default
         scandirs.append( rtdata.curdir )
 
-    scanner = TestFileScanner( rtdata.creator, scandirs,
-                               specform=opts.scan_type )
+    scanner = TestFileScanner( rtdata.creator, rtdata.tcasefactory,
+                               scandirs, specform=opts.scan_type )
 
     rtdata.scanner = scanner
 
@@ -418,6 +433,7 @@ def construct_test_list_manager( rtdata ):
     namer = BatchFileNamer( rtdata.testdir )
 
     rtdata.tlm = TestListManager( namer=namer,
+                                  tcasefactory=rtdata.tcasefactory,
                                   rtinfo=rtdata.rtinfo,
                                   perms=rtdata.perms )
 
@@ -447,7 +463,7 @@ def construct_results_writers( rtdata, opts, optD ):
         conobj = construct_console_writer( rtdata.testdir, opts, optD )
         writers.addWriter( conobj )
 
-    if opts.qsub_id == None:
+    if opts.qsub_id is None:
 
         if opts.html:
             htmlobj = construct_html_writer( rtdata.testdir, opts, optD,
@@ -579,11 +595,12 @@ def get_testing_directory( opts, platobj ):
 
 class TestListManager:
 
-    def __init__(self, namer, rtinfo, perms):
+    def __init__(self, namer, tcasefactory, rtinfo, perms):
         ""
         self.tlist = None
 
         self.namer = namer
+        self.tcasefactory = tcasefactory
         self.rtinfo = rtinfo
         self.perms = perms
 
@@ -599,7 +616,7 @@ class TestListManager:
         ""
         fn = self.namer.getFilePath( batchid )
 
-        self.tlist = TestList.TestList( fn )
+        self.tlist = TestList.TestList( self.tcasefactory, fn )
 
         return self.tlist
 
@@ -610,7 +627,7 @@ class TestListManager:
     def readAndMergePreviouslyRunTests(self):
         ""
         fn = self.namer.getFilePath()
-        prev_tlist = TestList.TestList( fn )
+        prev_tlist = TestList.TestList( self.tcasefactory, fn )
 
         attrs = prev_tlist.readTestResults()
 
@@ -690,8 +707,6 @@ def run_tests( opts, optD, rtdata ):
     ""
     rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
-    adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
-
     tlist = rtdata.tlm.makeTestList()
 
     check_for_currently_running_vvtest( tlist, opts.force )
@@ -723,7 +738,7 @@ def restart_tests( opts, optD, rtdata ):
     ""
     batchid = opts.qsub_id
 
-    if batchid == None:
+    if batchid is None:
         rtdata.plugin.callPrologue( rtdata.rtinfo.getInfo('cmdline') )
 
     adjust_filter_settings_for_restart( opts, rtdata.rtconfig )
@@ -732,7 +747,7 @@ def restart_tests( opts, optD, rtdata ):
 
     check_for_currently_running_vvtest( tlist, opts.force )
 
-    if batchid == None:
+    if batchid is None:
         rtdata.tlm.readTestList()
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
@@ -748,7 +763,7 @@ def restart_tests( opts, optD, rtdata ):
 
     xstat = run_test_exec_list( opts, optD, rtdata )
 
-    if batchid == None:
+    if batchid is None:
         rtdata.plugin.callEpilogue( rtdata.testdir, tlist.getTests() )
 
     return xstat
@@ -835,8 +850,6 @@ def output_timings( opts, optD, rtdata ):
 
     if not rtdata.isrestart:
 
-        adjust_filter_settings_for_batch( opts, rtdata.plat, rtdata.rtconfig )
-
         rtdata.scanner.scanPaths( tlist )
         rtdata.tlm.readAndMergePreviouslyRunTests()
         rtdata.timehandler.loadExternalRuntimes( tlist.getTests() )
@@ -857,21 +870,13 @@ def output_timings( opts, optD, rtdata ):
     cwriter.timings( tlist )
 
 
-def adjust_filter_settings_for_batch( opts, plat, rtconfig ):
-    ""
-    if opts.batch:
-        if opts.dash_N == None and plat.getPluginMaxProcs() == None:
-            # we are batching and no num procs limit is available
-            rtconfig.applyMaxProcsExpression( False )
-
-
 def adjust_filter_settings_for_restart( opts, rtconfig ):
     ""
-    if opts.dash_N == None:
+    if opts.dash_N is None:
         # no max procs filter unless -N was given on command line
         rtconfig.applyMaxProcsExpression( False )
 
-    if opts.max_devices == None:
+    if opts.max_devices is None:
         # no max devices filter unless --max-devices was given on command line
         rtconfig.applyMaxDevicesExpression( False )
 
@@ -1025,7 +1030,7 @@ def run_test_exec_list( opts, optD, rtdata ):
                                     shbang_supported=not windows_platform )
 
         xlist = TestExecList( tlist, handler )
-        xlist.createTestExecs( check_dependencies=(opts.qsub_id == None) )
+        xlist.createTestExecs( check_dependencies=(opts.qsub_id is None) )
 
         totaltime = get_total_timeout( opts.total_timeout )
 
@@ -1051,7 +1056,7 @@ def construct_direct_runner( rtdata, tlist, xlist, qsub_id, totaltime ):
                                  rtdata.rtinfo, rtdata.results_writer,
                                  rtdata.plat, totaltime )
 
-    if qsub_id != None:
+    if qsub_id is not None:
         drun.setQsubID( qsub_id )
 
     return drun
@@ -1066,23 +1071,24 @@ def construct_batch_runner( rtdata, tlist, xlist, totaltime, opts, optD ):
     namer = rtdata.tlm.getFileNamer()
     batch = create_Batcher( opts, optD, rtdata, namer,
                             tlist, xlist, rtdata.testdir,
-                            rtdata.plat, rtdata.perms )
+                            rtdata.plat, rtdata.perms, rtdata.tcasefactory )
     brun.setBatcher( batch )
 
     return brun
 
 
 def create_Batcher( opts, optD, rtdata, namer,
-                    tlist, xlist, test_dir, plat, perms ):
+                    tlist, xlist, test_dir, plat, perms, tcasefactory ):
     ""
     import libvvtest.batchutils as batchutils
     import batch.batching as batching
     from batch.qinterface import BatchQueueInterface
 
-    assert opts.qsub_id == None
+    assert opts.qsub_id is None
 
-    batchitf = BatchQueueInterface()
-    plat.initializeBatchSystem( batchitf )
+    batchitf = BatchQueueInterface( plat.getNodeSize(),
+                                    plat.getAttributes(),
+                                    plat.getEnvironment() )
 
     qsublimit = opts.batch_limit
     if qsublimit == None:
@@ -1103,7 +1109,7 @@ def create_Batcher( opts, optD, rtdata, namer,
                                 qsublimit,
                                 opts.batch_length,
                                 maxtmo,
-                                namer, jobhandler )
+                                namer, jobhandler, tcasefactory )
 
     return batch
 
@@ -1138,7 +1144,7 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
     if optD['platopt_dict']:
         for k,v in optD['platopt_dict'].items():
             if v:
-                cmd += ' --platopt ' + k + '=' + quote(v)
+                cmd += ' --platopt ' + k + '=' + quote(str(v))
             else:
                 cmd += ' --platopt ' + k
 

@@ -11,7 +11,6 @@ import shutil
 
 from . import testspec
 from .paramset import ParameterSet
-from .testcase import TestCase
 from .testspec import TestSpec
 
 version = 35
@@ -59,8 +58,9 @@ class TestListWriter:
 
 class TestListReader:
 
-    def __init__(self, filename):
+    def __init__(self, tcasefactory, filename):
         ""
+        self.fact = tcasefactory
         self.filename = filename
 
         self.vers = None
@@ -89,7 +89,7 @@ class TestListReader:
                 elif key == 'Finish':
                     self.finish = eval( val )[1]
                 else:
-                    tcase = string_to_test( val )
+                    tcase = string_to_test( val, self.fact )
                     self.tests[ tcase.getSpec().getID() ] = tcase
 
             except Exception:
@@ -171,7 +171,7 @@ class TestListReader:
 
         if os.path.exists( fname ):
 
-            tlr = TestListReader( fname )
+            tlr = TestListReader( self.fact, fname )
             tlr.read()
             self.tests.update( tlr.getTests() )
 
@@ -181,7 +181,7 @@ def file_is_marked_finished( filename ):
     finished = False
 
     try:
-        tlr = TestListReader( filename )
+        tlr = TestListReader( None, filename )
         if tlr.scanForFinishDate() != None:
             finished = True
     except Exception:
@@ -233,7 +233,7 @@ def test_to_string( tcase, extended=False ):
     return s
 
 
-def string_to_test( strid ):
+def string_to_test( strid, factory ):
     """
     Creates and returns a partially filled TestSpec object from a string
     produced by the test_to_string() method.
@@ -258,7 +258,7 @@ def string_to_test( strid ):
 
     tspec.setKeywordList( testdict['keywords'] )
 
-    tcase = TestCase( tspec )
+    tcase = factory.new( tspec )
     tstat = tcase.getStat()
 
     for k,v in testdict['attrs'].items():

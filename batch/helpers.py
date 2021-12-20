@@ -9,48 +9,43 @@ import shlex
 import subprocess
 
 
-def compute_num_nodes( size, cores_per_node, devices_per_node ):
+def get_node_size( attrs ):
     ""
-    np,ndevice = size
+    ppn = max( 1, attrs.get( 'ppn', 0 ) )
 
-    nnode1 = compute_node_count( np, cores_per_node )
-
-    if devices_per_node and ndevice:
-        nnode2 = compute_node_count( ndevice, devices_per_node )
+    dpn = attrs.get( attrs.get( 'dpn', 0 ) )
+    if dpn:
+        dpn = max( 0, dpn )
     else:
-        nnode2 = 0
+        dpn = 0
 
-    return max( nnode1, nnode2 )
+    return ppn,dpn
 
 
-def compute_node_count( num, numper ):
+def runcmd( cmdL, chdir=None, echo=False ):
     ""
-    num = max( 0, num )
-    if num > 0:
-        nnode = int( num/numper )
-        if (num%numper) != 0:
-            nnode += 1
-    else:
-        nnode = 0
+    cmdstr = ' '.join( cmdL )
 
-    return nnode
-
-
-def runcmd( cmdL, changedir=None ):
-    ""
-    sys.stdout.flush()
-    sys.stderr.flush()
-
-    if changedir:
+    if chdir:
+        cmdstr = 'cd "'+chdir+'" && '+cmdstr
         cwd = os.getcwd()
-        os.chdir( changedir )
+        os.chdir( chdir )
 
     try:
-        sp = subprocess.Popen( cmdL, stdout=subprocess.PIPE,
-                                     stderr=subprocess.STDOUT )
+        if echo:
+            print ( cmdstr )
+            sys.stdout.flush()
+            sys.stderr.flush()
+        try:
+            sp = subprocess.Popen( cmdL, stdout=subprocess.PIPE,
+                                         stderr=subprocess.STDOUT )
+        except Exception as e:
+            return 1,cmdstr,'subprocess failed: '+str(e)
+
         out,err = sp.communicate()
+
     finally:
-        if changedir:
+        if chdir:
             os.chdir( cwd )
 
     if sys.version_info[0] < 3:
@@ -58,7 +53,7 @@ def runcmd( cmdL, changedir=None ):
     else:
         out = out.decode() if out else ''
 
-    return sp.returncode, out
+    return sp.returncode, cmdstr, out
 
 
 def format_extra_flags( extra_flags ):

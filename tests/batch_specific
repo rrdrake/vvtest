@@ -189,13 +189,12 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
     def test_specifying_platform_options(self):
         ""
         util.writefile( "testA.vvt", """
-            import time
-            time.sleep(1)
             fp = open( 'testA.txt', 'w' ) ; fp.close()
             """ )
         time.sleep(1)
 
-        opts = '--platopt q=pickme --platopt walltime=1:30:00 --platopt PT=abc'
+        opts = '--platopt q=pickme --platopt walltime=1:30:00'
+        opts += ' --platopt PT=abc --platopt ppn=2'
 
         vrun = vtu.runvvtest( opts, batch=True )
         vrun.assertCounts( total=1, npass=1 )
@@ -203,20 +202,26 @@ class inlining_results_file_includes( vtu.vvtestTestCase ):
 
         assert len( glob.glob( 'TestResult*/testA/testA.txt' ) ) == 1
 
-        lines = util.grepfiles( 'np = 1', 'TestResult*/batchset*/qbat.*' )
+        lines = util.grepfiles( '# size = ', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
+        szL = eval( lines[0].strip().split( '# size = ' )[1].strip() )
+        self.assertEqual( szL, (1,1,0) )
 
         lines = util.grepfiles( 'qtime =', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
-        assert lines[0].split( 'qtime =', 1 )[1].strip() == '1:30:00'
+        qt = eval( lines[0].split( 'qtime =', 1 )[1].strip() )
+        self.assertEqual( qt, '1:30:00' )
 
-        lines = util.grepfiles( 'queue = pickme',
-                                'TestResult*/batchset*/qbat-out.*' )
+        lines = util.grepfiles( '# attributes: ', 'TestResult*/batchset*/qbat.*' )
         assert len( lines ) == 1
-
-        lines = util.grepfiles( 'account = abc',
-                                'TestResult*/batchset*/qbat-out.*' )
-        assert len( lines ) == 1
+        attrs = eval( lines[0].split( '# attributes: ', 1 )[1].strip() )
+        # print ( attrs )
+        self.assertEqual( attrs, { 'batchsys':'subprocs',
+                                   'queue': 'pickme',
+                                   'dpn': 0,
+                                   'ppn': 2,
+                                   'account': 'abc',
+                                   'walltime': '1:30:00' } )
 
     def test_restarting_a_killed_batch_run_three_times(self):
         """

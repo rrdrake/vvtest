@@ -44,7 +44,7 @@ class RuntimeConfig:
 
         self.optlist = []
 
-        self.maxsize = None
+        self.maxsize = (None,None)
         self.apply_maxprocs = True
         self.apply_maxdevices = True
 
@@ -205,7 +205,9 @@ class RuntimeConfig:
         return True
 
     def setMaxSize(self, maxsize):
-        ""
+        """
+        a pair (max cores, max devices) and one or both can be None
+        """
         self.maxsize = maxsize
 
     def applyMaxProcsExpression(self, true_or_false):
@@ -218,24 +220,24 @@ class RuntimeConfig:
 
     def evaluate_maxprocs(self, test_size):
         ""
-        if self.maxsize != None:
+        if self.apply_maxprocs:
 
             maxnp,maxnd = self.maxsize
             np,nd = test_size
 
-            if self.apply_maxprocs and np > maxnp:
+            if maxnp is not None and np > maxnp:
                 return False
 
         return True
 
     def evaluate_maxdevices(self, test_size):
         ""
-        if self.maxsize != None:
+        if self.apply_maxdevices:
 
             maxnp,maxnd = self.maxsize
             np,nd = test_size
 
-            if self.apply_maxdevices and nd > maxnd:
+            if maxnd is not None and nd > maxnd:
                 return False
 
         return True

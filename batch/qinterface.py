@@ -7,103 +7,136 @@
 import os
 import sys
 
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
+
+from .batchfactory import construct_batch_system
+
+
 class BatchQueueInterface:
 
-    def __init__(self):
-        ""
+    def __init__(self, node_size, attrs={}, envD={}):
+        """
+        The 'attrs' must have a "batchsys" key with one of these values:
+
+            slurm    : standard SLURM system
+            lsf      : LSF, such as the Sierra platform
+            craypbs  : for Cray machines running PBS (or PBS-like)
+            moab     : for Cray machines running Moab (may work in general)
+            pbs      : standard PBS system
+            subprocs : simulate batch processing with subprocesses
+        """
         self.batch = None
-        self.envD = {}
-        self.attrs = {}
+        self.attrs = dict( attrs )
+        self.envD = dict( envD )
+
+        assert node_size[0] and node_size[0] > 0
+        self.nodesize = node_size
+
+        assert 'batchsys' in self.attrs
+        self.batch = construct_batch_system( self.attrs )
 
         self.clean_exit_marker = "queue job finished cleanly"
 
-    def isBatched(self):
+    def getNodeSize(self):
         ""
-        return self.batch != None
+        return self.nodesize
 
-    def getCleanExitMarker(self):
-        ""
-        return self.clean_exit_marker
-
-    def setAttr(self, name, value):
-        ""
-        self.attrs[name] = value
-
-    def setEnviron(self, name, value):
-        ""
-        self.envD[name] = value
-
-    def setQueueType(self, qtype, ppn, **kwargs):
+    def checkForJobScriptExit(self, outfile):
         """
-        Set the batch system.  If 'batch' is a string, it must be one of the
-        known batch systems, such as
-
-              craypbs   : for Cray machines running PBS (or PBS-like)
-              moab      : for Cray machines running Moab (may work in general)
-              pbs       : standard PBS system
-              slurm     : standard SLURM system
-              lsf       : LSF, such as the Sierra platform
-
-        It can also be a python object which implements the batch functions.
+        Returns True if 'outfile' exists and contains the clean exit marker.
         """
-        if type(qtype) == type(''):
-            self.batch = batch_queue_factory( qtype, ppn, **kwargs )
+        clean = False
+
+        try:
+            # compute file seek offset, and open the file
+            sz = os.path.getsize( outfile )
+            off = max(sz-512, 0)
+            fp = open( outfile, 'rt' )
+        except Exception:
+            pass
         else:
-            self.batch = qtype
+            try:
+                # only read the end of the file
+                fp.seek(off)
+                buf = fp.read(512)
+            except Exception:
+                pass
+            else:
+                if self.clean_exit_marker in buf:
+                    clean = True
+            try:
+                fp.close()
+            except Exception:
+                pass
 
-        return self.batch
+        return clean
 
     def writeJobScript(self, size, queue_time, workdir, qout_file,
                              filename, command):
         ""
         qt = self.attrs.get( 'walltime', queue_time )
 
-        hdr = '#!/bin/csh -f\n' + \
-              self.batch.header( size, qt, workdir, qout_file, self.attrs ) + '\n'
+        bufL = [ '#!/bin/bash' ]
 
+        bhead = self.batch.header( size, qt, qout_file )
+        if type(bhead) == type(''):
+            bufL.append( bhead )
+        else:
+            bufL.extend( list(bhead) )
+
+        bufL.extend( [ '# attributes: '+str(self.attrs),
+                       '',
+                       'cd '+quote(workdir)+' || exit 1' ] )
         if qout_file:
-            hdr += 'touch '+qout_file + ' || exit 1\n'
+            bufL.append( 'touch '+quote(qout_file) + ' || exit 1' )
 
-        # add in the shim if specified for this platform
-        s = self.attrs.get( 'batchshim', None )
-        if s:
-            hdr += '\n'+s
-        hdr += '\n'
+        bufL.extend( [ '',
+                       'echo "job start time = `date`"',
+                       'echo "job time limit = '+str(queue_time)+'"' ] )
+
+        # set the environment variables from the platform into the script
+        for k,v in self.envD.items():
+            bufL.append( 'export '+k+'="'+v +'"' )
+
+        bufL.extend( [ '',
+                       command,
+                       '',
+                       'echo "'+self.clean_exit_marker+'"' ] )
 
         with open( filename, 'wt' ) as fp:
-
-            fp.writelines( [ hdr + '\n\n',
-                             'cd ' + workdir + ' || exit 1\n',
-                             'echo "job start time = `date`"\n' + \
-                             'echo "job time limit = ' + str(queue_time) + '"\n' ] )
-
-            # set the environment variables from the platform into the script
-            for k,v in self.envD.items():
-                fp.write( 'setenv ' + k + ' "' + v  + '"\n' )
-
-            fp.writelines( [ command+'\n\n' ] )
-
-            # echo a marker to determine when a clean batch job exit has occurred
-            fp.writelines( [ 'echo "'+self.clean_exit_marker+'"\n' ] )
+            fp.write( '\n'.join( bufL ) + '\n' )
 
     def submitJob(self, workdir, outfile, scriptname):
         ""
-        q = self.attrs.get( 'queue', None )
-        acnt = self.attrs.get( 'account', None )
-        cmd, out, jobid, err = \
-                self.batch.submit( scriptname, workdir, outfile, q, acnt )
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
+        cwd = os.getcwd()
+        os.chdir( workdir )
+        try:
+            jobid,cmd,out = self.batch.submit( scriptname, outfile )
+        finally:
+            os.chdir( cwd )
+
+        if jobid is None:
+            print3( cmd+'\n'+out )
+            print3( '*** Batch submission failed or could not parse '
+                    'output to get job id' )
         else:
             print3( "Job script", scriptname, "submitted with id", jobid )
 
         return jobid
 
     def queryJobs(self, jobidL):
-        ""
-        cmd, out, err, jobD = self.batch.query( jobidL )
-        if err:
-            print3( cmd + os.linesep + out + os.linesep + err )
+        """
+        returns a dict mapping jobid to a string, where the string is empty if
+        the jobid is not in the queue (or is done), or "running" or "pending"
+        """
+        jobD,cmd,out = self.batch.query( jobidL )
+
+        for jobid in jobidL:
+            if jobid not in jobD:
+                jobD[jobid] = ''
 
         return jobD
 
@@ -113,32 +146,6 @@ class BatchQueueInterface:
             print3( '\nCancelling jobs:', jobidL )
             for jid in jobidL:
                 self.batch.cancel( jid )
-
-
-def batch_queue_factory( qtype, ppn, **kwargs ):
-    ""
-    if qtype == 'procbatch':
-        from . import procbatch
-        batch = procbatch.ProcessBatch( ppn, **kwargs )
-    elif qtype == 'craypbs':
-        from . import craypbs
-        batch = craypbs.BatchCrayPBS( ppn, **kwargs )
-    elif qtype == 'pbs':
-        from . import pbs
-        batch = pbs.BatchPBS( ppn, **kwargs )
-    elif qtype == 'slurm':
-        from . import slurm
-        batch = slurm.BatchSLURM( ppn, **kwargs )
-    elif qtype == 'moab':
-        from . import moab
-        batch = moab.BatchMOAB( ppn, **kwargs )
-    elif qtype == 'lsf':
-        from . import lsf
-        batch = lsf.BatchLSF( ppn, **kwargs )
-    else:
-        raise Exception( "Unknown batch system name: "+str(qtype) )
-
-    return batch
 
 
 def print3( *args ):

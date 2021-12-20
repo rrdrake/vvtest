@@ -25,6 +25,7 @@ import libvvtest.TestList as TestList
 from libvvtest.testcreator import TestCreator
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.scanner import TestFileScanner
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class TestList_scan_behavior( vtu.vvtestTestCase ):
@@ -193,14 +194,15 @@ def scan_path_with_warnings_output( path ):
 def construct_TestList_and_TestFileScanner( specform=None, ostream=None ):
     ""
     creator = TestCreator()
-    tlist = TestList.TestList()
+    tlist = TestList.TestList( TestCaseFactory() )
 
     if ostream:
-        scan = TestFileScanner( creator,
+        scan = TestFileScanner( creator, TestCaseFactory(),
                                 specform=specform,
                                 warning_output_stream=ostream )
     else:
-        scan = TestFileScanner( creator, specform=specform )
+        scan = TestFileScanner( creator, TestCaseFactory(),
+                                specform=specform )
 
     return tlist,scan
 

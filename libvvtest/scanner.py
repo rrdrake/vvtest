@@ -7,13 +7,12 @@
 import os, sys
 
 from .errors import FatalError, TestSpecError
-from .testcase import TestCase
 from .staging import tests_are_related_by_staging
 
 
 class TestFileScanner:
 
-    def __init__(self, creator,
+    def __init__(self, creator, tcasefactory,
                        path_list=[],
                        specform=None,
                        warning_output_stream=sys.stdout):
@@ -23,6 +22,7 @@ class TestFileScanner:
         is both 'vvt' and 'xml'.
         """
         self.creator = creator
+        self.fact = tcasefactory
         self.path_list = path_list
         self.warnout = warning_output_stream
 
@@ -130,7 +130,7 @@ class TestFileScanner:
 
         for tspec in testL:
             if not self._is_duplicate_execute_directory( tspec ):
-                tcase = TestCase( tspec )
+                tcase = self.fact.new( tspec )
                 if tspec.hasKeyword( 'TDD' ):
                     tcase.getStat().setAttr( 'TDD', True )
                 testlist.addTest( tcase )

@@ -25,6 +25,7 @@ import libvvtest.TestList as TestList
 import libvvtest.testspec as testspec
 from libvvtest.testcase import TestCase
 import libvvtest.paramset as ParameterSet
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class TestSpec_to_and_from_string( vtu.vvtestTestCase ):
@@ -38,7 +39,7 @@ class TestSpec_to_and_from_string( vtu.vvtestTestCase ):
 
         sid = tio.test_to_string( tcase )
         assert '\n' not in sid
-        tcase2 = tio.string_to_test( sid )
+        tcase2 = tio.string_to_test( sid, TestCaseFactory() )
 
         assert_TestCase_same_as_fake( tcase2 )
 
@@ -47,7 +48,7 @@ class TestSpec_to_and_from_string( vtu.vvtestTestCase ):
         tcase = create_fake_analyze_TestCase()
 
         sid = tio.test_to_string( tcase )
-        tcase2 = tio.string_to_test( sid )
+        tcase2 = tio.string_to_test( sid, TestCaseFactory() )
 
         assert tcase2.getSpec().isAnalyze()
 
@@ -62,7 +63,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         tlw.finish()
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
         d1 = tlr.getStartDate()
         d2 = tlr.getFinishDate()
@@ -76,7 +77,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         tlw.finish()
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         assert tlr.getAttr( 'foobar', 'default value' ) == 'default value'
@@ -96,7 +97,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -117,7 +118,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tm = time.time()
@@ -158,7 +159,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         tstart,tdone = self.write_with_include_file( tcase )
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -179,7 +180,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         os.remove( 'tests.0' )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -192,7 +193,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         self.write_with_include_file( tcase, skip_completed_mark=True )
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -203,7 +204,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         os.remove( 'tests.0' )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -220,7 +221,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         tfile = abspath( 'tests.out' )
 
         os.chdir( 'rundir' )
-        tlr = tio.TestListReader( tfile )
+        tlr = tio.TestListReader( TestCaseFactory(), tfile )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -231,11 +232,11 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         write_test_list_with_fake_test( 'tests.out' )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tm = tlr.scanForFinishDate()
         assert tm and (time.time() - tm) < 10
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
         assert abs( tlr.getFinishDate() - tm ) < 2
 
@@ -248,7 +249,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tm = tlr.scanForFinishDate()
         assert tm == None
 
@@ -257,7 +258,7 @@ class test_list_file_read_write( vtu.vvtestTestCase ):
         write_test_list_with_include( 'tests.out', 'tests.0', finish=False )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'tests.out' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'tests.out' )
         tlr.read()
 
         tcase = get_single_test_from_test_list( tlr )
@@ -278,12 +279,12 @@ class TestList_results_file( vtu.vvtestTestCase ):
 
     def test_arbitrary_attributes_can_be_written(self):
         ""
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tcase = create_TestCase()
         tl.addTest( tcase )
         tl.stringFileWrite( anything=['A',1] )
 
-        tr = tio.TestListReader( tl.getFilename() )
+        tr = tio.TestListReader( TestCaseFactory(), tl.getFilename() )
         tr.read()
         assert tr.getAttr( 'anything' ) == ['A',1]
 
@@ -291,7 +292,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         tl.initializeResultsFile( checkme={'A':1} )
         tl.writeFinished()
 
-        tr = tio.TestListReader( tl.getResultsFilename() )
+        tr = tio.TestListReader( TestCaseFactory(), tl.getResultsFilename() )
         tr.read()
         D = tr.getAttr( 'checkme' )
         assert len(D) == 1 and D['A'] == 1
@@ -318,7 +319,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         sfx = tl.getResultsDate()
         time.sleep(2)
 
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tl.readTestList()
         assert tl.getResultsDate() == sfx
         rfile = write_TestList_fake_results( tl )
@@ -341,7 +342,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         # write include test list file containing suffix attribute
         tcase = list( tl.getTests() )[0]
         fn = os.path.join( 'subdir/'+TestList.default_filename )
-        tlincl = TestList.TestList( filename=fn )
+        tlincl = TestList.TestList( TestCaseFactory(), filename=fn )
         tlincl.setResultsDate( sfx )
         tlincl.addTest( tcase )
         tlincl.stringFileWrite( extended=True )
@@ -353,7 +354,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         time.sleep(1)
 
         # create the sublist test results
-        tlsub = TestList.TestList( filename=fn )
+        tlsub = TestList.TestList( TestCaseFactory(), filename=fn )
         tlsub.readTestList()
         write_TestList_fake_results( tlsub )
         time.sleep(1)
@@ -368,7 +369,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
         ""
         tcase = create_TestCase()
 
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tl.addTest( tcase )
         tl.stringFileWrite()
         tl.setResultsDate()
@@ -377,7 +378,7 @@ class TestList_results_file( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tl.readTestResults()
 
         tm = tl.getDateStamp()
@@ -392,7 +393,7 @@ class scan_finish_mark( vtu.vvtestTestCase ):
 
     def test_scan_an_unfinished_test_list_file(self):
         ""
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tl.setResultsDate()
         rfile = tl.initializeResultsFile()
         tcase = create_TestCase()
@@ -400,13 +401,13 @@ class scan_finish_mark( vtu.vvtestTestCase ):
 
         time.sleep(1)
 
-        tlr = tio.TestListReader( rfile )
+        tlr = tio.TestListReader( TestCaseFactory(), rfile )
         tm = tlr.scanForFinishDate()
         assert tm == None
 
     def test_function_to_test_for_finished_date(self):
         ""
-        tl = TestList.TestList()
+        tl = TestList.TestList( TestCaseFactory() )
         tl.setResultsDate()
         rfile = tl.initializeResultsFile()
         tcase = create_TestCase()
@@ -444,7 +445,7 @@ class format_versions( vtu.vvtestTestCase ):
         write_TestList_with_fake_test( 'testlist' )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'testlist' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'testlist' )
         tlr.read()
         assert tlr.getFileVersion() == 35
 
@@ -455,7 +456,7 @@ class format_versions( vtu.vvtestTestCase ):
         fp.close()
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'testlist' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'testlist' )
         self.assertRaises( Exception, tlr.read )
 
     def test_that_format_version_32_is_compatible_with_current_version(self):
@@ -465,7 +466,7 @@ class format_versions( vtu.vvtestTestCase ):
         fp.close()
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'testlist' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'testlist' )
         tlr.read()
         assert tlr.getFileVersion() == 32
         assert len( tlr.getTests() ) == 3
@@ -478,14 +479,14 @@ class format_versions( vtu.vvtestTestCase ):
         util.writefile( 'testlist.2', example_include_2_version_33 )
         time.sleep(1)
 
-        tlr = tio.TestListReader( 'testlist.1' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'testlist.1' )
         tlr.read()
         assert tlr.getFileVersion() == 33
         assert len( tlr.getTests() ) == 1
         tcase = list( tlr.getTests().values() )[0]
         assert tcase.getStat().getResultStatus() == 'pass'
 
-        tlr = tio.TestListReader( 'testlist' )
+        tlr = tio.TestListReader( TestCaseFactory(), 'testlist' )
         tlr.read()
         assert tlr.getFileVersion() == 33
         assert len( tlr.getTests() ) == 3
@@ -698,7 +699,7 @@ def write_test_sequence_to_file( filename, tcase ):
 
 def write_TestList_with_fake_test( addrundate=False, **kwargs ):
     ""
-    tl = TestList.TestList()
+    tl = TestList.TestList( TestCaseFactory() )
 
     if addrundate:
         tl.setResultsDate()
@@ -728,7 +729,7 @@ def write_TestList_fake_results( testlistobj ):
 
 def read_TestList_and_check_fake_test():
     ""
-    tl = TestList.TestList()
+    tl = TestList.TestList( TestCaseFactory() )
     tl.readTestList()
     tl.readTestResults()
     tL = list( tl.getTests() )

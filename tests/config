@@ -15,18 +15,16 @@ import time, shutil
 
 import vvtestutils as vtu
 import testutils as util
-from testutils import print3
 
 
 class config_tests( vtu.vvtestTestCase ):
 
     def test_using_idplatform_in_a_specified_config_directory(self):
         ""
-        util.writefile( "tst.xml", """
-            <rtest name="tst">
-              <execute> echo "the COMPILER is $COMPILER" </execute>
-            </rtest>""" )
-        time.sleep(1)
+        util.writefile( "tst.vvt", """
+            import vvtest_util as vvt
+            print ( "the COMPILER is "+vvt.COMPILER )
+            """ )
 
         for batch in [False,True]:
 
@@ -37,7 +35,6 @@ class config_tests( vtu.vvtestTestCase ):
                     return "BASIC"
                 """ )
             vtu.remove_results()
-            time.sleep(1)
 
             vrun = vtu.runvvtest( '--config config', batch=batch,
                                                      addplatform=False )
@@ -53,7 +50,6 @@ class config_tests( vtu.vvtestTestCase ):
                     return "Fortran"
                 """ )
             vtu.remove_results()
-            time.sleep(1)
 
             os.environ['VVTEST_CONFIGDIR'] = 'nonsense'
             try:
@@ -169,13 +165,13 @@ class config_tests( vtu.vvtestTestCase ):
             def initialize( plat ):
                 opts = plat.getOptions()
                 assert '--platopt' in opts
-                assert opts['--platopt']['foo'] == 'bar'
+                assert opts['--platopt']['account'] == 'foo'
                 print ( 'initialize successFUL' )
             """ )
         util.writefile( 'atest.vvt', 'pass' )
         time.sleep(1)
 
-        vrun = vtu.runvvtest( '--config config --platopt foo=bar' )
+        vrun = vtu.runvvtest( '--config config --platopt account=foo' )
         vrun.assertCounts( total=1, npass=1 )
         assert 'initialize successFUL' in vrun.out
 
@@ -201,7 +197,7 @@ class config_tests( vtu.vvtestTestCase ):
             assert plat.save[1] == 32
             assert 'variation' not in plat.save[2]
 
-            platopt = { '--platopt': { 'knl':'' } }
+            platopt = { '--platopt': { 'variation':'knl' } }
             plat = MockPlatform( 'CrayXC', platopt=platopt )
             plug.initialize( plat )
             assert plat.save[0] == 'slurm'
@@ -496,10 +492,10 @@ def extract_maxprocs( vvtest_output ):
     ""
     maxprocs = None
 
-    L1 = util.greplines( 'max procs', vvtest_output )
+    L1 = util.greplines( 'max cores', vvtest_output )
     if len(L1) > 0:
-        smax = L1[0].split( 'max procs', 1 )[1].strip().lstrip('=').strip()
-        maxprocs = int( smax )
+        L2 = L1[0].split( 'max cores', 1 )[1].strip().strip('=').split(',')
+        maxprocs = int( L2[0].strip() )
 
     return maxprocs
 

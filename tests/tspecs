@@ -25,6 +25,7 @@ from libvvtest.platexpr import PlatformExpression
 from libvvtest.RuntimeConfig import RuntimeConfig
 from libvvtest.testcase import TestCase
 import libvvtest.testlistio as tio
+from libvvtest.tcfactory import TestCaseFactory
 
 
 class XML_ElementTree_tests( vtu.vvtestTestCase ):
@@ -1268,11 +1269,11 @@ class test_file_reparse( vtu.vvtestTestCase ):
         tcase.setHasDependent()
 
         sid = tio.test_to_string( tcase )
-        tcase2 = tio.string_to_test( sid )
+        tcase2 = tio.string_to_test( sid, TestCaseFactory() )
         assert not tcase2.hasDependent()
 
         sid = tio.test_to_string( tcase, extended=True )
-        tcase3 = tio.string_to_test( sid )
+        tcase3 = tio.string_to_test( sid, TestCaseFactory() )
         assert tcase3.hasDependent()
 
     def test_transfer_dep_dirs_through_string_write_read(self):
@@ -1282,7 +1283,7 @@ class test_file_reparse( vtu.vvtestTestCase ):
         tcase.addDepDirectory( 'B*', 'bar/Btest' )
 
         sid = tio.test_to_string( tcase, extended=True )
-        tcase2 = tio.string_to_test( sid )
+        tcase2 = tio.string_to_test( sid, TestCaseFactory() )
 
         matchL = tcase2.getDepDirectories()
         assert len( matchL ) == 2
@@ -1299,7 +1300,7 @@ class test_file_reparse( vtu.vvtestTestCase ):
 
 def reparse_test_string( stringid ):
     ""
-    tcase = tio.string_to_test( stringid )
+    tcase = tio.string_to_test( stringid, TestCaseFactory() )
 
     TestCreator().reparse( tcase.getSpec() )
 
@@ -1338,7 +1339,7 @@ def reparse_test( testobj ):
     tw.append( TestCase( testobj ) )
     tw.finish()
 
-    tr = tio.TestListReader( 'tmplist' )
+    tr = tio.TestListReader( TestCaseFactory(), 'tmplist' )
     tr.read()
     tests = list( tr.getTests().values() )
     assert len( tests ) == 1

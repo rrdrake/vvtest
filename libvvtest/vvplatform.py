@@ -5,70 +5,50 @@
 # Government retains certain rights in this software.
 
 import os, sys
-import re
 import platform
 
-############################################################################
+from . import rpool
+from . import rprobe
+
 
 class Platform:
 
-    def __init__(self, vvtesthome, optdict):
+    def __init__(self, mode='direct',
+                       platname=platform.uname()[0],
+                       cplrname=None,
+                       environ={},
+                       attrs={} ):
         ""
-        self.vvtesthome = vvtesthome
-        self.optdict = optdict
+        self.mode = mode
+        self.platname = platname
+        self.cplrname = cplrname
 
-        self.plugin_maxprocs = None
-        self.procpool = ResourcePool( 1, 1 )
+        self.envD = dict( environ )
+        self.attrs = dict( attrs )
+
+        self.maxsize  = (None,None)  # max core, max device
+        self.size     = (None,None)  # num core, num device
+        self.nodesize = (None,None)  # ppn, dpn
+
+        self.procpool = None
         self.devicepool = None
-
-        self.platname = None
-        self.cplrname = None
-
-        self.envD = {}
-        self.attrs = {}
-
-        self.batchspec = None
 
     # ----------------------------------------------------------------
 
     def getName(self):  return self.platname
     def getCompiler(self): return self.cplrname
-    def getOptions(self): return self.optdict
 
     def getMaxSize(self):
         ""
-        maxnp = self.procpool.maxAvailable()
-        if self.devicepool != None:
-            maxnd = self.devicepool.maxAvailable()
-        else:
-            maxnd = 0
-        return (maxnp,maxnd)
+        return self.maxsize
 
     def getSize(self):
         ""
-        np = self.procpool.numTotal()
-        if self.devicepool != None:
-            nd = self.devicepool.numTotal()
-        else:
-            nd = 0
-        return (np,nd)
+        return self.size
 
-    def getPluginMaxProcs(self):
+    def getNodeSize(self):
         ""
-        return self.plugin_maxprocs
-
-    def display(self, isbatched=False):
-        ""
-        s = "Platform " + self.platname
-        if not isbatched:
-            np,nd = self.getSize()
-            maxnp,maxnd = self.getMaxSize()
-            s += ", num procs = " + str(np)
-            s += ", max procs = " + str(maxnp)
-            if self.devicepool != None:
-                s += ', num devices = '+str(nd)
-                s += ', max devices = '+str(maxnd)
-        print3( s )
+        return self.nodesize
 
     def getEnvironment(self):
         """
@@ -76,25 +56,26 @@ class Platform:
         """
         return self.envD
 
-    # ----------------------------------------------------------------
+    def getAttributes(self):
+        ""
+        return self.attrs
 
-    def setenv(self, name, value):
-        """
-        """
-        if value == None:
-            if name in self.envD:
-                del self.envD[name]
+    def display(self):
+        ""
+        s = "Platform " + self.platname
+        if self.mode == 'batch':
+            s += ', batchsys='+str(self.attrs.get('batchsys',None))
+            s += ', ppn='+str(self.attrs.get('ppn',None))
         else:
-            self.envD[name] = value
+            np,nd = self.getSize()
+            maxnp,maxnd = self.getMaxSize()
+            if np    is not None: s += ', num cores = '+str(np)
+            if maxnp is not None: s += ', max cores = '+str(maxnp)
+            if nd    is not None: s += ', num devices = '+str(nd)
+            if maxnd is not None: s += ', max devices = '+str(maxnd)
+        print ( s )
 
-    def setattr(self, name, value):
-        """
-        """
-        if value == None:
-            if name in self.attrs:
-                del self.attrs[name]
-        else:
-            self.attrs[name] = value
+    ##################################################################
 
     def getattr(self, name, *default):
         ""
@@ -103,30 +84,12 @@ class Platform:
         else:
             return self.attrs[name]
 
-    def setBatchSystem(self, batch, ppn, **kwargs ):
-        ""
-        assert ppn and ppn > 0
-
-        self.batchspec = ( batch, ppn, kwargs )
-
-    def initializeBatchSystem(self, batchitf):
-        ""
-        if self.batchspec:
-            qtype,ppn,kwargs = self.batchspec
-            batchitf.setQueueType( qtype, ppn, **kwargs )
-
-        for n,v in self.envD.items():
-            batchitf.setEnviron( n, v )
-
-        for n,v in self.attrs.items():
-            batchitf.setAttr( n, v )
-
     def getDefaultQsubLimit(self):
         ""
         n = self.attrs.get( 'maxsubs', 5 )
         return n
 
-    def initProcs(self, num_procs, max_procs, num_devices, max_devices ):
+    def initialize(self, num_procs, max_procs, num_devices, max_devices ):
         """
         Determine and set the number of CPU cores and devices.  The arguments
         are from the command line:
@@ -136,28 +99,139 @@ class Platform:
             max_procs   is -N
             max_devices is --max-devices
         """
-        self.plugin_maxprocs = self.attrs.get( 'maxprocs', None )
+        self._init_size( num_procs, max_procs, num_devices, max_devices )
 
-        np,maxnp = \
-            determine_processor_cores( num_procs,
-                                       max_procs,
-                                       self.plugin_maxprocs )
+        if self.mode != 'batch':
+            self._construct_resource_pools()
 
-        nd,maxdev = \
-            determine_device_count( num_devices,
-                                    max_devices,
-                                    self.attrs.get( 'maxdevices', None ) )
+        bsys = self.attrs.get( 'batchsys', None )
+        if self.mode == 'batch' and (bsys is None or bsys == 'subprocs'):
+            self._set_subprocess_batching()
 
-        self.procpool = ResourcePool( np, maxnp )
+        if self.mode == 'direct':
+            self._set_workstation_node_size()
+        else:
+            self._set_batch_node_size()
 
-        if nd != None:
-            assert maxdev != None
-            self.devicepool = ResourcePool( nd, maxdev )
+    def _init_size(self, num_procs, max_procs, num_devices, max_devices):
+        ""
+        plugmax = self._get_max_size_from_plugin( 'maxprocs' )
+        np,maxnp = self._select_size( num_procs, max_procs, plugmax,
+                                      self._backup_max_procs )
+
+        plugmax = self._get_max_size_from_plugin( 'maxdevices' )
+        nd,maxnd = self._select_size( num_devices, max_devices, plugmax,
+                                      self._backup_max_devices )
+
+        self.size = (np,nd)
+        self.maxsize = (maxnp,maxnd)
+
+    def _get_max_size_from_plugin(self, attrname):
+        ""
+        if self.mode == 'batchjob':
+            # don't use the plugin value for batch jobs
+            plugmax = None
+        else:
+            plugmax = self.attrs.get( attrname, None )
+
+        return plugmax
+
+    def _select_size(self, cmd_num, cmd_max, plugin_max, backup):
+        ""
+        mx = cmd_max
+        if mx is None:
+            mx = plugin_max
+            if mx is None:
+                mx = backup( cmd_num )
+
+        num = cmd_num
+        if num is None and mx:
+            num = mx
+
+        return num,mx
+
+    def _backup_max_procs(self, num_procs):
+        ""
+        if self.mode == 'direct':
+            ppn = self.attrs.get( 'ppn', None )
+            if ppn:
+                return ppn
+            else:
+                return rprobe.probe_num_processors( 4 )
+        else:
+            return None
+
+    def _backup_max_devices(self, num_devices):
+        ""
+        dpn = self.attrs.get( 'dpn', None )
+
+        if self.mode == 'direct':
+            if dpn:
+                return dpn
+            elif num_devices is None:
+                return 0
+            else:
+                return num_devices
+        elif self.mode == 'batch':
+            if dpn and dpn > 0:
+                return None
+            else:
+                return 0
+        else:
+            return None
+
+    def _set_batch_node_size(self):
+        ""
+        if 'ppn' not in self.attrs or self.attrs['ppn'] <= 0:
+            raise Exception( 'batch mode requested, but "cores_per_node" '
+                             'not set on the command line or in the plugin' )
+
+        self.nodesize = ( self.attrs['ppn'], self.attrs.get('dpn',None) )
+
+    def _set_workstation_node_size(self):
+        ""
+        maxnp,maxnd = self.maxsize
+
+        ppn = self.attrs.get( 'ppn', None )
+        if not ppn:
+            ppn = maxnp or None
+
+        dpn = self.attrs.get( 'dpn', None )
+        if not dpn:
+            dpn = maxnd or None
+
+        self.nodesize = ( ppn, dpn )
+
+    def _construct_resource_pools(self):
+        ""
+        np,nd = self.size
+        maxnp,maxnd = self.maxsize
+
+        if np:
+            self.procpool = rpool.ResourcePool( np, maxnp )
+
+        if nd:
+            self.devicepool = rpool.ResourcePool( nd, maxnd )
+
+    def _set_subprocess_batching(self):
+        """
+        If cores/devices per node is not set, we set the compute node size
+        to the size of the workstation. This is an arbitrary choice, but
+        makes sense for the "nnode" parameterization.
+        """
+        self.attrs['batchsys'] = 'subprocs'
+
+        maxnp,maxnd = self.maxsize
+        if not maxnp:
+            maxnp = rprobe.probe_num_processors( 4 )
+
+        self.attrs['ppn'] = self.attrs.get( 'ppn', maxnp )
+        self.attrs['dpn'] = self.attrs.get( 'dpn', maxnd )
 
     def sizeAvailable(self):
         ""
         sznp = self.procpool.numAvailable()
-        if self.devicepool == None:
+        if self.devicepool is None:
             return ( sznp, 0 )
         else:
             return ( sznp, self.devicepool.numAvailable() )
@@ -199,36 +273,18 @@ class Platform:
 
         return None
 
-    def which(self, prog):
-        """
-        """
-        if not prog:
-          return None
-        if os.path.isabs(prog):
-          return prog
-        for d in os.environ['PATH'].split(':'):
-          if not d: d = '.'
-          if os.path.isdir(d):
-            f = os.path.join( d, prog )
-            if os.path.exists(f) and \
-               os.access(f,os.R_OK) and os.access(f,os.X_OK):
-              if not os.path.isabs(f):
-                f = os.path.abspath(f)
-              return os.path.normpath(f)
-        return None
 
-
-def determine_processor_cores( num_procs, max_procs, plugin_max ):
+def determine_processor_cores( num_procs, max_procs, plugin_max, use_probe=True ):
     ""
-    if max_procs == None:
-        if plugin_max == None:
-            mx = probe_max_processors( 4 )
+    if max_procs is None:
+        if plugin_max is None and use_probe:
+            mx = rprobe.probe_num_processors( 4 )
         else:
             mx = plugin_max
     else:
         mx = max_procs
 
-    if num_procs == None:
+    if num_procs is None:
         np = mx
     else:
         np = num_procs
@@ -238,208 +294,17 @@ def determine_processor_cores( num_procs, max_procs, plugin_max ):
 
 def determine_device_count( num_devices, max_devices, plugin_max ):
     ""
-    if max_devices == None:
+    if max_devices is None:
         mx = plugin_max
     else:
         mx = max_devices
 
-    if num_devices == None:
+    if num_devices is None:
         nd = mx
     else:
         nd = num_devices
-        if mx == None:
-            # could probe for devices to get a better max
-            mx = num_devices
 
     return nd,mx
-
-
-class ResourcePool:
-
-    def __init__(self, total, maxavail):
-        ""
-        self.total = total
-        self.maxavail = maxavail
-
-        self.pool = None  # maps hardware id to num available
-
-    def maxAvailable(self):
-        ""
-        return self.maxavail
-
-    def numTotal(self):
-        ""
-        return self.total
-
-    def numAvailable(self):
-        ""
-        if self.pool == None:
-            num = self.total
-        else:
-            num = 0
-            for cnt in self.pool.values():
-                num += max( 0, cnt )
-
-        return num
-
-    def get(self, num):
-        ""
-        items = []
-
-        if num > 0:
-
-            if self.pool == None:
-                self._initialize_pool()
-
-            while len(items) < num:
-                self._get_most_available( items, num )
-
-        return items
-
-    def put(self, items):
-        ""
-        for idx in items:
-            self.pool[idx] = ( self.pool[idx] + 1 )
-
-    def _get_most_available(self, items, num):
-        ""
-        # reverse the index in the sort list (want indexes to be ascending)
-        L = [ (cnt,self.maxavail-idx) for idx,cnt in self.pool.items() ]
-        L.sort( reverse=True )
-
-        for cnt,ridx in L:
-            idx = self.maxavail - ridx
-            items.append( idx )
-            self.pool[idx] = ( self.pool[idx] - 1 )
-            if len(items) == num:
-                break
-
-    def _initialize_pool(self):
-        ""
-        self.pool = {}
-
-        for i in range(self.total):
-            idx = i%(self.maxavail)
-            self.pool[idx] = self.pool.get( idx, 0 ) + 1
-
-
-def create_Platform_instance( vvtestdir, platname, isbatched, platopts,
-                              numprocs, maxprocs, devices, max_devices,
-                              onopts, offopts ):
-    ""
-    assert vvtestdir
-    assert os.path.exists( vvtestdir )
-    assert os.path.isdir( vvtestdir )
-
-    optdict = {}
-    if platname:         optdict['--plat']    = platname
-    if platopts:         optdict['--platopt'] = platopts
-    if onopts:           optdict['-o']        = onopts
-    if offopts:          optdict['-O']        = offopts
-
-    plat = Platform( vvtestdir, optdict )
-
-    platname,cplrname = get_platform_and_compiler(
-                                platname,
-                                None,  # compiler name not used anymore
-                                onopts,
-                                offopts )
-
-    plat.platname = platname
-    plat.cplrname = cplrname
-
-    set_platform_options( plat, platopts )
-
-    if isbatched:
-        # this may get overridden by platform_plugin.py
-        plat.setBatchSystem( 'procbatch', 1 )
-
-    initialize_platform( plat )
-
-    plat.initProcs( numprocs,
-                    maxprocs,
-                    devices,
-                    max_devices )
-
-    return plat
-
-
-def set_platform_options( plat, platopts ):
-    ""
-    q = platopts.get( 'queue', platopts.get( 'q', None ) )
-    plat.setattr( 'queue', q )
-
-    act = platopts.get( 'account', platopts.get( 'PT', None ) )
-    plat.setattr( 'account', act )
-
-    wall = platopts.get( 'walltime', None )
-    plat.setattr( 'walltime', wall )
-
-    # QoS = "Quality of Service" e.g. "normal", "long", etc.
-    QoS = platopts.get( 'QoS', None )
-    plat.setattr( 'QoS', QoS )
-
-
-def get_platform_and_compiler( platname, cplrname, onopts, offopts ):
-    ""
-    idplatform = import_idplatform()
-
-    optdict = convert_to_option_dictionary( platname, cplrname, onopts, offopts )
-
-    if not platname:
-        if idplatform != None and hasattr( idplatform, "platform" ):
-            platname = idplatform.platform( optdict )
-        if not platname:
-            platname = platform.uname()[0]
-
-    if not cplrname:
-        if idplatform != None and hasattr( idplatform, "compiler" ):
-            cplrname = idplatform.compiler( platname, optdict )
-
-    return platname, cplrname
-
-
-def initialize_platform( plat ):
-    ""
-    plug = import_platform_plugin()
-
-    if plug != None and hasattr( plug, 'initialize' ):
-        plug.initialize( plat )
-
-
-def import_idplatform():
-    ""
-    try:
-        # this comes from the config directory
-        import idplatform
-    except ImportError:
-        idplatform = None
-
-    return idplatform
-
-
-def import_platform_plugin():
-    ""
-    try:
-        # this comes from the config directory
-        import platform_plugin
-    except ImportError:
-        platform_plugin = None
-
-    return platform_plugin
-
-
-def convert_to_option_dictionary( platname, cplrname, onopts, offopts ):
-    ""
-    optdict = {}
-
-    if platname: optdict['--plat'] = platname
-    if cplrname: optdict['--cplr'] = cplrname
-
-    optdict['-o'] = onopts
-    optdict['-O'] = offopts
-
-    return optdict
 
 
 ##########################################################################
@@ -468,7 +333,7 @@ def construct_job_info( procs, procpool,
 
     job_info = JobInfo( procs, maxprocs )
 
-    if devices != None:
+    if devices is not None:
         job_info.devices = devices
         job_info.maxdevices = devicepool.maxAvailable()
 
@@ -490,65 +355,3 @@ def construct_job_info( procs, procpool,
         job_info.mpi_opts += ' ' + mpiopts
 
     return job_info
-
-
-def probe_max_processors( fail_value=4 ):
-    """
-    Tries to determine the number of processors on the current machine.  On
-    Linux systems, it uses /proc/cpuinfo.  On OSX systems, it uses sysctl.
-    """
-    mx = None
-    
-    if platform.uname()[0].startswith( 'Darwin' ):
-        # try to use sysctl on Macs
-        try:
-            fp = os.popen( 'sysctl -n hw.physicalcpu 2>/dev/null' )
-            s = fp.read().strip()
-            fp.close()
-            mx = int(s)
-        except Exception:
-            mx = None
-    
-    if mx == None and os.path.exists( '/proc/cpuinfo' ):
-        # try to probe the number of available processors by
-        # looking at the proc file system
-        repat = re.compile( 'processor\s*:' )
-        mx = 0
-        try:
-            fp = open( '/proc/cpuinfo', 'r' )
-            for line in fp.readlines():
-                if repat.match(line) != None:
-                    mx += 1
-            fp.close()
-        except Exception:
-            mx = None
-
-    if not mx or mx < 1:
-        mx = fail_value
-
-    return mx
-
-
-##########################################################################
-
-# determine the directory containing the current file
-mydir = None
-if __name__ == "__main__":
-  mydir = os.path.abspath( sys.path[0] )
-else:
-  mydir = os.path.dirname( os.path.abspath( __file__ ) )
-
-
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(arg) for arg in args ] ) + '\n' )
-    sys.stdout.flush()
-
-###############################################################################
-
-if __name__ == "__main__":
-    """
-    """
-    vvtestdir = os.path.dirname(mydir)
-    sys.path.insert( 1, os.path.join( vvtestdir, 'config' ) )
-    plat = construct_Platform( vvtestdir, {} )
-    plat.display()

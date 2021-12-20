@@ -1,0 +1,316 @@
+#!/usr/bin/env python
+
+# Copyright 2018 National Technology & Engineering Solutions of Sandia, LLC
+# (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
+# Government retains certain rights in this software.
+
+#RUNTEST: vvtest
+
+import sys
+sys.dont_write_bytecode = True
+sys.excepthook = sys.__excepthook__
+import os
+import platform
+import subprocess
+
+import vvtestutils as vtu
+import testutils as util
+
+import libvvtest.rprobe as rprobe
+
+platname = platform.uname()[0].lower()
+
+
+class unit_tests( vtu.vvtestTestCase ):
+
+    def test_osx_probe(self):
+        ""
+        assert rprobe.num_cores_from_osx_sysctl( fakedata='4' ) == 4
+        assert rprobe.num_cores_from_osx_sysctl( fakedata='' ) is None
+        assert rprobe.num_cores_from_osx_sysctl( fakedata='foo\nbar' ) is None
+
+        if platname.startswith( 'darwin' ):
+            nc = rprobe.num_cores_from_osx_sysctl()
+            print ( 'num cores = '+repr(nc) )
+            assert type(nc) == type(2) and nc > 0
+
+    def test_proc_cpuinfo_probe(self):
+        ""
+        util.writefile( 'empty', '' )
+        util.writefile( 'sample', sample_cpuinfo_data )
+
+        assert rprobe.num_cores_from_proc_cpuinfo( fakefile='empty' ) is None
+        assert rprobe.num_cores_from_proc_cpuinfo( fakefile='sample' ) == 4
+
+        try:
+            with open( '/proc/cpuinfo', 'rt' ) as fp:
+                fp.read()
+        except Exception:
+            pass
+        else:
+            nc = rprobe.num_cores_from_proc_cpuinfo()
+            print ( 'num cores = '+repr(nc) )
+            assert type(nc) == type(2) and nc > 0
+
+    def test_lscpu_probe(self):
+        ""
+        assert rprobe.num_cores_from_lscpu( fakedata='' ) is None
+        assert rprobe.num_cores_from_lscpu( fakedata='Socket(s): 4' ) is None
+        assert rprobe.num_cores_from_lscpu( fakedata=sample_lscpu_data ) == 4
+
+        x = subprocess.call( 'type -p lscpu', shell=True )
+        if x == 0:
+            nc = rprobe.num_cores_from_lscpu()
+            print ( 'num cores = '+repr(nc) )
+            assert type(nc) == type(2) and nc > 0
+
+    def test_probe_for_num_processors(self):
+        ""
+        mx = rprobe.probe_num_processors( fail_value='failed' )
+
+        if mx == 'failed':
+            assert not platname.startswith('linux')
+            assert not platname.startswith('darwin')
+
+
+sample_cpuinfo_data = """\
+processor   : 0
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 0
+cpu cores   : 4
+apicid      : 0
+initial apicid  : 0
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 1
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 1
+cpu cores   : 4
+apicid      : 2
+initial apicid  : 2
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 2
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 2
+cpu cores   : 4
+apicid      : 4
+initial apicid  : 4
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 3
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 3
+cpu cores   : 4
+apicid      : 6
+initial apicid  : 6
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 4
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 2300.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 0
+cpu cores   : 4
+apicid      : 1
+initial apicid  : 1
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 5
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 1
+cpu cores   : 4
+apicid      : 3
+initial apicid  : 3
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 6
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 2
+cpu cores   : 4
+apicid      : 5
+initial apicid  : 5
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+
+processor   : 7
+vendor_id   : GenuineIntel
+cpu family  : 6
+model       : 94
+model name  : Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+stepping    : 3
+microcode   : 0xcc
+cpu MHz     : 800.000
+cache size  : 8192 KB
+physical id : 0
+siblings    : 8
+core id     : 3
+cpu cores   : 4
+apicid      : 7
+initial apicid  : 7
+fpu     : yes
+fpu_exception   : yes
+cpuid level : 22
+wp      : yes
+flags       : fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+bogomips    : 6000.00
+clflush size    : 64
+cache_alignment : 64
+address sizes   : 39 bits physical, 48 bits virtual
+power management:
+"""
+
+sample_lscpu_data = """\
+Architecture:          x86_64
+CPU op-mode(s):        32-bit, 64-bit
+Byte Order:            Little Endian
+CPU(s):                8
+On-line CPU(s) list:   0-7
+Thread(s) per core:    2
+Core(s) per socket:    4
+Socket(s):             1
+NUMA node(s):          1
+Vendor ID:             GenuineIntel
+CPU family:            6
+Model:                 94
+Model name:            Intel(R) Xeon(R) CPU E3-1585L v5 @ 3.00GHz
+Stepping:              3
+CPU MHz:               800.000
+CPU max MHz:           3000.0000
+CPU min MHz:           800.0000
+BogoMIPS:              6000.00
+Virtualization:        VT-x
+L1d cache:             32K
+L1i cache:             32K
+L2 cache:              256K
+L3 cache:              8192K
+NUMA node0 CPU(s):     0-7
+Flags:                 fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc aperfmperf eagerfpu pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch epb invpcid_single intel_pt ssbd ibrs ibpb stibp tpr_shadow vnmi flexpriority ept vpid fsgsbase tsc_adjust bmi1 hle avx2 smep bmi2 erms invpcid rtm mpx rdseed adx smap clflushopt xsaveopt xsavec xgetbv1 dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp md_clear spec_ctrl intel_stibp flush_l1d
+"""
+
+############################################################################
+
+util.run_test_cases( sys.argv, sys.modules[__name__] )

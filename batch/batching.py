@@ -20,7 +20,7 @@ class BatchJob:
 
         self.jobscript = None
         self.outfile = None
-        self.maxsize = None
+        self.size = None
         self.jobid = None
         self.wrkdir = None
 
@@ -33,7 +33,7 @@ class BatchJob:
         self.attrs = {}
 
     def getBatchID(self): return self.batchid
-    def getMaxSize(self): return self.maxsize
+    def getJobSize(self): return self.size
 
     def getJobScriptName(self): return self.jobscript
 
@@ -72,9 +72,9 @@ class BatchJob:
         ""
         self.wrkdir = dirpath
 
-    def setMaxSize(self, maxsize):
+    def setJobSize(self, jobsize):
         ""
-        self.maxsize = maxsize
+        self.size = jobsize
 
     def setJobID(self, jobid):
         ""
@@ -115,6 +115,10 @@ class BatchJobHandler:
         self.stopped  = {}  # not in queue or shown as completed by the queue
         self.done  = {}  # job results have been processed
 
+    def getNodeSize(self):
+        ""
+        return self.batchitf.getNodeSize()
+
     def createJob(self):
         ""
         bjob = BatchJob()
@@ -139,7 +143,7 @@ class BatchJobHandler:
 
         fn = batchjob.getJobScriptName()
 
-        maxsize = batchjob.getMaxSize()
+        maxsize = batchjob.getJobSize()
         self.batchitf.writeJobScript( maxsize, qtime, wrkdir, pout, fn, cmd )
 
         return fn
@@ -260,36 +264,11 @@ class BatchJobHandler:
         else:
             return False
 
-    def scanBatchOutput(self, outfile):
+    def checkBatchOutputForExit(self, outfile):
         """
-        Tries to read the batch output file, then looks for the marker
-        indicating a clean job script finish.  Returns true for a clean finish.
+        Returns True if the log file shows the batch job ran and finished.
         """
-        clean = False
-
-        try:
-            # compute file seek offset, and open the file
-            sz = os.path.getsize( outfile )
-            off = max(sz-512, 0)
-            fp = open( outfile, 'r' )
-        except Exception:
-            pass
-        else:
-            try:
-                # only read the end of the file
-                fp.seek(off)
-                buf = fp.read(512)
-            except Exception:
-                pass
-            else:
-                if self.batchitf.getCleanExitMarker() in buf:
-                    clean = True
-            try:
-                fp.close()
-            except Exception:
-                pass
-
-        return clean
+        return self.batchitf.checkForJobScriptExit( outfile )
 
     def markNotStartedJobsAsDone(self):
         ""

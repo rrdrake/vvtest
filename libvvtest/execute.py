@@ -66,7 +66,7 @@ class BatchRunner( TestListRunner ):
         ""
         self.setup()
 
-        self.plat.display( isbatched=True )
+        self.plat.display()
 
         self.tlist.setResultsDate()
 

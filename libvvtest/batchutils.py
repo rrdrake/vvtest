@@ -22,15 +22,16 @@ class Batcher:
                        tlist, xlist, perms,
                        qsublimit,
                        batch_length, max_timeout,
-                       namer, jobhandler ):
+                       namer, jobhandler, tcasefactory ):
         ""
         self.perms = perms
         self.maxjobs = qsublimit
 
         self.namer = namer
         self.jobhandler = jobhandler
+        self.fact = tcasefactory
 
-        self.results = ResultsHandler( tlist, xlist )
+        self.results = ResultsHandler( tlist, xlist, self.fact )
 
         self.rundate = tlist.getResultsDate()
         self.vvtestcmd = vvtestcmd
@@ -142,16 +143,16 @@ class Batcher:
         ""
         tlist = self._make_TestList( bjob.getBatchID(), testL )
 
-        maxsize = compute_max_size( tlist )
+        jobsize = compute_job_size( tlist, self.jobhandler.getNodeSize() )
 
-        bjob.setMaxSize( maxsize )
+        bjob.setJobSize( jobsize )
         bjob.setAttr( 'testlist', tlist )
 
     def _make_TestList(self, batchid, qlist ):
         ""
         fn = self.namer.getBatchPath( batchid )
 
-        tl = TestList.TestList( fn )
+        tl = TestList.TestList( self.fact, fn )
 
         tl.setResultsDate( self.rundate )
 
@@ -184,6 +185,13 @@ class Batcher:
             # force a timeout for batches with only one test
             if qtime < 600: cmd += ' -T ' + str(qtime*0.90)
             else:           cmd += ' -T ' + str(qtime-120)
+
+        nn,np,nd = bjob.getJobSize()
+        ppn,dpn = self.jobhandler.getNodeSize()
+        assert nn and ppn
+        cmd += ' -N '+str(nn*ppn)+' --platopt ppn='+str(ppn)
+        if dpn:
+            cmd += ' --max-devices '+str(nn*dpn)+' --platopt dpn='+str(dpn)
 
         cmd += ' || exit 1'
 
@@ -240,7 +248,7 @@ class Batcher:
         rfile = bjob.getAttr('testlist').getResultsFilename()
 
         finished = False
-        if self.jobhandler.scanBatchOutput( ofile ):
+        if self.jobhandler.checkBatchOutputForExit( ofile ):
             finished = testlistio.file_is_marked_finished( rfile )
 
         return finished
@@ -398,14 +406,34 @@ class BatchGroup:
         return [ self.tsum, self.size, self.groupid, self.tests ]
 
 
-def compute_max_size( tlist ):
+def compute_job_size( tlist, nodesize ):
     ""
-    maxsize = (0,0)
+    ppn,dpn = nodesize
+
+    mxnp = 1
+    mxnd = 0
     for tcase in tlist.getTests():
         np,nd = tcase.getSize()
-        maxsize = ( max( np, maxsize[0] ), max( nd, maxsize[1] ) )
+        mxnp = max( np, mxnp )
+        mxnd = max( nd, mxnd )
 
-    return maxsize
+    nn = 1
+
+    if ppn:
+        assert type(ppn) == type(2) and ppn > 0
+        numnd = int( mxnp/ppn )
+        if mxnp%ppn != 0:
+            numnd += 1
+        nn = max( nn, numnd )
+
+    if dpn and mxnd > 0:
+        assert type(dpn) == type(2) and dpn > 0
+        numnd = int( mxnd/dpn )
+        if mxnd%dpn != 0:
+            numnd += 1
+        nn = max( nn, numnd )
+
+    return nn,mxnp,mxnd
 
 
 def apply_queue_timeout_bump_factor( qtime ):
@@ -429,10 +457,11 @@ def apply_queue_timeout_bump_factor( qtime ):
 
 class ResultsHandler:
 
-    def __init__(self, tlist, xlist):
+    def __init__(self, tlist, xlist, tcasefactory):
         ""
         self.tlist = tlist
         self.xlist = xlist
+        self.fact = tcasefactory
 
     def addResultsInclude(self, bjob):
         ""
@@ -451,7 +480,7 @@ class ResultsHandler:
         if os.path.isfile( rfile ):
 
             try:
-                tlr = testlistio.TestListReader( rfile )
+                tlr = testlistio.TestListReader( self.fact, rfile )
                 tlr.read()
                 jobtests = tlr.getTests()
             except Exception:

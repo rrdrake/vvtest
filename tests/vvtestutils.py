@@ -53,6 +53,7 @@ import libvvtest.testcreator as testcreator
 from libvvtest.scanner import TestFileScanner
 from libvvtest.wordexpr import WordExpression
 from libvvtest.depend import connect_dependency
+from libvvtest.tcfactory import TestCaseFactory
 
 
 ##########################################################################
@@ -185,11 +186,11 @@ def run_vvtest_with_hook( vvtest_args, envspec, batch=False ):
     return x, out
 
 
-def adjust_sys_path_for_unit_testing():
+def clean_sys_path_and_plugin_modules():
     """
     Use like this:
 
-        savepath = adjust_sys_path_for_unit_testing()
+        savepath = clean_sys_path_and_plugin_modules()
         try:
             # do stuff with sys.path
         finally:
@@ -217,6 +218,25 @@ def adjust_sys_path_for_unit_testing():
         del sys.modules['platform_plugin']
 
     return save
+
+
+class clean_sys_path:
+    """
+    with clean_sys_path():
+        pass
+    """
+
+    def __init__(self):
+        ""
+        self.savepath = clean_sys_path_and_plugin_modules()
+
+    def __enter__(self):
+        ""
+        pass
+
+    def __exit__(self, type, value, traceback):
+        ""
+        sys.path[:] = self.savepath
 
 
 def remove_results():
@@ -877,7 +897,7 @@ def make_fake_TestExecList( timespec='runtime' ):
     ""
     tests = make_TestCase_list( timespec=timespec )
 
-    tlist = TestList()
+    tlist = TestList( TestCaseFactory() )
     for tcase in tests:
         tlist.addTest( tcase )
 
@@ -890,10 +910,10 @@ def make_fake_TestExecList( timespec='runtime' ):
 
 def scan_to_make_TestExecList( path, timeout_attr=None ):
     ""
-    tlist = TestList()
+    tlist = TestList( TestCaseFactory() )
 
     tc = testcreator.TestCreator( {}, 'XBox', [] )
-    scan = TestFileScanner( tc )
+    scan = TestFileScanner( tc, TestCaseFactory() )
     scan.scanPath( tlist, path )
 
     if timeout_attr != None:
