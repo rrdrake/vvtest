@@ -612,7 +612,7 @@ class bad_attrs( vtu.vvtestTestCase ):
         tspec = vtu.make_fake_TestSpec( name='ctest' )
         self.assertRaises( TestSpecError, psr.parse_enable, tspec )
 
-    def test_only_the_testname_is_allowed_for_keywords(self):
+    def test_only_testname_and_parameters_are_allowed_for_keywords(self):
         ""
         util.writefile( 'atest.vvt', """
             #VVT: keywords (parameters="foo=b") : akey bkey
@@ -628,7 +628,8 @@ class bad_attrs( vtu.vvtestTestCase ):
 
         psr = parsevvt.ScriptTestParser( 'atest.vvt' )
         tspec = vtu.make_fake_TestSpec( name='atest' )
-        self.assertRaises( TestSpecError, psr.parse_keywords, tspec )
+        psr.parse_keywords( tspec )
+        self.assertEqual( sorted(tspec.getKeywords()), ['atest', 'np'] )
 
         psr = parsevvt.ScriptTestParser( 'btest.vvt' )
         tspec = vtu.make_fake_TestSpec( name='btest' )

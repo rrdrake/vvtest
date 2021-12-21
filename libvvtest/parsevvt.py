@@ -18,15 +18,17 @@ from .paramset import ParameterSet
 
 from .wordcheck import allowable_variable, allowable_word
 
-from .parseutil import variable_expansion
-from .parseutil import evaluate_testname_expr
-from .parseutil import check_for_duplicate_parameter
-from .parseutil import create_dependency_result_expression
-from .parseutil import check_forced_group_parameter
-from .parseutil import parse_to_word_expression
-from .parseutil import evaluate_platform_expr
-from .parseutil import evaluate_option_expr
-from .parseutil import evaluate_parameter_expr
+from .parseutil import (
+        variable_expansion,
+        evaluate_testname_expr,
+        check_for_duplicate_parameter,
+        create_dependency_result_expression,
+        check_forced_group_parameter,
+        parse_to_word_expression,
+        evaluate_platform_expr,
+        evaluate_option_expr,
+        evaluate_parameter_expr,
+    )
 
 
 class ScriptTestParser:
@@ -253,19 +255,25 @@ class ScriptTestParser:
         
           keywords : key1 key2
           keywords (testname=mytest) : key3
+          keywords (parameters="foo=bar") : key3
         
         Note that a test will automatically pick up the test name and the
         parameterize names as keywords.
         """
         testname = tspec.getName()
+        params = tspec.getParameters()
 
         keys = []
 
         for spec in self.reader.getSpecList( 'keywords' ):
 
-            check_allowed_attrs( spec.attrs, spec.lineno, 'testname' )
+            check_allowed_attrs( spec.attrs, spec.lineno,
+                                 'testname parameter parameters' )
 
             if not testname_ok( spec.attrs, testname, spec.lineno ):
+                continue
+
+            if not self.attr_filter( spec.attrs, testname, params, spec.lineno ):
                 continue
 
             for key in spec.value.strip().split():

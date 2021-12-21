@@ -50,7 +50,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
     def test_use_results_keyword_expression(self):
         ""
         self.write_ab_test_pair()
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -71,7 +70,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
     def test_filter_by_testname_and_keyword_simultaneously(self):
         ""
         self.write_ab_test_pair()
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -97,7 +95,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
     def test_results_keyword_expression_inside_test_results_area(self):
         ""
         self.write_ab_test_pair()
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -133,7 +130,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
               <keywords> earth mars </keywords>
               <execute> echo "solar ran" </execute>
             </rtest>""" )
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -217,7 +213,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             #VVT: keywords : blah-1 foo.2 bar+3 baz=4 mars#5 sun%6
             #VVT::           pluto^7 venus:8 jupiter~9 jupiter@0
             """ )
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '-k pluto^7' )
         vrun.assertCounts( total=2, npass=2 )
@@ -234,26 +229,34 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             #VVT: keywords : earth mars
             print ( 'solar ran' )
             """ )
-        time.sleep(1)
+        util.writescript( 'galaxy.vvt', """
+            #!"""+sys.executable+"""
+            #VVT: parameterize : foo = bar baz
+            #VVT: keywords (parameter="foo=bar"): earth
+            #VVT: keywords (parameter="foo=baz"): mars
+            print ( 'galaxy ran' )
+            """ )
 
-        for batch in [False,True]:
+        vrun = vtu.runvvtest( '-k earth' )
+        vrun.assertCounts( total=2, npass=2 )
+        self.assertEqual( vrun.getTestIds(), ['galaxy.foo=bar','solar'] )
 
-            vtu.remove_results()
+        vrun = vtu.runvvtest( '-w -K earth' )
+        vrun.assertCounts( total=1, npass=1 )
+        self.assertEqual( vrun.getTestIds(), ['galaxy.foo=baz'] )
 
-            vrun = vtu.runvvtest( '-k earth', batch=batch )
-            vrun.assertCounts( total=1, npass=1 )
+        vrun = vtu.runvvtest( '-w -k earth -K mars' )
+        vrun.assertCounts( total=1, npass=1 )
+        self.assertEqual( vrun.getTestIds(), ['galaxy.foo=bar'] )
 
-            vrun = vtu.runvvtest( '-w -K earth', batch=batch )
-            vrun.assertCounts( total=0 )
+        vrun = vtu.runvvtest( '-w -k earth/mars' )
+        vrun.assertCounts( total=3, npass=3 )
+        self.assertEqual( vrun.getTestIds(),
+                          ['galaxy.foo=bar','galaxy.foo=baz','solar'] )
 
-            vrun = vtu.runvvtest( '-w -k earth -K mars', batch=batch )
-            vrun.assertCounts( total=0 )
-
-            vrun = vtu.runvvtest( '-w -k earth/mars', batch=batch )
-            vrun.assertCounts( total=1, npass=1 )
-
-            vrun = vtu.runvvtest( '-w -k venus/mars', batch=batch )
-            vrun.assertCounts( total=1, npass=1 )
+        vrun = vtu.runvvtest( '-w -k venus/mars' )
+        vrun.assertCounts( total=2, npass=2 )
+        self.assertEqual( vrun.getTestIds(), ['galaxy.foo=baz','solar'] )
 
     def test_script_test_filter_by_testname_and_keyword_simultaneously(self):
         ""
@@ -269,7 +272,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
             #!"""+sys.executable+"""
             print ( 'executing test' )
             """ )
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -299,7 +301,6 @@ class filter_and_keywords( vtu.vvtestTestCase ):
         util.writefile( 'btest.vvt', """
             #VVT: keywords : foo-bar earth+moon
             """ )
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '-k "*-bar or earth+*"' )
         vrun.assertCounts( total=2, npass=2 )
