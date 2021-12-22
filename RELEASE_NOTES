@@ -1,6 +1,18 @@
 
 Improvements:
 
+    - Including files into test headers (a.k.a, inserting directive files)
+      can now have testname, platform, and option attributes. For example,
+
+          #VVT: include (testname=foo) : afile.txt
+          #VVT: include (platform="Linux or XBox") : bfile.txt
+          #VVT: include (option="dbg and not gprof") : cfile.txt
+
+    - The "insert directive file" now has an alias, "include". For example,
+      this will insert the file "myfile.txt" during directive processing:
+
+          #VVT: include : myfile.txt
+
     - The keywords specification in a test header can now use the "parameters"
       attribute, such as
 

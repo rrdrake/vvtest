@@ -19,6 +19,7 @@ from testutils import print3
 
 from libvvtest.ScriptReader import ScriptReader
 from libvvtest.errors import TestSpecError
+import libvvtest.parsevvt as parsevvt
 
 
 class ScriptReader_file_reads( vtu.vvtestTestCase ):
@@ -28,7 +29,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
         util.writefile( 'script.vvt', """
             pass
             """ )
-        time.sleep(1)
 
         rdr = ScriptReader( 'script.vvt' )
 
@@ -40,7 +40,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             #VVT: keyname = value1 value2
             pass
             """ )
-        time.sleep(1)
 
         rdr = ScriptReader( 'script.vvt' )
 
@@ -58,7 +57,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             #VVT \t: keyname6 = value6
             pass
             """ )
-        time.sleep(1)
 
         rdr = ScriptReader( 'script.vvt' )
 
@@ -143,7 +141,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             This is line two."""
             #VVT: keyname : value
             ''' )
-        time.sleep(1)
 
         fnL = glob.glob( 'script*.vvt' )
         fnL.sort()
@@ -162,7 +159,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             #VVT: key5 ( foo = ) = val5
             pass
             """ )
-        time.sleep(1)
 
         rdr = ScriptReader( 'script.vvt' )
 
@@ -215,7 +211,6 @@ class ScriptReader_file_reads( vtu.vvtestTestCase ):
             #VVT: key1 ( =, jaz ) = val1
             pass
             """ )
-        time.sleep(1)
 
         fL = glob.glob( 'f*.vvt' )
         fL.sort()
@@ -337,18 +332,21 @@ class ScriptReader_include_directives( vtu.vvtestTestCase ):
 
     def test_insert_file_into_directives(self):
         ""
-        util.writefile( 'script.vvt', """
-            #VVT: insert directive file : directive_file.txt
-            pass
-            """ )
-        util.writefile( 'directive_file.txt', """
-            #VVT: keyname = value
-            """ )
-        time.sleep(1)
+        # the include directive has aliases
+        for keyname in ['include','insert directive file']:
 
-        rdr = ScriptReader( 'script.vvt' )
+            util.writefile( 'script.vvt', """
+                #VVT: """+keyname+""" : directive_file.txt
+                pass
+                """ )
+            util.writefile( 'directive_file.txt', """
+                #VVT: keyname = value
+                """ )
 
-        assert_speclist( rdr.getSpecList(), ('keyname', 'value' ) )
+            rdr = ScriptReader( 'script.vvt' )
+
+            kvL = flatten_key_values( rdr.getSpecList() )
+            self.assertEqual( kvL, [ ('keyname', 'value' ) ] )
 
     def test_insert_file_contained_in_parent_directory(self):
         ""
@@ -356,7 +354,7 @@ class ScriptReader_include_directives( vtu.vvtestTestCase ):
 
         util.writefile( 'subdir/script.vvt', """
             #VVT : perl : is old school
-            #VVT: insert directive file : ../directive_file.txt
+            #VVT: include : ../directive_file.txt
             # VVT: python : rocks
             pass
             """ )
@@ -365,44 +363,43 @@ class ScriptReader_include_directives( vtu.vvtestTestCase ):
             #VVT: foo : bar
 
             """ )
-        time.sleep(1)
 
         vvtfile = os.path.abspath( 'subdir/script.vvt' )
 
         os.chdir( 'rundir' )
         rdr = ScriptReader( vvtfile )
 
-        assert_speclist( rdr.getSpecList(),
-                         ('perl', 'is old school' ),
-                         ('whatever key', 'whatever value' ),
-                         ('foo', 'bar' ),
-                         ('python', 'rocks' ) )
+        kvL = flatten_key_values( rdr.getSpecList() )
+        self.assertEqual( kvL, [ ('perl', 'is old school' ),
+                                 ('whatever key', 'whatever value' ),
+                                 ('foo', 'bar' ),
+                                 ('python', 'rocks' ) ] )
 
     def test_insert_nested_files(self):
         ""
         os.mkdir( 'rundir' )
 
         util.writefile( 'subdir/script.vvt', """
-            #VVT: insert directive file : ../directive_file.txt
+            #VVT: include : ../directive_file.txt
             # VVT: python : rocks
             pass
             """ )
         util.writefile( 'directive_file.txt', """
             #VVT: foo : bar
-            #VVT: insert directive file: subdir/moredirectives.txt
+            #VVT: include: subdir/moredirectives.txt
             """ )
         util.writefile( 'subdir/moredirectives.txt', """
             #VVT: planets : earth mars others
             """ )
-        time.sleep(1)
 
-        os.chdir( 'rundir' )
-        rdr = ScriptReader( '../subdir/script.vvt' )
+        with util.change_directory( 'rundir' ):
 
-        assert_speclist( rdr.getSpecList(),
-                         ('foo', 'bar' ),
-                         ('planets', 'earth mars others' ),
-                         ('python', 'rocks' ) )
+            rdr = ScriptReader( '../subdir/script.vvt' )
+
+            kvL = flatten_key_values( rdr.getSpecList() )
+            self.assertEqual( kvL, [ ('foo', 'bar' ),
+                                     ('planets', 'earth mars others' ),
+                                     ('python', 'rocks' ) ] )
 
     def test_insert_abspath_file(self):
         ""
@@ -411,26 +408,150 @@ class ScriptReader_include_directives( vtu.vvtestTestCase ):
             """ )
         fname = os.path.abspath( 'subdir/directive_file.txt' )
         util.writefile( 'script.vvt', """
-            #VVT: insert directive file : """+fname+"""
+            #VVT: include : """+fname+"""
             #VVT: python : rocks
             pass
             """ )
-        time.sleep(1)
 
         rdr = ScriptReader( 'script.vvt' )
 
-        assert_speclist( rdr.getSpecList(),
-                         ('perl', 'old' ),
-                         ('python', 'rocks' ) )
+        kvL = flatten_key_values( rdr.getSpecList() )
+        self.assertEqual( kvL, [ ('perl', 'old' ),
+                                 ('python', 'rocks' ) ] )
 
-    def test_run_vvtest_on_a_test_file_with_an_insert_directive(self):
+    def test_directive_iteration_by_name(self):
+        ""
+        util.writefile( 'misc.vvt', """
+            #VVT: parameterize (autotype)   : np = 1 8
+            #VVT: link                      : somefile.txt
+            #VVT: depends on (result=pass)  : goodtest
+            #VVT: baseline (platform=Linux) : --baseline
+            """ )
+
+        specL = parser_iteration( 'misc.vvt' )
+        self.assertEqual( specL, [
+                ('parameterize', {'autotype': ''}, 'np = 1 8'),
+                ( 'link', None, 'somefile.txt'),
+                ( 'depends on', {'result': 'pass'}, 'goodtest'),
+                ( 'baseline', {'platform': 'Linux'}, '--baseline'),
+            ] )
+
+        specL = parser_iteration( 'misc.vvt', 'link' )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'misc.vvt', 'baseline', 'link' )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+                ( 'baseline', {'platform': 'Linux'}, '--baseline'),
+            ] )
+
+    def test_directive_iteration_with_nesting(self):
+        ""
+        util.writefile( 'param.vvt', """
+            #VVT: include : incl_param.txt
+            #VVT: link    : somefile.txt
+            """ )
+        util.writefile( 'incl_param.txt', """
+            #VVT: parameterize : np = 1 8
+            """ )
+
+        specL = parser_iteration( 'param.vvt' )
+        self.assertEqual( specL, [
+                ( 'parameterize', None, 'np = 1 8'),
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'param.vvt', 'parameterize' )
+        self.assertEqual( specL, [
+                ( 'parameterize', None, 'np = 1 8'),
+            ] )
+
+    def test_directive_iteration_with_include_filtering_by_platform(self):
+        ""
+        util.writefile( 'tname.vvt', """
+            #VVT: include (platform=foobar) : incl.txt
+            #VVT: link : somefile.txt
+            """ )
+        util.writefile( 'incl.txt', """
+            #VVT: parameterize : np = 1 8
+            """ )
+
+        specL = parser_iteration( 'tname.vvt', platname='foobar' )
+        self.assertEqual( specL, [
+                ( 'parameterize', None, 'np = 1 8'),
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'tname.vvt', platname='justsayno' )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+    def test_directive_iteration_with_include_filtering_by_option(self):
+        ""
+        util.writefile( 'tname.vvt', """
+            #VVT: include (option=foobar) : incl.txt
+            #VVT: link : somefile.txt
+            """ )
+        util.writefile( 'incl.txt', """
+            #VVT: parameterize : np = 1 8
+            """ )
+
+        specL = parser_iteration( 'tname.vvt', optlist=['foobar'] )
+        self.assertEqual( specL, [
+                ( 'parameterize', None, 'np = 1 8'),
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'tname.vvt', optlist=['justsayno'] )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'tname.vvt', optlist=[] )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+    def test_directive_iteration_with_include_filtering_by_testname(self):
+        ""
+        util.writefile( 'tname.vvt', """
+            #VVT: include (testname=foobar) : incl.txt
+            #VVT: link : somefile.txt
+            """ )
+        util.writefile( 'incl.txt', """
+            #VVT: parameterize : np = 1 8
+            """ )
+
+        specL = parser_iteration( 'tname.vvt', testname='foobar' )
+        self.assertEqual( specL, [
+                ( 'parameterize', None, 'np = 1 8'),
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'tname.vvt', testname='justsayno' )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+        specL = parser_iteration( 'tname.vvt', testname=None )
+        self.assertEqual( specL, [
+                ( 'link', None, 'somefile.txt'),
+            ] )
+
+    def test_run_vvtest_on_a_file_with_an_insert_directive(self):
         ""
         util.writefile( 'subdir/directive_file.txt', """
             #VVT: parameterize : size = 1 2
             """ )
+        util.writefile( 'explode.txt', """
+            #VVT: parameterize : fuse = 1 2 4 8 16 32 64 128 256
+            """ )
         util.writescript( 'script.vvt', """
             #!"""+sys.executable+"""
-            #VVT: insert directive file : subdir/directive_file.txt
+            #VVT: include : subdir/directive_file.txt
             #VVT: link (parameters="size=2") : foo
             #VVT: link (parameters="size=1") : bar
             import os
@@ -444,32 +565,20 @@ class ScriptReader_include_directives( vtu.vvtestTestCase ):
             else:
                 assert False
             """ )
+        util.writefile( 'two.vvt', """
+            #VVT: insert directive file (testname=dummy) : explode.txt
+            #VVT: include (testname=two) : subdir/directive_file.txt
+            """ )
 
         util.writefile( 'foo', "foofile\n" )
         util.writefile( 'bar', "barfile\n" )
 
-        time.sleep(1)
-
         vrun = vtu.runvvtest()
-        vrun.assertCounts( total=2, npass=2 )
+        vrun.assertCounts( total=4, npass=4 )
+        self.assertEqual( vrun.countTestLines( 'fuse' ), 0 )
 
 
 class parsing_errors( vtu.vvtestTestCase ):
-
-    def test_invalid_directive(self):
-        ""
-        util.writefile( 'script.vvt', """
-            #VVT: link (options="opt") oops : somefile
-            pass
-            """ )
-        time.sleep(1)
-
-        try:
-            ScriptReader( 'script.vvt' )
-        except TestSpecError:
-            assert 'script.vvt:2' in str( sys.exc_info()[1] )
-        else:
-            raise Exception( 'expected an exception' )
 
     def test_invalid_directive_in_an_inserted_file(self):
         ""
@@ -478,11 +587,19 @@ class parsing_errors( vtu.vvtestTestCase ):
             #VVT: link (options="opt") oops : somefile
             """ )
         util.writefile( 'script.vvt', """
-            #VVT: insert directive file = insertme.txt
+            #VVT: include = insertme.txt
             pass
             """ )
-        time.sleep(1)
 
+        # make sure the insertme.txt file contains invalid syntax
+        try:
+            ScriptReader( 'insertme.txt' )
+        except TestSpecError:
+            assert 'insertme.txt:3' in str( sys.exc_info()[1] )
+        else:
+            raise Exception( 'expected an exception' )
+
+        # then include the invalid file in a script
         try:
             ScriptReader( 'script.vvt' )
         except TestSpecError:
@@ -493,10 +610,9 @@ class parsing_errors( vtu.vvtestTestCase ):
     def test_inserted_file_does_not_exist(self):
         ""
         util.writefile( 'script.vvt', """
-            #VVT: insert directive file = foobar.txt
+            #VVT: include = foobar.txt
             pass
             """ )
-        time.sleep(1)
 
         try:
             ScriptReader( 'script.vvt' )
@@ -508,10 +624,9 @@ class parsing_errors( vtu.vvtestTestCase ):
     def test_error_in_insert_directive_itself(self):
         ""
         util.writefile( 'script.vvt', """
-            #VVT: insert directive file = 
+            #VVT: include = 
             pass
             """ )
-        time.sleep(1)
 
         try:
             ScriptReader( 'script.vvt' )
@@ -520,22 +635,60 @@ class parsing_errors( vtu.vvtestTestCase ):
         else:
             raise Exception( 'expected an exception' )
 
+    def test_include_attributes_can_only_be_testname_platform_and_option(self):
+        ""
+        util.writefile( 'atest.vvt', """
+            #VVT: include (parameter="foo=bar") : incl.txt
+            """ )
+        util.writefile( 'btest.vvt', """
+            #VVT: include (foo=bar) : incl.txt
+            """ )
+        util.writefile( 'incl.txt', """
+            #VVT: keywords : baz
+            """ )
+
+        self.assertRaises( TestSpecError, parser_iteration, 'atest.vvt' )
+        self.assertRaises( TestSpecError, parser_iteration, 'btest.vvt' )
+
 
 def assert_speclist( speclist, *key_value_pairs ):
     ""
     assert len( speclist ) == len( key_value_pairs )
-    for i in range(len(speclist)):
-        spec = speclist[i]
+    for i,spec in enumerate(speclist):
         key,val = key_value_pairs[i]
-        assert spec.keyword == key
-        assert spec.value == val
+        assert spec.keyword == key, 'keyword not equal: '+repr(spec.keyword)+' '+repr(key)
+        assert spec.value == val, 'value not equal: '+repr(spec.value)+' '+repr(val)
 
 
-# USE CASES:
-#   - error in a directive has file/line number
-#   - error in an inserted file has file/line number
-#   - error can't find inserted file
-#   - 
+def parser_iteration( filename, *keywords, **kwargs ):
+    ""
+    testname = kwargs.get( 'testname', 'fakename' )
+    platname = kwargs.get( 'platname', None )
+    optlist  = kwargs.get( 'optlist', [] )
+
+    parser = parsevvt.ScriptTestParser( filename,
+                                        platname=platname,
+                                        optionlist=optlist )
+
+    specL = []
+    for spec in parser.itr_specs( testname, *keywords ):
+        specL.append( (spec.keyword, spec.attrs, spec.value.strip()) )
+
+    return specL
+
+
+def flatten_key_values( speclist ):
+    ""
+    specL = []
+
+    for spec in speclist:
+        if spec.keyword == 'include':
+            specL.extend( flatten_key_values( spec.value ) )
+        else:
+            specL.append( ( spec.keyword, spec.value ) )
+
+    return specL
+
 
 ########################################################################
 

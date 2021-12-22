@@ -15,6 +15,10 @@ import tokenize
 from .errors import TestSpecError
 
 
+# include directive aliases; the final keyword name is always 'include'
+INCLUDE_KEYWORDS = [ 'include', 'insert directive file' ]
+
+
 class ScriptSpec:
 
     def __init__(self, lineno, keyword, attrs, value):
@@ -34,7 +38,7 @@ class ScriptReader:
 
         self.speclineL = []  # list of [line number, raw spec string]
         self.specL = []  # list of ScriptSpec objects
-        self.shebang = None  # a string, if not None
+        self.shbang = None  # None or a string
 
         self.readfile( filename )
 
@@ -44,17 +48,12 @@ class ScriptReader:
         """
         return os.path.splitext( os.path.basename( self.filename ) )[0]
 
-    def getSpecList(self, specname=None):
+    def getSpecList(self):
         """
-        Returns a list of ScriptSpec objects whose keyword equals 'specname'.
-        The order is the same as in the source test script.  If 'specname' is
-        None, return all ScriptSpec objects.
+        Returns a list of ScriptSpec objects whose order is the same as in
+        the source script.
         """
-        L = []
-        for sspec in self.specL:
-            if specname == None or sspec.keyword == specname:
-                L.append( sspec )
-        return L
+        return self.specL
 
     vvtpat = re.compile( '[ \t]*#[ \t]*VVT[ \t]*:' )
 
@@ -66,7 +65,7 @@ class ScriptReader:
         for line,lineno in lines:
             info = filename+':'+repr(lineno)
             if lineno == 1 and line[:2] == '#!':
-                self.shebang = line[2:].strip()
+                self.shbang = line[2:].strip()
             else:
                 self.parse_line( line, info )
 
@@ -155,29 +154,27 @@ class ScriptReader:
                 rest = line[m.end()-1:]
 
                 attrs,val = check_parse_attributes_section( rest, info )
-                if attrs == None:
-                    val = rest[1:].strip()
 
             else:
                 key = line.strip()
 
             if not key:
-                raise TestSpecError( \
+                raise TestSpecError(
                         'missing or invalid specification keyword, ' + info )
 
-            if key == 'insert directive file':
-                insert_specs = self._parse_insert_file( info, val )
-                self.specL.extend( insert_specs )
+            if key in INCLUDE_KEYWORDS:
+                # an alias is replaced with the primary name
+                key = INCLUDE_KEYWORDS[0]
+                # replace 'val' with the specs list from the included file
+                val = self._parse_insert_file( info, val )
 
-            else:
-                specobj = ScriptSpec( info, key, attrs, val )
-                self.specL.append( specobj )
+            specobj = ScriptSpec( info, key, attrs, val )
+            self.specL.append( specobj )
 
     def _parse_insert_file(self, info, filename):
         ""
         if filename == None or not filename.strip():
-            raise TestSpecError( 
-                        'missing insert directive file name, ' + info )
+            raise TestSpecError(  'missing include file name, ' + info )
 
         if not os.path.isabs( filename ):
             d = os.path.dirname( os.path.abspath( self.filename ) )
@@ -188,8 +185,8 @@ class ScriptReader:
         except TestSpecError:
             raise
         except Exception:
-            raise TestSpecError( 'at ' + info + ' the insert ' + \
-                            'directive failed: ' + str( sys.exc_info()[1] ) )
+            raise TestSpecError( 'at ' + info + ' the include '
+                                 'failed: ' + str( sys.exc_info()[1] ) )
 
         return inclreader.getSpecList()
 
@@ -266,7 +263,7 @@ def check_parse_attributes_section( a_string, file_and_lineno ):
 
             if rest:
                 if rest[0] in ':=':
-                    tail = rest[1:]
+                    tail = rest[1:].strip()
                 elif rest[0] == '#':
                     tail = ''
                 else:
@@ -278,10 +275,12 @@ def check_parse_attributes_section( a_string, file_and_lineno ):
             raise TestSpecError( \
                   'malformed attribute specification, ' + file_and_lineno )
 
+    elif a_string and a_string[0] in ':=':
+        tail = a_string[1:].strip()
     else:
-        tail = a_string
+        tail = a_string.strip()
 
-    if attrs != None:
+    if attrs is not None:
         attrD = parse_attr_string_into_dict( attrs, file_and_lineno )
 
     return attrD, tail
