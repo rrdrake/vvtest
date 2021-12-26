@@ -70,9 +70,8 @@ class ExecutionHandler:
     def loadCommonXMLDB(self):
         ""
         if self.commondb is None:
-            d = pjoin( self.rtconfig.getAttr('vvtestdir'), 'libvvtest' )
             cfgdirs = self.rtconfig.getAttr('configdir')
-            self.commondb = CommonSpec.load_common_xmldb( d, cfgdirs )
+            self.commondb = CommonSpec.load_common_xmldb( cfgdirs )
 
     def check_run_preclean(self, tcase, baseline):
         ""
@@ -249,8 +248,7 @@ class ExecutionHandler:
         self.check_write_mpi_machine_file( texec.getResourceObject() )
         self.check_set_working_files( tcase, baseline )
 
-        set_PYTHONPATH( self.rtconfig.getAttr( 'vvtestdir' ),
-                        self.rtconfig.getAttr( 'configdir' ) )
+        set_PYTHONPATH( self.rtconfig.getAttr( 'configdir' ) )
 
         pyexe = self.apply_plugin_preload( tcase )
 
@@ -314,7 +312,7 @@ class ExecutionHandler:
                 self.perms.apply( os.path.abspath( script_file ) )
 
 
-def set_PYTHONPATH( vvtestdir, configdirs ):
+def set_PYTHONPATH( configdirs ):
     """
     When running Python in a test, the sys.path must include a few vvtest
     directories as well as the user's config dir.  This can be done with
@@ -337,19 +335,16 @@ def set_PYTHONPATH( vvtestdir, configdirs ):
     import vvtest_util.py first thing, the directories are placed in
     PYTHONPATH here too (but only those that do not contain colons).
     """
-    os.environ['PYTHONPATH'] = determine_PYTHONPATH( vvtestdir, configdirs )
+    os.environ['PYTHONPATH'] = determine_PYTHONPATH( configdirs )
 
 
-def determine_PYTHONPATH( vvtestdir, configdirs ):
+def determine_PYTHONPATH( configdirs ):
     ""
     val = ''
 
     for cfgd in configdirs:
         if ':' not in cfgd:
             val += ':'+cfgd
-
-    if ':' not in vvtestdir:
-        val += ':'+pjoin( vvtestdir, 'config' ) + ':'+vvtestdir
 
     if 'PYTHONPATH' in os.environ:
         val += ':'+os.environ['PYTHONPATH']

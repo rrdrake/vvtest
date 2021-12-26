@@ -332,14 +332,18 @@ def scanCommonSpecs( filedoc, common_db ):
 
 ###########################################################################
 
-def load_common_xmldb( specdir, configdirs ):
-    ""
+def load_common_xmldb( configdirs ):
+    """
+    Load exeDB.xml files from each config directory, in reverse order. So if
+    the same function is defined in the first exeDB.xml and in the last, the
+    first version is used.
+    """
     import libvvtest.xmlwrapper as xmlwrapper
     xmldocreader = xmlwrapper.XmlDocReader()
     
     xdb = CommonSpecDB()
 
-    for d in [specdir]+configdirs:
+    for d in reversed( configdirs ):
         xdbf = os.path.join( d, 'exeDB.xml' )
 
         if os.path.exists( xdbf ):

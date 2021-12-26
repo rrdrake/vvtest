@@ -45,11 +45,13 @@ class RuntimeData:
         self.curdir  = curdir   # current working directory at vvtest startup
         self.exepath = exepath  # path to vvtest (without following soft link)
 
+        self.loc            = None   # Locator object
+        self.userconfig     = None   # list of user config directories
         self.testdir        = None   # top level test execution directory
         self.cash           = None   # CacheFileHandler object
         self.rtinfo         = None   # RuntimeInfo object
-        self.plat           = None   # Platform object
         self.rtconfig       = None   # RuntimeConfig object
+        self.plat           = None   # Platform object
         self.plugin         = None   # UserPluginBridge object
         self.isrestart      = False  # True if inside a test results tree
         self.perms          = None   # Permissions object
@@ -76,9 +78,8 @@ def construct_vvtest( argv, vvtestdir, exepath ):
     opts, optD, scandirs = \
         cmdline.parse_command_line( argv[1:], version )
 
-    construct_locator( rtdata, opts )
-    configdirs = rtdata.loc.getConfigDirs( opts.config )
-    insert_configdirs_into_sys_path( vvtestdir, configdirs )
+    configdirs = construct_locator( rtdata, opts, vvtestdir )
+    insert_configdirs_into_sys_path( configdirs )
     construct_runtime_config( rtdata, opts, optD )
     construct_and_process_cache_file( rtdata, opts, optD )
     construct_runtime_info( rtdata, argv, vvtestdir, start_epoch )
@@ -139,9 +140,25 @@ def run_vvtest( rtdata, opts, optD ):
         return exitstat
 
 
-def construct_locator( rtdata, opts ):
+def construct_locator( rtdata, opts, vvtestdir ):
     ""
     rtdata.loc = location.Locator( rtdata.curdir, opts.dash_M, opts.dash_w )
+
+    envconfig = os.getenv('VVTEST_CONFIGDIR', None )
+    rtdata.userconfig = rtdata.loc.getConfigDirs( opts.config, envconfig )
+
+    cfgL = list( rtdata.userconfig )
+
+    d1 = pjoin( dirname(rtdata.exepath), 'config' )
+    d2 = pjoin( vvtestdir, 'config' )
+    if os.path.isdir(d1):
+        cfgL.append( d1 )
+        if os.path.isdir(d2) and not os.path.samefile( d1, d2 ):
+            cfgL.append( d2 )
+    else:
+        cfgL.append( d2 )
+
+    return cfgL
 
 
 def construct_runtime_config( rtdata, opts, optD ):
@@ -1070,7 +1087,7 @@ def construct_batch_runner( rtdata, tlist, xlist, totaltime, opts, optD ):
 
     namer = rtdata.tlm.getFileNamer()
     batch = create_Batcher( opts, optD, rtdata, namer,
-                            tlist, xlist, rtdata.testdir,
+                            tlist, xlist,
                             rtdata.plat, rtdata.perms, rtdata.tcasefactory )
     brun.setBatcher( batch )
 
@@ -1078,7 +1095,7 @@ def construct_batch_runner( rtdata, tlist, xlist, totaltime, opts, optD ):
 
 
 def create_Batcher( opts, optD, rtdata, namer,
-                    tlist, xlist, test_dir, plat, perms, tcasefactory ):
+                    tlist, xlist, plat, perms, tcasefactory ):
     ""
     import libvvtest.batchutils as batchutils
     import batch.batching as batching
@@ -1096,7 +1113,8 @@ def create_Batcher( opts, optD, rtdata, namer,
 
     vvtestcmd = vvtest_command_line_for_batch( opts, optD,
                                                rtdata.exepath,
-                                               rtdata.rtconfig )
+                                               rtdata.rtconfig,
+                                               rtdata.userconfig )
 
     check_interval, check_timeout = determine_job_check_intervals()
     jobhandler = batching.BatchJobHandler( check_interval, check_timeout,
@@ -1126,7 +1144,7 @@ def determine_job_check_intervals():
     return check_interval, check_timeout
 
 
-def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
+def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig, userconfig ):
     ""
     cmd = sys.executable + ' ' + quote(vvtestpath)
 
@@ -1136,7 +1154,7 @@ def vvtest_command_line_for_batch( opts, optD, vvtestpath, rtconfig ):
 
     cmd += ' -n 1'  # force sequential batch execution
 
-    for cfgdir in rtconfig.getAttr('configdir'):
+    for cfgdir in userconfig:
         cmd += ' --config='+quote(cfgdir)
 
     cmd += ' --plat '+quote(rtconfig.getPlatformName())
@@ -1175,16 +1193,11 @@ def check_load_bootstrap_file( cwd, exepath ):
             import vvtest_bootstrap
 
 
-def insert_configdirs_into_sys_path( vvtestdir, configdirs ):
+def insert_configdirs_into_sys_path( configdirs ):
     ""
     dL = [ normpath(d) for d in configdirs ]
 
-    d = normpath( pjoin( vvtestdir, 'config' ) )
-    if d not in dL:
-        dL.append( d )
-
-    dL.reverse()
-    for d in dL:
+    for d in dL[::-1]:
         sys.path.insert( 1, d )
 
 
@@ -1200,8 +1213,9 @@ def get_vvtest_directory():
     ""
     # if vvtest is a soft link, this will follow it
     d = sys.path[0]
-    if not d:                  d = os.getcwd()
-    elif not os.path.isabs(d): d = abspath(d)
+    if not d:
+        d = os.getcwd()
+    d = normpath( abspath(d) )
     return d
 
 

@@ -8,6 +8,11 @@ import os, sys
 from os.path import join as pjoin
 from os.path import dirname, normpath
 
+try:
+    from shlex import quote
+except Exception:
+    from pipes import quote
+
 from .teststatus import DIFF_EXIT_STATUS, SKIP_EXIT_STATUS
 
 
@@ -67,8 +72,7 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
         # order matters; configdir should be the first entry in sys.path
         w.add( '',
                'sys.path.insert( 0, '+repr(trigdir)+' )',
-               'sys.path.insert( 0, '+repr(tdir)+' )',
-               'sys.path.insert( 0, '+repr( pjoin(tdir,'config') )+' )' )
+               'sys.path.insert( 0, '+repr(tdir)+' )' )
         for d in configdirs[::-1]:
             w.add( 'sys.path.insert( 0, '+repr(d)+' )' )
 
@@ -225,15 +229,12 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
             if 'ndevice' not in paramD:
                 w.add( 'ndevice="'+repr(len(resourceobj.devices))+'"' )
 
-        w.add( '',
-               'source $VVTESTSRC/config/script_util.sh' )
+        # the name script_util_plugin.sh is now deprecated, Dec 2021
         for d in configdirs[::-1]:
-            w.add( """
-                if [ -e """+d+"""/script_util_plugin.sh ]
-                then
-                    source """+d+"""/script_util_plugin.sh
-                fi
-                """ )
+            for fn in ['script_util.sh','script_util_plugin.sh']:
+                pn = pjoin( d, fn )
+                if os.path.isfile(pn):
+                    w.add( 'source '+quote(pn) )
     
     w.write( filename )
 

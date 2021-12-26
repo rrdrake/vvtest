@@ -52,28 +52,26 @@ class exechandler_free_functions( vtu.vvtestTestCase ):
 
     def test_setting_PYTHONPATH(self):
         ""
+        os.mkdir( 'colon:path' )
+
         with util.set_environ( PYTHONPATH=None ):
 
-            ps = exechandler.determine_PYTHONPATH( '/some/path', [] )
-            assert ps == ':/some/path/config:/some/path'
-            ps = exechandler.determine_PYTHONPATH( '/some/colon:path', [] )
-            assert ps == ':'
+            ps = exechandler.determine_PYTHONPATH( ['/some/path'] )
+            self.assertEqual( ps, ':/some/path' )
+            ps = exechandler.determine_PYTHONPATH( ['/some/colon:path'] )
+            self.assertEqual( ps, ':' )
+            ps = exechandler.determine_PYTHONPATH( [abspath('colon:path')] )
+            self.assertEqual( ps, ':' )
 
-            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar'] )
-            assert ps == ':/foo/bar:/pypath/config:/pypath'
-            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar:baz'] )
-            assert ps == ':/pypath/config:/pypath'
+            ps = exechandler.determine_PYTHONPATH( ['/foo/bar','/pypath'] )
+            self.assertEqual( ps, ':/foo/bar:/pypath' )
 
-            ps = exechandler.determine_PYTHONPATH( '/pypath', ['/foo/bar','/to/day'] )
-            assert ps == ':/foo/bar:/to/day:/pypath/config:/pypath'
+            ps = exechandler.determine_PYTHONPATH( ['/foo/bar','/to/day'] )
+            self.assertEqual( ps, ':/foo/bar:/to/day' )
 
         with util.set_environ( PYTHONPATH='/usr/path:/an:other' ):
-            ps = exechandler.determine_PYTHONPATH( '/pypath', [] )
-            assert ps == ':/pypath/config:/pypath:/usr/path:/an:other'
-
-        with util.set_environ( PYTHONPATH=None ):
-            exechandler.set_PYTHONPATH( '/pypath', ['/foo/bar'] )
-            assert os.environ['PYTHONPATH'] == ':/foo/bar:/pypath/config:/pypath'
+            ps = exechandler.determine_PYTHONPATH( ['/pypath'] )
+            self.assertEqual( ps, ':/pypath:/usr/path:/an:other' )
 
     def prepare_for_link_and_copy(self):
         ""

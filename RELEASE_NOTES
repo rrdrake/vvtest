@@ -1,6 +1,9 @@
 
 Improvements:
 
+    - A soft link to vvtest and a config directory can now be used (without
+      using the vvtest_bootstrap.py mechanism).
+
     - Including files into test headers (a.k.a, inserting directive files)
       can now have testname, platform, and option attributes. For example,
 
@@ -74,6 +77,14 @@ Fixes:
       set for the platform.
 
 Changes:
+
+    - Probably not used, but the vvtest_util.sh script sources script_util.sh
+      from vvtest/config/ and a file called script_util_plugin.sh from the
+      user supplied config directory(ies). This behavior has changed a little.
+      Now both script_util.sh and script_util_plugin.sh are sourced if they
+      exist in the user supplied config or vvtest config directories. And
+      the script_util_plugin.sh script name is decprecated, and will be
+      removed at a future date.
 
     - Platform options are now examined to make sure they are known. They
       are set via the vvtest command line option --platopt name=value, and in

@@ -23,36 +23,66 @@ class Testing_boostrap_file( vtu.vvtestTestCase ):
 
     def test_without_a_bootstrap_file(self):
         ""
-        util.writefile( 'hello.py.vvt', """
+        util.writefile( 'hello.vvt', """
             import os, sys
             print ( "hello from the python test script" )
             """ )
-        time.sleep(1)
 
         vrun = vtu.runvvtest()
         vrun.assertCounts( npass=1 )
 
     def run_soft_linked_vvtest_and_expect_one_test_pass(self, args='',
-                                                              batch=False):
+                                                              batch=False,
+                                                              addplatform=True):
         ""
         cmd = vtu.vvtest_command_line( args, batch=batch,
-                                       vvtestpath=abspath( 'vvtest' ) )
+                                       vvtestpath=abspath( 'vvtest' ),
+                                       addplatform=addplatform )
 
         x,out = util.runcmd( cmd )
+        # print ( out )
         assert x == 0
         counts = vtu.parse_vvtest_counts( out )
         assert counts['npass'] == 1
 
     def test_using_a_softlink_to_vvtest(self):
         ""
-        util.writefile( 'hello.py.vvt', """
+        util.writefile( 'hello.vvt', """
             import os, sys
-            print ( "hello from the python test script" )
+            import vvtest_util as vvt
+            import script_util.standard_utilities as util
+            assert not util.analyze_only()
             """ )
         os.symlink( vtu.vvtest_file, 'vvtest' )
-        time.sleep(1)
 
         self.run_soft_linked_vvtest_and_expect_one_test_pass()
+
+    def test_a_config_dir_next_to_a_vvtest_soft_link(self):
+        ""
+        os.symlink( vtu.vvtest_file, 'vvtest' )
+
+        util.writefile( 'config/idplatform.py', """
+            def platform( opts ):
+                return 'SkyNet'
+            """ )
+        util.writefile( 'config/solarsystem.py', """
+            def energy():
+                return 'its complicated'
+            """ )
+
+        util.writefile( 'hello.vvt', """
+            import os, sys
+            import vvtest_util as vvt
+            assert vvt.PLATFORM == 'SkyNet'
+            import script_util.standard_utilities as util
+            assert not util.analyze_only()
+            import solarsystem
+            assert solarsystem.energy() == 'its complicated'
+            """ )
+
+        self.run_soft_linked_vvtest_and_expect_one_test_pass( addplatform=False )
+        self.run_soft_linked_vvtest_and_expect_one_test_pass( '-w', batch=True,
+                                                              addplatform=False )
 
     def test_with_a_bootstrap_file(self):
         ""
@@ -69,14 +99,12 @@ class Testing_boostrap_file( vtu.vvtestTestCase ):
             fp.close()
             time.sleep(1)
             """ )
-        time.sleep(1)
 
         for batch in [False,True]:
 
             vtu.remove_results()
             for fn in util.findfiles( 'bscheck_*', '.' ):
                 os.remove( fn )
-            time.sleep(1)
 
             self.run_soft_linked_vvtest_and_expect_one_test_pass( batch=batch )
 
@@ -105,18 +133,16 @@ class Testing_boostrap_file( vtu.vvtestTestCase ):
             os.environ['VVTEST_CONFIGDIR'] = '"""+abspath('myconfig')+"""'
             """ )
 
-        util.writefile( 'hello.py.vvt', """
+        util.writefile( 'hello.vvt', """
             import os, sys
             import script_util_plugin as util
             util.my_special_func()
             """ )
 
-        time.sleep(1)
-
         self.run_soft_linked_vvtest_and_expect_one_test_pass()
 
         assert len( util.grepfiles( 'my special function called',
-                    'TestResults*/hello.py*/execute.log' ) ) == 1
+                    'TestResults*/hello*/execute.log' ) ) == 1
 
     def test_a_bootstrap_config_dir_is_overridden_with_command_line(self):
         ""
@@ -138,13 +164,11 @@ class Testing_boostrap_file( vtu.vvtestTestCase ):
             os.environ['VVTEST_CONFIGDIR'] = '"""+abspath('myconfig')+"""'
             """ )
 
-        util.writefile( 'hello.py.vvt', """
+        util.writefile( 'hello.vvt', """
             import os, sys
             import script_util_plugin as util
             util.my_special_func()
             """ )
-
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -155,9 +179,9 @@ class Testing_boostrap_file( vtu.vvtestTestCase ):
                                                                   batch=batch )
 
             assert len( util.grepfiles( 'my special function called',
-                        'TestResults*/hello.py*/execute.log' ) ) == 0
+                        'TestResults*/hello*/execute.log' ) ) == 0
             assert len( util.grepfiles( 'command config function called',
-                        'TestResults*/hello.py*/execute.log' ) ) == 1
+                        'TestResults*/hello*/execute.log' ) ) == 1
 
 
 ############################################################################

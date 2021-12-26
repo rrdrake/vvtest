@@ -51,11 +51,13 @@ class Locator:
         self.cashfile = None
         self.testdir = None
 
-    def getConfigDirs(self, cmdline_configdir=None):
-        ""
-        varval = os.getenv( 'VVTEST_CONFIGDIR' )
-        cdir = collect_config_dirs( cmdline_configdir, varval )
-        return cdir
+    def getConfigDirs(self, cmdline_configdir=None, environ_configdir=None):
+        """
+        A command line specification will take precedence. If it is None,
+        the environment value will be used. A list of paths is returned,
+        which may be empty.
+        """
+        return collect_config_dirs( cmdline_configdir, environ_configdir )
 
     def findCacheFile(self):
         """

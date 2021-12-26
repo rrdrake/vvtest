@@ -10,8 +10,6 @@ import sys
 sys.dont_write_bytecode = True
 sys.excepthook = sys.__excepthook__
 import os
-import re
-import time, shutil
 
 import vvtestutils as vtu
 import testutils as util
@@ -86,7 +84,6 @@ class config_tests( vtu.vvtestTestCase ):
             import vvtest_util as vvt
             print ( 'executing test, np='+str(vvt.np) )
             """ )
-        time.sleep(1)
 
         vrun = vtu.runvvtest()
 
@@ -104,7 +101,6 @@ class config_tests( vtu.vvtestTestCase ):
                 def initialize( plat ):
                     plat.setattr( 'maxprocs', 2 )
                 """ )
-            time.sleep(1)
 
             vrun = vtu.runvvtest( '--config config' )
             vrun.assertCounts( total=2, npass=2 )
@@ -114,7 +110,6 @@ class config_tests( vtu.vvtestTestCase ):
             assert vrun.getTestIds() == [ 'atest.np=1', 'btest.np=2' ]
 
             vtu.remove_results()
-            time.sleep(1)
 
             vrun = vtu.runvvtest( '--config config', batch=True )
             vrun.assertCounts( total=2, npass=2 )
@@ -169,7 +164,6 @@ class config_tests( vtu.vvtestTestCase ):
                 print ( 'initialize successFUL' )
             """ )
         util.writefile( 'atest.vvt', 'pass' )
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '--config config --platopt account=foo' )
         vrun.assertCounts( total=1, npass=1 )
@@ -222,36 +216,33 @@ class config_tests( vtu.vvtestTestCase ):
         finally:
             sys.path.pop(0)
 
-    def test_using_a_script_util_plugin_from_the_config_dir(self):
+    def test_overriding_builtin_script_utils(self):
         ""
         cfg = os.path.abspath('config')
         util.writescript( 'pytest.vvt', """
             #!"""+sys.executable+"""
-            import os
+            import os, sys
             import vvtest_util as vvt
-            import script_util_plugin as util
-            assert os.path.samefile( vvt.CONFIGDIR[0], '"""+cfg+"""' )
-            util.special_function()
+            import script_util.standard_utilities as std
+            std.if_diff_exit_diff()
             """ )
         util.writescript( 'shtest.vvt', """
             #!/bin/sh
             source ./vvtest_util.sh
-            [ -e "$CONFIGDIR/script_util_plugin.sh" ] || exit 1
-            special_function
+            if_diff_exit_diff || exit 1
             """ )
 
-        util.writefile( "config/script_util_plugin.py", """
+        util.writefile( 'config/script_util/__init__.py', '' )
+        util.writefile( "config/script_util/standard_utilities.py", """
             import os, sys
-            def special_function():
-                print ( 'hello from spec func' )
+            def if_diff_exit_diff():
+                print ( 'override pyfunc if diff exit diff' )
             """ )
-        util.writefile( "config/script_util_plugin.sh", """
-            source $VVTESTSRC/config/script_util.sh
-            special_function() {
-                echo 'hello from sh spec func'
+        util.writefile( "config/script_util.sh", """
+            if_diff_exit_diff() {
+                echo 'override shfunc if diff exit diff'
             }
             """ )
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -260,8 +251,46 @@ class config_tests( vtu.vvtestTestCase ):
             vrun = vtu.runvvtest( '--config config', batch=batch )
             vrun.assertCounts( total=2, npass=2 )
 
-            assert vrun.countGrepLogs( "hello from spec func", 'pytest' ) == 1
-            assert vrun.countGrepLogs( "hello from sh spec func", 'shtest' ) == 1
+            assert vrun.countGrepLogs( "override pyfunc if diff exit diff", 'pytest' ) == 1
+            assert vrun.countGrepLogs( "override shfunc if diff exit diff", 'shtest' ) == 1
+
+    def test_adding_a_config_dir_to_script_utils(self):
+        ""
+        cfg = os.path.abspath('config')
+        util.writescript( 'pytest.vvt', """
+            #!"""+sys.executable+"""
+            import os, sys
+            import vvtest_util as vvt
+            import mystuff
+            mystuff.my_special_func()
+            """ )
+        util.writescript( 'shtest.vvt', """
+            #!/bin/sh
+            source ./vvtest_util.sh
+            my_special_func || exit 1
+            """ )
+
+        util.writefile( "config/mystuff.py", """
+            import os, sys
+            def my_special_func():
+                print ( 'my special pyfunc called' )
+            """ )
+        # any script_util.sh file in the config dirs is sourced by vvtest_util.sh
+        util.writefile( "config/script_util.sh", """
+            my_special_func() {
+                echo 'my special shfunc called'
+            }
+            """ )
+
+        for batch in [False,True]:
+
+            vtu.remove_results()
+
+            vrun = vtu.runvvtest( '--config config', batch=batch )
+            vrun.assertCounts( total=2, npass=2 )
+
+            assert vrun.countGrepLogs( "my special pyfunc called", 'pytest' ) == 1
+            assert vrun.countGrepLogs( "my special shfunc called", 'shtest' ) == 1
 
     def test_exercising_defaults_and_checking_in_the_idplatform_plugin(self):
         ""
@@ -270,7 +299,6 @@ class config_tests( vtu.vvtestTestCase ):
             <rtest name="tst">
               <execute> echo "the COMPILER is $COMPILER" </execute>
             </rtest>""" )
-        time.sleep(1)
 
         # first grab the default compiler and platform name
         vrun = vtu.runvvtest( '--config config', addplatform=False )
@@ -285,7 +313,6 @@ class config_tests( vtu.vvtestTestCase ):
                 return "BASIC"
             """ )
         vtu.remove_results()
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '--config config', addplatform=False )
         core_platname, core_cplr = check_get_compiler_and_platform( vrun )
@@ -300,7 +327,6 @@ class config_tests( vtu.vvtestTestCase ):
                 return ''
             """ )
         vtu.remove_results()
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '--config config', addplatform=False )
         platname, cplr = check_get_compiler_and_platform( vrun )
@@ -315,7 +341,6 @@ class config_tests( vtu.vvtestTestCase ):
                 pass
             """ )
         vtu.remove_results()
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '--config config', addplatform=False )
         platname, cplr = check_get_compiler_and_platform( vrun )
@@ -330,7 +355,6 @@ class config_tests( vtu.vvtestTestCase ):
                 if platname == 'PlayStation': return "BASIC"
             """ )
         vtu.remove_results()
-        time.sleep(1)
 
         vrun = vtu.runvvtest( '--config config --plat PlayStation' )
         platname, cplr = check_get_compiler_and_platform( vrun )
@@ -370,7 +394,6 @@ class config_tests( vtu.vvtestTestCase ):
                 echo "myshfunc was called"
             }
             """ )
-        time.sleep(1)
 
         for batch in [False,True]:
 
@@ -426,7 +449,6 @@ class preload_tests( vtu.vvtestTestCase ):
             #VVT: preload = fakepython
             pass
             """ )
-        time.sleep(1)
 
         tspec = vtu.parse_single_test_file( 'testA.vvt' )
         assert tspec.getPreloadLabel() == 'fakepython'
@@ -456,7 +478,6 @@ class preload_tests( vtu.vvtestTestCase ):
                 else:
                     pass  # test does not specify a preload label
             """ )
-        time.sleep(1)
 
         for batch in [False,True]:
 
