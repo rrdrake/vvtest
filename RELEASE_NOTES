@@ -78,6 +78,12 @@ Fixes:
 
 Changes:
 
+    - The Python sys.path has the config directory(ies) and a few other paths
+      added for each test. This is done at the process level when running the
+      test itself (by using PYTHONPATH), and also happens when a test script
+      imports vvtest_util.py. The PYTHONPATH mechanism is now deprecated.
+      When it is removed, tests that do not import vvtest_util.py may break.
+
     - Probably not used, but the vvtest_util.sh script sources script_util.sh
       from vvtest/config/ and a file called script_util_plugin.sh from the
       user supplied config directory(ies). This behavior has changed a little.

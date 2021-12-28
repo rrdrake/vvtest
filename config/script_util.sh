@@ -4,6 +4,33 @@
 # (NTESS). Under the terms of Contract DE-NA0003525 with NTESS, the U.S.
 # Government retains certain rights in this software.
 
+
+# Some of the shell helper functions call on Python utilities, and the
+# VVTEST_EXECUTION_DIR environment variable may be needed to import them.
+# Note that this script_util.sh file must be sourced while in a test execution
+# directory or a subdirectory.
+if [ "x$VVTEST_EXECUTION_DIR" = "x" ]
+then
+    DIR1="`pwd`"
+    while :
+    do
+        if [ -f "$DIR1/vvtest_util.py" ]
+        then
+            export VVTEST_EXECUTION_DIR="$DIR1"
+            break
+        fi
+
+        DIR2="`dirname $DIR1`"
+        if [ "x$DIR1" = "x$DIR2" ]
+        then
+            # some of the utility functions may not work in this case
+            break
+        fi
+        DIR1="$DIR2"
+    done
+fi
+
+
 analyze_only() {
     # the --analyze option means only execute operations in the test that
     # analyze previously computed results, such as comparing to baseline or

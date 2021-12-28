@@ -236,10 +236,10 @@ class ExecutionHandler:
 
         if tcase.getSpec().getSpecificationForm() == 'xml':
             self.write_xml_run_script( tcase, texec.getRunDirectory() )
-        else:
-            rundir = texec.getRunDirectory()
-            resourceobj = texec.getResourceObject()
-            self.write_script_utils( tcase, rundir, resourceobj )
+
+        rundir = texec.getRunDirectory()
+        resourceobj = texec.getResourceObject()
+        self.write_script_utils( tcase, rundir, resourceobj )
 
         tm = texec.getTimeout()
         self.set_timeout_environ_variable( tm )
@@ -339,7 +339,14 @@ def set_PYTHONPATH( configdirs ):
 
 
 def determine_PYTHONPATH( configdirs ):
-    ""
+    """
+    Note: Adding configdirs to PYTHONPATH has been marked deprecated, Dec 2021.
+          Tests should instead import vvtest_util.py.  When removed, this
+    function must still make sure an empty directory is added to PYTHONPATH in
+    the case of the test execution directory containing colons in the path.
+    This is so that the test can import the vvtest_util.py file from the test
+    directory.
+    """
     val = ''
 
     for cfgd in configdirs:

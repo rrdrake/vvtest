@@ -15,30 +15,59 @@ sys.excepthook = sys.__excepthook__
 import os
 import getopt
 
-import vvtest_util as vvt
-from script_util.exprutils import platform_expr, parameter_expr, option_expr
 
-optL,argL = getopt.getopt( sys.argv[1:], 'f:p:o:' )
+def main( argv ):
+    ""
+    check_sys_path()
 
-for n,v in optL:
+    from script_util.exprutils import platform_expr, parameter_expr, option_expr
 
-    if n == '-p':
-        if parameter_expr( v ):
-            sys.stdout.write( 'true' )
+    optL,argL = getopt.getopt( argv, 'f:p:o:' )
+
+    for n,v in optL:
+
+        if n == '-p':
+            if parameter_expr( v ):
+                sys.stdout.write( 'true' )
+            else:
+                sys.stdout.write( 'false' )
+            break
+
+        elif n == '-f':
+            if platform_expr( v ):
+                sys.stdout.write( 'true' )
+            else:
+                sys.stdout.write( 'false' )
+            break
+
+        elif n == '-o':
+            if option_expr( v ):
+                sys.stdout.write( 'true' )
+            else:
+                sys.stdout.write( 'false' )
+            break
+
+
+def check_sys_path():
+    """
+    The expression functions use values from vvtest_util.py, so it must
+    be able to be imported. Also, some files from the vvtest installation
+    directory are used, so the vvtest install directory must be in sys.path.
+    The VVTEST_EXECUTION_DIR environment variable is added by script_util.sh.
+    """
+    try:
+        import vvtest_util as vvt
+    except ImportError:
+        vvt = None
+
+    if vvt is None:
+        xdir = os.environ.get('VVTEST_EXECUTION_DIR',None)
+        if xdir:
+            sys.path.insert( 0, xdir )
+            import vvtest_util as vvt
         else:
-            sys.stdout.write( 'false' )
-        break
+            raise Exception( 'could not import vvtest_util.py file' )
 
-    elif n == '-f':
-        if platform_expr( v ):
-            sys.stdout.write( 'true' )
-        else:
-            sys.stdout.write( 'false' )
-        break
 
-    elif n == '-o':
-        if option_expr( v ):
-            sys.stdout.write( 'true' )
-        else:
-            sys.stdout.write( 'false' )
-        break
+if __name__ == "__main__":
+    main( sys.argv[1:] )

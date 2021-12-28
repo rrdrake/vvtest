@@ -12,7 +12,6 @@ sys.excepthook = sys.__excepthook__
 import os
 from os.path import abspath, basename
 import time
-import shutil
 
 import vvtestutils as vtu
 import testutils as util
@@ -43,7 +42,6 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
             #!/bin/csh
             echo hello
             """ )
-        time.sleep(1)
 
         cwd = os.getcwd()
 
@@ -80,7 +78,6 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
         util.writefile( 'subdir/ascript', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         cwd = os.getcwd()
 
@@ -101,7 +98,6 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
         util.writefile( 'ascript', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         cwd = os.getcwd()
 
@@ -118,7 +114,6 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
             echo hello
             """ )
         abscript = os.path.abspath( 'subdir/ascript' )
-        time.sleep(1)
 
         os.chdir( 'rundir' )
 
@@ -132,7 +127,6 @@ class function_make_file_execute_command( vtu.vvtestTestCase ):
             print ( 'hello' )
             """ )
         absfile = os.path.abspath( 'subdir/ascript' )
-        time.sleep(1)
 
         os.chdir( 'rundir' )
 
@@ -217,7 +211,6 @@ class function_command_from_filename_or_option( vtu.vvtestTestCase ):
             #!/bin/bash
             echo hello
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -233,7 +226,6 @@ class function_command_from_filename_or_option( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -252,7 +244,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
         tspec.setBaselineScript( '--run-baseline' )
@@ -269,7 +260,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -297,7 +287,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest_bline.py', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -327,7 +316,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest_bline.py', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -351,7 +339,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -376,7 +363,6 @@ class make_baseline_commands( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.xml', """
             <rtest name="atest">
             </rtest>""" )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.xml' )
 
@@ -394,7 +380,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.xml', """
             <rtest name="atest">
             </rtest>""" )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.xml' )
         tspec.setBaselineScript( 'echo hello\n' )
@@ -412,7 +397,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.xml', """
             <rtest name="atest">
             </rtest>""" )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.xml' )
         tspec.setBaselineScript( 'echo hello\n' )
@@ -430,7 +414,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -449,7 +432,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -475,7 +457,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.vvt', """
             print ( 'hello' )
             """ )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.vvt' )
 
@@ -494,7 +475,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
         util.writefile( 'subdir/atest.xml', """
             <rtest name="atest">
             </rtest>""" )
-        time.sleep(1)
 
         tspec = make_TestSpec( 'subdir/atest.xml' )
 
@@ -506,43 +486,67 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
     def test_running_in_a_directory_containing_a_colon(self):
         ""
         util.writefile( 'sub:dir/atest.vvt', """
-            import vvtest_util as vvt
-            print ( 'coolname='+vvt.NAME )
-            print ( 'src dir='+vvt.SRCDIR )
+            import os
+            # this import will have to be added when PYTHONPATH is deprecated
+            # import vvtest_util
+            os.mkdir('subd')
+            os.chdir('subd')
             import script_util as util
+            if util.platform_expr("not fakeplatform"):
+                print ( 'check atest' )
             util.exit_diff()
             """ )
-        time.sleep(1)
+        util.writescript( 'sub:dir/btest.vvt', """
+            #!/bin/bash
+            mkdir subd
+            cd subd
+            source ../vvtest_util.sh
+            platform_expr "not fakeplatform" && echo "check btest"
+            exit_diff
+            """ )
 
         vrun = vtu.runvvtest( chdir='sub:dir' )
-        vrun.assertCounts( total=1, diff=1 )
+        vrun.assertCounts( total=2, diff=2 )
 
-        assert vrun.countGrepLogs( 'coolname=atest' ) == 1
-        lineL = vrun.greplogs( 'src dir=' )
-        assert len( lineL ) == 1
-        assert lineL[0].split( '=', 1 )[1].strip() == abspath( 'sub:dir' )
+        self.assertEqual( vrun.countGrepLogs( 'check atest', 'atest' ), 1 )
+        self.assertEqual( vrun.countGrepLogs( 'check btest', 'btest' ), 1 )
 
     def test_running_vvtest_out_of_a_directory_containing_a_colon(self):
         ""
         os.mkdir( 'install:dir' )
 
         vtu.copy_vvtest_into_directory( 'install:dir' )
-        vvtest = abspath( 'install:dir/vvtest' )
+        localvvtest = abspath( 'install:dir/vvtest' )
 
         util.writefile( 'rundir/atest.vvt', """
-            import vvtest_util as vvt
-            print ( 'coolname='+vvt.NAME )
+            import os
+            # have to import this to get config dirs added to sys.path (and
+            # will be needed for all situations when PYTHONPATH is deprecated)
+            import vvtest_util
+            os.mkdir('subd')
+            os.chdir('subd')
             import script_util as util
+            if util.platform_expr("not fakeplatform"):
+                print ( 'check atest' )
             util.exit_diff()
             """ )
-
-        time.sleep(1)
+        util.writescript( 'rundir/btest.vvt', """
+            #!/bin/bash
+            mkdir subd
+            cd subd
+            source ../vvtest_util.sh
+            platform_expr "not fakeplatform" && echo "check btest"
+            exit_diff
+            """ )
 
         os.chdir( 'rundir' )
-        x,out = util.runcmd( vvtest )
+        x,out = util.runcmd( localvvtest )
+        # print ( out )
 
-        assert len( util.grepfiles( 'coolname=atest', '*/atest/execute.log' ) ) == 1
         assert len( util.greplines( 'diff *atest', out ) ) > 0
+        assert len( util.greplines( 'diff *btest', out ) ) > 0
+        assert len( util.grepfiles( 'check atest', '*/atest/execute.log' ) ) == 1
+        assert len( util.grepfiles( 'check btest', '*/btest/execute.log' ) ) == 1
 
     def test_the_set_environ_utility_context_manager(self):
         ""
@@ -589,7 +593,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             import script_util as util
             util.exit_diff()
             """ )
-        time.sleep(1)
 
         with util.set_environ( PYTHONPATH=pth ):
             x,out = util.runcmd( vtu.vvtest_file )
@@ -607,7 +610,6 @@ class the_core_make_execute_command_function( vtu.vvtestTestCase ):
             import script_util as util
             util.exit_diff()
             """ )
-        time.sleep(1)
 
         with util.set_environ( PYTHONPATH=None ):
             x,out = util.runcmd( vtu.vvtest_file )

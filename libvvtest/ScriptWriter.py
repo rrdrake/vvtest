@@ -72,7 +72,7 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
         # order matters; configdir should be the first entry in sys.path
         w.add( '',
                'sys.path.insert( 0, '+repr(trigdir)+' )',
-               'sys.path.insert( 0, '+repr(tdir)+' )' )
+               'sys.path.insert( 0, VVTESTSRC )' )
         for d in configdirs[::-1]:
             w.add( 'sys.path.insert( 0, '+repr(d)+' )' )
 
