@@ -77,6 +77,12 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
             w.add( 'sys.path.insert( 0, '+repr(d)+' )' )
 
         w.add( '',
+               'tmpL = '+repr(configdirs),
+               'if "PATH" in os.environ:',
+               '    tmpL += os.environ["PATH"].split(":")',
+               'os.environ["PATH"] = ":".join( tmpL )' )
+
+        w.add( '',
                'diff_exit_status = '+str(DIFF_EXIT_STATUS),
                'skip_exit_status = '+str(SKIP_EXIT_STATUS),
                'opt_analyze = "--execute-analysis-sections" in sys.argv[1:]' )
@@ -173,6 +179,11 @@ def writeScript( testcase, resourceobj, filename, lang, rtconfig, plat, test_dir
                'PYTHONEXE="'+sys.executable+'"' )
 
         w.add( 'CONFIGDIR="'+':'.join( configdirs )+'"' )
+
+        w.add( '',
+               'tmp=',
+               '[ "x$PATH" = "x" ] || tmp=":$PATH"',
+               'export PATH="'+':'.join(configdirs)+'$tmp"' )
 
         w.add( '',
                'diff_exit_status='+str(DIFF_EXIT_STATUS),

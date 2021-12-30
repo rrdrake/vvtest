@@ -16,7 +16,7 @@ expect_status_replace_re = re.compile('[$][(]EXPECT_STATUS[)]')
 
 
 def writeScript( testcase, xdb, plat, \
-                 vvtestdir, projdir, srcdir, \
+                 vvtestdir, projdir, configdirs, srcdir, \
                  onopts, offopts,
                  scriptname ):
     """
@@ -117,6 +117,11 @@ def writeScript( testcase, xdb, plat, \
         'set SRCDIR = "' + srcdir + '"',
         'set XMLDIR = "' + srcdir + '"',
         'echo "XMLDIR = $XMLDIR"' ] )
+
+    line_list.extend( [
+        '',
+        'set path = ( '+' '.join(configdirs)+' $path )',
+        'rehash' ] )
 
     # set variables defined by the platform
 

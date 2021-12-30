@@ -286,6 +286,7 @@ class ExecutionHandler:
                                          self.platform,
                                          self.rtconfig.getAttr('vvtestdir'),
                                          self.rtconfig.getAttr('exepath'),
+                                         self.rtconfig.getAttr('configdir'),
                                          srcdir,
                                          self.rtconfig.getAttr('onopts'),
                                          self.rtconfig.getAttr('offopts'),

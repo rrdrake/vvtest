@@ -46,7 +46,6 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
               <execute name="exename"> echo "hello world" </execute>
             </rtest>
             """ )
-        time.sleep(1)
 
         fn = os.path.join( vtu.topdir, 'config', 'exeDB.xml' )
         xreader = xmlwrapper.XmlDocReader()
@@ -60,11 +59,11 @@ class writing_csh_scripts( vtu.vvtestTestCase ):
 
         plat = FakePlatform()
         cshScriptWriter.writeScript( TestCase( tL[0] ), xdb, plat,
-                                     vtu.topdir, os.getcwd(), testdir,
+                                     vtu.topdir, os.getcwd(),
+                                     ['/some/path'], testdir,
                                      [], [], 'runscript' )
-        time.sleep(1)
 
-        print3( util.readfile( 'runscript' ) )
+        # print3( util.readfile( 'runscript' ) )
 
 
 ########################################################################
