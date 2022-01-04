@@ -24,8 +24,6 @@ def parse_command_line( argvlist, vvtest_version=None ):
 
     args = opts.directory
 
-    check_print_help_section( psr, args )
-
     check_deprecated_option_use( opts )
 
     check_print_version( opts, vvtest_version )
@@ -37,421 +35,21 @@ def parse_command_line( argvlist, vvtest_version=None ):
 
 ##############################################################################
 
-help_intro = """
-
+description = """\
 The vvtest program generates and runs a set of scripts, called tests.
 In normal operation, a list of tests to run is determined by recursively
 scanning the directory arguments (or the current working directory if
 none are given).  The tests are filtered using the command line options,
 then run in a subdirectory prefixed with "TestResults".
-
-The available options are listed below.  Additional help is available as
-subhelp sections, which are displayed using "vvtest help <name>".  Available
-subhelp section names are HELP_SECTION_LIST.
 """
-
-
-help_filters = """
-
-Tests can define arbitrary keywords, parameters with values, and can restrict
-a test to run on specific platforms.  Tests can be selected (filtered) on the
-command line using these keywords, parameter names, parameter values, and
-platform names.
-
->  Options -k, -K, -R filter by keyword expression
->  Options -p, -P, -S filter by parameter name/value
->  Options -x, -X, -A select by platform name
->  Options --tmin, --tmax, --tsum select based on previous runtime
-
-Also, the --search option can be used to search input files for regular
-expression patterns.
-
-The "TDD" keyword is special.  If a test adds TDD to its keyword list, then
-that test is not run by default.  To run tests that have the TDD keyword, add
-the --include-tdd option.  The idea is that these tests are a work-in-progress
-and are not expected to pass yet.  They are not "production".
-"""
-
-
-help_keywords = """
-
-Keywords are arbitrary words defined in each test.  A vvtest command line
-can include or exclude tests based on the keywords they define.
-For example, using "-k fast" will only include tests that contain the keyword
-"fast".
-
-Each test defines implicit keywords, including the name of the test and
-results keywords:
-
->  notrun  : test was in the test list but was not launched
->  notdone : test was launched but did not finish
->  fail    : test finished and returned a fail status
->  diff    : test finished with a diff status
->  pass    : test finished with a pass status
->  timeout : test finished by running out of time
-
-Entire expressions can be built up by using multiple -k & -K options, using
-the "/" operator, and using the "!" operator.  Examples:
-
->  -k key1/key2    means key1 OR key2
->  -K key1/key2    means ( NOT key1 ) OR ( NOT key2 )
->  -k key1 -k key2 means key1 AND key2
->  -k key1 -K key2 means key1 AND ( NOT key2 )
->  -k key1/!key2   means key1 OR ( NOT key2 )
->  -k key1 -K key2 means key1 AND ( NOT key2 )
-
-Information on the keywords of tests as a whole can be gained by using the
---keys option.  When the --keys option is given, no tests are run.  It causes
-vvtest to gather all the keywords for each of the tests and write them to
-stdout.  Note that keyword filtering is applied before the keywords are
-gathered.
-
-The --files option is similar to --keys, except the test file names are
-written instead of the collection of keywords.
-"""
-
-
-help_parameters = """
-
-A test can define parameter names together with values.  A common (and
-special) one is the number of processors, np, with values 1, 2, and 4, for
-example.  At run time, the test expands into multiple tests, one for each
-parameter value.
-
-Tests can be selected based on their parameter names and values using the
--p and -P options.  Examples:
-
->  -p np=2         means include tests defining np and only value of 2
->  -p np           means include tests that define the parameter name np
->  -P np           means exclude tests that define the parameter name np
->  -p np<16        means include tests with np less than 16
->  -P np<=16       means include tests with np not defined or np>16
->  -p np!=4        means include tests with np not equal to 4
->  -P np!=4        means include tests with np not defined or np==4
->  -p np>4 -p np<8 means include tests with np>4 AND np<8
->  -p np<4/np>8    means include tests with np<4 OR np>8
->  -p np=1/!np     means include tests with np=1 OR (param np is not defined)
-"""
-
-
-help_platforms = """
-
-The platform name defaults to the shell command uname, but may be overridden
-by a project specific configuration.  In either case, the name is arbitrary
-as far as test filtering goes.
-
-Tests can add specifications that include or exclude platform names, so that
-the test will run or will not run for a platform name.  The options -x and
--X can be used use include or exclude tests that would run on a platform
-different from the current platform.  Examples,
-
->  -x Linux           means include tests that would run on Linux
->  -X Linux           means exclude tests that would run on Linux
->  -x Linux/Darwin    means include tests that would run on Linux OR Darwin
->  -x Linux -X Darwin means include if they would run on Linux AND ( NOT Darwin )
-
-The -A option means ignore platform restrictions, so no tests will be excluded
-due to platform names or expressions.
-"""
-
-
-help_runtimes = """
-
-The total time each test takes to run is recorded and can be used to filter
-the tests.
-
-Using --tmin and --tmax will filter tests by previous runtime.
-One or both --tmin and --tmax can be specified.  Tests are not run if the
-previous runtime is below the minimum or above the maximum.  Tests that do
-not have a previous runtime are not filtered out.
-
-Using --tsum will filter tests by accumulated previous runtime.  Tests will be
-sorted by previous runtime (in ascending order), then accumulated
-until the sum of the runtimes is above the --tsum value.  Tests
-that do not have a previous runtime are given the value zero.
-"""
-
-
-help_config = """
-
-The vvtest logic is separated from configuration settings, although it comes
-with defaults in the "config" subdirectory of the source.  A config directory
-can be provided at runtime using the --config option or defining the
-VVTEST_CONFIGDIR environment variable.  If so, vvtest will look at that
-directory first when configuring the platform, batch queueing system, etc.
-
-The --config option specifies the directory containing the platform
-configuration and test helpers.  Vvtest looks for a file called
-platform_plugin.py in that directory.  An environment variable can be used
-instead, VVTEST_CONFIGDIR.
-
-The -e option means use environment variable overrides.  By default, all
-environment variables that can influence the execution of the tests are
-cleared.  This switch will allow certain environment variables
-to take precedence over the defaults determined by each platform
-plugin.
-"""
-
-
-help_behavior = """
-
-The first call to vvtest will scan for tests, filter, and run them.
-Subsequent calls will also scan, but will merge in the previous results,
-which can be used to filter by result keyword, such as "fail" or "notdone".
-
-You can also change into the TestResults directory and run vvtest.  In this
-case, no directory scanning is done.  Also, implicit filtering is done by
-the subdirectory you are in - only tests at that directory level or below
-will be run.
-
-The test results directory will be called
->    TestResults.<platform name>.ON=<on options>.OFF=<off options>
-where ON and OFF are only added if you specify -o or -O.  This name can be
-overridden using the --run-dir option.
-
-By default, tests that have already run will not be run again unless the -R
-option is given.  Actually what happens is -k notdone/notrun is automatically
-added, and specifying -R prevents that.  In fact, specifying a -k or -K option
-with a results keyword (such as notrun or fail), will also prevent
--k notdone/notrun from being added.
-
-To only scan for and filter tests, use -g.  This creates the test results
-directories, but does not run the tests.
-
-The -m option means do not clean out the test results directory before
-running the test (by default, all files in the results directory are
-removed prior to execution).
-It also prevents the vvtest generated script files from being overwitten
-(i.e., the vvtest_util.py, vvtest_util.sh, and runscript).
-
-The --perms option will apply permission settings and/or a group name to
-files and directories in the test execution area.  Multiple --perms options
-can be used and/or the specifications can be comma separated.
-A permission specification mimics the UNIX chmod command, such as "+rX",
-"g=rwX", and "o=". One notable difference compared to chmod is that while
-"g+s" sets the setgid bit on files and directories, the string "g+S" will
-only set the setgid bit for directories. If the specification is not a valid
-permission setting, then a UNIX group is assumed, such as "my-cool-group".
-
-The -C or --postclean option will clean out the test directory of each test
-after it shows a "pass".  Only those tests that "pass" are cleaned out after
-they run.  The execute.log file is not removed.
-
-The --force option will force vvtest to run.  When vvtest finishes running
-tests, a mark is placed in the testlist file.  If another vvtest execution is
-started while the first is still running, the second will refuse
-to run because it cannot find the mark.  It is possible that vvtest
-dies badly and the mark is never placed (and never will be).  So
-vvtest can be forced to run in this case by using --force.
-
-The -M option will use the given directory to actually contain the test
-results. The tests will run faster if a local disk is used to write to.
-The special value "any" will search for a scratch disk.
-
-The --run-dir option will override the default test results directory naming
-mechanism of TestResults.platform.ON=...  It is the subdirectory under the
-current working directory in which all the tests will be run.
-
-The -L option means to not use log files.  By default, each test output is
-sent to a log file contained in the run directory.  This option turns
-off this redirection.  This can be used to debug a single test
-for example, so that the results of the run are seen immediately.
-Note that "-n 1" can be used with the -L option to send many test
-results to stdout/stderr without interleaving the output (the
-"-n 1" prevents multiple tests from being run simultaneously).
-
-The -a or --analyze option can be used to only run the analysis portions of
-each test, and is only useful if the tests have already been run previously.
-It causes the option --execute-analysis-sections to be given to each test
-invocation.  The test itself has to be written to check for this option and
-only execute the parts of the script that analyze the results, such as
-the logic that determines pass for diff.
-For XML test specifications, this option will only execute the sections
-marked with analyze="yes".
-
-The --encode-exit-status option will encode non-passing and not-run tests
-into the program exit status.  That is, the exit status integer is filled
-like this
->    exitstatus  = ( 2^1 if num diff > 0 )
->    exitstatus |= ( 2^2 if num fail > 0 )
->    exitstatus |= ( 2^3 if num timeout > 0 )
->    exitstatus |= ( 2^4 if num notdone > 0 )
->    exitstatus |= ( 2^5 if num notrun > 0 )
-"""
-
-
-help_resources = """
-
-By default, vvtest will try not to oversubscribe the current machine.
-It does this by limiting the tests in flight to use equal or fewer CPU cores
-than are available.  Each test is assumed to need one core, unless the
-test specifies a larger value.
-
-The number of CPU cores to occupy at any one time is set by the -n value,
-and defaults to the max available on the platform (see below for the max).
-Tests that take more than this number are run last and run one at a time.
-
-The maximum number of CPU cores available on the platform is set by the
--N option.  If not specified on the command line, the default value is set
-by the platform plugin "maxprocs" attribute, or if that is not set it will
-probe the system.  Tests that need more cores than this maximum will not
-be run (they are filtered out).
-
-The --plat option sets the platform name for use by plugins and default
-resource settings.  Using --plat will override the default platform name,
-which is set in the config/idplatform.py file.
-
-The --platopt option specifies platform options, which are understood by
-certain platform plugins.  The most common use is sending options into
-the batching system, such as "--platopt ppn=4" to set the number of
-processors per node to an artificial value of 4.
-
-The -T option will apply a timeout value in seconds to each test.
-Zero or negative means no timeout.  In batch mode, note that the time given
-to the batch queue for each batch job is the sum of the timeouts of each test
-in the batch job.
-
-The --timeout-multiplier option will apply a multiplier to the
-timeout value for each test.
-
-The --max-timeout option will cap the timeout value for each
-test and for batch jobs. A value of zero or negative means no maximum.
-It is the last operation performed when computing timeouts. No max is
-applied by default, except that in batch mode, a maximum job length is imposed.
-"""
-
-
-help_batch = """
-
-Tests can be run under a batch queue server (such as SLURM or LSF).
-
-The --batch option will
-collect sets of tests in and submit them to a batch queue rather
-than executing individual tests as resources become open.  In
-order to use the queue submit capability of batch systems, the
-plugin for the platform must be set up to launch batch jobs.
-
-The --batch-limit option will will limit the number of batch jobs submitted
-to the queue at any one time.  The default is 5 concurrent batch jobs.
-
-The --batch-length option limits the
-number of tests that are placed into each batch set.  The sum
-of the timeouts of the tests in each set will be less than the
-given number of seconds.  The default is 30 minutes.  The longer
-the length, the more tests will go in each batch job; the shorter
-the length, the fewer.  A value of zero will force each test to
-run in a separate batch job.
-"""
-
-
-help_results = """
-
-To display information on a previous test run, use vvtest -i.  When
-the current working directory is not a TestResults directory, the same
--o & -O options and --plat option must be given on the command line.
-It is safe to run vvtest -i even when another process is running vvtest to
-execute tests.
-
-When listing the tests, the --sort option can be used to control the order.
-When test results are printed to the screen, they are sorted by
-their execution by default.  Use this option to sort by other fields:
->   n : test name
->   x : execution directory name (the default)
->   t : test run time
->   d : execution date
->   s : test status (such as pass, fail, diff, etc)
->   r : reverse the order
-If more than one character is given, then ties on the first
-ordering are broken by subsquent orderings.  For example,
-"--sort txr" would sort first by runtime, then by execution
-directory name, and would reverse the order (so largest runtimes
-first, smallest runtimes last).
-
-The --save-results option.  If used with the -i option, this saves test
-results for an existing run to the testing directory in a file called
-'results.<date>.<platform>.<compiler>.<tag>' where the "tag" is
-an optional, arbitrary string determined by the --results-tag
-option.  The testing directory is determined by the platform
-plugins, but can be overridden by defining the environment
-variable TESTING_DIRECTORY to the desired absolute path name.
-
-If --save-results is used without the -i option, this causes an empty results
-file to be written at the start of the testing sequence, and a
-final results file to be written when the test sequence finishes.
-
-When the --results-tag=<string> option is used with --save-results, this adds
-a string to the results file name within the testing directory.
-
-The --junit=<filename> option will write a test summary to a file in the
-JUnit XML format.  Should be compatible with Jenkins JUnit test results plugin.
-Can be used as part of the vvtest run, or given with the -i option.
-
-The --cdash=<specifications> option will either write an XML file in CDash
-format, or write and send that file to an http URL. The "specifications"
-string must start with either a filename or a URL, such as
-http://sparky.com/cdash. Additional name=value attributes can follow as long
-as they are delineated with commas, such as
-"https://sparky.com/cdash, project=Proj, group=Important".
-The possible attributes are:
->   project : the project name on the CDash server
->   group   : the name of the group of build lines
->   site    : the name of the host site
->   name    : the name of the build line
->   date    : the date of the build line
->   files   : a value "all" means include output files for all tests, and a
->             value "nonpass" (the default) outputs only for non-passing tests
->   filemax : output files have their middle removed if over a max size; the
->             default is 100KB, but can take values like 500KB, 10MB, and 1GB
-"""
-
-
-help_baseline = """
-
-Rebaseline generated files from a previous run by copying them over
-the top of the files in the directory which contain the XML test
-description.  Keywords and parameter options can be given to control
-which tests get rebaselined, including results keywords like "diff".
-If no keyword options are specified, then all tests that show a diff
-status are rebaselined, which would be equivalent to running the
-command "vvtest -b -k diff".
-
-The rebaseline option can be given when the current working directory is
-a TestResults directory with the same behavior.
-"""
-
-
-help_extract = """
-
-Extract tests from a test tree.  This mode copies the files from the
-test source directory into the 'to_directory' given as the argument to
-the --extract option.  Keyword filtering can be applied, and is often
-used to pull tests that can be distributed to various customers.
-"""
-
-
-help_deprecated = """
-
->DEPRECATED BUT STILL AVAILABLE:
-
-The -e option is now deprecated. It used to mean prefer environment variables
-to vvtest plugin configuration values.
-
->DEPRECATED AND REMOVED:
-
-The -s option is now deprecated. It is the same as --search.
-
-"""
-
 
 def create_parser( argvlist, vvtest_version ):
     ""
     argutil.set_num_columns_for_help_formatter()
 
-    names = ', '.join( get_help_section_list() )
-    intro = help_intro.replace( 'HELP_SECTION_LIST', names )
     psr = argutil.ArgumentParser(
                         prog='vvtest',
-                        description=intro,
+                        description=description,
                         formatter_class=argutil.ParagraphHelpFormatter )
 
     psr.add_argument( '--version', action='store_true',
@@ -460,13 +58,12 @@ def create_parser( argvlist, vvtest_version ):
         help='Add verbosity to console output.  Can be repeated, which gives '
              'even more verbosity.' )
 
-    grp = psr.add_argument_group( 'Test selection / filters (subhelp: filters)' )
+    grp = psr.add_argument_group( 'Test selection / filters' )
 
     # keyword filtering
     grp.add_argument( '-k', dest='dash_k', action='append',
         help='Filter tests by including those with a keyword or keyword '
-              'expression, such as "-k fast" or "-k fail/diff" '
-              '(subhelp: keywords).' )
+              'expression, such as "-k fast" or "-k fail/diff".' )
     grp.add_argument( '-K', dest='dash_K', action='append',
         help='Filter tests by excluding those with a keyword or keyword '
              'expression, such as "-K long" or "-K fail/notdone".' )
@@ -477,8 +74,7 @@ def create_parser( argvlist, vvtest_version ):
     # parameter filtering
     grp.add_argument( '-p', dest='dash_p', action='append',
         help='Filter tests by parameter name and value, such as '
-             '"-p np=8" or "-p np<8" or "-p np" '
-             '(subhelp: parameters).' )
+             '"-p np=8" or "-p np<8" or "-p np".' )
     grp.add_argument( '-P', dest='dash_P', action='append',
         help='Filter the set of tests by excluding those with a parameter '
              'name and value, such as "-P np".' )
@@ -489,8 +85,7 @@ def create_parser( argvlist, vvtest_version ):
     # platform filtering
     grp.add_argument( '-x', dest='dash_x', action='append',
         help='Include tests that would, by default, run for the given '
-             'platform name, such as "-x Linux" or "-x TLCC2/CTS1" '
-             '(subhelp: platforms).' )
+             'platform name, such as "-x Linux" or "-x TLCC2/CTS1".' )
     grp.add_argument( '-X', dest='dash_X', action='append',
         help='Exclude tests that would, by default, run for the given '
              'platform name, such as "-X Linux" or "-X TLCC2/CTS1".' )
@@ -500,7 +95,7 @@ def create_parser( argvlist, vvtest_version ):
     # runtime filtering
     grp.add_argument( '--tmin',
         help='Only include tests whose previous runtime is greater than '
-             'the given number of seconds (subhelp: runtimes).' )
+             'the given number of seconds.' )
     grp.add_argument( '--tmax',
         help='Only include tests whose previous runtime is less than the '
              'given number of seconds.' )
@@ -520,10 +115,9 @@ def create_parser( argvlist, vvtest_version ):
              'one type of test specification (extension). Default is both.' )
 
     # behavior
-    grp = psr.add_argument_group( 'Runtime behavior (subhelp: behavior)' )
+    grp = psr.add_argument_group( 'Runtime behavior' )
     grp.add_argument( '-o', dest='dash_o', action='append',
-        help='Turn option(s) on, such as "-o dbg" or "-o intel17+dbg" '
-             '(subhelp: options).' )
+        help='Turn option(s) on, such as "-o dbg" or "-o intel17+dbg".' )
     grp.add_argument( '-O', dest='dash_O', action='append',
         help='Turn option(s) off if they would be on by default.' )
     grp.add_argument( '-w', dest='dash_w', action='store_true',
@@ -560,7 +154,7 @@ def create_parser( argvlist, vvtest_version ):
              'names with only one value.' )
 
     # resources
-    grp = psr.add_argument_group( 'Resource controls (subhelp: resources)' )
+    grp = psr.add_argument_group( 'Resource controls' )
     grp.add_argument( '-n', metavar='NUM_CORES', dest='dash_n', type=int,
         help='The number of CPU cores to occupy at any one time. '
              'Tests taking more than this number are run last.  '
@@ -599,7 +193,7 @@ def create_parser( argvlist, vvtest_version ):
              'or negative value means no timeout, which is the default.' )
 
     # config
-    grp = psr.add_argument_group( 'Runtime configuration (subhelp: config)' )
+    grp = psr.add_argument_group( 'Runtime configuration' )
     grp.add_argument( '-j', '--bin-dir', dest='bin_dir', metavar='BINDIR',
         help='Specify the directory containing the project executables.' )
     grp.add_argument( '--config', action='append',
@@ -613,7 +207,7 @@ def create_parser( argvlist, vvtest_version ):
              'responsible for parsing sys.argv to find --user-args.' )
 
     # batch
-    grp = psr.add_argument_group( 'Batching / queuing (subhelp: batch)' )
+    grp = psr.add_argument_group( 'Batching / queuing' )
     grp.add_argument( '--batch', action='store_true',
         help='Groups tests, submits to the batch queue manager, and '
              'monitors for completion.' )
@@ -627,7 +221,7 @@ def create_parser( argvlist, vvtest_version ):
     psr.add_argument( '--qsub-id', type=int, help=argutil.SUPPRESS )
 
     # results
-    grp = psr.add_argument_group( 'Results handling (subhelp: results)' )
+    grp = psr.add_argument_group( 'Results handling' )
     grp.add_argument( '-i', dest='dash_i', action='store_true',
         help='Read and display testing results. Can be run while another '
              'vvtest is running.' )
@@ -664,22 +258,22 @@ def create_parser( argvlist, vvtest_version ):
 
     grp = psr.add_argument_group( 'Other operating modes' )
     grp.add_argument( '-b', dest='dash_b', action='store_true',
-        help='Rebaseline tests that have diffed (subhelp: baseline).' )
+        help='Rebaseline tests that have diffed.' )
 
     grp.add_argument( '-g', dest='dash_g', action='store_true',
         help='Scan for tests and populate the test results tree, '
-             'but do not run any tests (subhelp: behavior).' )
+             'but do not run any tests.' )
 
     grp.add_argument( '--extract', metavar='DESTDIR',
         help='Extract test files from their source to the DESTDIR '
-             'directory (subhelp; extract).' )
+             'directory.' )
 
     grp.add_argument( '--keys', action='store_true',
         help='Gather and print all the keywords in each test, after '
-             'filtering (subhelp: keywords).' )
+             'filtering.' )
     grp.add_argument( '--files', action='store_true',
         help='Gather and print the file names that would be run, after '
-             'filtering (subhelp: keywords).' )
+             'filtering.' )
     grp.add_argument( '-t', '--show-times', dest='show_times', action='store_true',
         help='Used with -i, this prints the timeouts for each test.' )
 
@@ -702,7 +296,7 @@ def an_argument_startswith( prefix, argvlist ):
 def check_print_version( opts, vvtest_version ):
     ""
     if opts.version:
-        print3( vvtest_version )
+        print( str(vvtest_version) )
         sys.exit(0)
 
 
@@ -798,8 +392,9 @@ def adjust_options_and_create_derived_options( opts ):
             opts.results_date = check_convert_date_spec( opts.results_date )
 
     except Exception:
-        errprint( '*** error: command line problem with', errtype+':',
-                  sys.exc_info()[1] )
+        sys.stderr.write( '*** error: command line problem with ' + \
+            str(errtype)+': '+str(sys.exc_info()[1]) + '\n' )
+        sys.stderr.flush()
         sys.exit(1)
 
     return derived_opts
@@ -941,70 +536,3 @@ def check_convert_date_spec( date_spec ):
             pass
 
     return spec
-
-
-def check_print_help_section( psr, args ):
-    """
-    If args=["help"] then the parser is run with -h (and sys.exit called).
-    If args=["help","section name"] then that help section is written and
-    sys.exit called.
-    """
-    if len(args) > 0 and args[0] == 'help':
-
-        if len(args) == 1:
-            psr.parse_args( ['-h'] )
-
-        else:
-            print_help_section( args[1] )
-            sys.exit(0)
-
-
-def print_help_section( section_name ):
-    ""
-    try:
-        text = eval( 'help_'+section_name )
-    except Exception:
-        print_help_section_list()
-    else:
-        ncol = int( os.environ.get( 'COLUMNS', 80 ) ) - 2
-        print3( argutil.format_text( text, ncol, '' ) )
-
-
-def print_help_section_list():
-    """
-    Gather then print the list of available help sections.
-    """
-    namelist = get_help_section_list()
-    text = 'Available help sections: ' + ', '.join( namelist )
-    ncol = int( os.environ.get( 'COLUMNS', 80 ) ) - 2
-    print3( argutil.format_text( text, ncol, '' ) )
-
-
-def get_help_section_list():
-    """
-    Use introspection to gather all variables in this module which start with
-    "help_" and whose value is a string.  Return as a list.
-    """
-    namelist = []
-
-    for attrname in dir( sys.modules[__name__] ):
-        if attrname.startswith( 'help_' ) and len(attrname) > 5:
-            try:
-                val = eval( attrname )
-            except Exception:
-                pass
-            else:
-                if type(val) == type(''):
-                    namelist.append( attrname[5:] )
-
-    return namelist
-
-
-def print3( *args ):
-    sys.stdout.write( ' '.join( [ str(x) for x in args ] ) + os.linesep )
-    sys.stdout.flush()
-
-
-def errprint( *args ):
-    sys.stderr.write( ' '.join( [ str(x) for x in args ] ) + os.linesep )
-    sys.stderr.flush()

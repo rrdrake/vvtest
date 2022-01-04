@@ -28,7 +28,6 @@ class help_page_tests( vtu.vvtestTestCase ):
         ""
         rtn,out,err = util.call_capture_output(
                             cmdline.parse_command_line, ['-h'] )
-        print3( out )
         assert 'usage:' in out.lower()
         assert 'vvtest' in out
         assert 'Traceback' in err and 'SystemExit' in err
@@ -39,45 +38,14 @@ class help_page_tests( vtu.vvtestTestCase ):
         assert 'vvtest' in out
         assert 'Traceback' in err and 'SystemExit' in err
 
-        rtn,out,err = util.call_capture_output(
-                            cmdline.parse_command_line, ['help'] )
-        assert 'usage:' in out.lower()
-        assert 'vvtest' in out
-        assert 'Traceback' in err and 'SystemExit' in err
-
         # expected argument groups
         assert len( util.greplines( 'Test selection*filters', out ) ) == 1
-        assert len( util.greplines( 'Runtime behavior*behavior', out ) ) == 1
-        assert len( util.greplines( 'Resource controls*resources', out ) ) == 1
-        assert len( util.greplines( 'Runtime configuration*config', out ) ) == 1
-        assert len( util.greplines( 'Batching*batch', out ) ) == 1
-        assert len( util.greplines( 'Results handling*results', out ) ) == 1
+        assert len( util.greplines( 'Runtime behavior', out ) ) == 1
+        assert len( util.greplines( 'Resource controls', out ) ) == 1
+        assert len( util.greplines( 'Runtime configuration', out ) ) == 1
+        assert len( util.greplines( 'Batching*queuing', out ) ) == 1
+        assert len( util.greplines( 'Results handling', out ) ) == 1
         assert len( util.greplines( 'Other operating modes', out ) ) == 1
-
-    def test_subhelp_spot_check(self):
-        ""
-        rtn,out,err = util.call_capture_output(
-                        cmdline.parse_command_line, [ 'help', 'intro' ] )
-        print3( out )
-        assert 'The vvtest program' in out
-        assert 'Available help sections' not in out
-        assert 'Traceback' in err and 'SystemExit' in err
-
-        rtn,out,err = util.call_capture_output(
-                        cmdline.parse_command_line, [ 'help', 'filters' ] )
-        print3( out )
-        assert 'arbitrary keywords' in out
-        assert 'Traceback' in err and 'SystemExit' in err
-
-    def test_request_nonexistent_section_will_list_available_sections(self):
-        ""
-        rtn,out,err = util.call_capture_output(
-                        cmdline.parse_command_line, [ 'help', 'silverbullet' ] )
-        print3( out )
-        assert 'keyword' in out
-        assert 'parameter' in out
-        assert 'Available help sections' in out
-        assert 'Traceback' in err and 'SystemExit' in err
 
 
 class special_options( vtu.vvtestTestCase ):
