@@ -71,12 +71,16 @@ Improvements:
 Fixes:
 
     - For running on batched systems, filtering based on num cores (np) and
-      num devices (ndevice) is now turned off by default (where default is
+      num devices (ndevice) is now turned off by default (where default means
       no max given in the platform plugin or on the command line). However,
       for devices (GPUs), the max will be zero unless devices_per_node is
       set for the platform.
 
 Changes:
+
+    - The topic-based inline documentation has been removed. The wiki pages
+      cover mostly the same thing, but the inline documentation was placed
+      in the wiki pages in case it is useful.
 
     - The Python sys.path has the config directory(ies) and a few other paths
       added for each test. This is done at the process level when running the

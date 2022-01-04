@@ -61,10 +61,10 @@ def create_parser( argvlist, vvtest_version ):
     grp = psr.add_argument_group( 'Test selection / filters' )
 
     # keyword filtering
-    grp.add_argument( '-k', dest='dash_k', action='append',
+    grp.add_argument( '-k', metavar='EXPR', dest='dash_k', action='append',
         help='Filter tests by including those with a keyword or keyword '
               'expression, such as "-k fast" or "-k fail/diff".' )
-    grp.add_argument( '-K', dest='dash_K', action='append',
+    grp.add_argument( '-K', metavar='EXPR', dest='dash_K', action='append',
         help='Filter tests by excluding those with a keyword or keyword '
              'expression, such as "-K long" or "-K fail/notdone".' )
     grp.add_argument( '-R', dest='dash_R', action='store_true',
@@ -72,21 +72,21 @@ def create_parser( argvlist, vvtest_version ):
              'completed.' )
 
     # parameter filtering
-    grp.add_argument( '-p', dest='dash_p', action='append',
+    grp.add_argument( '-p', metavar='EXPR', dest='dash_p', action='append',
         help='Filter tests by parameter name and value, such as '
              '"-p np=8" or "-p np<8" or "-p np".' )
-    grp.add_argument( '-P', dest='dash_P', action='append',
+    grp.add_argument( '-P', metavar='EXPR', dest='dash_P', action='append',
         help='Filter the set of tests by excluding those with a parameter '
              'name and value, such as "-P np".' )
-    grp.add_argument( '-S', dest='dash_S', action='append',
+    grp.add_argument( '-S', metavar='KEYVAL', dest='dash_S', action='append',
         help='Using name=value will set the parameter name to that value in '
              'any test that defines the parameter, such as "-S np=16".' )
 
     # platform filtering
-    grp.add_argument( '-x', dest='dash_x', action='append',
+    grp.add_argument( '-x', metavar='EXPR', dest='dash_x', action='append',
         help='Include tests that would, by default, run for the given '
              'platform name, such as "-x Linux" or "-x TLCC2/CTS1".' )
-    grp.add_argument( '-X', dest='dash_X', action='append',
+    grp.add_argument( '-X', metavar='EXPR', dest='dash_X', action='append',
         help='Exclude tests that would, by default, run for the given '
              'platform name, such as "-X Linux" or "-X TLCC2/CTS1".' )
     grp.add_argument( '-A', dest='dash_A', action='store_true',
@@ -116,9 +116,9 @@ def create_parser( argvlist, vvtest_version ):
 
     # behavior
     grp = psr.add_argument_group( 'Runtime behavior' )
-    grp.add_argument( '-o', dest='dash_o', action='append',
+    grp.add_argument( '-o', metavar='OPTS', dest='dash_o', action='append',
         help='Turn option(s) on, such as "-o dbg" or "-o intel17+dbg".' )
-    grp.add_argument( '-O', dest='dash_O', action='append',
+    grp.add_argument( '-O', metavar='OPTS', dest='dash_O', action='append',
         help='Turn option(s) off if they would be on by default.' )
     grp.add_argument( '-w', dest='dash_w', action='store_true',
         help='Wipe previous test results, if present.' )
@@ -132,7 +132,7 @@ def create_parser( argvlist, vvtest_version ):
     grp.add_argument( '--force', action='store_true',
         help='Force vvtest to run even if it appears to be running in '
              'another process.' )
-    grp.add_argument( '-M', dest='dash_M',
+    grp.add_argument( '-M', metavar='PATH', dest='dash_M',
         help='Use this path to contain the test executions.' )
     grp.add_argument( '--run-dir',
         help='The name of the subdir under the current working '
